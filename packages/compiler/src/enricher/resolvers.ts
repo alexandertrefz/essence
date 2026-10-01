@@ -5137,9 +5137,8 @@ export function solveConformance(
 			position,
 		)
 
-		// Only successes are memoised — a failure reached through a cycle
-		// is tainted by whatever else was in progress, so caching it could
-		// poison an independent later query for the same key.
+		// Only successes are memoised, since a failure reached through a
+		// cycle depends on what else was in progress.
 		if (result.ok) {
 			state.memo.set(key, result)
 		}
@@ -5153,16 +5152,12 @@ export function solveConformance(
 type ConformanceCandidate = {
 	name: string
 	type: common.NamespaceType
-	// The Namespace's target Type and Generics as DECLARED — `type` is
-	// specialized against the binding below, which erases exactly the
-	// difference the specificity order needs to see between a hand written
-	// `for List<Integer>` and `List<ItemType>` reached with an Integer item.
+	// The target and Type Parameters as declared, for the specificity order;
+	// specializing erases the difference between `for List<Integer>` and
+	// `List<ItemType>`.
 	declaredTarget: NamespaceTarget & { targetType: common.Type }
-	// The Namespace's own `where` conditions for this Protocol, and
-	// the bindings that map each condition's Generic to a concrete Type, so
-	// the conditions can be solved recursively. Ordered by the Namespace's
-	// Generic declaration order to line the witnesses up with the hidden
-	// conformance Parameters.
+	// The Namespace's `where` conditions for this Protocol, in its Type
+	// Parameters' declaration order, and the bindings each is solved under.
 	conditions: Array<{ generic: string; protocol: string }>
 	conditionBindings: GenericBindings
 }
@@ -5211,13 +5206,8 @@ function solveNamespaceConformance(
 
 		let targetBindings = bindNamespaceTarget(namespace, binding)
 
-		// A generic Namespace (`List<Item>`) conforms to the binding
-		// when its target Type unifies with it — `List<Item>` binds `Item`
-		// to `Integer` against a `List<Integer>` receiver. The Namespace is
-		// then specialized against those bindings, so its target Type and
-		// Method signatures read concretely from here on. The builtin table
-		// singleton is never mutated — `specializeNamespace` builds fresh
-		// objects.
+		// A generic Namespace conforms where its target unifies with the
+		// binding, and is then specialized against it.
 		if (targetBindings !== null) {
 			candidates.push({
 				name,
@@ -5229,13 +5219,9 @@ function solveNamespaceConformance(
 		}
 	}
 
-	// The same specificity order Method dispatch picks between overlapping
-	// Namespaces with — a hand written `for List<Integer> is Equatable` beats
-	// `List<ItemType> is Equatable`, a Namespace for a concrete Record shape
-	// beats the builtin Record Namespace's blanket conformance, and an exact
-	// target beats a covering Union. Compared on the DECLARED targets: the
-	// candidates above are already specialized against the binding, which makes
-	// a generic target read as concrete.
+	// The specificity order Method dispatch uses, on the declared targets:
+	// `for List<Integer>` beats `List<ItemType>`, and an exact target beats a
+	// covering Union.
 	candidates = filterMostSpecificByTarget(
 		candidates,
 		(candidate) => candidate.declaredTarget,
@@ -5246,8 +5232,7 @@ function solveNamespaceConformance(
 	}
 
 	if (candidates.length === 0) {
-		// No written Namespace conforms — a Choice still does, through
-		// the derived equality.
+		// Without a written Namespace, a Choice may still derive.
 		let derived = derivedConformanceSource(
 			binding,
 			protocolName,
@@ -5282,10 +5267,7 @@ function solveNamespaceConformance(
 					(candidate) =>
 						`'${candidate.name}' conforms to '${describeProtocol(protocolName, scope)}'.`,
 				),
-				// The choice is made by SPECIFICITY, not at the call —
-				// nothing written here can pick between two Namespaces, which
-				// is what "can not be chosen here" says. So the edit is at one
-				// of the declarations, and there are exactly two of them.
+				// Specificity chooses, so the edit is at a declaration.
 				helps: [
 					`Drop the conformance from one of them, or narrow one target Type so it is the more specific for ${describeType(binding)}.`,
 				],
@@ -5297,10 +5279,8 @@ function solveNamespaceConformance(
 
 	let candidate = candidates[0]
 
-	// The candidate conforms only under its own `where` conditions — feed
-	// them in as assumptions so a fulfilling Method carrying that same bound
-	// (List's `compare`) is accepted here, then verify the assumptions hold
-	// by solving the conditions recursively below.
+	// The `where` conditions are assumed, so a Method carrying the same bound
+	// fulfils its requirement, then solved.
 	let assumptions = new Map(
 		candidate.conditions.map((condition) => [
 			condition.generic,
@@ -5315,10 +5295,8 @@ function solveNamespaceConformance(
 		scope,
 	)
 
-	// As on the direct rail, a body whose own conformance does not hold
-	// for this binding fulfils nothing, and a Choice's derived printing is
-	// what answers instead. Only where there is one: a Choice with a payload
-	// derives none, and keeps the body.
+	// A provided body whose conformance does not hold here fulfils nothing,
+	// and a Choice's derived printing answers instead, where there is one.
 	let providerOf =
 		protocolName === printableProtocolName &&
 		derivesPrinting(binding, scope)
@@ -5353,10 +5331,8 @@ function solveNamespaceConformance(
 	)
 
 	if (result.kind !== "conforms") {
-		// The Namespace DECLARED the conformance and wrote none of it —
-		// for a Choice that is not a mistake, it is a statement of intent the
-		// derived equality fulfills. The declaration site accepts the same
-		// pairing, so the two agree on which Namespaces conform.
+		// A Choice's Namespace that declares the conformance and writes none
+		// of it is fulfilled by the derive, as at the declaration.
 		let derived = derivedConformanceSource(
 			binding,
 			protocolName,
@@ -5378,10 +5354,8 @@ function solveNamespaceConformance(
 			return { ok: false, chain: [] }
 		}
 
-		// Reachable when the Namespace covers the binding through a wider
-		// target Type (a Union) but a `Self` position makes the signatures
-		// incompatible for this narrower binding, or a fulfilling Method still
-		// carries an unassumed bound. Reported here; the caller stays silent.
+		// Reached where a covering target's `Self` does not fit this narrower
+		// binding, or a Method carries a bound not assumed. Reported here.
 		let label =
 			result.kind === "needs-condition"
 				? `Method '${result.methodName}' needs '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'`
@@ -5423,9 +5397,8 @@ function solveNamespaceConformance(
 		return { ok: false, chain: [] }
 	}
 
-	// Recursively solve the chosen Namespace's own `where` conditions —
-	// their bindings come from the unification above. A failure bubbles up as
-	// a because-chain with this level prepended.
+	// The chosen Namespace's `where` conditions. A failure adds this level
+	// to the chain.
 	let solvedConditions = solveCandidateConditions(
 		candidate.conditions,
 		candidate.conditionBindings,
@@ -5442,15 +5415,9 @@ function solveNamespaceConformance(
 
 	let conditions = solvedConditions.conditions
 
-	// And the one candidate whose conditions are not written anywhere: the
-	// library's blanket Record Namespace conforms `for Record`, and which
-	// members a particular Record HAS is the only thing that can say whether its
-	// `is` — the universal structural comparison — is the answer its members
-	// would give. A Record whose members all agree with it answers null here and
-	// keeps the plain, unconditional, byte-identical witness it always had.
-	//
-	// It stands after the written conditions rather than instead of them because
-	// the two can not both apply: the library's Namespace declares none.
+	// The standard library's `Record` Namespace is conditional on the
+	// receiver's members. See "Records that route their members" in
+	// DEVELOPMENT.md.
 	if (isBuiltinRecordNamespace(candidate.name, candidate.declaredTarget)) {
 		let routed = routedRecordSource(
 			binding,
@@ -5511,8 +5478,7 @@ function solveCandidateConditions(
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
-	// The candidate's declared target, where a Choice's Cases may carry
-	// the Type Arguments that would have bound a condition's Generic.
+	// The declared target, whose Cases may carry the Type Arguments.
 	target: common.Type | null = null,
 ): SolvedConditions {
 	let conditions: Array<common.Conformance> = []
@@ -5524,9 +5490,8 @@ function solveCandidateConditions(
 				? disagreeingTypeArguments(target, binding, condition.generic)
 				: null
 
-		// Cases carrying different Type Arguments for the Generic, as a
-		// List of `Tag<Integer>#A` and `Tag<String>#B` holds, leave it open, and
-		// no Namespace can be declared for such a value.
+		// Cases with differing Type Arguments, as in a List of
+		// `Tag<Integer>#A` and `Tag<String>#B`, leave the Type Parameter open.
 		if (differing !== null) {
 			let names = differing.typeArguments.map(describeType)
 			let application = `${displayChoiceName(differing.choice)}<${Array.from({ length: differing.arity }, () => "…").join(", ")}>`
@@ -5543,15 +5508,12 @@ function solveCandidateConditions(
 			}
 		}
 
-		// An empty List Literal reaches the candidate without pinning
-		// this condition's Generic, and a Method expecting its witness would
-		// read `compare` off `undefined`. Binding it to Unknown hides that.
+		// An empty List Literal pins no Type Parameter, so the condition is
+		// refused rather than solved without a witness.
 		if (conditionBinding === undefined) {
 			return {
 				ok: false,
-				// An Error somewhere in the binding was reported where it
-				// went wrong — that is why nothing pinned the Generic, and a
-				// second Diagnostic about it would only repeat the first.
+				// An Error in the binding was reported already.
 				chain: typeContainsError(binding)
 					? []
 					: [
@@ -5578,8 +5540,7 @@ function solveCandidateConditions(
 								`${describeType(binding)} does not conform to '${describeProtocol(protocolName, scope)}'.`,
 								...solved.chain,
 							],
-				// The level below names the Type to do something about,
-				// and this one only explains how the ask reached it.
+				// The culprit is the deeper level's.
 				...(solved.culprit === undefined
 					? {}
 					: { culprit: solved.culprit }),
@@ -5612,9 +5573,11 @@ type GroupWitness = {
 	curriedWith?: Record<string, number>
 }
 
-// A body runs with the witness being solved where that answers each entry
-// it reads as its own Protocol's witness does, or else with that witness. If
-// that fails, the call is refused unless those entries hold and answer alike.
+// A provided body of another Protocol runs with the witness being solved
+// where that answers each entry it reads as the body's own Protocol does.
+// Otherwise it is curried with that Protocol's witness, which joins the group.
+// Where that witness does not hold either, the conformance is refused as
+// `nonconforming-namespace`.
 function providedWitnessGroup(
 	root: GroupWitness & { conditions: Array<common.Conformance> },
 	candidate: ConformanceCandidate,
@@ -5818,9 +5781,8 @@ function providedWitnessGroup(
 				continue
 			}
 
-			// A read entry is solved alike in the whole witness and in the
-			// one of the entries read, so the whole one is solved only where the
-			// member answers some entry otherwise.
+			// The witness of the read entries alone is solved first, and the
+			// whole one only where that answers some entry differently.
 			let restricted = readWitness(provider, reads)
 			let answersAlike = (answers: GroupWitness | null): boolean =>
 				answers !== null &&
@@ -5956,8 +5918,8 @@ function providedWitnessGroup(
 	}
 }
 
-// The conformer's witness at the binding for the Protocol that wrote a
-// body, as a bound of that Protocol solves it, or the one a Choice derives.
+// The conformer's witness for the Protocol that wrote a body, as a bound of
+// that Protocol solves it, or the one a Choice derives.
 function bodyProtocolWitness(
 	protocol: common.ProtocolType,
 	candidate: ConformanceCandidate,
@@ -6049,9 +6011,9 @@ function bodyProtocolCheck(
 	}
 }
 
-// What a report says of a body whose own Protocol's witness fails at the
-// binding: the first entry it reads that the conformer does not answer there as
-// that Protocol declares it, or else that it needs the whole conformance.
+// What a report says of a body whose own Protocol's witness fails here: the
+// first entry read that the conformer answers otherwise than that Protocol
+// declares. Failing that, it needs the whole conformance.
 function unansweredReadReport(
 	body: { methodName: string; provider: string },
 	reads: Array<string>,
@@ -6142,9 +6104,9 @@ function unansweredReadReport(
 	}
 }
 
-// The first Parameter a written Method takes narrower than a requirement
-// passes at the binding, or else its answer where that is wider, or null where
-// the two are not both Simple.
+// The first Parameter a written Method takes narrower than its requirement
+// passes here, or else its answer where that is wider. Null unless both are
+// Simple.
 function writtenMismatch(
 	requirement: common.MethodType | undefined,
 	written: common.MethodType | undefined,
@@ -6217,9 +6179,9 @@ function witnessAnswer(
 		: undefined
 }
 
-// Orders a Protocol's `where` conditions by the Namespace's Generic
-// declaration order — the invariant that lines each witness up with its hidden
-// conformance Parameter, which the simplifier emits in that same order.
+// INVARIANT: `where` conditions are ordered by the Namespace's Type Parameter
+// declaration order, the order the simplifier emits the hidden conformance
+// Parameters in.
 function orderConditions(
 	conditions: Array<{ generic: string; protocol: string }>,
 	generics: Array<common.GenericDeclaration>,
@@ -6231,36 +6193,17 @@ function orderConditions(
 	)
 }
 
-// What to say about a concrete Type with no conforming Namespace. Five
-// answers, because five different things are actually wrong, and the plain
-// "declare a Namespace" is only the last of them:
-//
-// - A bare Case binds the CASE. `namespace X for Colour#Red is Enumerable` does
-//   not parse and never will — a Namespace targets a Type, and one Case of a
-//   Choice is not one — so what the reader edits is the value's annotation.
-// - A Future is one word short, not a Type in want of a conformance. Declaring
-//   `for Future<String> is Printable` COMPILES and prints a description of the
-//   work, which is the one outcome nobody wanted; the shared asynchrony sentence
-//   is what every other report about a forgotten `complete` says.
-// - A Type declared in another Module of this graph is already conforming —
-//   through a DERIVED conformance, which is in scope only where the Type is. The
-//   edit is an import, and the Namespace the old Help asked for is a second
-//   conformance for a Type that has one.
-// - A Module this one names exports a Namespace that conforms, so the edit is
-//   an import of it.
-// - Everything else owes a Namespace. Where the Type is a Choice whose Cases
-//   carry no payload the body of it may be EMPTY, since declaring the
-//   conformance is the whole of what such a Choice needs — a fact worth saying,
-//   because writing `toString` by hand is what a reader otherwise sets out to do.
+// What to say about a concrete Type with no conforming Namespace. A bare Case
+// needs its annotation widened to the Choice, and a Future its `complete`.
+// A Type from another Module, or a Namespace another Module exports, needs an
+// import. Anything else needs a Namespace, which for a Choice without payloads
+// may be empty.
 type ConformanceRemedy = {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
-	// Set where the culprit is WORK rather than a value — a Future or a
-	// Started standing where its answer was wanted. It is what withholds the
-	// `Terminal.inspect` escape beside these: `inspect` takes work as happily as
-	// it takes anything, and printing a description of work instead of its
-	// answer is the one outcome nobody wanted. The edit is the missing word.
+	// Set where the culprit is a Future or a Started standing for its answer,
+	// which withholds the `Terminal.inspect` Help.
 	describesWork?: true
 }
 
@@ -6270,8 +6213,7 @@ function missingConformance(
 	culprit: common.Type,
 	protocolName: string,
 	scope: enricher.Scope,
-	// Where the refusal is being made, which only the bare-Case branch
-	// reads, for the conformance question it asks of its own.
+	// Read only by the bare-Case branch, for its own conformance question.
 	position: common.Position,
 	asker: "bound" | "condition",
 ): ConformanceRemedy {
@@ -6295,16 +6237,9 @@ function conformanceRemedy(
 	let spelling = protocolSpelling(protocolName, scope)
 	let protocol = describeProtocol(protocolName, scope)
 
-	// A bare Case is typed as the CASE and not as its Choice, and no
-	// Namespace can target one — `namespace X for Colour#Red` does not parse —
-	// so the edit is one Type wider. WHICH edit depends on the Choice: where it
-	// already conforms, annotating the value is the whole of it and is what is
-	// offered; where it does not, annotating lands the reader on this same
-	// refusal about the Choice and they are told to declare the Namespace THEN.
-	// The Choice is in hand here, so that second question is asked now and what
-	// comes back is the Choice's own answer — which works on its own, because a
-	// Namespace declared `for Door` answers for a value typed `Door#Open` as
-	// well: the annotation was never the part that was missing.
+	// No Namespace can target a Case, so the edit is about its Choice. Where
+	// the Choice conforms, it is an annotation. Otherwise it is the Choice's own
+	// remedy, since a Namespace `for Door` answers a `Door#Open` too.
 	if (culprit.type === "Case") {
 		let choice = choiceTypeOf(culprit, scope)
 		let conforms =
