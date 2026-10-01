@@ -135,6 +135,190 @@ describe("Parser Recovery", () => {
 		expect(nodes[1].nodeType).toBe("VariableDeclarationStatement")
 	})
 
+	// See "Error recovery" in packages/compiler/src/parser/DEVELOPMENT.md.
+	describe("a Statement that begins with a name", () => {
+		it("should read a Statement that begins with a name after a broken one", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant d = f(total + tax
+					const price = 12
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				[
+					"Essence has no '+' operator",
+					"'const' is not how Essence declares a binding",
+				],
+			)
+
+			let nodes = program.implementation.nodes
+
+			expect(nodes).toHaveLength(1)
+			expect(nodes[0].nodeType).toBe("ConstantDeclarationStatement")
+
+			if (nodes[0].nodeType === "ConstantDeclarationStatement") {
+				expect((nodes[0].name as parser.IdentifierNode).content).toBe(
+					"price",
+				)
+			}
+		})
+
+		it("should report a broken Statement that begins with a name after a broken one", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					class Money { constant q = ) }
+					user.name = "Ada"
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				[
+					"'class' declares nothing in Essence",
+					"A Record's member can not be assigned",
+				],
+			)
+		})
+
+		it("should keep a call broken over lines to one Diagnostic", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant total = compute(
+						first + 1,
+						second,
+					)
+					Terminal.print(total)
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Essence has no '+' operator"],
+			)
+			expect(
+				program.implementation.nodes.map((node) => node.nodeType),
+			).toEqual(["FunctionInvocation"])
+		})
+
+		// A stray `)` closes the call, so the Statement after it shares a line
+		// with the call and gives no indentation to compare.
+		it("should not resume at a name below a broken Statement that shares its line", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant range = compute(
+						) from 1,
+						to 3,
+					)
+					constant after = 2
+				}`,
+			)
+
+			expect(diagnostics).toHaveLength(1)
+		})
+
+		// The Lexer counts a tab as one column, so the Arguments' two tabs stand
+		// left of the four spaces. By text neither indentation begins the other.
+		it("should not resume where a line's indentation can not be compared with the broken one", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				[
+					"implementation {",
+					"\tconstant tiles = [1, 2, 3]",
+					"    constant total tiles::reduce(",
+					"\t\tstartingWith 0,",
+					"\t\tstep (sum, tile) { <- sum::add(tile) },",
+					"\t)",
+					"\tTerminal.print(total)",
+					"}",
+				].join("\n"),
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Expected '=' but found 'tiles'."],
+			)
+		})
+
+		it("should not resume at a 'with' that continues a Dictionary base", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					constant scores = ["kim" = 1]
+					constant updated = [scores +
+					with "kim" = 7]
+					Terminal.print(updated)
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Essence has no '+' operator"],
+			)
+			expect(
+				program.implementation.nodes.map((node) => node.nodeType),
+			).toEqual(["ConstantDeclarationStatement", "FunctionInvocation"])
+		})
+
+		it("should resume at a name but not at another language's operator that opens a line", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					if a::isGreaterThan(1)
+					&& b {
+						Terminal.print(1)
+					}
+					$total = 2
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Expected '{' but found '&&'."],
+			)
+			expect(
+				program.implementation.nodes.map((node) => node.nodeType),
+			).toEqual(["VariableAssignmentStatement"])
+		})
+
+		it("should not resume at an 'is' that continues a Namespace's head", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					namespace Checks for Integer +
+					is Equatable {
+						is(_ other: Integer) -> Boolean {
+							<- true
+						}
+					}
+					constant x = 1
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Expected '{' but found '+'."],
+			)
+		})
+
+		it("should resume at a Method named 'is' after a broken Method", () => {
+			let { program, diagnostics } = parseWithDiagnostics(
+				`implementation {
+					namespace Checks for Integer {
+						isSmall(limit: Integer +) -> Boolean {
+							<- true
+						}
+						is(_ other: Integer) -> Boolean {
+							<- true
+						}
+					}
+				}`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["Expected ')' but found '+'."],
+			)
+
+			let namespace = program.implementation.nodes[0]
+
+			expect(namespace?.nodeType).toBe("NamespaceDefinitionStatement")
+
+			if (namespace?.nodeType === "NamespaceDefinitionStatement") {
+				expect(Object.keys(namespace.methods)).toEqual(["is"])
+			}
+		})
+	})
+
 	it("should report a torn-open block once and terminate", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {

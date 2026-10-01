@@ -191,8 +191,8 @@ function startsMatcher(token: Token | undefined): boolean {
 	return token !== undefined && matcherStartTokenTypes.has(token.type)
 }
 
-// The Keywords that open a Statement, where recovery resynchronises. A
-// Statement that begins with a name is skipped with the broken one.
+// The Keywords that open a Statement, where recovery resynchronises.
+// See "Error recovery" in DEVELOPMENT.md.
 // INVARIANT: every Keyword `parseImplementationNode` dispatches on is here,
 // or recovery silently skips the Declaration it opens.
 const statementStartTokenTypes = new Set([
@@ -772,16 +772,6 @@ const closingBracketTokenTypes = new Set([
 	TokenType.SymbolRightParen,
 	TokenType.SymbolRightBracket,
 	TokenType.SymbolRightBrace,
-])
-
-// The Tokens a Statement that begins with a bare name continues with. See
-// `parseOptionalRefinementPredicate`.
-const STATEMENT_CONTINUATIONS = new Set([
-	TokenType.SymbolEqual,
-	TokenType.SymbolColon,
-	TokenType.SymbolDot,
-	TokenType.SymbolLeftParen,
-	TokenType.SymbolLeftBracket,
 ])
 
 class DescentParser {
@@ -1907,7 +1897,7 @@ class DescentParser {
 		startState: TokenStreamState,
 	): void {
 		this.reportParseError(error)
-		this.resynchronise(startState.braceDepth)
+		this.resynchronise(startState)
 
 		// Guarantee progress where the broken element consumed no Token and
 		// resynchronisation stopped at once.
@@ -2051,9 +2041,10 @@ class DescentParser {
 		}
 	}
 
-	// Skips to the next Statement start or `}` at the brace depth the broken
-	// element started on, skipping braces the element opened.
-	protected resynchronise(targetDepth: number): void {
+	// Skips to the next place a Statement can begin at the brace depth the
+	// broken element started on, skipping braces the element opened.
+	// See "Error recovery" in DEVELOPMENT.md.
+	protected resynchronise(startState: TokenStreamState): void {
 		while (true) {
 			let token = this.tokens.peek()
 
@@ -2064,28 +2055,29 @@ class DescentParser {
 				return
 			}
 
-			if (this.tokens.depth <= targetDepth) {
-				if (token.type === TokenType.SymbolRightBrace) {
-					return
-				}
-
-				if (this.isStatementStart(token)) {
-					return
-				}
+			if (
+				this.tokens.depth <= startState.braceDepth &&
+				(token.type === TokenType.SymbolRightBrace ||
+					this.isStatementStart(token, startState.index))
+			) {
+				return
 			}
 
 			this.tokens.next()
 		}
 	}
 
-	protected isStatementStart(token: Token): boolean {
-		if (statementStartTokenTypes.has(token.type)) {
-			return true
-		}
-
+	// Whether `token` begins a Statement, for a skip from the broken element
+	// at `from`. A name counts only where it opens a line below that element,
+	// indented no further. See "Error recovery" in DEVELOPMENT.md.
+	protected isStatementStart(token: Token, from: number): boolean {
 		return (
-			token.type === TokenType.SymbolLeftAngle &&
-			this.tokens.peek(1)?.type === TokenType.SymbolDash
+			statementStartTokenTypes.has(token.type) ||
+			(isIdentifierToken(token) &&
+				!standsAfterExpression(token) &&
+				this.tokens.resumesAtName(from)) ||
+			(token.type === TokenType.SymbolLeftAngle &&
+				this.tokens.peek(1)?.type === TokenType.SymbolDash)
 		)
 	}
 
@@ -2803,7 +2795,7 @@ class DescentParser {
 
 	// The `where` clause of a checked refinement, recognised by content as in
 	// `parseOptionalGuard`. On the next line, `where` opens the clause only if
-	// no `STATEMENT_CONTINUATIONS` Token follows it on its line.
+	// it does not begin a Statement of its own.
 	protected parseOptionalRefinementPredicate(
 		type: parser.TypeDeclarationNode,
 	): parser.ExpressionNode | null {
@@ -2813,16 +2805,11 @@ class DescentParser {
 			return null
 		}
 
-		if (token.position.start.line !== type.position.end.line) {
-			let after = this.tokens.peek(1)
-
-			if (
-				after === undefined ||
-				after.position.start.line !== token.position.start.line ||
-				STATEMENT_CONTINUATIONS.has(after.type)
-			) {
-				return null
-			}
+		if (
+			token.position.start.line !== type.position.end.line &&
+			this.tokens.beginsOwnStatement()
+		) {
+			return null
 		}
 
 		this.tokens.next()

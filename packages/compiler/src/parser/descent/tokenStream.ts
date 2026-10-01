@@ -240,6 +240,25 @@ function lineFrom(source: string, cursor: common.Cursor): string {
 	return (source.split("\n")[cursor.line - 1] ?? "").slice(cursor.column - 1)
 }
 
+// The Tokens a Statement that begins with a bare name continues with. See
+// `beginsOwnStatement`.
+const STATEMENT_CONTINUATIONS = new Set([
+	TokenType.SymbolEqual,
+	TokenType.SymbolColon,
+	TokenType.SymbolDot,
+	TokenType.SymbolLeftParen,
+	TokenType.SymbolLeftBracket,
+])
+
+// Words that continue a Declaration's head on the line below it, as `is`
+// does under `namespace Checks for Integer`.
+const headContinuations = new Set(["is", "where"])
+
+// Another language's operator starts with punctuation or a mathematical or
+// modifier symbol, as `&&`, `+` and `^` do. The Lexer reads it as an
+// Identifier, while a name such as `$total` or `π` starts otherwise.
+const operatorStart = /^[\p{P}\p{Sm}\p{Sk}]/u
+
 export type TokenStreamState = {
 	index: number
 	braceDepth: number
@@ -259,8 +278,13 @@ export class TokenStream {
 	// backtracks by Token index need not step over them. A Comment ends at its
 	// line break, so keying by line holds at most one per line.
 	protected documentationLines: Map<number, Token>
+	protected source: string
+	// Split on the first recovery that compares indentation.
+	protected sourceLines: Array<string> | null = null
 
 	constructor(source: string) {
+		this.source = source
+
 		let sourceLexer = new Lexer()
 
 		sourceLexer.ignore(TokenType.Comment)
@@ -482,17 +506,68 @@ export class TokenStream {
 	// Declaration's line must not claim the Documentation written for the
 	// Declaration.
 	startsLine(): boolean {
-		let token = this.peek()
+		return this.opensLine(this.index)
+	}
+
+	// Whether the Token at the absolute `index` is the first on its line.
+	opensLine(index: number): boolean {
+		let token = this.tokens[index]
 
 		if (token === undefined) {
 			return false
 		}
 
-		let previous = this.tokens[this.index - 1]
+		let previous = this.tokens[index - 1]
 
 		return (
 			previous === undefined ||
 			previous.position.end.line < token.position.start.line
+		)
+	}
+
+	// Whether the name at the cursor, opening its line, begins a Statement of
+	// its own. It does where nothing follows it on its line, or where a Token
+	// that continues a bare name does, as in `where = 1`.
+	beginsOwnStatement(): boolean {
+		let token = this.peek()
+		let after = this.peek(1)
+
+		return (
+			token !== undefined &&
+			(after === undefined ||
+				after.position.start.line !== token.position.start.line ||
+				STATEMENT_CONTINUATIONS.has(after.type))
+		)
+	}
+
+	// Whether a skip from the broken element at the absolute `from` stops at
+	// the name at the cursor. See "Error recovery" in DEVELOPMENT.md.
+	resumesAtName(from: number): boolean {
+		let opening = this.tokens[from]
+		let token = this.peek()
+
+		if (
+			opening === undefined ||
+			token === undefined ||
+			this.index <= from ||
+			!this.opensLine(from) ||
+			!this.startsLine() ||
+			operatorStart.test(token.value) ||
+			(headContinuations.has(token.value) && !this.beginsOwnStatement())
+		) {
+			return false
+		}
+
+		return this.indentationOf(opening).startsWith(this.indentationOf(token))
+	}
+
+	// The whitespace before `token` on its line, which opens with `token`.
+	protected indentationOf(token: Token): string {
+		this.sourceLines ??= this.source.split("\n")
+
+		return (this.sourceLines[token.position.start.line - 1] ?? "").slice(
+			0,
+			token.position.start.column - 1,
 		)
 	}
 

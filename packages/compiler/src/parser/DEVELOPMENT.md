@@ -209,11 +209,33 @@ The parser always returns a Program. `parseStatementList` reads a block's elemen
 throws a `ParseError`, `recoverFromError` reports one Diagnostic for it, resynchronises, and drops the element from
 the AST. No error nodes are invented: the enricher already tolerates missing declarations.
 
-`resynchronise` skips to the next Keyword that opens a Statement, a `<-`, or a `}`, at the brace depth the broken
-element started on. A Statement that begins with a name, such as a call or an assignment, is skipped along with the
-broken one. Braces the broken element opened are skipped whole. `statementStartTokenTypes` lists the starts, so a
+`resynchronise` skips to the next place a Statement can begin, at the brace depth the broken element started on: a
+Keyword that opens a Statement, a `<-`, a `}`, or a name that opens a line indented no further than the broken
+element. Braces the broken element opened are skipped whole. `statementStartTokenTypes` lists the Keywords, so a
 Keyword missing from it makes recovery skip the whole Declaration it opens. If the element consumed no Token and
 resynchronisation stopped at once, the loop steps over one Token so it always makes progress.
+
+No Expression continues with a name, except `with` and `otherwise`, which only stand where an Expression has ended.
+A name opening a line still belongs to the Statement before it where that Statement waits for more, such as an
+Argument or a Parameter written on a line of its own. Counting brackets can not find those, because the mistake may
+be the bracket left open. Indentation can, since such a line stands further in. `resumesAtName` takes a name only
+where all of these hold:
+
+- The broken element opened its own line. One that shares its line with another Statement has no indentation to
+  compare. A stray `)` that closes a call early starts one mid-line, and the Arguments below it stand at that line's
+  indentation.
+- The whitespace before the name is a prefix of the whitespace before the broken element. The text is compared, not
+  the column, because the Lexer counts a tab as one column. A line indented with spaces and one indented with tabs
+  compare as neither, so the skip passes it.
+- The name does not start with punctuation or a mathematical or modifier symbol. Another language's operators, such
+  as `&&`, `+` or `^`, start that way, the Lexer reads them as Identifiers, and no Statement begins with one. A name
+  such as `$total` or `π` still counts.
+- The name is not `with` or `otherwise`. An `is` or a `where` counts only where `beginsOwnStatement` says it begins a
+  Statement of its own, the rule a refinement's `where` follows. Both also continue a Declaration's head, as `is
+  Equatable {` does on the line under `namespace Checks for Integer`.
+
+Arguments written flush with their own Statement, as unformatted code may have them, cost one follow-on Diagnostic.
+Their lines stand exactly as far in as a Statement's, so indentation can not tell them apart.
 
 When resynchronisation reaches the end of the input, the parser sets `suppressDiagnostics`. Every later error would
 be a cascade of the one just reported. A Lexer error that truncates the Token stream sets it from the start.
@@ -349,12 +371,12 @@ That refusal is only made when the arms were read cleanly. If the arm loop recov
 block, an `otherwise` arm may stand in the text that was skipped. Then the `define` still can not be built, so the
 parser throws a `ParseError` marked `reported` and drops the Statement without a second account.
 
-`parseDefineArms` has its own loop, because `parseStatementList` resynchronises to a Statement start and an `as` is
-not one. A broken arm would swallow every arm after it. `resynchroniseToArm` skips to the next `as` or the closing
-`}` at the arm's brace depth. An arm that failed on its first Token read nothing, so only that Token is dropped.
-Scanning from there could step into whatever the Token opens and skip the rest of the block. A coded refusal inside
-an arm is raised to the Statement loop, as a speculation raises one. A recovered arm's lines are recorded as
-abandoned.
+`parseDefineArms` has its own loop, because the skip in `parseStatementList` stops at an `as` that opens a line but
+not at one written mid-line. A broken arm would swallow the arms after it on its line. `resynchroniseToArm` skips to
+the next `as` or the closing `}` at the arm's brace depth. An arm that failed on its first Token read nothing, so
+only that Token is dropped. Scanning from there could step into whatever the Token opens and skip the rest of the
+block. A coded refusal inside an arm is raised to the Statement loop, as a speculation raises one. A recovered arm's
+lines are recorded as abandoned.
 
 An arm after the `otherwise` arm can never be reached. `reportUnreachableArm` reports it once it is read, so the
 report spans the whole arm, and then drops it. Throwing would take the whole Statement and leave its Constant
