@@ -806,16 +806,23 @@ describe("Property tests", () => {
 			).toEqual(["ungeneratable-type"])
 		})
 
-		it("refuses a refinement whose predicate describes no value", () => {
-			expect(
-				codesOf(
-					`implementation {
-						type Never = Integer where @::isGreaterThan(10)::and(@::isLessThan(5))
-					}
+		// Only drawing finds the predicate empty, so the compile accepts the
+		// test and the run refuses it.
+		it("refuses a refinement whose predicate describes no value when it runs", async () => {
+			let source = `implementation {
+				type Never = Integer where @::isGreaterThan(10)::and(@::isLessThan(5))
+			}
 
-					${sectionOf("n: Never")}`,
-				),
-			).toEqual([])
+			${sectionOf("n: Never")}`
+
+			expect(codesOf(source)).toEqual([])
+
+			let { events } = await run(source)
+			let [failure] = events.filter((event) => event.kind === "test-fail")
+
+			expect((failure as { error: string | null }).error).toBe(
+				"Could not generate a value of 'Never'. Its predicate describes no value at all.",
+			)
 		})
 
 		it("refuses a test that is both a table and a property", () => {
