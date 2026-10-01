@@ -74,7 +74,6 @@
 	"packages/compiler/src/tests/testing.spec.ts": {"sentence-length": 16, "em-dash": 19, "all-caps": 7, "history": 2, "position": 1, "block-length": 1},
 	"packages/compiler/src/tests/testingContracts.spec.ts": {"sentence-length": 9, "em-dash": 9, "all-caps": 8, "position": 1, "block-length": 2},
 	"packages/compiler/src/tests/testingProperties.spec.ts": {"sentence-length": 33, "em-dash": 27, "all-caps": 29, "position": 7, "block-length": 4},
-	"packages/compiler/src/tests/testingSemantics.spec.ts": {"sentence-length": 33, "em-dash": 23, "all-caps": 16, "history": 1, "position": 2, "block-length": 1},
 	"packages/compiler/src/tests/typeHelps.spec.ts": {"sentence-length": 22, "em-dash": 19, "all-caps": 17, "history": 1, "position": 1},
 	"packages/compiler/src/tests/typeMatching.spec.ts": {"sentence-length": 41, "em-dash": 35, "all-caps": 33, "history": 4, "position": 7, "block-length": 9},
 	"packages/compiler/src/tests/undecidedSeeds.spec.ts": {"sentence-length": 34, "em-dash": 21, "all-caps": 14, "history": 2, "block-length": 3},

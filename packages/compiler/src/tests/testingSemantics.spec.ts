@@ -14,13 +14,12 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 import { compiles } from "./followedHelps"
 
-// What a tests section MEANS — the Scopes it opens, the vocabulary its
-// Modifiers are read against, what an assertion demands of what it asserts, and
-// the identity every test carries. The grammar alone is `testing.spec.ts`.
+// What a tests section means: its Scopes, its Modifiers, what an assertion
+// demands, and the identity every test carries. The grammar is
+// `testing.spec.ts`.
 //
-// Everything here enriches with `tests: true`, because that is the one thing
-// that makes a `tests { … }` block anything but parsed text. The last describe
-// block is the other half of that: with the flag off, the section is not there.
+// Everything enriches with `tests: true`, without which a `tests { … }` block
+// is only parsed text.
 
 function analyse(
 	source: string,
@@ -433,10 +432,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["malformed-modifier"])
 		})
 
-		// The shared template "Write one reason and nothing else here" is
-		// anchored on the SECOND reason — the reader stands on the thing that
-		// has to go, so writing a reason there writes a third. Only a deletion
-		// answers it, and the Help says so.
+		// The report stands on the second reason, so only a deletion answers
+		// it.
 		it("should ask for the extra reason to go", () => {
 			expect(
 				diagnosticsOf(
@@ -497,10 +494,9 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["duplicate-modifier"])
 		})
 
-		// The Parser reads `tagged slow focused` as three Modifiers —
-		// see `regrouped`. The vocabulary is what puts it back together, and
-		// the test is here because getting it wrong is silent: a swallowed
-		// `focused` is a test nobody notices has stopped running.
+		// The Parser reads `tagged slow focused` as three Modifiers, and
+		// `regrouped` puts them back together. A swallowed `focused` would be
+		// silent.
 		it("should adopt a bare name a tagged was written without", () => {
 			let section = sectionOf(
 				`implementation {}
@@ -527,9 +523,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["unknown-modifier"])
 		})
 
-		// A tag is any bare name, and plenty of ordinary ones sit within a
-		// typo's distance of a Modifier. Only a name that IS one is read as a
-		// Modifier written in the wrong place.
+		// Many ordinary tags sit within a typo of a Modifier, so only a name
+		// that is one is read as a misplaced Modifier.
 		it("should take a tag that merely looks like a Modifier", () => {
 			let section = sectionOf(
 				`implementation {}
@@ -591,9 +586,7 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
-	// The escape hatch the Help has always named, and which nothing read
-	// until now: `enrichTableRows` never looked at the Modifiers, so a reader who
-	// wrote the `skipped "…"` it asked for had the same report back.
+	// A `skipped "…"` table may have no rows, as the Help says.
 	describe("a table with no rows", () => {
 		let table = (modifiers: string) =>
 			`implementation {}
@@ -628,11 +621,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["expect-not-boolean"])
 		})
 
-		// Taking a value apart is an answer only where it HAS parts. The
-		// clause used to be unconditional and hardcoded, so an Integer was sent
-		// to `require #Value(item) = value` — which answers `unknown-case` about
-		// `#Value` and `unknown-name` about `item`, two reports for a line the
-		// Help itself wrote.
+		// Taking a value apart is offered only where the value has Cases.
 		it("should offer taking apart only what has Cases", () => {
 			expect(
 				diagnosticsOf(
@@ -649,9 +638,8 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// And spells a Case the value really holds, binding a payload only
-		// where that Case carries one — beside the NAME the assertion was
-		// written over, which is the spelling the reader reads straight back.
+		// The Help spells a Case the value really holds, over the name the
+		// assertion was written over.
 		it("should spell a Case the asserted value has", () => {
 			let helps = (source: string) =>
 				diagnosticsOf(
@@ -680,8 +668,7 @@ describe("Tests Section Semantics", () => {
 				"Or take it apart instead: 'require #Won = result'.",
 			])
 
-			// No name was written, so the value is a schematic rather than
-			// a plausible one this stage would have had to invent.
+			// No name was written, so the value is a schematic `…`.
 			expect(helps("expect play()")).toEqual([
 				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
 				"Or take it apart instead: 'require #Won = …'.",
@@ -752,9 +739,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// What a `require` binds is typed AT the Matcher, not at what the
-		// value was declared as: below the assertion the value IS the Case the
-		// Matcher named, which is the whole reason a test writes one.
+		// What a `require` binds is typed at the Matcher, since after the
+		// assertion the value is the Case the Matcher named.
 		it("should type what it binds at the Matcher", () => {
 			let section = sectionOf(
 				`implementation {
@@ -783,8 +769,7 @@ describe("Tests Section Semantics", () => {
 			expect(binding.type).toEqual({ type: "Integer" })
 		})
 
-		// A Matcher that names nothing is still a question about the
-		// value — and the only question a bare Case asks.
+		// A Matcher that binds nothing still asks a question about the value.
 		it("should take a value apart with a Matcher that binds nothing", () => {
 			expect(
 				codesOf(
@@ -836,10 +821,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// The members a Pattern may hold, all three of them: one bound
-		// under its own name, one bound at a Type, and one constrained by a
-		// written value, which binds nothing and is a question about the value
-		// instead.
+		// A member bound under its own name, one bound at a Type, and one
+		// constrained by a written value, which binds nothing.
 		it("should read every kind of Pattern member", () => {
 			expect(
 				codesOf(
@@ -952,9 +935,8 @@ describe("Tests Section Semantics", () => {
 			expect(table.type.type).toBe("Record")
 		})
 
-		// The whole reason a Parameter is annotated at all — the rows are
-		// read against what it declared, so a bare Case resolves the way it
-		// does under any other annotation.
+		// The rows are read against the Parameter's annotation, so a bare Case
+		// resolves as under any other annotation.
 		it("should resolve a bare Case in a row against the annotation", () => {
 			let table = testsOf(sectionOf(source).nodes)[0]
 				?.table as common.typed.TestTableNode
@@ -1034,9 +1016,8 @@ describe("Tests Section Semantics", () => {
 			expect(table.type).toEqual({ type: "Integer" })
 		})
 
-		// A row is a value like any other, so a `require` takes it apart
-		// where it stands — and what it binds is read by the rest of that row's
-		// own run of the body.
+		// A row is a value like any other, so a `require` takes it apart for
+		// the rest of that row's run.
 		it("should take a row apart with a Matcher", () => {
 			expect(
 				codesOf(
@@ -1088,8 +1069,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-not-written"])
 		})
 
-		// No rows is no tests, and nothing in a report says so: no line,
-		// no count, no failure.
+		// No rows is no tests, and no report would say so.
 		it("should refuse a table test with no rows in it", () => {
 			expect(
 				codesOf(
@@ -1102,10 +1082,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-without-rows"])
 		})
 
-		// Spelled out of the ROWS the reader wrote. `Row` was a Type
-		// nothing declares — a reader who wrote it back was answered with
-		// `unknown-type 'Row'` — and the rows are where the Parameter's Type
-		// comes from in a table that has not declared one.
+		// The Help spells the row Type out of the rows the reader wrote.
 		it("should spell the row Type the written rows have", () => {
 			let source = `implementation {}
 
@@ -1132,9 +1109,8 @@ describe("Tests Section Semantics", () => {
 			).toBe(true)
 		})
 
-		// And no clause about taking the row apart where a row is no
-		// Record: there is nothing to take apart, and the clause named members
-		// nobody had written.
+		// A row that is no Record has nothing to take apart, so the Help offers
+		// no destructuring.
 		it("should offer no destructuring where a row is one value", () => {
 			expect(
 				helpsOf(`implementation {}
@@ -1147,9 +1123,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["Write one Parameter: '(row: Integer)'."])
 		})
 
-		// The rows are what this Help can not read — that IS the report —
-		// so what it hands back is the Parameter list the reader wrote, and the
-		// rows are the hole.
+		// The Help can not read the rows, so it hands back the reader's own
+		// Parameter list with the rows as a hole.
 		it("should spell the reader's own Parameter where the rows are not written", () => {
 			let source = `implementation {
 						constant scorelines: List<Integer> = [1, 2]
@@ -1194,13 +1169,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
-		// And says nothing else about it. A table naming two Parameters
-		// has no row Type — the FIRST of them is not it — so measuring the rows
-		// against that one reported the Parameter list a second time, in words
-		// about a Type the reader never wrote for the row. Reading the Type off
-		// the ROWS instead only moved the cascade into the body, where the
-		// Arguments refused, so the bindings carry Error, which is what every
-		// other dropped Declaration binds.
+		// A table naming two Parameters has no row Type, so the rows are not
+		// measured and the bindings carry Error.
 		it("should say nothing about the rows a refused list can not type", () => {
 			expect(
 				codesOf(
@@ -1215,11 +1185,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
-		// The rows are the one thing about a table test that nothing else
-		// would ever check. A row is neither an Argument nor a Declaration, and
-		// the Type the Parameter declares reaches them as the HINT that resolves
-		// a bare Case — which refuses nothing. A row that slipped through
-		// reached the runtime as a Type it is not.
+		// A row is neither an Argument nor a Declaration, so this is the only
+		// check that holds it to the Parameter's declared Type.
 		it("should refuse a row that does not fit what the Parameter declares", () => {
 			expect(
 				codesOf(
@@ -1234,9 +1201,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// A Pattern Parameter declares its Type in the very same place a
-		// named one does, and binds every name off what it declared — so a row
-		// that does not fit is the same mistake, told the same way.
+		// A Pattern Parameter declares its Type where a named one does, so a
+		// row that does not fit is told the same way.
 		it("should refuse a row a Pattern Parameter takes apart", () => {
 			expect(
 				codesOf(
@@ -1253,10 +1219,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// The shape that HUNG rather than crashed. An Integer stands
-		// where a Rational was declared, and the name interpolates the row — so
-		// `Rational::toString` was handed an Integer before the body had run at
-		// all, and reduced a pair of members it does not carry forever.
+		// The name interpolates the row, so an Integer row under a declared
+		// Rational would reach `Rational::toString` before the body runs.
 		it("should refuse an Integer row where a Rational was declared", () => {
 			expect(
 				codesOf(
@@ -1290,9 +1254,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// Held to assignability and not to identity, the way every other
-		// value in the language is: an Integer is a value of `Number`, and a
-		// row is admitted by the same rule that admits an Argument.
+		// A row is held to assignability, as an Argument is.
 		it("should admit a row of a Type the declared one contains", () => {
 			expect(
 				codesOf(
@@ -1310,11 +1272,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// A row is WRITTEN where it stands, and a written value carries
-		// evidence of its own: a refinement's predicate is decided while
-		// compiling, exactly as it is for the identical Argument or
-		// Declaration. Asked as assignability alone, a refined row Parameter
-		// would refuse every row a reader could write.
+		// A written row carries its own evidence, so a refinement's predicate
+		// is decided while compiling, as for an Argument.
 		it("should admit a written row that answers a refinement", () => {
 			expect(
 				codesOf(
@@ -1337,8 +1296,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// Decided and not assumed — the row that answers the predicate is
-		// admitted and the one beside it that does not is still refused.
+		// The row that answers the predicate is admitted and the other refused.
 		it("should refuse a written row that fails a refinement", () => {
 			expect(
 				codesOf(
@@ -1353,10 +1311,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// Nothing to hold a row to where the Parameter declares nothing.
-		// The row Type is worked out FROM the rows there, so every one of them
-		// fits it by construction — including a table whose rows disagree,
-		// which is a Union and not a mistake.
+		// Without a declared Type the row Type is worked out from the rows, so
+		// every row fits. Disagreeing rows make a Union.
 		it("should say nothing where the Parameter declares no Type", () => {
 			expect(
 				codesOf(
@@ -1371,9 +1327,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
-		// One Diagnostic per row rather than one per table — every row is
-		// a test of its own, and a table of forty has to say which of them is
-		// wrong.
+		// One Diagnostic per row, since every row is a test of its own.
 		it("should report every row that does not fit, on its own", () => {
 			let diagnostics = diagnosticsOf(
 				`implementation {}
@@ -1399,8 +1353,7 @@ describe("Tests Section Semantics", () => {
 			).toEqual([5, 6])
 		})
 
-		// A benchmark's rows are read by the very same enrichment, so
-		// what refuses a row of a test refuses a row of a measurement.
+		// A benchmark's rows are read by the same enrichment.
 		it("should refuse a mistyped row of a benchmark", () => {
 			expect(
 				codesOf(
@@ -1415,10 +1368,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-row-type-mismatch"])
 		})
 
-		// The rows and the Constants a Pattern Parameter binds off them are
-		// Statements of the test like any other, and the Validator has to walk
-		// them: a non-exhaustive `match` in a row would otherwise compile in
-		// silence while the identical one a line below is refused.
+		// The Validator walks the rows and the Constants bound off them like
+		// any other Statements of the test.
 		it("should hold a row to what the Validator asks of every Expression", () => {
 			expect(
 				codesOf(
@@ -1444,8 +1395,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["missing-case"])
 		})
 
-		// Every row runs the same body, so an inline snapshot written in
-		// one would hold a value per row and one slot to write them into.
+		// Every row runs the same body, so an inline snapshot would hold a
+		// value per row in one slot.
 		it("should refuse an inline snapshot in a table test", () => {
 			expect(
 				codesOf(
@@ -1527,10 +1478,8 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// What a snapshot records is the value RENDERED, which is
-		// `Printable::toString` — built as the interpolation an author could
-		// have written, so the witness and the lowering are the ones the
-		// language already has.
+		// A snapshot records the value rendered through `Printable`, built as
+		// the interpolation an author could have written.
 		it("records the value through Printable", () => {
 			let body = testsOf(sectionOf(source).nodes)[0]?.body ?? []
 			let asserted = (body[0] as common.typed.ExpectStatementNode).value
@@ -1563,11 +1512,9 @@ describe("Tests Section Semantics", () => {
 		})
 	})
 
-	// A benchmark is a test in every structural respect and differs in
-	// exactly one: what RUNNING it means. So what is asked here is that the form
-	// reaches the lowering, that the key its baseline is stored under is spelled
-	// where the run can read it, and that the one shape a measurement can not
-	// take is refused.
+	// A benchmark differs from a test only in what running it means. The form
+	// reaches the lowering, its baseline key is spelled for the run, and
+	// `for any` is refused.
 	describe("Benchmarks", () => {
 		let source = `implementation {
 			function double(_ value: Integer) -> Integer {
@@ -1609,10 +1556,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["doubles", "doubling"])
 		})
 
-		// The stored key is the identity WITHOUT the Module path — the
-		// file it belongs to is the file its baselines are written beside, so
-		// naming it in the key as well would lose every entry the day the file
-		// moves.
+		// Baselines are stored beside their file, so the key leaves out the
+		// Module path and survives a move.
 		it("should spell a stored key without the Module path", () => {
 			expect(
 				relativeIdentityKey({
@@ -1641,9 +1586,8 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
-		// Each row is a benchmark in its own right, measured and compared
-		// against a baseline of its own — so each row's manifest entry carries
-		// its own key, the row spelled as the identity's last step.
+		// Each row is a benchmark with a baseline of its own, keyed with the
+		// row as the identity's last step.
 		it("should take rows, each keyed by its own entry", () => {
 			let section = simplifiedSectionOf(
 				`implementation {}
@@ -1698,9 +1642,8 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["benchmark-for-any"])
 		})
 
-		// The refusal is an Error and has already stopped the run; what
-		// the Parameters go on being enriched FOR is everything an Editor draws
-		// off the tree beside it.
+		// The refusal stops the run, but an Editor still draws off the enriched
+		// Parameters.
 		it("should keep enriching a refused benchmark's Parameters", () => {
 			let node = testsOf(
 				analyse(
@@ -1769,10 +1712,8 @@ describe("Tests Section Semantics", () => {
 		it("should leave nothing of the section in the implementation", () => {
 			let simplified = simplify(analyse(source).program)
 
-			// The section is carried BESIDE the implementation rather
-			// than folded into it — a build's implementation is byte for byte
-			// what it would have been with no `tests` block written at all,
-			// which is what the golden below proves the whole way down.
+			// The section is carried beside the implementation, not folded into
+			// it.
 			expect(simplified.implementation.nodes.length).toBe(1)
 			expect(simplified.tests).not.toBeNull()
 			expect(
@@ -1780,10 +1721,8 @@ describe("Tests Section Semantics", () => {
 			).toBeNull()
 		})
 
-		// The claim "a test costs a shipped Program nothing", stated as
-		// the only thing that could prove it: the JavaScript a build writes for
-		// the fixture is byte for byte the JavaScript it writes for the same
-		// file with the whole block deleted.
+		// A build of the fixture is byte for byte the build of the same file
+		// with the tests block deleted.
 		it("should build the fixture into what the same file without tests builds into", () => {
 			let text = readFileSync(fixturePath("Tests.es"), "utf8")
 
@@ -1806,8 +1745,8 @@ function build(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// The section as the lowering leaves it — the manifest and the Nodes a
-// runner is registered with, which is where a table test's rows become tests.
+// The section as the lowering leaves it: the manifest and the Nodes a runner
+// is registered with.
 function simplifiedSectionOf(
 	source: string,
 ): common.typedSimple.TestsSectionNode {
@@ -1822,8 +1761,7 @@ function simplifiedSectionOf(
 	return simplified.tests as common.typedSimple.TestsSectionNode
 }
 
-// The block cut out by its own Position, lines and all, rather than by
-// searching the text for it — the Parser is what knows where the block ends.
+// The block cut out by its own Position, since the Parser knows where it ends.
 function withoutTestsSection(source: string): string {
 	let { program } = parseWithDiagnostics(source)
 	let section = program.tests
