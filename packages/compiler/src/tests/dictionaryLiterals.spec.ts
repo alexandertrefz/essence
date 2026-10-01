@@ -14,26 +14,19 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The three WRITTEN forms of a Dictionary — `["a" = 1]`, `[=]` and
-// `[base with …]` — end to end. What is worth pinning about them is not one
-// stage's output but that every stage agrees: the same brackets read as a List,
-// as a Dictionary and as an update depending on ONE Token past the first
-// Expression, and each reading has to survive typing, lowering and emission as
-// the thing it was read as.
+// The written forms of a Dictionary, `["a" = 1]`, `[=]` and `[base with …]`,
+// end to end. One Token past the first Expression decides between a List, a
+// Dictionary and an update, and every stage must keep that reading.
 //
-// The harness runs the emitted JavaScript, as `rationals.spec.ts` and
-// `decimalLiterals.spec.ts` do and for the same reason: a construction that
-// compiles green and stores its keys in the wrong place is visible from Essence
-// and from nowhere else.
+// The harness runs the emitted JavaScript, since keys stored in the wrong
+// place show only from Essence.
 
 function block(...lines: Array<string>): string {
 	return ["implementation {", ...lines, "}"].join("\n")
 }
 
-// Every Diagnostic the front end has about a Program, from all three of
-// the stages that report one — an assignment that does not fit is the
-// Validator's to say, and a spec reading only the Enricher's would pass on a
-// Program the Compiler refuses.
+// Every Diagnostic the front end reports, since an assignment that does not
+// fit is the Validator's to report.
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
 	let enriched = enrich(parsed.program)
@@ -49,9 +42,8 @@ function codesFor(source: string): Array<string> {
 	return diagnosticsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// The Type the LAST Declaration of the implementation came to, spelled
-// the way a Hover would spell it — which is the only thing about a literal's
-// Type that anybody outside the Compiler ever reads.
+// The Type the last Declaration of the implementation came to, spelled the
+// way a Hover spells it.
 function typeOfLastDeclaration(source: string): string {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -109,9 +101,8 @@ async function run(source: string): Promise<Array<string>> {
 
 describe("Dictionary literals", () => {
 	describe("the Parser", () => {
-		// One Token of lookahead past the first Expression decides all
-		// three readings, so the three are asserted together: what tells them
-		// apart is the `=`, the `with` and the absence of both.
+		// The `=`, the `with` or neither after the first Expression decides the
+		// reading.
 		it("reads the three forms out of one pair of brackets", () => {
 			let { program } = parseWithDiagnostics(
 				block(
@@ -162,9 +153,8 @@ describe("Dictionary literals", () => {
 			expect(combinations[1].brackets).toBeUndefined()
 		})
 
-		// An entry's Position spans the key and the value, so a
-		// Diagnostic about one entry underlines the entry and not the bracket
-		// list it stands in.
+		// An entry's Position spans the key and the value, so a Diagnostic
+		// underlines the entry, not the whole list.
 		it("spans an entry from its key to its value", () => {
 			let source = block('\tconstant ages = ["alex" = 39]')
 			let { program } = parseWithDiagnostics(source)
@@ -201,10 +191,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// A List's mistakes keep a List's messages, and a Dictionary's
-		// report where the reader is standing. Both are here because ONE Token
-		// decides which of the two a bracket list is, so a message from the
-		// wrong reading is the failure mode this arrangement has.
+		// One Token decides the reading, so each mistake must get the message
+		// of the reading the reader meant.
 		it("reports a List's mistake as a List's and an entry's as an entry's", () => {
 			expect(
 				diagnosticsFor(block('\tconstant ages = ["alex" 39]'))[0]
@@ -221,9 +209,8 @@ describe("Dictionary literals", () => {
 			).toBe("Expected an Expression but found ']'.")
 		})
 
-		// A key that is a VALUE is a Dictionary's, and braces never hold
-		// one — so the braces say what was meant rather than reporting about a
-		// `with` nobody wrote.
+		// Braces never hold a value key, so the report points at the brackets
+		// rather than at a missing `with`.
 		it("sends a value key written in braces to the brackets", () => {
 			let diagnostics = diagnosticsFor(
 				block('\tconstant ages = { "alex" = 39 }'),
@@ -237,9 +224,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// A bare name after a Dictionary's `with` is the whole value
-		// being merged, never a key short for itself — there is no `a = a` for
-		// it to have meant, because a key is a value and not a name.
+		// A bare name after a Dictionary's `with` is the whole value merged,
+		// since a key is a value and not a name.
 		it("reads a bare name after 'with' as the whole value", () => {
 			let { program } = parseWithDiagnostics(
 				block(
@@ -289,9 +275,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// The same narrowing an empty List gets — the Declaration holds
-		// no Type until an assignment decides one, and the assignment pins both
-		// slots at once.
+		// As for an empty List, an assignment decides the Declaration's Type,
+		// both slots at once.
 		it("narrows an empty Dictionary through an assignment", () => {
 			expect(
 				codesFor(
@@ -300,9 +285,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// A key stands in the key slot of whatever the Dictionary is
-		// expected to be, so a bare Case resolves there exactly as it does in a
-		// List's item position.
+		// A bare Case in key position resolves against the expected key Type,
+		// as in a List's item position.
 		it("resolves a bare Case in key position", () => {
 			expect(
 				codesFor(
@@ -335,10 +319,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// A key Type has to be Equatable because a construction COMPARES
-		// its keys, and the bound is resolved exactly as a bounded Method call
-		// resolves its own — so what a key Type with no conformance reports is
-		// the Diagnostic that call would report.
+		// A construction compares its keys, so the key Type must be Equatable.
+		// The bound reports as a bounded Method call would.
 		it("refuses a key Type that is not Equatable", () => {
 			expect(
 				codesFor(
@@ -354,11 +336,9 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// A written Dictionary proves what its brackets say and what stands
-	// inside them, exactly as a written List does — `["a" = [1]]` is a
-	// `Dictionary<String, NonEmptyList<Integer>>` because the inner brackets are
-	// right there, one pair per entry. Both slots are walked, so a refinement in
-	// the key position is admitted on the same terms.
+	// A written Dictionary proves what its brackets hold, as a written List
+	// does. Both slots are walked, so `["a" = [1]]` admits a `NonEmptyList`
+	// value.
 	describe("refinement admission", () => {
 		it("admits a written value that proves the slot's refinement", () => {
 			expect(
@@ -418,9 +398,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["written a second time here", "first written here"])
 		})
 
-		// The key is the VALUE and not the characters — `2/4` is `1/2`,
-		// and a whole Rational is the Integer it is, because that is what the
-		// runtime's canonical encoding makes of them.
+		// The key is the value, not the characters, as the runtime's canonical
+		// encoding reads it: `2/4` is `1/2`, and `3/1` is `3`.
 		it("refuses two spellings of one Rational", () => {
 			expect(
 				codesFor(block("\tconstant scores = [1/2 = 1, 2/4 = 2]")),
@@ -452,9 +431,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["duplicate-key"])
 		})
 
-		// A key the Compiler can not compare as written is left to the
-		// runtime rule — a later duplicate wins — which is the honest division:
-		// what is refused is what is visible.
+		// A key the Compiler can not compare as written is left to the runtime,
+		// where a later duplicate wins.
 		it("says nothing about keys it can not compare", () => {
 			expect(
 				codesFor(
@@ -466,8 +444,7 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// Overriding is the POINT of an update, so a key the base already
-		// holds is no duplicate at all.
+		// An update overrides, so a key the base holds is no duplicate.
 		it("allows an update to override a key the base holds", () => {
 			expect(
 				codesFor(
@@ -547,8 +524,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["partial-type-mismatch"])
 		})
 
-		// An update over a base nothing has decided the slots of decides
-		// them, exactly as an assignment does.
+		// An update decides the slots of an undecided base, as an assignment
+		// does.
 		it("lets the entries decide an Unknown base's slots", () => {
 			expect(
 				typeOfLastDeclaration(
@@ -604,12 +581,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["wrong-update-brackets"])
 		})
 
-		// ONCE, in both directions. The pair that was written says which
-		// form was meant, so the key list is read under a form nobody wrote —
-		// `port` there is an Expression naming no Constant, and `alex = 40` is
-		// a Partial of a Dictionary. Both are Diagnostics about mistakes the
-		// reader did not make, and the second of them contradicts the first
-		// one's Help.
+		// Once, in both directions. The key list is not also read under the
+		// form the brackets did not mean.
 		it("reports once for a Record updated in brackets with a named key", () => {
 			expect(
 				codesFor(
@@ -632,10 +605,9 @@ describe("Dictionary literals", () => {
 			).toEqual(["wrong-update-brackets"])
 		})
 
-		// And a braced update whose key is a written VALUE never reaches
-		// the Enricher at all — no reading of `{ ages with "alex" = 40 }` gets
-		// past the `=`. The Parser reports the same code, because the value key
-		// says which pair was wanted without any Type being known.
+		// A braced update with a value key never reaches the Enricher. The
+		// Parser reports the same code, since the value key says which pair was
+		// wanted.
 		it("names the brackets for a value key written after a braced 'with'", () => {
 			let diagnostics = diagnosticsFor(
 				block(
@@ -656,10 +628,8 @@ describe("Dictionary literals", () => {
 			])
 		})
 
-		// `uncombinable-types` reaches a Dictionary-shaped base from two
-		// directions now — a Union of Dictionaries, and a bare `Dictionary`
-		// nothing applied Arguments to — so what it says about which Types
-		// combine has to be true of Dictionaries too.
+		// `uncombinable-types` reaches a Union of Dictionaries and a bare
+		// `Dictionary`, so its Notes must be true of Dictionaries.
 		it("does not claim a Dictionary can not be combined", () => {
 			let diagnostics = diagnosticsFor(
 				block(
@@ -676,10 +646,8 @@ describe("Dictionary literals", () => {
 			)
 		})
 
-		// A bare `Dictionary` takes every Dictionary, as a bare `List`
-		// takes every List — and updating one is refused as a "Generic Type".
-		// What is missing is exactly what would make it updatable, so the Help
-		// names it rather than leaving the reader with a category.
+		// A bare `Dictionary` can not be updated, so the Help names the Type
+		// Arguments that would make it updatable.
 		it("says which Type Arguments a bare Dictionary is missing", () => {
 			let diagnostics = diagnosticsFor(
 				block(
@@ -696,10 +664,8 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// The Diagnostics the empty Dictionary alone reaches. `[=]` decides
-	// neither of its slots, so it is the one written Dictionary whose Type a
-	// later line has to settle — and every Diagnostic about that used to be a
-	// sentence written about an empty LIST.
+	// `[=]` decides neither slot, so a later line settles its Type. Its
+	// Diagnostics speak of a Dictionary, not a List.
 	describe("the empty Dictionary's Diagnostics", () => {
 		const captured = block(
 			"\tvariable ages = [=]",
@@ -714,9 +680,8 @@ describe("Dictionary literals", () => {
 			expect(codesFor(captured)).toEqual(["uninferable-item-type"])
 		})
 
-		// A Dictionary has no item Type — it has two slots — and the
-		// Help a List is given, `variable ages: List<Integer> = []`, is advice
-		// that does not compile under a `[=]`.
+		// A Dictionary has two slots rather than an item Type, and a List's
+		// Help would not compile under a `[=]`.
 		it("speaks of both slots rather than of an item Type", () => {
 			let [diagnostic] = diagnosticsFor(captured)
 
@@ -728,21 +693,15 @@ describe("Dictionary literals", () => {
 					(line) => !line.includes("item Type"),
 				),
 			).toBe(true)
-			// The annotation alone, spelled the way every other report of a
-			// blank spells one. A value can not be shown with it: the same Help
-			// answers a Declaration whose blank sits inside something else, where
-			// the initialiser is no Literal at all.
-			// An example, and marked as one — a capture is refused with no
-			// value standing opposite it, so both slot Types here are made up.
+			// The annotation alone, marked as an example: a capture has no value
+			// opposite it, so both slot Types are made up.
 			expect(diagnostic.helps).toEqual([
 				"Annotate the declaration — 'variable ages: Dictionary<String, Integer>', for instance — so the Function is checked against the Types it will hold.",
 			])
 		})
 
-		// A Method called on `[=]` binds NEITHER Type Parameter, and one
-		// report per Parameter is the same sentence twice about one pair of
-		// brackets — with a Help that can not be followed, since `length` takes
-		// no Type Argument to write.
+		// A Method called on `[=]` binds neither Type Parameter, and the two
+		// are reported once together.
 		it("reports once for a Method called on it, with an annotation to write", () => {
 			let diagnostics = diagnosticsFor(
 				block("\tconstant count = [=]::length()"),
@@ -759,11 +718,9 @@ describe("Dictionary literals", () => {
 			])
 		})
 
-		// Both slots erase before a Match runs, so an EMPTY Dictionary is
-		// a value of every Dictionary Type there is — exactly what the empty
-		// List is, and exactly what `empty-list-overlap` exists to warn about.
-		// Written as a PAIR, because the hazard is one hazard and reporting it
-		// for one container and not the other is the failure this catches.
+		// An empty Dictionary is a value of every Dictionary Type, as an empty
+		// List is of every List Type. Both containers get the Warning. See
+		// "Runtime overlap" in packages/compiler/src/validator/DEVELOPMENT.md.
 		it("warns about the crossover in a Match, as the empty List does", () => {
 			let list = block(
 				"\tconstant u: List<String> | List<Integer> = []",
@@ -795,13 +752,9 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// `hasKey` is `@::value(at key)::hasValue()` and nothing else, so a
-	// branch guarded by one and opening with that same lookup walks the
-	// Dictionary twice for one answer. What is worth pinning is not the
-	// Warning on its own but the line either side of it: every way the
-	// repetition stops being something a reader can SEE is a way the Warning
-	// has to go quiet, because a style lint that fires on a Program somebody
-	// wrote deliberately is worse than no lint at all.
+	// A branch guarded by `hasKey` and opening with the same lookup looks the
+	// key up twice. The Warning must stay quiet wherever a reader can not see
+	// the repetition.
 	describe("the redundant key check", () => {
 		const ages = '\tconstant ages = ["alex" = 39, "sam" = 25]'
 
@@ -818,9 +771,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["redundant-key-check"])
 		})
 
-		// Both entries of the `value` Overload count. The one that
-		// answers an Optional is the shape the Help points AT — and it is
-		// still one lookup too many while the `if` stands in front of it.
+		// Both entries of the `value` Overload count, including the one that
+		// answers the Optional the Help points at.
 		it("warns where the branch asks for the Optional itself", () => {
 			expect(
 				codesFor(
@@ -862,9 +814,7 @@ describe("Dictionary literals", () => {
 			).toEqual(["redundant-key-check"])
 		})
 
-		// An `else` changes nothing about the branch the `if` opens —
-		// and the `match` the Help asks for is exactly the two-armed shape an
-		// `if`/`else` around one lookup was reaching for.
+		// An `else` changes nothing about the branch the `if` opens.
 		it("warns in the true branch of an if/else", () => {
 			expect(
 				codesFor(
@@ -931,8 +881,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// The branch is entered by the key being ABSENT, so the lookup
-		// under it is the first one there is.
+		// The branch is entered when the key is absent, so its lookup is the
+		// first.
 		it("stays silent where the check is negated", () => {
 			expect(
 				codesFor(
@@ -959,9 +909,7 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// Two calls that answer the same key are not two spellings of
-		// one key — nothing a reader reads says the second call answers what
-		// the first one did, and the Warning would be claiming it does.
+		// Two calls that answer the same key are not visibly one key.
 		it("stays silent where the key is worked out", () => {
 			expect(
 				codesFor(
@@ -976,9 +924,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// The same rule from the receiver's side. Two written updates
-		// are two Dictionaries built one after the other, and holding the
-		// first call's answer says nothing about the second one's.
+		// Two written updates are two Dictionaries, so the guard says nothing
+		// about the second.
 		it("stays silent where the receiver is worked out", () => {
 			expect(
 				codesFor(
@@ -992,9 +939,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// Everything past the first Statement could be what the branch
-		// was entered FOR — a lookup after a line that acted on the key being
-		// there is a second question rather than the first one repeated.
+		// Only the first Statement of the branch is read. A later lookup is a
+		// second question.
 		it("stays silent where the lookup is not the first Statement", () => {
 			expect(
 				codesFor(
@@ -1009,10 +955,8 @@ describe("Dictionary literals", () => {
 			).toEqual([])
 		})
 
-		// And the boundary that makes the Statement above the whole of
-		// what is read: the walk stops at a body. A lookup inside a Function
-		// literal runs whenever the Function is called, which is not here, so
-		// nothing says the guard's answer is still the answer.
+		// The walk stops at a body, since a Function literal's lookup runs
+		// whenever the Function is called.
 		it("stays silent where the lookup is inside a body", () => {
 			expect(
 				codesFor(
@@ -1042,9 +986,7 @@ describe("Dictionary literals", () => {
 			).toContain("Dictionary.createDictionary(")
 		})
 
-		// The one construction that compares nothing, and the one that
-		// hands over no witness — there is no key in an empty store for a
-		// written key to be measured against.
+		// The empty Dictionary compares nothing, so it hands over no witness.
 		it("hands the empty Dictionary no witness", () => {
 			expect(
 				generate(
@@ -1068,9 +1010,8 @@ describe("Dictionary literals", () => {
 			expect(js).toContain("Dictionary.set(Dictionary.set(")
 		})
 
-		// A literal written inside a bounded Method or Function hands over
-		// the witness that ARRIVED — the hidden conformance Parameter — rather
-		// than one resolved for a Type Parameter nothing has decided yet.
+		// A literal inside a bounded Method or Function hands over the hidden
+		// conformance Parameter.
 		it("forwards a bound the enclosing signature carries", () => {
 			let js = generate(
 				block(
@@ -1085,11 +1026,9 @@ describe("Dictionary literals", () => {
 			expect(js).toContain("Key__conformance)")
 		})
 
-		// `merge` is written in Essence, so the whole-value form has to
-		// reach it by name through the helper every emission site routes
-		// through — otherwise the search that decides which standard library
-		// consts a Module carries would never draw the edge, and the emitted
-		// Program would name a const nobody declared.
+		// `merge` is written in Essence, so the whole-value form names it in a
+		// way prelude reachability sees. See "Prelude reachability" in
+		// packages/compiler/src/rewriter/DEVELOPMENT.md.
 		it("emits the whole-value form as merge, and pulls its const in", () => {
 			let js = generate(
 				block(
@@ -1105,8 +1044,8 @@ describe("Dictionary literals", () => {
 		})
 	})
 
-	// What the emitted JavaScript actually does, which is the only place
-	// the insertion order, the override rule and the witness can be seen at all.
+	// The insertion order, the override rule and the witness show only in the
+	// emitted JavaScript.
 	describe("running", () => {
 		it("holds what was written, in the order it was written", async () => {
 			expect(
@@ -1142,9 +1081,8 @@ describe("Dictionary literals", () => {
 			).toEqual(["39", "0"])
 		})
 
-		// The runtime's rule for a duplicate the Compiler could not see:
-		// the later value wins and the key keeps the place its FIRST occurrence
-		// took.
+		// A duplicate the Compiler could not see: the later value wins in the
+		// first one's place.
 		it("lets a later duplicate win, in the first one's place", async () => {
 			expect(
 				await run(
@@ -1169,8 +1107,7 @@ describe("Dictionary literals", () => {
 			).toEqual(['"[\\"alex\\" = 39]"'])
 		})
 
-		// An overwritten key keeps its place and a new one lands at the
-		// end — the ratified order rule, seen through the written form.
+		// An overwritten key keeps its place and a new one lands at the end.
 		it("runs an update as the sets it stands for", async () => {
 			expect(
 				await run(
@@ -1199,8 +1136,7 @@ describe("Dictionary literals", () => {
 			).toEqual(['"[\\"alex\\" = 40, \\"sam\\" = 25, \\"kim\\" = 7]"'])
 		})
 
-		// A Record key has no encoding, so it is found by the scan path
-		// — through the very witness the literal carried into the construction.
+		// A Record key, found through the witness the literal carried.
 		it("holds a key the runtime can only find by comparing", async () => {
 			expect(
 				await run(
@@ -1212,8 +1148,7 @@ describe("Dictionary literals", () => {
 			).toEqual(["10"])
 		})
 
-		// `3` and `3/1` are one key under a `Number` key Type, which is
-		// what the Rational arm of the canonical encoding is for.
+		// `3` and `3/1` are one key under a `Number` key Type.
 		it("holds a whole Rational and the Integer it is as one key", async () => {
 			expect(
 				await run(
