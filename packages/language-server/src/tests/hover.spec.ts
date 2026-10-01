@@ -1009,6 +1009,27 @@ describe("Hover inside a Protocol or Choice declaration", () => {
 		)
 	})
 
+	// The predicate is typed with `@` as the base, so its calls answer as a
+	// body's do rather than as the whole Declaration.
+	it("should describe a refinement predicate's receiver and Method", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Checks for Integer {",
+			"\t\tisSmall() -> Boolean {",
+			"\t\t\t<- @::isLessThan(10)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\ttype Small = Integer where @::isSmall()",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 8, column: 29 })).toBe("@: Integer")
+		expect(hover(source, { line: 8, column: 34 })).toBe(
+			"isSmall() -> Boolean",
+		)
+	})
+
 	// The standard library's own refinement, which nothing in the source names.
 	// A List that answered `hasItems` reads back as the applied `NonEmptyList`,
 	// and its Method reads back as declared, answering an item.

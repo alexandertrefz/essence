@@ -523,32 +523,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			return
-		case "TypeAliasStatement": {
-			// A refinement reads back as what it refines on its own declaration, and a
-			// Record Alias as its members (`aliasedRecordShape`). See "How a declaration
-			// reads back" in DEVELOPMENT.md.
-			let declaredType =
-				refinedAliasBase(node.type) ??
-				aliasedRecordShape(node.type) ??
-				node.type
-
-			consider(
-				state,
-				node.position,
-				declaredType,
-				node.name.content,
-				node.documentation,
-			)
-			consider(
-				state,
-				node.name.position,
-				declaredType,
-				node.name.content,
-				node.documentation,
-			)
-			visitGenericDeclarations(node.generics, state)
+		case "TypeAliasStatement":
+			visitTypeAlias(node, state)
 			return
-		}
 		case "ProtocolDeclarationStatement": {
 			let content = describeProtocol(node.name.content, node.protocolType)
 
@@ -875,6 +852,39 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 		case "BooleanValue":
 			consider(state, node.position, node.type, null)
 			return
+	}
+}
+
+function visitTypeAlias(
+	node: common.typed.TypeAliasStatementNode,
+	state: State,
+) {
+	// A refinement reads back as what it refines on its own declaration, and a
+	// Record Alias as its members (`aliasedRecordShape`). See "How a declaration
+	// reads back" in DEVELOPMENT.md.
+	let declaredType =
+		refinedAliasBase(node.type) ??
+		aliasedRecordShape(node.type) ??
+		node.type
+
+	consider(
+		state,
+		node.position,
+		declaredType,
+		node.name.content,
+		node.documentation,
+	)
+	consider(
+		state,
+		node.name.position,
+		declaredType,
+		node.name.content,
+		node.documentation,
+	)
+	visitGenericDeclarations(node.generics, state)
+
+	if (node.predicate !== null) {
+		visitNode(node.predicate, state)
 	}
 }
 
