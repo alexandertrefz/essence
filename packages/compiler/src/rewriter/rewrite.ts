@@ -3710,11 +3710,8 @@ function projectedCombination(
 	)
 }
 
-// `{ ...lhs, member: rhs.member, … }` — the spread and one read per
-// member, both operands already reduced to something that can be named twice.
-// The keys go through `memberKey` and the reads through `memberRead`, which is
-// what carries an Essence name JavaScript can not spell as an identifier
-// (`ok?`) into a quoted key on the one side and a bracketed read on the other.
+// `{ ...lhs, member: rhs.member, … }`, over operands that can be named twice.
+// `memberKey` and `memberRead` quote a name like `ok?`.
 function combinedObject(
 	lhs: estree.Expression,
 	rhs: estree.Expression,
@@ -3807,10 +3804,8 @@ function rewriteStringValue(
 	}
 }
 
-// What renders one hole — `<witness>.toString` read off the method map,
-// and the Method ITSELF where `devirtualise-witnesses` has already said which
-// one it is. This is the one emission site that consumes a witness rather than
-// passing it on, which is why it is the one site that pass has anything to do.
+// What renders one hole: `<witness>.toString`, or the Method itself where
+// `devirtualise-witnesses` resolved it.
 function holeRenderer(
 	witness: common.typedSimple.ExpressionNode,
 ): estree.Expression {
@@ -3821,14 +3816,9 @@ function holeRenderer(
 	return memberRead(rewriteExpression(witness), "toString")
 }
 
-// An interpolated String folds into one `String.createString(<concat>)`,
-// where the concatenation `+`-joins the text runs (plain JS string Literals)
-// with each hole rendered by its witness — `<witness>.toString(<hole>).value`,
-// the JS string the Printable conformance produces. The whole thing is string
-// concatenation because `segments` always begins with a text run (`""` when the
-// first thing written is a hole), so the fold starts from a Literal. No runtime
-// helper is added: this is the same `toString` call `List::join` makes at run
-// time, inlined per hole.
+// An interpolated String as `String.createString(<concat>)`, joining text
+// runs and `<witness>.toString(<hole>).value` with `+`. `segments` always
+// starts with a text run, so the fold starts from a string.
 function rewriteInterpolatedStringValue(
 	node: common.typedSimple.InterpolatedStringValueNode,
 ): estree.CallExpression {
@@ -3868,25 +3858,16 @@ function rewriteInterpolatedStringValue(
 	}
 }
 
-// A Number Literal is decimal digits and nothing else — Essence has no
-// hexadecimal, binary or exponent form — and the Lexer is what refuses the rest,
-// with a positioned Diagnostic naming the text the author wrote. This is the
-// belt to that braces: `BigInt` is not a decimal parser, it reads `"0xFF"` as
-// 255 and THROWS on `"FF"`, so a digit string that ever slipped past the Lexer
-// would either compile to a silently different number or abort the Rewriter with
-// a JavaScript SyntaxError carrying no source location at all. Keeping the
-// leading decimal run — and 0 when there is none — makes the emission total, and
-// leaves a well-formed Literal byte-identical.
+// The leading decimal digits, or `0`. The Lexer refuses any other number
+// form, but `BigInt` would read `"0xFF"` as 255 and throw on `"FF"`.
 function decimalDigits(value: string): string {
 	let digits = /^-?[0-9]+/.exec(value)?.[0]
 
 	return digits === undefined ? "0" : digits
 }
 
-// The literal is written in the representation the value CANONICALLY has
-// — a JavaScript number where a double holds it exactly, a bigint beyond that —
-// so that `createInteger` has nothing to convert and a pooled literal is already
-// the shape every comparison against it expects.
+// The literal in its canonical representation, so `createInteger` has
+// nothing to convert.
 function rewriteIntegerValue(
 	node: common.typedSimple.IntegerValueNode,
 ): estree.CallExpression {
@@ -4030,17 +4011,8 @@ function rewriteListValue(
 	}
 }
 
-// The written Dictionary, handed to the runtime as the pairs it was
-// written as and the witness its keys are compared through. `createDictionary`
-// is a literal constructor and names its Namespace directly, exactly as
-// `List.createList` does above and for the same reason: it is no Method any
-// standard library file declares, so it can never be Essence-implemented and
-// never goes through `namespaceMember`.
-//
-// The empty Dictionary hands over `null` where a witness would be. It is
-// the one construction that compares nothing — there is no key in the store for
-// a written key to be measured against — and `createDictionary` reads the
-// witness only inside the loop over the pairs, which does not run.
+// A written Dictionary as its pairs and its key witness. The empty one
+// passes `null`, since `createDictionary` reads the witness only per pair.
 function rewriteDictionaryValue(
 	node: common.typedSimple.DictionaryValueNode,
 ): estree.CallExpression {
@@ -4069,22 +4041,12 @@ function rewriteDictionaryValue(
 	}
 }
 
-// A Lookup reaches here for a static Method call (`Number.sum(…)`), a
-// static Property read (`Number.Pi`) and a plain Record member access
-// (`record.field`). Only the first two name a Namespace, and WHICH of the three
-// this is has to be read off the base's resolved Type, not off its spelling: a
-// local may be named after a Namespace — `constant Optional = { isEmpty = 5 }`
-// is a legal Program the Enricher types as a Record — and deciding by the name
-// alone would send `Optional.isEmpty` through `namespaceMember`, which answers
-// with the standard library's `$es_Optional_isEmpty` Function in place of the
-// field. That would miscompile silently: it type checks, it emits, and the
-// value is simply the wrong one. Every other base — a shadowing local, a
-// chained access, a call result — keeps the plain member read.
+// A static Method, a static Property or a Record member. The base's Type,
+// not its spelling, says which, since a local Record may be named like a
+// Namespace.
 function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
-	// A member read off a bounded Type Parameter's conformance rather
-	// than off the Namespace the base spells — `T.cases()` is
-	// `T__conformance.cases()`. The base Node holds the author's name, which is
-	// what Hover reads, so the emitted one comes from the Lookup instead.
+	// A bounded Type Parameter's member reads its witness: `T.cases()` is
+	// `T__conformance.cases()`.
 	if (node.conformanceName !== undefined) {
 		return memberRead(
 			{ type: "Identifier", name: node.conformanceName },
@@ -4092,9 +4054,7 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
-	// A derived `cases`, which is a member of no Namespace at all — the
-	// base may name the Choice itself, or a Namespace written over it that
-	// simply does not hold the Method, and neither is what the emission reads.
+	// A derived `cases` is a member of no Namespace.
 	if (node.derivedCases !== undefined) {
 		return namespaceMember(
 			derivedEnumerableNamespaceName,
@@ -4106,9 +4066,8 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		)
 	}
 
-	// And a member the base does not spell either: a `cases` written in a
-	// Namespace of another name, reached through the Choice's own. The base
-	// names the Type, as the author wrote it, so the Namespace comes from here.
+	// A `cases` written in a Namespace of another name, reached through the
+	// Choice.
 	if (node.namespaceName !== undefined) {
 		return namespaceMember(node.namespaceName, node.member.name)
 	}
@@ -4129,14 +4088,8 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 	return memberRead(rewriteExpression(node.base), node.member.name)
 }
 
-// The JavaScript words that can not be a binding or a bare reference —
-// `case`, `default`, `new`, `class` — but ARE legal Essence identifiers, so a
-// Parameter or Constant can be named one and reach here. `with`, `for`, `if`,
-// `case`, `static` are Essence keywords too, yet the Parser still lets them name
-// a Parameter's internal name, so the full JavaScript set is what matters. The
-// list is the reserved words plus the ones a strict-mode module also forbids
-// (`let`, `static`, `implements`, …, `arguments`, `eval`) — emitted code is an
-// ES module, so it runs strict.
+// The words a strict-mode JavaScript module can not bind. Essence allows
+// many of them as names, even its own keywords as a Parameter's internal name.
 const reservedJavaScriptWords = new Set([
 	"break",
 	"case",
@@ -4188,65 +4141,34 @@ const reservedJavaScriptWords = new Set([
 	"eval",
 ])
 
-// The names the emitted Program binds — or reads off the host — for its
-// OWN purposes: the runtime Namespace imports (`List`, `String`, …), the module
-// aliases beside them, and the globals the emission reaches for, such as the
-// `Object` of a Combination's `Object.assign`. None of them is an Essence
-// keyword and none can be reported to the author as taken, so a Program is free
-// to bind any of them itself — and ordinary JavaScript lexical scoping then
-// rebinds every emitted `List.createList(…)`, `$type.isValueOfType(…)` and
-// `Object.assign(…)` below it to the user's value. `constant List = 5` beside a
-// List literal is a `TypeError` out of a Program that compiled green, and
-// `$type`/`$helpers` are worse: `$` is a legal Essence identifier character, so
-// they are names a user can write without any way of knowing they are spoken
-// for. Every one of them is therefore a name the user half of the Program can
-// not hold — `escapeName` mangles it instead, at the binding and at every
-// reference alike.
+// The names emitted code binds or reads for its own use: runtime imports,
+// module aliases and globals such as `Object`. A Program may bind them too, so
+// `escapeName` mangles the user's. See "Escaped names" in DEVELOPMENT.md.
 const compilerOwnedNames = new Set([
 	...runtimeNamespaceNames,
 	"$_",
 	"$type",
 	"$helpers",
-	// The test runtime and the name a test's context is bound to inside
-	// the Function a `tests` section becomes. A Program is free to write either
-	// — `$` is a legal Essence identifier character — and would otherwise take
-	// the context away from every assertion below it.
+	// The test runtime and the names a `tests` section binds.
 	"$testing",
 	"$context",
 	"$tests",
-	// The Module's coverage counter, bound at the head of a Module a
-	// coverage compile instrumented. Every counter in the body calls it by
-	// this name.
+	// The coverage counter of an instrumented Module.
 	"$cover",
-	// Asynchrony's module alias, and the name the CONTEXT a completing
-	// body runs under is bound to — the one Parameter of the async closure such
-	// a body answers with. Every `start` and every `complete` written in that
-	// body, and in every sync closure written inside it, reads the context by
-	// this name, so a Program binding it would hand its own value to the
-	// runtime's stopping machinery.
+	// The `Future` module alias, and the context a completing body runs
+	// under, which every `start` and `complete` inside it reads.
 	"$future",
 	"$ctx",
 	"Object",
-	// A counted walk whose bounds escaped safe range converts its start
-	// with it, so a Program declaring its own `BigInt` would take the
-	// conversion away from the loop it sits above.
+	// A counted walk past the safe range converts its start with `BigInt`.
 	"BigInt",
 ])
 
-// The builtin Namespaces as a set, for the one question emission asks of
-// a Namespace name: is this the `import * as <Name>` the Program opens with, or
-// a user's `class`?
+// The builtin Namespaces, whose names are the module's `import * as <Name>`.
 const runtimeNamespaceNameSet = new Set(runtimeNamespaceNames)
 
-// A JavaScript IdentifierName, spelled as the specification does — an
-// ID_Start (or `$`/`_`) followed by ID_Continue — so an Essence name that is
-// already a legal JavaScript one is emitted untouched, accents and all. The
-// Lexer ends an Identifier only at one of ITS symbols, and `?`, `+`, `!`, `%`,
-// `*`, `&`, `^`, `;` and `'` are not among them, so `ok?` and `a+b` are single
-// Identifier Tokens that every stage carries to here. Emitted raw they are not
-// JavaScript at all, and the build died in the bundler — an esbuild syntax error
-// quoting generated text, at a line number that does not exist in the author's
-// file.
+// A JavaScript IdentifierName as the specification spells it, so a name
+// JavaScript accepts, accents included, is emitted as it is.
 const javaScriptIdentifierName =
 	/^[$_\p{ID_Start}][$\u200C\u200D\p{ID_Continue}]*$/u
 
@@ -4254,15 +4176,8 @@ function isJavaScriptIdentifierName(name: string): boolean {
 	return javaScriptIdentifierName.test(name)
 }
 
-// The escape hatch for a name JavaScript can not spell, or one the
-// compiler has already spoken for. Every character JavaScript accepts unchanged
-// is kept, and every other becomes `_<code point in hex>_` — an encoding that is
-// injective, because `_` can appear NOWHERE else in the result: the Lexer reads
-// `_` as a Symbol, so no Essence identifier contains one, and the kept
-// characters are exactly `[A-Za-z0-9$]`. Two different names therefore can not
-// mangle alike, and the `$user_` prefix — itself unspellable in Essence, for the
-// same reason — keeps the whole space clear of the compiler's own `$es_…`
-// consts, `$type`, `$_`, `_self` and the `_`-escaped reserved words.
+// The injective spelling of a name JavaScript can not spell or the compiler
+// owns. See "Escaped names" in DEVELOPMENT.md.
 const mangledNamePrefix = "$user_"
 const keptMangledCharacter = /^[A-Za-z0-9$]$/
 
@@ -4278,26 +4193,9 @@ function mangleName(name: string): string {
 	return mangled
 }
 
-// One Essence name as the emitted Program binds and reads it. Three things
-// can be wrong with it, and a name is left ALONE unless one of them is — which
-// is what keeps every ordinary Program's emission byte-identical:
-//
-//   spelled like the compiler's own    `List`, `$type`   → mangled
-//   not a JavaScript IdentifierName    `ok?`, `a+b`      → mangled
-//   a JavaScript reserved word         `new`, `default`  → `_`-prefixed
-//
-// The reserved-word escape stays its own, older answer: `_case` can not be a
-// user's own identifier and no reserved word starts with `_`, so it is injective
-// on its own, and it does not collide with a mangled name, which always begins
-// `$user_`. Member and property positions do NOT come through here — a reserved
-// word is a legal property key (`record.case`, `{ case: … }`) and escaping one
-// would part it from the key the Record literal wrote. `memberKey` answers for
-// those.
-//
-// Exported because a host binding names off an Export Surface has to ask
-// the same question — an Essence Module exports `square` and `ok?`, and the
-// bundle binds `square` and `$user_ok_3f_`. Answering it a second time
-// somewhere else is how the two spellings drift apart.
+// One Essence name as emitted code binds and reads it. Not for member
+// positions, which `memberKey` spells. Exported so a host's bindings agree. See
+// "Escaped names" in DEVELOPMENT.md.
 export function escapeName(name: string): string {
 	if (compilerOwnedNames.has(name) || !isJavaScriptIdentifierName(name)) {
 		return mangleName(name)
@@ -4315,31 +4213,8 @@ function rewriteIdentifier(
 	}
 }
 
-// A Namespace's emitted binding. A builtin's name IS the `import * as
-// <Name>` the Program opens with, so it is emitted verbatim — escaping it would
-// part every reference from the import. Every other Namespace is a user's,
-// emitted as a `class <Name>`, and its name is an ordinary Essence identifier:
-// `namespace new for Integer` and `namespace Object for Integer` both parse. So
-// it is escaped exactly as a Constant is — here, at the class declaration, and
-// in `namespaceMember`, at every reference — which is what keeps the two
-// agreeing. They did not: the declaration was escaped and the references were
-// not, so `constant this = { x = 1 }` bound `_this` and read `this.x`.
-//
-// A user Namespace named after a builtin — `namespace List for Integer` —
-// is refused where the Enricher can see it: at the top level `List` is already
-// declared, and the answer is 'Variable 'List' is already declared'. A NESTED
-// one is accepted, because it declares `List` in an inner Scope where nothing is
-// taken yet, and it used to be emitted verbatim as well: the `class List` inside
-// the Function then shadowed the `import * as List` for the rest of that block,
-// so the List literal two lines below it called the user's class and died with
-// `List.createList is not a function` out of a Program that compiled green.
-//
-// The two ARE tellable apart, and lexically: a name is the user's inside the
-// block that declares it and the import everywhere else, which is exactly what
-// `shadowingNamespaceScopes` tracks. The user's is mangled — declaration and
-// every reference alike — and the import keeps the name it was imported under,
-// so a List literal beside a `namespace List` calls the runtime and
-// `21::doubledValue()` calls `$user_List`.
+// Whether a Namespace name is the builtin import rather than a user's class.
+// See "Shadowed Namespaces" in DEVELOPMENT.md.
 function isBuiltinNamespaceReference(namespaceName: string): boolean {
 	return (
 		runtimeNamespaceNameSet.has(namespaceName) &&
@@ -4353,26 +4228,12 @@ function namespaceIdentifierName(namespaceName: string): string {
 		: escapeName(namespaceName)
 }
 
-// The user Namespaces in lexical scope right now whose name the compiler
-// has already spoken for — one Set per emitted block, innermost last. Only a
-// name in `compilerOwnedNames` is ever recorded: every other Namespace name
-// means the same thing wherever it is written, and `escapeName` already answers
-// for it without any scope to consult.
-//
-// The stack mirrors the Enricher's own Scope chain, and that is what makes
-// it exact rather than a guess. A nested Namespace does not merely add a name —
-// it REPLACES the builtin of that name for the rest of its block, in Method
-// resolution ('No Method named 'firstItem'' for a List beside a
-// `namespace List`) and in conformance solving alike ('String does not conform
-// to 'Comparable'' beside a `namespace String`). So inside the block every
-// `List` a Node can carry is the user's, and outside it every one is the
-// import — including the ones that arrive as a bare string with no Type to ask,
-// a `UnionMethodInvocation`'s dispatch case and a `ConformanceValue`'s witness.
+// The compiler-owned names a user Namespace took, one set per emitted block,
+// innermost last. See "Shadowed Namespaces" in DEVELOPMENT.md.
 let shadowingNamespaceScopes: Array<Set<string>> = [new Set()]
 
-// `finally`, so a throw out of the Rewriter — the one for a Lookup on a
-// native invocation, say — can not leave the stack deeper than it found it and
-// mangle a Namespace name in the NEXT Program this process compiles.
+// Popped in `finally`, so a throw can not leave the stack deeper for the
+// next Program.
 function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
 	shadowingNamespaceScopes.push(new Set())
 

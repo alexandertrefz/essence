@@ -424,3 +424,43 @@ Overload. Each call receives the base's key witness, since each `set` compares a
 already holds. The witness is rewritten once per call, so no two positions share a node; `pool-constants`
 turns it into a reference to one const. A `null` witness stands for an update over a Dictionary whose key
 Type is not yet decided, which holds no key to compare.
+
+## Escaped names
+
+`escapeName` decides how an Essence name is bound and read in emitted code. It leaves a name alone unless
+one of three things is wrong with it:
+
+| The name is | For example | It becomes |
+| --- | --- | --- |
+| one the compiler uses itself | `List`, `$type` | mangled |
+| no JavaScript IdentifierName | `ok?`, `a+b` | mangled |
+| a JavaScript reserved word | `new`, `default` | prefixed with `_` |
+
+`compilerOwnedNames` holds the names emitted code binds or reads for its own use. They are the runtime
+Namespace imports, the module aliases, the test and coverage bindings, `$ctx`, `Object` and `BigInt`. A Program may bind any of them, since `$` is legal in an Essence identifier and the rest are no
+keywords. JavaScript scoping would then send the emitted code's own references to the user's value.
+
+The Lexer ends an Identifier only at one of its own symbols, so `ok?` and `a+b` are single Identifiers.
+JavaScript can not spell them.
+
+`mangleName` keeps `[A-Za-z0-9$]` and writes every other character as `_<code point in hex>_`, after the
+prefix `$user_`. No Essence name contains `_`, so the encoding is injective, and a mangled name can not
+collide with the compiler's names. A reserved word becomes `_<word>`, which is also injective, since no
+reserved word starts with `_`.
+
+Member positions do not go through `escapeName`. A reserved word is a legal property key, as in
+`record.case`, and `memberKey` quotes a key JavaScript can not spell. `escapeName` is exported so a host's
+binding names, read off an Export Surface, agree with the bundle's.
+
+### Shadowed Namespaces
+
+A builtin Namespace's name is the `import * as <Name>` a module opens with, so it is emitted as it is. A
+user Namespace is a `class`, and its name is escaped like any other at the declaration and at every
+reference.
+
+A user Namespace may take a builtin's name in a nested block, where the Enricher has nothing declared under
+it yet. Within that block it replaces the builtin, for Method resolution and conformance alike. Elsewhere the
+name still means the import. `shadowingNamespaceScopes` mirrors the Enricher's Scopes: one set per emitted
+block, holding the compiler-owned names a user Namespace took there. `isShadowingUserNamespace` answers from
+it, so even a bare Namespace name with no Type, such as a dispatch case's or a witness's, resolves correctly.
+The user's Namespace is mangled, and the import keeps its name.
