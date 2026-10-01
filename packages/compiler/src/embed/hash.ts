@@ -9,31 +9,21 @@ import { type OptimiserOptions, optimiserOptionsKey } from "../optimiser/index"
 
 type BundleHashParts = {
 	entryPath: string
-	// Only what each Module is spelled and what it SAYS. A parsed graph
-	// answers this and so does a linked one, which is what lets a caller hash
-	// before it has decided to link — the whole point of naming a bundle after
-	// what it was compiled from.
+	// Each Module's path and text, which a parsed graph answers too, so a caller can
+	// hash before linking.
 	modules: ReadonlyMap<string, { readonly sourceText: string }>
 	optimisation: OptimiserOptions
-	// What the HOST puts into the bundle beyond the sources. A
-	// `transformSources` is a Function and a Function can not be hashed, so the
-	// host names what it injects instead — without it one file would stand for
-	// two different bundles, and whichever was written first would answer for
-	// both.
+	// What the host puts into the bundle beyond the sources. A `transformSources`
+	// Function can not be hashed, so the host names it here.
 	emitterKey: string
-	// Defaulted rather than passed, because there is one right answer and
-	// the call site should not be able to forget it. It is a parameter at all so
-	// that the spec can hand over two and prove it participates.
+	// Defaulted, so a call site can not forget it. A parameter only so the spec
+	// can prove it takes part.
 	toolchain?: string
 }
 
-// What the bundle was compiled FROM and BY, in one string. It is a cache
-// key: two compiles agreeing here have to have produced the same bytes, and a
-// change to anything that went into those bytes has to change it.
-//
-// The graph's order is not used — dependency order depends on which entry
-// was asked for, and the same set of files reached from two entries has to hash
-// the same. Sorted instead.
+// What the bundle was compiled from and by, as a cache key. Modules are sorted
+// by path, so the key does not depend on the order a graph lists them in. See
+// "Bundle hashes" in DEVELOPMENT.md.
 export function hashGraph(parts: BundleHashParts): string {
 	let hash = createHash("sha256")
 
@@ -51,27 +41,8 @@ export function hashGraph(parts: BundleHashParts): string {
 	return hash.digest("hex")
 }
 
-// What a bundle was compiled BY. A bundle is not a function of the `.es`
-// sources alone: the standard library is compiled into it and the runtime is
-// inlined into it, and neither is in the Module graph — so a key over the graph
-// alone names a file an OLDER toolchain wrote, and a host with a cache goes on
-// running it forever. Upgrade the Compiler to get a codegen fix, leave the
-// sources alone, and the fix never arrives.
-//
-// What goes in is the Compiler's version and the TEXT of everything it
-// emits that is not the user's — the standard library's Essence sources and the
-// runtime's TypeScript. The version alone is exact for anybody who installed
-// the package and useless in a workspace checkout, where it does not move
-// between two edits of `String.es`.
-//
-// What does NOT go in is the Compiler's own sources: three and a half
-// megabytes across a hundred files, re-read by every process that compiles, to
-// catch a case only somebody editing the Compiler is in. Whoever edits the
-// Rewriter and wants to see the difference compiles against a cache directory
-// of their own, as the test suite does, or empties the shared one.
-//
-// Read once per process and kept. Nothing here can change under a
-// running compile in a way this is meant to notice.
+// What compiled a bundle: the compiler's version, the standard library and the
+// runtime, read once per process. See "Bundle hashes" in DEVELOPMENT.md.
 let toolchain: string | null = null
 
 export function toolchainKey(): string {
@@ -85,10 +56,8 @@ function digestToolchain(): string {
 
 	mix(hash, compilerVersion())
 
-	// Named by their base name rather than by their path — the same
-	// standard library installed under two prefixes is the same standard
-	// library, and the paths that do matter, the user's, are mixed in beside
-	// the graph.
+	// By base name, so one standard library installed under two prefixes hashes
+	// alike.
 	for (let { filePath, sourceText } of readStdlibFiles()) {
 		mix(hash, path.basename(filePath))
 		mix(hash, sourceText)
@@ -102,10 +71,8 @@ function digestToolchain(): string {
 	return hash.digest("hex")
 }
 
-// The manifest two levels up — `src/embed/` in a workspace checkout,
-// `dist/embed/` in the published package, and the package root either way. A
-// manifest that can not be read leaves the version out rather than stopping a
-// compile: what is lost is a cache invalidation, not an answer.
+// The package manifest two levels up. An unreadable one leaves the version out,
+// which costs a cache invalidation, not a compile.
 function compilerVersion(): string {
 	try {
 		let manifest = JSON.parse(
@@ -121,10 +88,8 @@ function compilerVersion(): string {
 	}
 }
 
-// Everything the Bundler could inline — the runtime's TypeScript, and
-// the tsconfig it is transpiled under, which decides what that TypeScript
-// becomes. Sorted, so the digest does not depend on the order a file system
-// happens to enumerate a directory in.
+// Everything the Bundler could inline: the runtime's TypeScript and the
+// tsconfig it is transpiled under. Sorted, so directory order does not matter.
 function runtimeSources(): Array<string> {
 	let found: Array<string> = []
 
@@ -143,9 +108,7 @@ function runtimeSources(): Array<string> {
 	return found.sort()
 }
 
-// Length-prefixed, so that no two different sequences of parts can spell
-// the same bytes — a file whose name ends where the next one's text begins is
-// otherwise indistinguishable from the pair that swaps the boundary.
+// Length-prefixed, so no two sequences of parts spell the same bytes.
 function mix(hash: Hash, text: string): void {
 	hash.update(`${text.length}:${text}`)
 }

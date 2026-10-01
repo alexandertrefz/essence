@@ -9,22 +9,14 @@ import {
 import { type EmitTarget, rewriteModules } from "../rewriter/index"
 import { simplify, type SimplifyOptions } from "../simplifier/index"
 
-// The back half of the pipeline — enriched Programs in, a bundle's bytes
-// out — written once and shared by everything that emits: `esc`, and the
-// in-memory compile below it. What the stages are, what order they run in and
-// what each of them has to be handed is stated here and nowhere else, so the
-// two callers can not drift into emitting differently.
-//
-// The seams below exist because the CALLERS differ, not because the pipeline
-// does: `esc` times each stage and caches simplification across the entries of
-// one invocation, and an embedder does neither. Everything that decides what
-// the output IS lives in the request.
+// The back half of the pipeline, enriched Programs in and a bundle out, shared
+// by the CLI and the in-memory entries so they emit alike. The hooks exist
+// because callers differ: the CLI times stages and caches simplification.
 
 export type EmitStage = "simplify" | "optimise" | "generate" | "bundle"
 
-// One Module on its way to JavaScript: the canonical path it is keyed by,
-// the typed Program that path enriched into, and its Essence source, which
-// becomes the source map's `sourcesContent` entry.
+// One Module on its way to JavaScript: its canonical path, its typed Program,
+// and its source, which becomes the source map's `sourcesContent` entry.
 export type EmitModule = {
 	filePath: string
 	program: common.typed.Program
@@ -32,42 +24,30 @@ export type EmitModule = {
 }
 
 export type EmitRequest = {
-	// Dependency-first with the entry last — the graph's order, which is
-	// the order the Module bodies run in.
+	// Dependency-first with the entry last, the order Module bodies run in.
 	modules: Array<EmitModule>
-	// The canonical path of the entry Module, which every other Module's
-	// specifier in the bundle is spelled relative to — unless the target below
-	// says otherwise.
+	// The entry Module's canonical path, which other Modules' specifiers are
+	// spelled relative to unless `emit` says otherwise.
 	entryPath: string
-	// What the bundle's own source is CALLED, as the caller spells it.
-	// Only a single-file compile reads it; a graph carries its own names.
+	// The bundle's source name, read only by a single-file compile.
 	sourceFileName: string
 	outputFileName: string
 	minify?: boolean
 	sourcemap?: boolean
 	sourcemapMode?: "linked" | "inline"
 	optimisation?: OptimiserOptions
-	// Who the emitted Modules are for — see `EmitTarget`. Absent means a
-	// bundle, which is what `esc` and every embedder emitting one ask for; only
-	// a caller that stops at `generateModules` and serves the Modules to a host
-	// bundler names the other one.
+	// Who the emitted Modules are for. Absent means a bundle. Only a caller serving
+	// `generateModules` output to a host bundler names the other target.
 	emit?: EmitTarget
-	// A last word on the rewritten Modules before esbuild reads them —
-	// the seam an embedder injects a synthetic Module through, entry included.
-	// It runs after rewriting because what it adds is JavaScript rather than
-	// Essence, and before bundling because that is what makes it part of the
-	// bundle rather than a second file beside it.
+	// A last change to the rewritten Modules before bundling, through which an
+	// embedder injects a synthetic Module, entry included.
 	transformSources?: (sources: ModuleSources) => ModuleSources
 }
 
-// Who does the work, when somebody other than this file should. Both
-// caches are `esc`'s: one typed Program is reached by every entry that imports
-// it, and each is simplified and optimised once.
+// Stage overrides for a caller with caches of its own, as the CLI has.
 export type EmitHooks = {
-	// The Options carry the Module's own text, which only a test compile
-	// reads — the span table a test lowering emits slices the source of every
-	// instrumented point out of it. A caching hook may ignore them: one Program
-	// is one Module's, and its text can not change under it.
+	// The Options carry the Module's text, which only a test compile reads. A
+	// caching hook may ignore them, since a Program's text can not change.
 	simplify?: (
 		program: common.typed.Program,
 		options?: SimplifyOptions,
@@ -82,11 +62,8 @@ export type EmitHooks = {
 	) => Promise<Result>
 }
 
-// The pipeline down to JavaScript and no further: the Modules rewritten,
-// the prelude beside them, and whatever the caller injected. What a caller does
-// with them is the difference between a bundle and a host's build — the stages
-// above that seam are the same either way, which is why they are written here
-// once rather than in each caller.
+// The pipeline down to JavaScript: the rewritten Modules, the prelude and any
+// injected Module, for a bundle or for a host's build.
 export async function generateModules(
 	request: EmitRequest,
 	hooks: EmitHooks = {},
@@ -106,10 +83,7 @@ export async function generateModules(
 		simplified.map((program) => runOptimise(program, optimisation)),
 	)
 
-	// The whole graph is rewritten in one call, which is what shares the
-	// standard library prelude between its Modules — rewriting them one at a
-	// time would put a copy of every reachable Essence Method into every Module
-	// that reaches it.
+	// The whole graph is rewritten in one call, so its Modules share one prelude.
 	return runStage("generate", () => {
 		let sources = rewriteModules(
 			optimised.map((program, index) => ({
@@ -118,10 +92,8 @@ export async function generateModules(
 				sourceText: request.modules[index]!.sourceText,
 			})),
 			request.entryPath,
-			// The Options the user Program was optimised under reach the
-			// Rewriter too: the standard library's bodies are optimised inside
-			// the prelude it builds, and a Program compiled with a pass off must
-			// not import one compiled with it on.
+			// The prelude's bodies are optimised under the user Program's Options, so a
+			// pass is never on in one and off in the other.
 			{
 				sourcemap: request.sourcemap,
 				optimiser: optimisation,

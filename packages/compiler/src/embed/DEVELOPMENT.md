@@ -127,3 +127,19 @@ exported `type` reaches a host through the declaration file. The answer is deriv
 a sidecar, where it could go stale. `carriesFuture` asks every position, not only answers: the marshaller writes
 its refusals from the Descriptor, so a door it does not need changes nothing. `reaches` names every Descriptor kind
 in its `switch`, so a new kind must be answered there.
+
+## Bundle hashes
+
+`hashGraph` names a bundle after what it was compiled from and by: two compiles that agree on the hash must produce
+the same bytes. It mixes the entry path, the optimiser options, the `emitterKey` and every Module's path and text.
+A `transformSources` Function can not be hashed, so the host names what it injects as `emitterKey`. Modules are
+sorted by path, so the key does not depend on the order a graph lists them in. Each part is length-prefixed, so
+no two sequences of parts spell the same bytes.
+
+`toolchainKey` covers what compiled the bundle. The standard library is compiled into a bundle and the runtime is
+inlined into it, and neither is in the Module graph. Without them in the key, a host's cache would keep a bundle
+an older toolchain wrote. The key mixes the compiler's version, the standard library's Essence sources by base
+name, and the runtime's TypeScript and `tsconfig.json`. The version alone would not move between two edits in a
+workspace checkout. The compiler's own sources are left out, since reading them in every process costs more than
+the case is worth. Someone editing the Rewriter compiles against a cache directory of their own, or empties the
+shared one. The key is computed once per process.
