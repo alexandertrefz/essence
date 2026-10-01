@@ -5,10 +5,9 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { parseWithDiagnostics } from "../parser/index"
 import { compiles } from "./followedHelps"
 
-// The `tests { … }` section and everything only written in it — the two
-// items, their Modifiers and the two assertions. This covers the GRAMMAR
-// alone: nothing here is enriched, and a tests section costs a compiled
-// Program nothing until `essence test` asks for it.
+// The grammar of the `tests { … }` section and what is written only there:
+// `test` and `suite`, their Modifiers, and the assertions. Only the followed
+// Helps are compiled.
 
 function parse(source: string): {
 	program: parser.Program
@@ -103,10 +102,9 @@ describe("Tests Section", () => {
 			expect(program.exports?.entries).toHaveLength(1)
 		})
 
-		// The `Season.tests.es` convention — imports and tests and no
-		// implementation block at all. The Program still carries an
-		// implementation section so that everything walking Statements walks
-		// one shape; `kind` is what says the block was never written.
+		// A `Season.tests.es` file holds imports and tests only. The Program
+		// still carries an empty implementation section, and `kind` says it was
+		// never written.
 		it("should read a file that is nothing but tests", () => {
 			let { program, diagnostics } = parse(
 				`import {
@@ -177,10 +175,8 @@ describe("Tests Section", () => {
 			expect(program.implementation.nodes).toHaveLength(2)
 		})
 
-		// A tests block first reads as a file that is nothing but tests
-		// until the implementation block turns up behind it. The Diagnostic has
-		// to be about the block that moved, rather than "unexpected
-		// 'implementation'" about the one that did not.
+		// The report is about the tests block that moved, not the
+		// implementation block behind it.
 		it("should report a tests section written above the implementation", () => {
 			let { program, diagnostics } = parse(
 				`tests {
@@ -223,8 +219,8 @@ describe("Tests Section", () => {
 			expect(diagnostics[0].severity).toBe("error")
 			expect(diagnostics[0].labels).toHaveLength(2)
 
-			// Kept rather than dropped — one Diagnostic about an order
-			// beats a cascade of "unknown name" about everything inside it.
+			// Kept, so one Diagnostic about the order replaces a cascade of
+			// unknown names.
 			expect(program.tests?.nodes).toHaveLength(1)
 		})
 	})
@@ -277,9 +273,8 @@ describe("Tests Section", () => {
 			expect(node.name.nodeType).toBe("InterpolatedStringValue")
 		})
 
-		// The Keyword's own span, for a Code Lens to sit on — the
-		// Position of the item spans the whole form, which is what a Diagnostic
-		// about the test underlines instead.
+		// The Keyword's span is where a Code Lens sits. A Diagnostic about the
+		// test underlines the whole item.
 		it("should carry the Keyword's Position apart from the item's", () => {
 			let section = testsOf(
 				`implementation {}
@@ -339,8 +334,6 @@ describe("Tests Section", () => {
 			})
 		})
 
-		// The whole item is read before it is refused, so the Statement
-		// written after it is still read as itself.
 		it("should read on past a refused test", () => {
 			let { program, diagnostics } = parse(
 				`implementation {
@@ -468,11 +461,9 @@ describe("Tests Section", () => {
 		})
 	})
 
-	// Error recovery resynchronises on the Tokens a Statement can begin
-	// with, so a Keyword missing from that list is not a Statement start to the
-	// recovery — and the whole item it opens, braces and all, is skipped
-	// without a word. That is what these hold: a broken Statement inside a
-	// test's body must cost that Statement and nothing around it.
+	// Recovery resynchronises on the Tokens a Statement can begin with, and
+	// skips an item opened by any other Keyword. A broken Statement in a test's
+	// body must cost that Statement alone.
 	describe("Error recovery", () => {
 		it("should read the next test after a broken Statement in a body", () => {
 			let { program, diagnostics } = parse(
@@ -630,10 +621,8 @@ describe("Tests Section", () => {
 			).toEqual(["slow", "network"])
 		})
 
-		// A bare name is the one shape a Modifier and its own argument
-		// share. It is an argument where a comma or the body follows it, and a
-		// Modifier of its own everywhere else — which is what keeps
-		// `focused tagged slow` from reading as `focused(tagged)`.
+		// A bare name is an argument where a comma or the body follows it, and
+		// a Modifier elsewhere, so `focused tagged slow` is not `focused(tagged)`.
 		it("should leave a bare name in front of another Modifier alone", () => {
 			let section = testsOf(
 				`implementation {}
@@ -753,10 +742,9 @@ describe("Tests Section", () => {
 			])
 		})
 
-		// A Match Handler refuses `} as name` because `@` already names
-		// the whole value. An assertion has no `@`, and what it takes apart is
-		// often a computed value with no name of its own, so the binder is
-		// allowed here — the one place a Matcher's Pattern may carry one.
+		// A Match Handler refuses `} as name` because `@` names the whole value.
+		// An assertion has no `@` and often takes apart a computed value, so the
+		// binder is allowed here.
 		it("should let a Pattern name the whole value", () => {
 			let section = testsOf(
 				`implementation {}
@@ -777,11 +765,9 @@ describe("Tests Section", () => {
 			expect(matcher.binder?.content).toBe("row")
 		})
 
-		// The reading a cover grammar could not give back: `{ name }` and
-		// `#Value(second)` are Expressions as well, and only the `=` behind the
-		// Matcher says which was written. What is not a Matcher is read as the
-		// Expression it is, and nothing the Matcher reading touched is left
-		// behind.
+		// `{ name }` and `#Value(second)` are Expressions too, and only an `=`
+		// behind them makes a Matcher. Without one they read as the asserted
+		// Expression.
 		it("should read what is no Matcher as the asserted Expression", () => {
 			let section = testsOf(
 				`implementation {}
@@ -821,10 +807,8 @@ describe("Tests Section", () => {
 
 			let node = testAt(section, 0).body[0] as parser.RequireStatementNode
 
-			// Through the end of the value, which is where the Statement
-			// ends — the span is drawn under a failed assertion, and one that
-			// stopped at the Matcher would leave a reader looking at what the
-			// value was supposed to be with no sight of what it was.
+			// A failed assertion is underlined through the value, not only
+			// the Matcher.
 			expect(node.position).toEqual({
 				start: { line: 5, column: 7 },
 				end: { line: 5, column: 37 },
@@ -859,11 +843,8 @@ describe("Tests Section", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("literal-in-require")
-			// Built from what was WRITTEN — the name on the right and the
-			// literal on the left — the way the Quick Fix on this very
-			// Diagnostic builds its edit. The hardcoded 'require x::is(3)' it
-			// used to print asked a reader looking at `require "Lions" = name`
-			// to find themselves in it.
+			// Built from the name and the literal as written, as the Quick Fix
+			// builds its edit.
 			expect(diagnostics[0].helps).toEqual([
 				"Compare instead: 'first::is(3)'.",
 			])
@@ -885,13 +866,9 @@ describe("Tests Section", () => {
 			])
 		})
 
-		// Read off the SOURCE, not built back up out of the Node. A
-		// String Node holds the value its escapes STAND FOR, so a Help written
-		// from one gives the reader back a String with the escapes taken out —
-		// and `\\{` is the escape that matters most, because the `{` it stands
-		// for opens an interpolation hole and the line it is written into no
-		// longer closes its String. Followed, this Help used to answer an
-		// `unclosed-string`.
+		// Read off the source, since a String Node holds the value its escapes
+		// stand for. Without its escape, the `{` of `\\{` would open an
+		// interpolation hole.
 		it("should spell a String Matcher's escapes as they were written", () => {
 			let source = `implementation {
 				constant body = "a"
@@ -952,10 +929,8 @@ describe("Tests Section", () => {
 			).toBe(true)
 		})
 
-		// A Rational has two spellings for one Node, and the one the
-		// reader wrote is the one they are handed back — `0.75` read as
-		// `75/100` was neither what they wrote nor the fraction in its lowest
-		// terms.
+		// A Rational Node has two spellings, and the reader gets back the one
+		// they wrote.
 		it("should spell a Rational Matcher the way it was written", () => {
 			let source = `implementation {
 				constant ratio = 0.5
@@ -1003,10 +978,8 @@ describe("Tests Section", () => {
 			).toBe(true)
 		})
 
-		// A String written across two lines is text this can not print
-		// back — a Help is one line — so it is written as the schematic it is
-		// rather than as a spelling that would be neither the reader's nor
-		// valid.
+		// A Help is one line, so a String written across two lines becomes a
+		// schematic.
 		it("should write a schematic where the literal spans lines", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1024,9 +997,8 @@ line two" = body
 			])
 		})
 
-		// And says so where the right-hand side is no name. The Parser
-		// holds Nodes rather than the text they were read from, so anything
-		// else is written as the schematic it is.
+		// The Parser keeps no text for a value that is not a name, so it is
+		// written as a schematic.
 		it("should write a schematic where the value is no name", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1043,9 +1015,8 @@ line two" = body
 			])
 		})
 
-		// An `expect` records its result and the test carries on, so
-		// there is no line below it that only runs where the Matcher matched —
-		// which is the only place a name it bound would be true.
+		// The test carries on past a failed `expect`, so a name its Matcher
+		// bound would not be true on the lines after it.
 		it("should refuse a Matcher on an expect", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1078,18 +1049,16 @@ line two" = body
 				"matcher-after-value",
 			])
 
-			// From the `is` through the end of the Matcher — the whole of
-			// what the language does not have, rather than the Token that
-			// opened it.
+			// From the `is` through the end of the Matcher, the whole of what
+			// the language does not have.
 			expect(diagnostics[0].position).toEqual({
 				start: { line: 5, column: 21 },
 				end: { line: 5, column: 38 },
 			})
 		})
 
-		// A snapshot records a value, and the line it is written on took
-		// one apart — so what there is to record is the name it introduced, on
-		// a line of its own.
+		// A snapshot records a value, so on a line that takes one apart, the
+		// name it introduced is recorded on a line of its own.
 		it("should refuse a snapshot on a line that takes a value apart", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1104,18 +1073,16 @@ line two" = body
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("snapshot-after-matcher")
 
-			// From `matches` through the end of the recorded text — the
-			// whole snapshot, read to its end before the report so no tail of
-			// it is left to be read as a Statement of its own.
+			// From `matches` through the end of the recorded text, so no tail
+			// is read as a Statement of its own.
 			expect(diagnostics[0].position).toEqual({
 				start: { line: 5, column: 38 },
 				end: { line: 5, column: 60 },
 			})
 		})
 
-		// The Statement is DROPPED, so the names it introduced survive
-		// nowhere else — a Quick Fix that writes one of them onto a line of its
-		// own reads them here.
+		// The Statement is dropped, so its Quick Fix reads the names it
+		// introduced off the Diagnostic.
 		it("should carry the names the refused Matcher introduced", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1155,8 +1122,7 @@ line two" = body
 				"snapshot-after-matcher",
 			])
 
-			// The test below is read whole — the refusal drops the
-			// assertion and nothing else.
+			// The refusal drops the assertion and nothing else.
 			let section = program.tests as parser.TestsSectionNode
 
 			expect(section.nodes).toHaveLength(2)
@@ -1167,8 +1133,6 @@ line two" = body
 			).toEqual(["ExpectStatement"])
 		})
 
-		// A refused assertion is DROPPED, as every broken Statement is,
-		// and the Statements around it are still read.
 		it("should read the rest of the test past a refused assertion", () => {
 			let { program, diagnostics } = parse(
 				`implementation {}
@@ -1305,9 +1269,8 @@ line two" = body
 			expect(diagnostics[0].code).toBe("expect-outside-test")
 		})
 
-		// The boundary the rule is really about — a Function literal
-		// written in a test body runs wherever it is handed to, which is not
-		// something the test can answer for.
+		// A Function literal in a test body runs wherever it is handed, which
+		// the test can not answer for.
 		it("should report an assertion written in a Function literal", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -1396,9 +1359,8 @@ line two" = body
 			).toBe("n")
 		})
 
-		// `(` after an Expression is a call everywhere else, so the one
-		// thing that says the Parameter list is a Parameter list is the block
-		// behind it.
+		// `(` after an Expression is a call everywhere else, so only the block
+		// behind it makes a Parameter list.
 		it("should let the rows be a call", () => {
 			let section = testsOf(
 				`implementation {}

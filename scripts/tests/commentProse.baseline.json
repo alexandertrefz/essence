@@ -39,7 +39,6 @@
 	"packages/compiler/src/tests/stringPerformance.spec.ts": {"sentence-length": 60, "em-dash": 31, "all-caps": 167, "history": 6, "position": 8, "block-length": 10},
 	"packages/compiler/src/tests/tailCalls.spec.ts": {"sentence-length": 29, "em-dash": 18, "all-caps": 17, "position": 3, "block-length": 4},
 	"packages/compiler/src/tests/terminal.spec.ts": {"sentence-length": 18, "em-dash": 16, "all-caps": 15, "position": 1, "block-length": 2},
-	"packages/compiler/src/tests/testing.spec.ts": {"sentence-length": 16, "em-dash": 19, "all-caps": 7, "history": 2, "position": 1, "block-length": 1},
 	"packages/compiler/src/tests/testingProperties.spec.ts": {"sentence-length": 33, "em-dash": 27, "all-caps": 29, "position": 7, "block-length": 4},
 	"packages/compiler/src/tests/typeHelps.spec.ts": {"sentence-length": 22, "em-dash": 19, "all-caps": 17, "history": 1, "position": 1},
 	"packages/compiler/src/tests/typeMatching.spec.ts": {"sentence-length": 41, "em-dash": 35, "all-caps": 33, "history": 4, "position": 7, "block-length": 9},
