@@ -251,3 +251,83 @@ segments the NFC form with `Intl.Segmenter`, as `clustersIn` does in the runtime
 the name and labels it was written with, so a reader is told `@::isBetween(0, and 9)` as written, not the Method
 it resolves to. A conjunct nobody wrote, such as a complement, carries no spelling and prints as its resolved
 Method with `::negate()` where negated.
+
+## Walking a Type
+
+`typeWalkFinds` answers a question about a whole Type by walking its objects reflectively, so it covers Type
+shapes added later without naming any. A resolved Type is a graph that shares objects. In
+`type Nested = Box<Inner> | Box<List<Inner>>` one `Inner` object stands in several places, and each level of
+nesting multiplies the sharing. Followed reference by reference, the walk grows exponentially with nesting. So it
+remembers what it visited, which makes it linear in the objects held and lets it finish on a Type that names itself.
+Every question asked this way is monotone, "is there an X anywhere", so a second visit could find nothing new.
+
+The walk does not follow a display `alias`, on the Record and Union Types that carry one. An `alias` holds the Type
+Arguments a Type was spelled with, and they already stand wherever they were substituted to. Followed, they would
+find a refinement, an `Error` or a Type Parameter that the Type's members do not hold. `type Box<Held> = { value:
+Integer }` applied as `Box<NonZeroInteger>` holds a refinement in its spelling and none in its members.
+
+## Freshened Type Parameters
+
+Generic identity is by name across the compiler, and a caller may declare a Generic under the same name as its
+callee's. A Method generic in `ItemType` calling `List.reduce` meets `List`'s own `ItemType`. Matched by name, the
+callee's bindable `ItemType` would bind to a Type mentioning the caller's opaque one, then substitute itself into
+itself without end.
+
+So `createFreshenedInference` renames a signature's Generics for the span of one call's Argument matching. A fresh
+name is the declared name, a zero-width space and a counter. No written Generic holds a zero-width space, and no
+other call shares the counter, so a fresh name collides with nothing. Only the Parameter Types matched are renamed.
+`unfreshenBindings` translates the bindings back, so the return Type, the conformances and every Diagnostic read in
+the names the source wrote. `displayGenericName` strips what is left of a fresh name wherever one is printed.
+
+`createFreshenedChoiceInference` does the same for a Choice's Type Parameters during the one payload match that
+binds them. A callback inside `myCount<State>` that answers `#Done(current.carried)` hands `Step<State, Result>` a
+payload typed in the caller's `State`. By name it would bind `Step`'s own `State` and leave `Result` unbound. Every
+Choice Parameter is bindable here, since a Choice's Type Parameters are applied, not declared `infer`. A Parameter
+the payload leaves unbound keeps its fresh name. `mentionsUnsolvedTypeParameter` tells it from an enclosing
+Function's own Type Parameter, which reads as a source name.
+
+`borrowedGenericName` names a fabricated signature's Type Parameters, such as a derived Method's, under a
+stable name with the separator and no counter. Such a signature arrives with the receiver's Type Arguments as
+`defaultType` pins, which are caller-side Types. Freshening would rename a pin along with its Parameter and pin
+the Parameter to itself. The borrowed name settles the collision before any call sees the signature.
+
+`settlePins` substitutes each binding of one call into the others until nothing moves, while the names are still
+fresh. A pin such as a provided Method's `Self`, pinned to `List<ItemType>`, needs what the Arguments made of
+`ItemType`. After `unfreshenBindings` the callee's and the caller's `Key` would be one name, and the substitution
+would rewrite both. The loop is capped at one pass per binding. No Program can pin two Parameters to each other,
+since a `defaultType` naming a sibling is refused, so the cap only bounds this code.
+
+## Namespace targets
+
+`bindNamespaceTarget` binds a Namespace's own Generics from a receiver, or answers null where the Namespace's
+target does not cover it. Method dispatch, conformance search, the specialized target a Diagnostic prints and the
+specificity order all ask it. A `NamespaceTarget` holds the target as declared, never a specialized copy: a
+`List<Integer>` specialized from `List<ItemType>` equals a written `for List<Integer>`, and the two would tie.
+
+Namespaces spell their Generics alike, `ItemType` across the standard library, and Generic identity is by name. So
+the target's Generics are renamed fresh before the match, as `createFreshenedInference` does for a call, and the
+bindings are translated back. Without the rename, `List<List<ItemType>>` would bind `ItemType` to a Type
+mentioning itself, and tie with `List<ItemType>` in the specificity order. A `Pairing<infer Item>` reached from a
+caller's own `Item` would bind `Item := List<Item>` and chase the name through itself. `isOpenBindable`'s occurs
+check stops such a binding, and the rename keeps it from arising.
+
+`renamedNamespaceTarget` renames each Namespace once and reuses the result for every receiver. That is sound
+because fresh names are counter-unique and no subject can hold one. `unfreshenBindings` rewrites keys and values
+before returning, and each match makes its own inference context. A fresh name escaping into a Type that comes
+back as a subject would break it. The memo is a `WeakMap` keyed by the target Type object. The language
+server outlives any one analysis, and a name key would answer a new analysis with an old target. An entry is
+rebuilt when another Generics array arrives for the same Type, since two Namespaces may share a target object.
+
+A Choice's Type Parameter that no payload mentions is carried by the Type Arguments alone, and matching reads only
+payloads. `bindPhantomTypeArguments` binds it from the subject's Type Arguments where every Case of the subject
+agrees. `[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and
+`disagreeingTypeArguments` says why.
+
+### Specificity
+
+`isStrictlyMoreSpecificTarget` is the one order over overlapping Namespaces, for Method dispatch and conformance
+alike. A target wins where the other covers it as a pattern and not the other way round. So `List<Integer>` beats
+`List<ItemType>`, and `List<List<ItemType>>` beats `List<ItemType>`. Everything else ties, including a pair the
+cover fails both ways for, such as `List<ItemType>` against `List<Integer> | String`. `filterMostSpecificByTarget`
+keeps the candidates nothing beats. A cyclic order would leave none, so it then hands back every candidate, and the
+caller reports the ambiguity.

@@ -1,18 +1,14 @@
 import type { common } from "@essence-lang/interfaces"
 
-// The suffix the Simplifier mangles an Overload's name with, spelled once
-// for the two Functions that write it and read it back.
+// The suffix the Simplifier mangles an Overload's name with.
 const OVERLOAD_SUFFIX = "__overload$"
 
 export function resolveOverloadedMethodName(name: string, index: number) {
 	return `${name}${OVERLOAD_SUFFIX}${index + 1}`
 }
 
-// And the inverse: the Overload slot a mangled name names, counting from
-// zero, or null where the name carries no suffix at all — which is what a
-// Method with one Overload emits. Beside the Function that writes the name,
-// because a suffix written in one place and read in another is a suffix two
-// places have to agree about.
+// The Overload a mangled name names, counting from zero, or null for a name
+// without the suffix, as a Method with one Overload emits.
 export function overloadIndexOf(name: string): number | null {
 	let suffix = name.indexOf(OVERLOAD_SUFFIX)
 
@@ -25,30 +21,15 @@ export function overloadIndexOf(name: string): number | null {
 	return Number.isInteger(index) && index > 0 ? index - 1 : null
 }
 
-// The unit Type — the empty Record, `{}`. A Function that answers
-// nothing useful says so by promising a Record with no members: there is
-// nothing to read off it, and a caller that tries names a member it does not
-// have. Essence had a `Nothing` Type for this and it earned its keep nowhere
-// else — a functional language has no statements to sequence, so "returns
-// nothing useful" is the whole of what it ever meant, and `{}` says that
-// without a Type of its own.
-//
-// Two stages ask: the Validator lets a body promising it fall off its end, and
-// the Simplifier spells the fall-off out. They must agree, so they ask here.
+// The unit Type, the empty Record `{}`: nothing can be read off it. The
+// Validator lets a body that promises it fall off its end.
 export function isUnitType(type: common.Type): boolean {
 	return type.type === "Record" && Object.keys(type.members).length === 0
 }
 
-// What a `<-` in a body answers with — the declared Type for every
-// ordinary body, and the INNER Type for a completing one. A body that suspends
-// is written as though it answered the value, and the future is what the
-// emission wraps around it, so `function headline(_ url: String) ->
-// Future<String>` returns a String from its `<-`.
-//
-// A completing body whose declaration is not a Future is answered with
-// what it declared. The `complete` inside it has been reported already, and
-// unwrapping something that is not a future would say the same thing again at
-// every `<-`.
+// What a `<-` in a body answers with: the declared Type, or the inner Type of a
+// completing body's declared Future. A completing body declaring no Future has
+// been reported already, so it answers what it declared.
 export function returnedTypeOf(
 	declared: common.Type,
 	completing: boolean,
@@ -58,21 +39,11 @@ export function returnedTypeOf(
 		: declared
 }
 
-// What a Type mismatch has to say about ASYNCHRONY, and null wherever it
-// has nothing — which is every mismatch in a Program that waits for nothing.
-// Three shapes are worth naming, and each is one missing word rather than a
-// wrong value:
-//
-//   - `"unstarted"` — a `Future<T>` stands where its `T` is wanted. The work
-//     was described and never run.
-//   - `"in-flight"` — a `Started<T>` stands where its `T` is wanted. The work
-//     IS running, and nobody waited for it.
-//   - `"not-a-future"` — a `T` stands where a `Future<T>` is wanted, which is
-//     what a body that declares a future and completes nothing answers with.
-//
-// Each is decided by assignability rather than by the spelling, so a
-// `Future<Integer>` arriving where a String is wanted is a plain mismatch and
-// gets none of this: `complete` would not have fixed it.
+// The asynchrony a Type mismatch is one word short of, or null. Each is decided
+// by assignability, so a `Future<Integer>` where a String is wanted is null.
+//   - `"unstarted"`: a `Future<T>` stands where its `T` is wanted.
+//   - `"in-flight"`: a `Started<T>` stands where its `T` is wanted.
+//   - `"not-a-future"`: a `T` stands where a `Future<T>` is wanted.
 export type AsynchronyMismatch = "unstarted" | "in-flight" | "not-a-future"
 
 export function asynchronyMismatch(
@@ -98,37 +69,9 @@ export function asynchronyMismatch(
 	return null
 }
 
-// A structural walk over a Type, visiting each object it is built from
-// exactly once. Types are plain data, so walking them covers every shape —
-// including ones added later — without enumerating any, which is why the
-// questions asked of a whole Type are asked this way.
-//
-// A resolved Type is a DAG, though, not a tree: `type Nested = Box<Inner> |
-// Box<List<Inner>>` names the ONE `Inner` object from four places, its Type
-// Arguments and its Cases' members among them, and each level of nesting
-// multiplies that sharing again. Followed reference by reference, a Type a few
-// hundred objects large is walked exponentially many times — asking whether an
-// eight-level nesting mentions an unsolved Type Parameter took thirty-seven
-// million steps, and twelve levels never finished. Remembering what has been
-// visited makes the walk linear in the Type as it is actually held, and answers
-// where a Type that named itself would have hung.
-//
-// Every question asked this way is monotone — "is there an X anywhere" or
-// "collect every X" — so a second visit to a shared object could only find what
-// the first one already did.
-//
-// The one field it does NOT follow is a display `alias`, on the two Types
-// that carry one. Walking whatever is there is what makes this cover shapes
-// nobody has added yet, and a display spelling is the one thing on a Type that
-// is not part of it: the Type Arguments an `alias` holds are already standing
-// wherever they were substituted TO, so following them finds nothing new about
-// a Type and finds plenty about a Type Parameter the body never used.
-// `type Box<Held> = { value: Integer }` applied as `Box<NonZeroInteger>` holds a
-// refinement in its spelling and none in its members — enough, followed, to fail
-// the Rewriter's erasure assertion on a Program that erased everything it had.
-// The same goes for an Error Argument silencing a second Diagnostic and for an
-// unbound Parameter holding an Argument back. A plain `name` is a string and was
-// never walked into.
+// The display field `typeWalkFinds` does not follow. The walk asks whether
+// `found` holds of any object a Type is built from, visiting each once. See
+// "Walking a Type" in DEVELOPMENT.md.
 const displaySpelling = "alias"
 
 function typeWalkFinds(
@@ -158,10 +101,7 @@ function typeWalkFinds(
 			return true
 		}
 
-		// Asked of the FIELD before it is asked of the Type, so that every
-		// Type but a spelled one walks exactly as it always did — `entries`
-		// allocates a pair per field where `values` allocates a value, and this
-		// runs over every Type the Enricher resolves.
+		// Only a Type with an `alias` takes the slower walk over its entries.
 		if (
 			record[displaySpelling] === undefined ||
 			(record.type !== "Record" && record.type !== "UnionType")
@@ -181,19 +121,15 @@ function typeWalkFinds(
 
 export type GenericBindings = Map<common.GenericName, common.Type>
 
-// The mutable state of one inference — `bindableNames` holds the Type
-// Parameters the current invocation may bind, `bindings` the Types they have
-// been bound to so far. Generics outside of `bindableNames` stay opaque
-// symbols that only match themselves.
+// The mutable state of one inference: the Type Parameters this call may bind,
+// and their bindings so far. Any other Generic matches only itself.
 export type GenericInferenceContext = {
 	bindableNames: Set<common.GenericName>
 	bindings: GenericBindings
 }
 
-// `infer` Generics start unbound and re-bind on every invocation.
-// Plain Generics bind at definition time — their default Type is seeded as
-// an immutable binding; without a default they stay opaque and can never be
-// bound, which the caller reports at the invocation.
+// An `infer` Generic starts unbound on every call. A plain one is bound to its
+// default Type, or stays opaque without one, which the caller reports.
 export function createInferenceContext(
 	generics: Array<common.GenericDeclaration>,
 	seededBindings: GenericBindings | null = null,
@@ -221,26 +157,17 @@ export function createInferenceContext(
 	return { bindableNames, bindings }
 }
 
-// A per-instantiation counter for `createFreshenedInference`. Only its
-// uniqueness matters, never its value — it never reaches a Type a Program can
-// observe, so it does not compromise the determinism the Enricher otherwise
-// keeps (unlike `Date.now`/`Math.random`, which are banned for that reason).
+// A counter for fresh names. Only its uniqueness matters, and it never reaches
+// a Type a Program can observe, so compiling stays deterministic.
 let freshGenericCounter = 0
 
-// What separates a freshened Generic's name from its counter. A source
-// Generic can not carry it, which is the whole assumption the alpha-renaming
-// below rests on.
+// What separates a fresh Generic's name from its counter. No written Generic
+// can hold it.
 const freshGenericSeparator = "\u200B"
 
-// Whether a Type still carries a Type Parameter of the call it is being
-// matched against — one `createFreshenedInference` renamed for the span of this
-// match and that the match has not solved. Every Parameter it DID solve was
-// substituted away by `applyGenericBindings` before the Type got here, so a
-// fresh name still standing in it is exactly a slot this call has not decided.
-// Asked where a decision has to be committed rather than merely checked: an
-// enclosing Function's own Type Parameter is a decision (a generic one), and it
-// reads as a source name, while a callee's unsolved one is no decision at all
-// and must never be recorded as one.
+// Whether a Type still holds a fresh Type Parameter this call has not solved.
+// Such a slot is undecided, where an enclosing Function's own Type Parameter is
+// a decision, so it must never be recorded as one.
 export function mentionsUnsolvedTypeParameter(type: common.Type): boolean {
 	return typeWalkFinds(
 		type,
@@ -251,20 +178,9 @@ export function mentionsUnsolvedTypeParameter(type: common.Type): boolean {
 	)
 }
 
-// Alpha-renames a signature's own Generics to fresh, collision-proof names
-// for the span of one invocation's Argument matching. A caller may declare a
-// Generic under the SAME spelling as the callee's — a Method generic in
-// `ItemType` calling `List.reduce`, whose Namespace Generic is also `ItemType`;
-// a `loop` entry generic in `State` calling another `loop` entry, also `State`
-// — and Generic identity is by name across the compiler, so without this the
-// callee's bindable `ItemType` and the caller's opaque `ItemType` are the same
-// symbol: the bindable one binds to a Type mentioning the opaque one, then
-// substitutes the name into itself until the stack dies. A fresh name carries a
-// zero-width space, which no source Generic can, plus the counter, so it
-// collides with nothing. ONLY the Parameter Types matched here are renamed; the
-// bindings that come back are translated to the original names by
-// `unfreshenBindings`, so the return Type, conformances and every Diagnostic
-// still read in the Generics the source wrote.
+// Renames a signature's Generics to fresh names for one call's Argument
+// matching, so a caller's same-named Generic can not collide with them. See
+// "Freshened Type Parameters" in DEVELOPMENT.md.
 export function createFreshenedInference(signature: common.BaseFunction): {
 	parameterTypes: common.BaseFunction["parameterTypes"]
 	context: GenericInferenceContext
@@ -320,21 +236,9 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	}
 }
 
-// The construction-side twin of `createFreshenedInference` — a Choice's
-// own Type Parameters, alpha-renamed for the span of the one payload match that
-// binds them. The collision it settles is the same one, one rail over: a
-// callback inside `myCount<State>` answering `#Done(current.carried)` hands a
-// payload Typed as the CALLER's opaque `State` to `Step<State, Result>`, and by
-// name alone that payload matched `Step`'s own bindable `State` — so `State`
-// bound to the whole Record and `Result`, the Parameter the payload was there to
-// decide, bound to nothing at all.
-//
-// A Parameter the payload never binds is left standing under its FRESH name
-// rather than restored, deliberately: it is a Type Argument nothing decided, and
-// `mentionsUnsolvedTypeParameter` is what the construction rail asks to tell one
-// from an enclosing Function's own Type Parameter, which is a decision (a
-// generic one) and reads as a source name. `displayGenericName` shows it under
-// the spelling the Choice declares, so a reader never sees the counter.
+// A Choice's Type Parameters renamed fresh for the payload match that binds
+// them. An unbound one keeps its fresh name. See "Freshened Type Parameters" in
+// DEVELOPMENT.md.
 export function createFreshenedChoiceInference(
 	choiceGenerics: Array<common.GenericDeclaration>,
 ): {
@@ -356,53 +260,26 @@ export function createFreshenedChoiceInference(
 		rename,
 		freshNames,
 		context: {
-			// Every one of them, unlike a signature's, where only an
-			// `infer` Parameter binds — a Choice's Type Parameters are applied
-			// rather than declared bindable, and the payload match is the one
-			// place they are worked out from a value at all.
+			// Every one binds, since a Choice's Type Parameters are applied, not
+			// declared `infer`.
 			bindableNames: new Set(freshNames),
 			bindings: new Map(),
 		},
 	}
 }
 
-// The name a FABRICATED signature borrows a Type Parameter under. A
-// derived Method takes its Parameters from the Type it was fabricated for, so
-// their names are that Type's own — and `createFreshenedInference` can not undo
-// a collision with the CALLER's Generics on its own here, because the receiver's
-// Type Arguments arrive as `defaultType` pins, which are caller-side Types: the
-// alpha-rename above renamed the pin along with the Parameter it pinned, and the
-// Parameter ended up pinned to itself. Borrowing under a name no source Generic
-// can carry settles it before an invocation ever sees the signature. Stable
-// rather than counted, because the invocation freshens on top of this anyway and
-// a fabricated signature should be the same every time it is built.
+// The stable name a fabricated signature borrows a Type Parameter under, so
+// freshening never pins a Parameter to itself. See "Freshened Type Parameters" in
+// DEVELOPMENT.md.
 export function borrowedGenericName(
 	name: common.GenericName,
 ): common.GenericName {
 	return `${name}${freshGenericSeparator}`
 }
 
-// Substitutes what each Parameter of ONE invocation bound into every
-// other binding of that same invocation that still names it, until nothing
-// moves. A binding the Arguments produced names no Parameter of the invocation
-// and comes back as itself; a `defaultType` PIN is the one that does — a
-// provided Method's `Self` is pinned to `List<ItemType>`, and what the
-// Arguments made of `ItemType` is what the witness has to be solved for.
-//
-// Run while the names are still FRESH, which is the whole point: a fresh name
-// carries a counter no source Generic can spell and no other invocation shares,
-// so substituting this map can not reach a Type Parameter belonging to the
-// CALLER. Once `unfreshenBindings` below puts the declared names back, the
-// callee's `Key` and the caller's `Key` are one name and the same substitution
-// rewrites both — which is exactly the bug this moved the work out of
-// `resolveConformances` to fix.
-//
-// Bounded by the number of bindings: each pass either settles one more name or
-// stops. Nothing can declare a pair of Parameters pinned to each other today —
-// a `defaultType` naming a sibling is refused where it is written, and the only
-// pins the Compiler fabricates name Parameters that carry no pin of their own —
-// so the cap is what keeps that a statement about this code rather than a
-// promise about the language.
+// Substitutes each binding of one call into the others until nothing moves,
+// while the names are fresh. Capped at one pass per binding. See "Freshened Type
+// Parameters" in DEVELOPMENT.md.
 function settlePins(bindings: GenericBindings): GenericBindings {
 	let settled = bindings
 
@@ -427,12 +304,9 @@ function settlePins(bindings: GenericBindings): GenericBindings {
 	return settled
 }
 
-// Translates the bindings collected against freshened Generic names back
-// to the Generics the signature declares, so the return-Type substitution and
-// conformance resolution downstream read in the original names. Binding VALUES
-// come from the Arguments, which never mention the callee's fresh names — but a
-// `defaultType` pin does, so `settlePins` above settles those first, under the
-// fresh names that still tell this invocation's Parameters from the caller's.
+// Translates bindings made under fresh names back to the declared names, keys
+// and values. `settlePins` first settles any `defaultType` pin under the fresh
+// names.
 export function unfreshenBindings(
 	bindings: GenericBindings,
 	freshToOriginal: Map<common.GenericName, common.GenericName>,
@@ -441,13 +315,8 @@ export function unfreshenBindings(
 		return bindings
 	}
 
-	// The usual shape, and the one `bindNamespaceTarget` asks a thousand
-	// times over a Program: every binding is a Type the SUBJECT produced, which
-	// can mention no fresh name of this invocation, so the two substitutions
-	// below have nothing to substitute and only the KEYS change. Asked of the
-	// memoised mention set rather than by walking, which is what makes this
-	// cheaper than the work it skips — a pin is the one thing that puts a fresh
-	// name in a value, and a pin is rare.
+	// The usual case: no binding mentions a pin or a fresh name, so only the keys
+	// change. The memoised mention sets answer that without a walk.
 	if (!bindingsMentionAPin(bindings, freshToOriginal)) {
 		let renamedKeys: GenericBindings = new Map()
 
@@ -476,12 +345,8 @@ export function unfreshenBindings(
 	return result
 }
 
-// Whether any binding VALUE names something the translation above would
-// rewrite — a Parameter this invocation bound (which is what `settlePins`
-// settles) or a fresh name (which is what the reverse rename replaces). False
-// means both passes are the identity and only the keys have to move. Asked of
-// `mentionedGenericNames`, which remembers its walk per Type object and answers
-// the empty Set for everything the Arguments built.
+// Whether any binding value names a Parameter this call bound or a fresh name.
+// False means only the keys have to move.
 function bindingsMentionAPin(
 	bindings: GenericBindings,
 	freshToOriginal: Map<common.GenericName, common.GenericName>,
@@ -497,43 +362,16 @@ function bindingsMentionAPin(
 	return false
 }
 
-// A Namespace as the specificity order below sees it — the target Type
-// exactly as DECLARED, plus the Generics that are open in it. Never a
-// specialized copy: `List<Integer>` specialized out of `List<ItemType>` is
-// structurally identical to a hand written `for List<Integer>`, and comparing
-// those two would tie where one is strictly narrower.
+// A Namespace as the specificity order sees it: the target as declared, and its
+// open Generics. See "Namespace targets" in DEVELOPMENT.md.
 export type NamespaceTarget = {
 	targetType: common.Type | null
 	generics: Array<common.GenericDeclaration>
 }
 
-// A Namespace's own Generics bound from a receiver, in the Namespace's OWN
-// names — null where its target Type does not cover that receiver at all. THE
-// one door every "does this Namespace target that value" question goes through:
-// Method dispatch's candidate set, the specialized target a Diagnostic prints,
-// the conformance search, and the specificity order below.
-//
-// The pattern's Generics are alpha-renamed before the match, exactly as
-// `createFreshenedInference` does for a call's Parameters, and the bindings are
-// translated back afterwards. The rename itself is remembered per Namespace —
-// see `renamedNamespaceTarget`, which is where the reason one set of fresh
-// names serves every receiver is written down. Namespaces spell their Generics
-// alike (`ItemType` throughout the stdlib, `Item` in a Program) and Generic
-// identity is by NAME, so without the rename the pattern's bindable `ItemType`
-// and the subject's opaque one are a single symbol. Two things go wrong then,
-// and both are why this is one function rather than a rename each caller
-// remembers:
-//
-//   • `List<List<ItemType>>` binds `ItemType` to a Type mentioning itself, reads
-//     as covering `List<ItemType>`, and the two targets tie in the specificity
-//     order that has to tell them apart.
-//   • A `namespace Pairing<infer Item> for { left: Item, right: Item }` reached
-//     from a `via<infer Item>(_ pair: { left: List<Item>, right: List<Item> })`
-//     binds `Item := List<Item>` off the FIRST member; the second re-checks
-//     `Item` against that binding, and chasing the name through itself never
-//     ends. `isOpenBindable`'s occurs check is what makes any such binding
-//     terminate; the rename here is what keeps it from arising, so the
-//     Namespace is FOUND and the call resolves.
+// A Namespace's own Generics bound from a receiver, or null where its target
+// does not cover it. Every "does this Namespace target that value" question asks
+// here. See "Namespace targets" in DEVELOPMENT.md.
 export function bindNamespaceTarget(
 	pattern: NamespaceTarget,
 	subject: common.Type,
@@ -558,11 +396,8 @@ export function bindNamespaceTarget(
 	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
 }
 
-// A Choice's Type Parameter that no Case's payload mentions is carried by
-// the Type Arguments alone, and matching reads only payloads, so the match
-// leaves it open. It is bound from the subject's Type Arguments instead, where
-// every Case of the subject carries the same one: `[Tag<Integer>#A,
-// Tag<String>#B]` holds Cases that disagree, and no one binding is true of both.
+// Binds a Choice's Type Parameter that no payload mentions from the subject's
+// Type Arguments, where every Case of the subject carries the same one.
 function bindPhantomTypeArguments(
 	pattern: common.Type,
 	subject: common.Type,
@@ -592,9 +427,8 @@ function bindPhantomTypeArguments(
 	}
 }
 
-// The different Type Arguments a subject's Cases carry where a Choice
-// pattern names `genericName`, which is why a binding of it was left open.
-// Null where they agree, or where the pattern names it at no such position.
+// The differing Type Arguments a subject's Cases carry where a Choice pattern
+// names `genericName`, or null where they agree.
 export function disagreeingTypeArguments(
 	pattern: common.Type,
 	subject: common.Type,
@@ -721,10 +555,8 @@ function choiceCasesOf(type: common.Type): Array<common.CaseType> {
 		: []
 }
 
-// The alpha-renamed half of `bindNamespaceTarget` — the Namespace's
-// Generics under fresh names, its target Type rewritten to use them, and the way
-// back. It depends on the PATTERN alone: the same Namespace against a thousand
-// receivers renames once.
+// A Namespace's Generics under fresh names, its target rewritten to use them,
+// and the way back. It depends on the pattern alone.
 type RenamedNamespaceTarget = {
 	generics: Array<common.GenericDeclaration>
 	target: common.Type
@@ -732,51 +564,15 @@ type RenamedNamespaceTarget = {
 	declaredGenerics: Array<common.GenericDeclaration>
 }
 
-// Remembered per target TYPE object, because that is the stable half of a
-// Namespace here: `solveNamespaceConformance` wraps `{ targetType, generics }`
-// in a fresh literal per candidate, so the wrapper is no key at all, while the
-// Type it names and the Generics array it hands on are the Namespace's own
-// objects and live as long as the analysis does. The entry carries the Generics
-// it was built from and is rebuilt when a different array turns up against the
-// same Type — two Namespaces can share a target object, and the rename has to
-// follow the Generics rather than the Type.
-//
-// WEAK, and keyed on an OBJECT rather than on a name, because the Language
-// Server is a process that outlives any one analysis: a file edited and
-// re-enriched builds fresh Types, which are fresh keys, and the entries of the
-// analysis it replaced die with it. A `Map` keyed by the Namespace's NAME would
-// answer the second analysis with the first one's target.
+// Keyed by the target Type object, which outlives the wrapper a caller builds
+// per candidate. See "Namespace targets" in DEVELOPMENT.md.
 const renamedNamespaceTargets = new WeakMap<
 	common.Type,
 	RenamedNamespaceTarget
 >()
 
-// ONE set of fresh names per Namespace, reused by every question asked of
-// it. What makes that sound is what makes the renaming work in the first place:
-//
-//   • the names are counter-unique — `Item`, a zero-width space and a number
-//     that only ever goes up — so no two Namespaces, and no two renames of one
-//     Namespace, can ever mint the same name;
-//   • no SUBJECT can hold one. Subjects are Types built from source, and the
-//     separator is not a character an Identifier may contain; the only place a
-//     fresh name exists is inside this pattern and inside the inference context
-//     of a match against it, and `unfreshenBindings` translates every binding —
-//     keys and values both — back into the Namespace's own names before a single
-//     one is returned;
-//   • nothing here is written to. Each match makes its own `createInferenceContext`
-//     over these declarations, so two questions asked of one Namespace share the
-//     pattern and share no bindings.
-//
-// What would break it is a fresh name ESCAPING into a Type that later comes back
-// as a subject — a caller keeping `context.bindings` untranslated, or
-// `unfreshenBindings` ceasing to rewrite binding values. The pattern's bindable
-// `Item` and a subject's opaque `Item` would be one symbol again, which is the
-// collision this renaming exists to prevent and, one level down, the spin
-// `isOpenBindable`'s occurs check is the backstop for.
-//
-// Exported for its guard alone: "one rename per Namespace" is a claim about WORK
-// that nothing about an answer can show, since the whole point of the names is
-// that none of them is ever seen from outside.
+// One set of fresh names per Namespace, reused for every receiver. Exported for
+// its spec. See "Namespace targets" in DEVELOPMENT.md.
 export function renamedNamespaceTarget(
 	targetType: common.Type,
 	declaredGenerics: Array<common.GenericDeclaration>,
@@ -819,9 +615,8 @@ export function renamedNamespaceTarget(
 	return renamed
 }
 
-// Whether `pattern`'s target Type covers `subject` with the pattern's own
-// Generics OPEN — `List<ItemType>` covers `List<Integer>` and `List<List<X>>`,
-// while `List<List<ItemType>>` covers only the nested one.
+// Whether `pattern`'s target covers `subject` with its own Generics open:
+// `List<ItemType>` covers `List<Integer>`, `List<List<ItemType>>` only the nested.
 function targetCoversAsPattern(
 	pattern: NamespaceTarget,
 	subject: common.Type,
@@ -829,16 +624,8 @@ function targetCoversAsPattern(
 	return bindNamespaceTarget(pattern, subject) !== null
 }
 
-// THE specificity order over overlapping Namespaces, shared by Method
-// dispatch and Protocol conformance so both answer "which Namespace covers this
-// receiver more closely" the same way. `target` wins when `other` covers it as a
-// pattern and not the other way around: a concrete `List<Integer>` beats the
-// generic `List<ItemType>`, and the deeper `List<List<ItemType>>` beats the
-// shallower `List<ItemType>`. Everything else is a tie the callers report: the
-// same target twice, and equally a pair the cover fails both ways for — a
-// `List<Integer> | String` is no case of a `List<ItemType>` and no `List<…>`
-// is a case of that Union, so a receiver matching both has no narrower
-// Namespace to be dispatched to.
+// The specificity order over overlapping Namespaces, for dispatch and
+// conformance alike. See "Specificity" in DEVELOPMENT.md.
 function isStrictlyMoreSpecificTarget(
 	target: NamespaceTarget,
 	other: NamespaceTarget,
@@ -853,10 +640,8 @@ function isStrictlyMoreSpecificTarget(
 	)
 }
 
-// Keeps only the candidates no other candidate is strictly more specific
-// than. A cyclic order would leave nothing standing, which must not read as "no
-// Namespace matched" — the unfiltered set is handed back instead, and the
-// caller reports the ambiguity it already reports for a tie.
+// Keeps the candidates no other is strictly more specific than, or all of them
+// where a cyclic order would leave none.
 export function filterMostSpecificByTarget<Candidate>(
 	candidates: Array<Candidate>,
 	targetOf: (candidate: Candidate) => NamespaceTarget,
