@@ -582,3 +582,67 @@ loop writes its answer outside its callbacks, so only a Match needs this.
 
 A compiled dispatch, `held-expression`, declares its numbered `$dispatch_<N>` consts in a block of its own.
 Two chains in one Scope then never declare one name twice.
+
+## Inlined loops
+
+`inline-loops` replaces a call of a looping standard library Method with an `inline-loop` node, and
+`inlinedLoop` writes the walk out. In a Statement position it stands in a block of its own; in an
+Expression position it is one arrow called at once. Every name a walk binds is spelled from the loop's own
+prefix, so two walks in one Scope can not collide. A walk evaluates what the call was given in call order,
+before its bodies. Pooled constants are then collected in the order the Program states them.
+
+The drivers are `condition` (`loop(startingWith:while:_)` and its `until` form), `counted`, `general`
+(`loop(startingWith:step:)`), `fold` (both `List.reduce` entries), `map` and `keep`.
+
+### Counted walks
+
+`loop(from:through:startingWith:_)` and `loop(from:downTo:startingWith:_)` become a `for` over the values the
+two bounds hold. The direction is the entry that was called, so it is decided while compiling.
+
+The down-counting entry always takes its first turn, a promise `List.of(integersFrom:downTo:)` carries into
+its Type. The walk runs down to the lower of the end and the start, so an end above the start stops after one
+turn. The up-counting entry tests its end directly, since an end below the start means no turns.
+
+The counter counts in JavaScript numbers wherever both bounds are held as numbers. A counter between two
+safe bounds never leaves the safe range, so counting it as a double is exact. A bound held as a bigint
+sends the counter to bigint, decided once before the first turn. The start is then converted with `BigInt`,
+since a number stepped by a bigint throws. Where both bounds are written as safe Integer literals, none of
+the bigint machinery is emitted.
+
+### Step answers
+
+A `general` walk and an early-stopping fold answer with a `Step` each turn. `steppedTarget` writes the answer
+where it is built. Where the Compiler can see the Case being built at the answering position, as in
+`<- #Done(x)`, the walk assigns and leaves. The Case is never built. `#Continue` assigns the State and
+leaves the body; `#Done` assigns the answer and breaks the walk's own label. Otherwise, as for a `Step` held under
+a name or answered by a Method, its tag is read as the driver would read it.
+
+A `general` walk's label is emitted only where a `#Done` leaves through it. A body that never answers
+`#Done` never ends, as the driver's would not.
+
+A fold reads the receiver's count together with the receiver, before the seed. So a seed that appends to the
+receiver does not lengthen the walk.
+
+### Lists built in place
+
+`build-lists-in-place` lets a walk whose State is a List push into an Array it owns, instead of building a
+new List each turn. The Array is `<prefix>_built`, apart from a fold's `<prefix>_items`, since a fold
+seeded with its own receiver holds both.
+
+`ownedItems` gives the walk its Array. A seed written as a List Literal hands its Array over, because nobody
+else ever held it. Any other seed is copied once by `List.ownItemsOf`. A List the Program held before the
+walk must never be pushed onto. The copy also makes a walk of no turns answer the seed's items. `listLiteral`
+reads both spellings of a literal, `ListValue` and `direct-list`, so the emission does not depend on
+`collapse-construction` being on.
+
+A turn's answer is a `list-build`, whose additions `builtAdditions` writes as pushes. A whole List added as a
+literal pushes its items directly; any other List goes through `List.pushItemsOf`. There is no slot to
+assign, since the Array is the State. With a `Step` answer, `#Continue` pushes. `#Done` finishes either
+with the built List, boxing the Array once at that exit, or with a value of its own. A `Step` the Compiler
+can not see being built would have to replace the State whole, which an owned Array can not do.
+`build-lists-in-place` declines such bodies.
+
+`pushedWhereBound` pushes the Argument expression itself where a turn's whole body is one binding followed by
+a push of it, as in `<- accumulated::append(item)`. Only a name read and `push` on the walk's own Array move
+ahead of the Argument, and neither can run a Program's code. V8 keeps the loop in optimised code when the
+item is not bound before it is stored. Anything else in the body keeps its binding.
