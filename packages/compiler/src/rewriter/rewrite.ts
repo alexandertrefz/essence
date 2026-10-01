@@ -4244,14 +4244,8 @@ function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
 	}
 }
 
-// A Protocol's PROVIDED Methods are emitted exactly as the standard
-// library's Essence-implemented Methods are — one const each, reached by a bare
-// Identifier, tree-shaken by the same fixed point — which is what makes ONE
-// const answer for every conformer. They are named by
-// `protocolMemberIdentifier` rather than by the Namespace scheme, because a
-// Protocol and a Namespace may be spelled exactly alike and their consts must
-// not be.
-//
+// The Programs' Protocols with provided Methods, as prelude entries, so one
+// const answers for every conformer.
 function protocolPreludeNamespaces(
 	programs: Array<common.typedSimple.Program>,
 ): Array<PreludeNamespace> {
@@ -4304,10 +4298,7 @@ function protocolPreludeNamespaces(
 			}
 		}
 
-		// A `type` or `returnType` holds a Type, and a Type holds no
-		// Statements — so the whole of the Type graph, which is most of what a
-		// simplified Program weighs, is stepped over rather than walked. This
-		// runs once per emission, and the walk is what it costs.
+		// A Type holds no Statements, so `type` and `returnType` are skipped.
 		for (let [key, entry] of Object.entries(node)) {
 			if (key !== "type" && key !== "returnType") {
 				visit(entry)
@@ -4315,8 +4306,7 @@ function protocolPreludeNamespaces(
 		}
 	}
 
-	// A `tests` block may declare a Protocol too, and its conformers
-	// name the provided consts exactly as the implementation's do.
+	// A `tests` block may declare a Protocol too.
 	for (let program of programs) {
 		visit(program.implementation.nodes)
 		visit(program.tests?.nodes ?? [])
@@ -4333,9 +4323,7 @@ export type ProvidedMemberIdentifiers = ReadonlyMap<
 	ReadonlyMap<string, string>
 >
 
-// Bare identities claim first, so the standard library's consts never
-// depend on the graph. The rest claim by declaring Module path and Position, so
-// every entry of a graph names them alike.
+// See "Const names" in DEVELOPMENT.md.
 function providedMemberIdentifiers(
 	prelude: Array<PreludeNamespace>,
 ): ProvidedMemberIdentifiers {
@@ -4433,51 +4421,32 @@ function isShadowingUserNamespace(namespaceName: string): boolean {
 	return shadowingNamespaceScopes.some((scope) => scope.has(namespaceName))
 }
 
-// A name in KEY or PROPERTY position — a Record field, a Namespace's
-// static Method, a Protocol Method in a conformance witness. It is never
-// escaped: a reserved word is a legal property key, and the read has to match
-// the key the literal wrote. It does still have to be spellable, though, and an
-// Essence identifier may hold characters no JavaScript IdentifierName may — so
-// such a name becomes a string Literal instead. `{ "ok?": … }` and
-// `record["ok?"]` are the same property under a spelling JavaScript accepts, and
-// because both positions ask this one question they still agree.
+// A name in key or property position. A reserved word stays as it is, and a
+// name JavaScript can not spell, such as `ok?`, becomes a string Literal.
 function memberKey(name: string): estree.Identifier | estree.Literal {
 	return isJavaScriptIdentifierName(name)
 		? { type: "Identifier", name }
 		: { type: "Literal", value: name }
 }
 
-// A user Namespace is a `class`, and a class refuses two member names an
-// object literal accepts: no static member may be named `prototype` and no
-// field may be named `constructor` — computed keys only move the refusal from
-// the parser to a `TypeError` at definition. `namespace Shape for Shape {
-// prototype () -> … }` is a legal Program, so such a member is mangled instead,
-// at the class body and at every read alike — `namespaceMember` is the one
-// place every read routes through, which is what keeps the two agreeing. A
-// builtin's members are module exports, not class members, so they keep their
-// names.
-//
-// Exported for the same reason `escapeName` is — a host binding reads a
-// Namespace's members off the emitted class, so it has to ask the same
-// question.
+// A class refuses a static member named `prototype` and a field named
+// `constructor`, so a user Namespace's member of either name is mangled.
+// Exported so a host's reads agree.
 const forbiddenClassMemberNames = new Set(["prototype", "constructor"])
 
 export function namespaceMemberName(name: string): string {
 	return forbiddenClassMemberNames.has(name) ? mangleName(name) : name
 }
 
-// A spine before the spines it is a prefix of, so a requirement about
-// `payload` is tested before one about `payload.origin` — the second reads
-// through what the first established. Sorted by depth rather than by text,
-// because that is the property being relied on.
+// Shallower spines first, so `payload` is tested before `payload.origin`
+// reads through it.
 function shallowestFirst(spines: Array<string>): Array<string> {
 	return [...spines].sort(
 		(left, right) => left.split(".").length - right.split(".").length,
 	)
 }
 
-// One member read, `computed` iff the key had to become a Literal — the
-// dotted form for every ordinary name, the bracketed one for the rest.
+// One member read, bracketed where the key had to become a Literal.
 function memberRead(
 	object: estree.Expression,
 	name: string,
@@ -4491,18 +4460,9 @@ function memberRead(
 	}
 }
 
-// `options?.server?.port` — the chain a callee reads one member of a
-// Record-defaulted Parameter through, and the only member read in an emitted
-// Program that short circuits: every other one is of a value that exists.
-//
-// The FIRST step reads optionally exactly where the whole Argument may have been
-// left out; every step after it always does, because a level the Argument left
-// out is a level that is not there.
-//
-// ONE `ChainExpression` wraps the whole read, for the reason `typeKeyRead`
-// gives — a bare `MemberExpression` carrying `optional` is not a tree the ESTree
-// grammar has — and because `?.` short circuits the rest of the chain it stands
-// in: a chain per link would answer `(a?.b)?.c`, which reads `c` off `undefined`.
+// `options?.server?.port`, a read into a Record-defaulted Argument. The first
+// step is optional only where the whole Argument may be missing. One
+// `ChainExpression` wraps the whole read, so `?.` short circuits all of it.
 function memberPathRead(
 	object: estree.Expression,
 	path: ReadonlyArray<string>,
@@ -4557,17 +4517,7 @@ function callAnyIs(
 	}
 }
 
-// A literal Matcher needs no Type check in front of it — `anyIs`
-// already answers false across differing Types. A Guard is ANDed on after
-// whichever check the Matcher produced, so it only ever narrows.
-//
-// A Handler carrying a residual test was given one by
-// `compile-type-tests`, which found something cheaper that answers what the
-// Matcher's check answers — a tag comparison in place of a descriptor, or a
-// raw comparison in place of `anyIs` over a scalar literal. It reads the value
-// under the same `_self` this binds, so it goes where the call would have gone
-// and everything ANDed on after it is unchanged. It is asked FIRST for that
-// reason: it stands for whatever the Matcher's own half was, literal or not.
+// One Handler's test. See "Handler tests" in DEVELOPMENT.md.
 function handlerTest(
 	handler: common.typedSimple.MatchHandler,
 	value: estree.Identifier,
@@ -4597,18 +4547,8 @@ function handlerTest(
 		test = callIsValueOfType(value, handler.matcher)
 	}
 
-	// What a Case Matcher's payload Pattern requires of a member, tested
-	// behind the Matcher's own check and BEFORE any member comparison. The
-	// order is load-bearing rather than tidy: a value comparison may read down
-	// a spine — `@.payload.origin.x` — and only these requirements establish
-	// that the spine exists. Shallowest first, for the same reason.
-	//
-	// `memberTests` is what `compile-type-tests` leaves where it has DECIDED a
-	// requirement — a tag comparison where the tag decides it, and otherwise the
-	// same check over a descriptor `pool-constants` can hoist out of the test.
-	// Without that pass the requirement is emitted from its Type instead, which
-	// is the same question asked the general way, so a build with the Optimiser
-	// off answers what an optimised one answers.
+	// The payload Pattern's member requirements, before any comparison reads
+	// down a spine they establish.
 	if (handler.memberTests !== null) {
 		for (let path of shallowestFirst(Object.keys(handler.memberTests))) {
 			test = and(test, rewriteExpression(handler.memberTests[path]!))
@@ -4624,15 +4564,8 @@ function handlerTest(
 		}
 	}
 
-	// The member comparisons come after the Matcher's own check and the
-	// member requirements, and rely on `&&` short-circuiting: those are what
-	// guarantee the value carries every member named here, so reading them is
-	// only safe once they have passed.
-	//
-	// A key is the DOTTED SPINE that reaches the member, so a Pattern that
-	// constrains a nested member by value — `{ origin as { x = 0 } }` — reads
-	// its way down. A member name can hold no dot, so splitting on one can not
-	// mistake anything else for a spine.
+	// Member comparisons, keyed by dotted spine, safe once the checks before
+	// them passed.
 	if (handler.memberLiterals !== null) {
 		for (let [path, literal] of Object.entries(handler.memberLiterals)) {
 			let read = path.split(".").reduce(memberRead, value)
@@ -4648,18 +4581,7 @@ function handlerTest(
 	return and(test, valueRead(rewriteExpression(handler.guard)))
 }
 
-// The `else` no Handler owns — the one branch taken when every
-// Matcher declined. The Validator has already refused a Match that leaves
-// a member of its Union unhandled, so this is dead code in a Program that
-// compiled clean; it exists because it did NOT used to, and the chain
-// ending in nothing was invisible: the wrapper answered `undefined`, which
-// is not an Essence value, and the Program failed later and elsewhere —
-// with a `TypeError` out of whatever read the missing Type key, or with
-// `undefined` flowing on as if it were a result. It is the innermost
-// `else` rather than a Statement after the chain on purpose: a Handler
-// body is not obliged to return (a Match in Statement position is written
-// for its effects), so a Handler that ran and fell through must NOT reach
-// it.
+// The `else` no Handler owns. See "The end of the chain" in DEVELOPMENT.md.
 function noCaseMatched(value: estree.Identifier): estree.ExpressionStatement {
 	return {
 		type: "ExpressionStatement",
@@ -4675,48 +4597,18 @@ function noCaseMatched(value: estree.Identifier): estree.ExpressionStatement {
 	}
 }
 
-// `_self` is the name a Match binds the matched value to, and the name
-// `@` lowers to inside a Handler body — one value under one name, so a test
-// written against it reads what the body reads. A fresh Node each time, because
-// a Position may be written onto one of them.
+// The matched value's name, which `@` lowers to in a Handler. A fresh node
+// each time, since a Position may be written onto one.
 function selfIdentifier(): estree.Identifier {
 	return { type: "Identifier", name: "_self" }
 }
 
-// The matched value's tag, read ONCE for a chain that asks about it more
-// than once. `_self[$type.typeKeySymbol] === "…"` per Handler is N reads of one
-// key off one object, and where the Cases carry different fields — which is what
-// a Choice with payloads is — every value has a hidden class of its own and the
-// read goes megamorphic: measured on an eight-Case chain over such values, a
-// bound tag is a third off the chain, and over uniformly shaped values (a Choice
-// of unit Cases) it is exactly as fast as the reads it replaces.
-//
-// This is EMISSION, not a pass, and the difference is what decides where
-// it belongs. Nothing about the Program changes: the same key is read off the
-// same immutable value, before the same tests, in the same order, and no Node is
-// added, removed or reordered. There is no Node to add one with either — a tag
-// is a raw JavaScript string, and `typedSimple` has no Expression that holds one
-// and no Statement that binds one, so a pass would have to grow both and every
-// pass after it would have to learn a shape that exists only to be emitted.
-//
-// And it depends on no pass having run, which is what the registry's
-// "any subset must be correct" rule asks of everything around it. The binding is
-// made off the `tag-test` Nodes `compile-type-tests` leaves; turn that pass off
-// — or the whole phase, with `--no-optimise` — and there are none, so no name is
-// bound and the chain is emitted exactly as it was before. It can not make a
-// subset of the registry wrong because it reads whatever reached it.
-//
-// One name, not a numbered series. A Match nested inside a Handler binds
-// its own inside its own block and SHADOWS this one, which is harmless for the
-// reason a nested dispatch's `$dispatch_0` is: a chain reads the tag it bound
-// and nothing else's. The `_` is what keeps the name unspellable in Essence —
-// the Lexer reads one as a Symbol — exactly as it does for `_self`.
+// The matched value's tag, read once for a chain that compares it twice or
+// more. See "The bound tag" in DEVELOPMENT.md.
 const selfTagName = "$self_tag"
 
-// The Handler's own check where it is a tag comparison on the MATCHED
-// VALUE, and null for everything else. A literal Matcher is checked by `anyIs`
-// and reads no tag; a member test reads its way down a spine, which is a
-// different object every time and is left where it stands.
+// The Handler's own check where it compares the matched value's tag, or
+// null.
 function selfTagTestOf(
 	handler: common.typedSimple.MatchHandler,
 ): common.typedSimple.TagTestNode | null {
@@ -4736,8 +4628,7 @@ function selfTagTestOf(
 		: null
 }
 
-// Two, because one read is not worth a name — and a chain of one tag test
-// is what a two-member Union compiles to, which is most of them.
+// Bound from two tag tests, since one read is not worth a name.
 function hoistedTagName(
 	handlers: ReadonlyArray<common.typedSimple.MatchHandler>,
 ): string | null {
@@ -4777,27 +4668,9 @@ function boundTagTest(
 	}
 }
 
-// The chain a Match's Handlers become, and the one place it is built. The
-// Handlers are folded BACK TO FRONT, so that each `if` becomes the `else` of
-// the one before it — the first Handler ends up at the head of the chain and is
-// therefore tested first.
-//
-// What the chain ends in, and the Handlers that are tested to reach it.
-// `elide-final-match-test` proved the last Handler is the one taken when every
-// other declined, so its body IS the `else` and the fall-through above is gone
-// with its test — see that pass for what the proof rests on and what it gives
-// up.
-//
-// `bodyOf` is what tells the two forms of a Match apart. In an Expression
-// position a Handler's Return Statement is the wrapper Function's Return and the
-// body is emitted as written; in a Statement position it is whatever the
-// Statement's own answer is, and the caller hands in a body that writes it
-// there.
-//
-// A run of Statements rather than one, because a chain that asks about the
-// matched value's tag more than once binds it first — see `selfTagName`. The
-// callers splice them into the block they are already building, so the binding
-// costs no block of its own wherever one is there.
+// A Match's Handlers as an `if` chain, preceded by the tag binding when there
+// is one. `bodyOf` writes a Handler's answer for the Expression or Statement
+// form. See "Match emission" in DEVELOPMENT.md.
 function matchChain(
 	handlers: Array<common.typedSimple.MatchHandler>,
 	finalHandlerIsElse: boolean,
@@ -4815,8 +4688,7 @@ function matchChain(
 		tail = bodyOf(handlers.at(-1)!)
 	}
 
-	// Asked of the TESTED Handlers alone. The last one is the `else` where
-	// `elide-final-match-test` proved it is, and an `else` reads no tag.
+	// Only the tested Handlers count; an elided `else` reads no tag.
 	let tagName = hoistedTagName(tested)
 	let ifChain: estree.IfStatement | undefined
 
@@ -4836,15 +4708,8 @@ function matchChain(
 	return tagName === null ? [chain] : [bindTag(tagName, value), chain]
 }
 
-// A Match standing in an Expression position, which is the only place
-// JavaScript has no way of saying what a Match says: the chain is Statements,
-// and the one Expression that may hold Statements is a Function call. So the
-// Handlers become the body of a Function of `_self` and the matched value is its
-// Argument — which is also what binds `_self` for the Handlers, shadowing an
-// enclosing one for exactly the length of the chain.
-//
-// `lower-matches-to-statements` is what takes the wrapper away wherever
-// the Match stands somewhere a Statement may be written instead.
+// A Match in an Expression position: a Function of `_self`, called with the
+// matched value.
 function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 	let value = selfIdentifier()
 
@@ -4866,26 +4731,11 @@ function rewriteMatch(node: common.typedSimple.MatchNode): estree.Expression {
 	)
 }
 
-// A chain of JavaScript conditionals and nothing else:
+// A `define` as JavaScript conditionals:
 //
 //   score.value >= 90 ? "A" : score.value >= 80 ? "B" : "F"
 //
-// No Function to call and no block to fall out of, which is the whole point of
-// the Node — a Match holds Statements and so must be emitted as a body, while
-// every half of every `define` arm is an Expression that JavaScript can say
-// where it stands.
-//
-// The arms are folded back to front, so each conditional becomes the
-// `alternate` of the one written above it and the first arm is tested first.
-// The `otherwise` value is the tail, which is what makes the chain total: there
-// is no fall-through here and no throw to end it with.
-//
-// An Essence Boolean is an object and every object is true, so what
-// JavaScript is asked is the `value` the Condition holds — unless
-// `unbox-conditions` has already left the question asked in JavaScript's own
-// terms, which is what `conditionIsRaw` says. Reading `.value` off a raw
-// boolean would be `undefined`, and `undefined` is false: every arm would
-// decline and every `define` would answer with its `otherwise`.
+// See "Define emission" in DEVELOPMENT.md.
 function rewriteDefine(node: common.typedSimple.DefineNode): estree.Expression {
 	let chain = rewriteExpression(node.otherwise)
 

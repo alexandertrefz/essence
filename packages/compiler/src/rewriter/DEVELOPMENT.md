@@ -52,6 +52,11 @@ holds because no user name can carry the prefix.
 starts with `_`, so the double separator keeps it apart from every Namespace member's const. A user's
 `protocol Integer` beside the standard library's `Integer` Namespace then emits two consts.
 
+Protocols of one name declared in different Modules may provide the same Method. `providedMemberIdentifiers`
+gives the first claimant `$es_<Name>__<member>` and the n-th `$es_<Name>_<n>__<member>`, which no Name can
+spell. Bare identities, the standard library's, claim first, so its consts never depend on the graph. The
+rest claim in order of declaring Module path and Position, so every entry of a graph names them alike.
+
 A Method and a static Property of one Namespace share a const name. Nothing upstream refuses the pair,
 because the two live in separate records. The Rewriter keys its candidates by const name, so every call of
 the Method would read the Property's value. `buildStdlibArtifacts` throws on such a pair. A misrouted read is wrong whichever half
@@ -464,3 +469,61 @@ name still means the import. `shadowingNamespaceScopes` mirrors the Enricher's S
 block, holding the compiler-owned names a user Namespace took there. `isShadowingUserNamespace` answers from
 it, so even a bare Namespace name with no Type, such as a dispatch case's or a witness's, resolves correctly.
 The user's Namespace is mangled, and the import keeps its name.
+
+## Match emission
+
+`matchChain` turns a Match's Handlers into an `if` chain, folded back to front so the first Handler is
+tested first. The chain binds the matched value as `_self`, the name `@` lowers to in a Handler, so a test
+reads what the body reads. In an Expression position, `rewriteMatch` makes the chain the body of a Function
+of `_self`, called at once with the matched value. `lower-matches-to-statements` removes that wrapper where
+the Match can stand as a Statement.
+
+### Handler tests
+
+`handlerTest` builds one Handler's test in a fixed order, joined by `&&`:
+
+1. The Matcher's own check. A residual `typeTest` from `compile-type-tests` comes first, since it stands for
+   whatever the Matcher's check was. Otherwise a literal Matcher calls `$helpers.anyIs`, which answers false
+   across differing Types, and any other Matcher calls `$type.isValueOfType`.
+2. What a Case Matcher's payload Pattern requires of its members, shallowest first. A later comparison may
+   read down a spine such as `@.payload.origin.x`, and only these requirements establish that the spine
+   exists. Without `compile-type-tests` the requirements are asked from their Types, which gives the same
+   answers.
+3. The member comparisons, keyed by the dotted spine that reaches each member. `&&` reads them only after
+   the requirements pass. A member name holds no dot, so splitting on one is safe.
+4. The Guard, which can only narrow.
+
+### The end of the chain
+
+The chain ends in `$type.noCaseMatched`, the `else` no Handler owns. The Validator refuses a Match that
+leaves a member of its Union unhandled, so a valid Program never reaches it. Without it the wrapper would
+answer `undefined`, which is no Essence value, and the Program would fail somewhere else. It is the
+innermost `else` rather than a Statement after the chain. A Handler body need not return, and a Handler that
+ran and fell through must not reach it.
+
+Where `elide-final-match-test` proved the last Handler is taken whenever every other declines, its body is
+the `else`, and the fall-through goes with its test.
+
+### The bound tag
+
+A chain that compares the matched value's tag at least twice reads it once, into `$self_tag`. Values of a
+Choice whose Cases carry different fields have different hidden classes, so repeated reads of one key go
+megamorphic.
+
+This is emission, not a pass. Nothing about the Program changes: the same key is read off the same value,
+before the same tests, in the same order. `typedSimple` has no node that holds a raw tag string, so a pass
+would need new node kinds that exist only to be emitted. The binding is made from the `tag-test` nodes that
+`compile-type-tests` leaves. With that pass off there are none, nothing is bound, and each test reads the
+tag itself. So any subset of the optimiser's passes stays correct.
+
+A nested Match binds its own `$self_tag` in its own block, which shadows the outer one harmlessly: each
+chain reads only the tag it bound. The `_` keeps the name out of reach of Essence code. The last Handler,
+when it is the `else`, reads no tag and is not counted.
+
+## Define emission
+
+`rewriteDefine` emits a `define` as a chain of JavaScript conditionals, folded back to front so the first arm
+is tested first. Every part of an arm is an Expression, so no Function is needed. The `otherwise` value ends
+the chain, so it is total and has no fall-through. Each Condition is read through `.value` unless
+`conditionIsRaw` says `unbox-conditions` left a raw JavaScript boolean. Reading `.value` off a raw boolean
+would answer `undefined`, and every arm would decline.

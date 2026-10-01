@@ -166,7 +166,7 @@
 	"packages/compiler/src/parser/index.ts": {"em-dash": 1},
 	"packages/compiler/src/parser/nodeGenerators.ts": {"sentence-length": 3, "em-dash": 7},
 	"packages/compiler/src/printType.ts": {"sentence-length": 19, "em-dash": 20, "all-caps": 10, "position": 2, "block-length": 4},
-	"packages/compiler/src/rewriter/rewrite.ts": {"sentence-length": 238, "em-dash": 165, "all-caps": 121, "history": 3, "position": 19, "block-length": 48},
+	"packages/compiler/src/rewriter/rewrite.ts": {"sentence-length": 204, "em-dash": 135, "all-caps": 100, "history": 2, "position": 18, "block-length": 36},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
 	"packages/compiler/src/testing/corpus.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 16, "block-length": 2, "stacked": 1},
