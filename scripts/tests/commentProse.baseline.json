@@ -15,7 +15,6 @@
 	"packages/ariadne/src/report.spec.ts": {"sentence-length": 3, "em-dash": 1},
 	"packages/ariadne/src/write.ts": {"sentence-length": 6, "em-dash": 3, "all-caps": 5},
 	"packages/cli/src/tests/harness.ts": {"sentence-length": 4, "em-dash": 2, "all-caps": 4},
-	"packages/cli/src/tests/mutation.spec.ts": {"sentence-length": 35, "em-dash": 23, "all-caps": 17, "history": 1, "position": 1, "block-length": 2},
 	"packages/cli/src/tests/oneAnalysis.spec.ts": {"sentence-length": 8, "em-dash": 4, "all-caps": 4, "history": 4},
 	"packages/cli/src/tests/resultCache.spec.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 5, "position": 2, "block-length": 1},
 	"packages/cli/src/tests/terminalInput.spec.ts": {"sentence-length": 11, "em-dash": 7, "all-caps": 2},
