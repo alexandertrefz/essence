@@ -21,15 +21,9 @@ import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 import { compiles } from "./followedHelps"
 
-// The full pipeline minus bundling, mirroring codeGeneration.spec — a
-// Choice is only implemented once every stage agrees on it.
-//
-// The Options are a Parameter because one question below is about what
-// the Rewriter emits for a derived equality, and the Optimiser answers a
-// comparison against a payload-less Case without reaching the Rewriter's
-// emission at all. Turning that one pass off is how the emission is asked
-// about directly; what the Optimiser does with it instead is pinned under
-// `lower-unit-case-equality` in `optimiser.spec.ts`.
+// The full pipeline minus bundling, since a Choice works only once every stage
+// agrees on it. The Options are a Parameter so a spec can turn off
+// `lower-unit-case-equality` and see the Rewriter's own derived equality.
 function generate(
 	source: string,
 	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
@@ -80,19 +74,15 @@ function notesOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) => diagnostic.notes)
 }
 
-// The text under the carets, which for the undecided rails is where the
-// reader is told WHICH Type Argument is missing — the message names the
-// construction and the labels name the Parameters.
+// The Label messages, which name the Type Parameters an undecided
+// construction is missing.
 function labelsOf(source: string): Array<string> {
 	return diagnosticsOf(source).flatMap((diagnostic) =>
 		diagnostic.labels.map((label) => label.message),
 	)
 }
 
-// Emits the Program, writes it to a throwaway module and imports it so
-// its top-level `Terminal.inspect` calls run — the counterpart of `generate`, mirroring
-// codeGeneration.spec's own `run`, so a generic Choice is exercised end to end
-// rather than only type-checked.
+// Runs the emitted Program and captures what `Terminal.inspect` prints.
 async function run(source: string): Promise<Array<string>> {
 	let js = generate(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-choice-"))
@@ -125,10 +115,8 @@ function codesOf(source: string): Array<string> {
 	return diagnosticsOf(source).map((diagnostic) => diagnostic.code)
 }
 
-// The declared Type of a named Declaration in an enriched Program — the
-// applied Union of a `type Applied = Progress<Integer, String>` alias, or the
-// Generic Alias a generic `choice` resolves to — so a test can read a Type off
-// the tree without also constructing a value for it.
+// The declared Type of a named Type Alias or Choice, read without
+// constructing a value.
 function declaredTypeOf(source: string, name: string): common.Type {
 	let parsed = parseWithDiagnostics(source)
 
@@ -151,9 +139,8 @@ function declaredTypeOf(source: string, name: string): common.Type {
 	return node.type
 }
 
-// The Type of a Constant's VALUE — a constructed Case carries its
-// instantiated CaseType here, so a test can assert on the members and Type
-// Arguments the construction site inferred.
+// The Type of a Constant's value, where a constructed Case carries the
+// members and Type Arguments its construction inferred.
 function valueTypeOf(source: string, name: string): common.Type {
 	let parsed = parseWithDiagnostics(source)
 
@@ -389,8 +376,8 @@ describe("Choices", () => {
 			expect((bare!.binding as parser.IdentifierNode).content).toBe(
 				"pair",
 			)
-			// The Matcher's Position has to reach the closing paren, or
-			// an editor greys out a dead Handler short of its own binding.
+			// The Matcher's Position reaches the closing paren, so an editor greys
+			// out a dead Handler's binding too.
 			expect(bare!.position.end.column).toBeGreaterThan(
 				bare!.caseName.position.end.column,
 			)
@@ -435,13 +422,10 @@ describe("Choices", () => {
 			expect(choice.generics).toEqual([])
 		})
 
-		// A Case payload is ONE value — every construct that takes a
-		// trailing comma is a LIST — so the comma is refused. What matters is
-		// WHERE: the applied form is read speculatively, because only the `#`
-		// past the Type Arguments tells it from a comparison chain, and a
-		// generic `syntax-error` is given back and rewound. The rewound reading
-		// then refused the `#` instead, naming the wrong character on the wrong
-		// line. A coded refusal is what the rewind does not swallow.
+		// A Case payload is one value, so a trailing comma is refused where it is
+		// written. The applied form is read speculatively, and a coded refusal
+		// survives the rewind where a `syntax-error` would not. See "Refusals of
+		// the text" in packages/compiler/src/parser/DEVELOPMENT.md.
 		it("refuses a trailing comma in a Case payload where it is written", () => {
 			expect(
 				codesOf(`implementation {
@@ -620,8 +604,8 @@ describe("Choices", () => {
 
 			let body = alias.aliasedType as common.UnionType
 
-			// The body Union is anonymous so an application heals its
-			// display `alias` onto it.
+			// The body Union is anonymous, so an application can give it a
+			// display `alias`.
 			expect(body.name).toBeUndefined()
 			expect(body.alias).toBeUndefined()
 
@@ -630,9 +614,8 @@ describe("Choices", () => {
 					member.type === "Case" && member.name === "Stopped",
 			)!
 
-			// A declared Case records the Choice's Generics and keeps its
-			// members as GenericUses until a use site binds them — the interface
-			// construction-side instantiation reads back.
+			// A declared Case records the Choice's Generics and keeps its members
+			// as GenericUses until a use site binds them.
 			expect(done.choiceGenerics?.map((generic) => generic.name)).toEqual(
 				["State", "Result"],
 			)
@@ -742,9 +725,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// A Type Parameter may spell the Choice's own name, and then the
-		// payload names the Parameter — no recursion, and as silent as the
-		// plain `type Bad<Bad> = { next: Bad }` the same shadowing makes.
+		// A Type Parameter may spell the Choice's own name, and then the payload
+		// names the Parameter, so there is no recursion.
 		it("reads a payload as the Type Parameter shadowing the Choice's name", () => {
 			expect(
 				messagesOf(`implementation {
@@ -770,11 +752,8 @@ describe("Choices", () => {
 			).toContain("wrong-type-argument-count")
 		})
 
-		// The `combinationTypeOf` TODO (resolvers.ts) is about applied
-		// Types in `{ … with … }`. An applied Generic Alias of a Record already
-		// resolves to a plain Record at annotation time, so the update reads its
-		// members straight off — the TODO's remaining work is applied *non*-alias
-		// Types, and this case must keep passing meanwhile.
+		// An applied Generic Alias of a Record resolves to a plain Record at the
+		// annotation, so an update reads its members directly.
 		it("updates a value annotated with an applied generic Alias of a Record", () => {
 			expect(
 				messagesOf(`implementation {
@@ -787,11 +766,9 @@ describe("Choices", () => {
 		})
 	})
 
-	// Everything the direct check above does NOT catch — a mutual pair, a
-	// non-generic Choice, a Type Alias — is caught by the cycle pre-pass before
-	// the hoist rounds. `toEqual` throughout, because the point of the pre-pass
-	// is as much what it does NOT report: each of these used to be a pile of
-	// `unknown-type` Diagnostics about names the Program does declare.
+	// The cycle pre-pass before the hoist rounds catches a mutual pair, a
+	// non-generic Choice and a Type Alias. The specs use `toEqual`, since it
+	// must also report no `unknown-type` about names the Program declares.
 	describe("Recursive Type Declarations", () => {
 		it("names the cycle of a mutually recursive Choice pair", () => {
 			let source = `implementation {
@@ -848,9 +825,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// A Generic's default Type is resolved along with the declaration
-		// it belongs to, so a cycle through one is just as unresolvable — and it
-		// is the position the direct check never looked at.
+		// A default Type resolves with its declaration, so a cycle through one
+		// is a cycle too.
 		it("names a cycle closed by a Generic's default Type", () => {
 			expect(
 				messagesOf(`implementation {
@@ -859,10 +835,9 @@ describe("Choices", () => {
 			).toEqual(["Type 'Boxed' names itself"])
 		})
 
-		// A default Type resolves in the Scope AROUND the declaration,
-		// where the Parameter it belongs to is not visible yet — so the `B` in
-		// `type B<B = B>` is the declaration being made, and the shadowing the
-		// body enjoys must not be applied here.
+		// A default Type resolves around the declaration, where its own
+		// Parameter is not visible, so the `B` in `type B<B = B>` is the
+		// declaration itself.
 		it("names a cycle a Parameter's own name closes in its default Type", () => {
 			expect(
 				messagesOf(`implementation {
@@ -891,8 +866,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// The other side of the same coin — a default Type naming what its
-		// Parameter shadows in the body is no cycle at all, and stays silent.
+		// A default Type naming what its Parameter shadows in the body is no
+		// cycle.
 		it("reads a default Type as the declaration its Parameter shadows", () => {
 			expect(
 				messagesOf(`implementation {
@@ -923,9 +898,8 @@ describe("Choices", () => {
 			).toEqual(["recursive-generic-choice"])
 		})
 
-		// The cascade the pre-pass exists to prevent: every name in the
-		// cycle stays declared — as an Error — so a declaration naming one of
-		// them, above or below, is not reported at all.
+		// Every name in a cycle stays declared as an Error, so a declaration
+		// naming one is not reported.
 		it("leaves declarations that merely name a cycle member alone", () => {
 			expect(
 				codesOf(`implementation {
@@ -966,8 +940,7 @@ describe("Choices", () => {
 			])
 		})
 
-		// A Type Parameter is not the Type its name may also spell
-		// further out — the graph resolves the shadowing, so this is no cycle.
+		// The graph resolves a Type Parameter's shadowing, so this is no cycle.
 		it("does not read a Type Parameter as naming the declaration it shadows", () => {
 			expect(
 				messagesOf(`implementation {
@@ -979,11 +952,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// `infer` marks a Type Parameter a USE works out for itself. A Choice
-	// and a Type Alias have no such use — every one of theirs applies its
-	// Arguments outright — so the marker is refused rather than accepted and
-	// ignored, which is what it was while a construction's payload could stand in
-	// for a use site that worked the Argument out.
+	// `infer` marks a Type Parameter a use works out for itself. Every use of a
+	// Choice or a Type Alias applies its Arguments, so the marker is refused.
 	describe("'infer' on an Applied Type Parameter", () => {
 		it("refuses it on a Choice", () => {
 			let source = `implementation {
@@ -1028,9 +998,8 @@ describe("Choices", () => {
 			).toEqual(["Remove the 'infer' before 'Right'."])
 		})
 
-		// The Generic list is the same grammar a Method writes, where the
-		// marker is the whole point — which is why this is a Diagnostic and not a
-		// parse error.
+		// A Method's Generic list has the same grammar and needs the marker, so
+		// the refusal is a Diagnostic, not a parse error.
 		it("leaves a Method's own Type Parameters alone", async () => {
 			expect(
 				await run(`implementation {
@@ -1047,9 +1016,8 @@ describe("Choices", () => {
 			).toEqual(['"1"'])
 		})
 
-		// `infer` is a valid Identifier, so `<infer>` declares a Generic
-		// NAMED infer and marks nothing — the Parser only reads it as the modifier
-		// when a name follows it.
+		// `infer` is a valid Identifier, so `<infer>` declares a Generic named
+		// `infer`. The Parser reads the modifier only when a name follows.
 		it("leaves a Type Parameter actually named 'infer' alone", () => {
 			expect(
 				messagesOf(`implementation {
@@ -1074,10 +1042,8 @@ describe("Choices", () => {
 			).toContain("This Match Expression does not handle every Case")
 		})
 
-		// The Union's OTHER member is an ordinary Type — the claim is that a
-		// Choice standing in a Union contributes its Cases rather than itself, so
-		// exhaustiveness is every Case plus every non-Choice member, and the
-		// second member is only here to make a Union at all.
+		// A Choice in a Union contributes its Cases, so exhaustiveness needs
+		// every Case plus every other member.
 		it("treats a Union containing a Choice as the Union of its Cases", () => {
 			expect(
 				messagesOf(`implementation { ${calculatorChoice}
@@ -1157,21 +1123,10 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// The bare form CARRYING A PAYLOAD reads what its payload MENTIONS
-		// and nothing else, which used to be blessed here as the whole of the
-		// rule: `#Stopped({ value = "x" })` decided `Result` and let `State` — a
-		// Parameter no member of `#Stopped` names — stand in the Program as the
-		// Type of a value, where it resurfaced far from this line. It is the same
-		// leak the unit Case below is refused for, one spelling over, so it is
-		// refused too: everything that decides runs first (the payload, the
-		// position, the Parameter Type an Argument is matched against), and what
-		// is STILL open then is what reports.
-		//
-		// The form a Function literal with no written return Type answers with —
-		// `<- #Done(item)` in a `loop` or `reduce` callback, which the standard
-		// library is written on throughout — is untouched by that: the callback's
-		// position is re-read once the call has committed, and every Parameter is
-		// decided by the time this asks. The tests below walk that end to end.
+		// A bare Case's payload binds only the Type Parameters its members
+		// mention. After the payload, the position and the Argument's Parameter
+		// Type, whatever is still open is reported. See "Instantiating a generic
+		// Case from its payload" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		describe("A payload-carrying bare Case nothing finishes deciding", () => {
 			it("reports the Parameter the payload does not mention", () => {
 				let source = `implementation { ${progressChoice}
@@ -1189,18 +1144,14 @@ describe("Choices", () => {
 					"'Progress' takes 2 Type Parameters: 'State', 'Result'.",
 					"A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
 				])
-				// The Argument the payload DECIDED is spelled out and the
-				// one it left is an ellipsis. Both used to be the Choice's own
-				// Parameter names — `Progress<State, Result>` copied out of a
-				// Help is `unknown-type` twice over, since those names belong to
-				// the declaration and are in scope nowhere else.
+				// The decided Argument is spelled out and the open one is an
+				// ellipsis, since the Choice's Parameter names are out of scope here.
 				expect(helpsOf(source)).toEqual([
 					"Annotate the Declaration this is written into with 'Progress<…, String>', which is what decides them.",
 					"Or apply the Type Arguments here — 'Progress<…, String>#Stopped(…)', with the Type you mean in place of each '…'.",
 				])
 
-				// And the spelling with its blank filled in compiles, which
-				// is the whole of what a Help promises.
+				// The spelling with its blank filled in compiles.
 				expect(
 					compiles(`implementation { ${progressChoice}
 					constant done = Progress<Integer, String>#Stopped({ value = "x" })
@@ -1208,8 +1159,7 @@ describe("Choices", () => {
 				).toBe(true)
 			})
 
-			// The other flavour — a payload that mentions no Type Parameter
-			// at all, so there is not even half a decision to report on.
+			// A payload that mentions no Type Parameter decides nothing.
 			it("reports one whose payload decides nothing at all", () => {
 				let source = `implementation {
 					choice Box<Value> { Full { value: Value }, Tag { label: String } }
@@ -1223,15 +1173,9 @@ describe("Choices", () => {
 				])
 			})
 
-			// And asked only where a payload STOOD. A Case that carries one
-			// and was written without has `missing-payload` to report, and one
-			// whose payload is not the Case's Record has `payload-type-mismatch` —
-			// each about the mistake the reader made, where the refusal is about
-			// the Type Arguments a payload that stood did not decide. Standing in
-			// front of either hid it: `#Full` on its own was told its payload
-			// decides none of them, spelled with a `(…)` it never wrote, and a
-			// misspelled member was answered with a message claiming the other
-			// half of the application had been decided by it.
+			// The rule asks only where a payload stands for the Case. A missing
+			// payload is `missing-payload`, and one that does not fit is
+			// `payload-type-mismatch`.
 			it("leaves a payload that was never given to its own Diagnostic", () => {
 				const box = `choice Box<Value> { Full { value: Value } }`
 
@@ -1279,9 +1223,8 @@ describe("Choices", () => {
 				})
 			})
 
-			// A Choice every one of whose Parameters the payload mentions
-			// needs no position at all — the rule asks what is left, not whether
-			// a position spoke.
+			// A payload mentioning every Parameter needs no position, since the
+			// rule asks what is left open.
 			it("leaves one its payload decides entirely alone", () => {
 				expect(
 					valueTypeOf(
@@ -1302,11 +1245,8 @@ describe("Choices", () => {
 			})
 		})
 
-		// An Argument position decides a bare construction exactly as it
-		// decides the prefixed twin — the two spellings used to part ways here,
-		// the prefixed one reading `Step<Integer, Integer>` straight off the
-		// Parameter Type while the bare one was left to its payload and refused
-		// for the `State` that payload never mentions.
+		// An Argument position decides a bare construction as it decides the
+		// prefixed one.
 		it("decides a bare construction from the Argument position", async () => {
 			let program = `implementation {
 				constant steps: List<Step<Integer, Integer>> = [
@@ -1320,15 +1260,8 @@ describe("Choices", () => {
 			expect(messagesOf(program)).toEqual([])
 		})
 
-		// And decides it whatever order the Overloads are declared in. A
-		// candidate that decides nothing — an unrelated Parameter Type, or an
-		// instantiation the payload does not fit — used to leave the construction to
-		// be enriched FOR REAL from inside the probe: the refusal was reported from
-		// a position no candidate had committed to, and the Error it answered was
-		// kept for every candidate after it. The Overload that decides both
-		// Parameters went on to win all the same, with an Argument that was an Error
-		// and a recording of its own that nothing read. Reading the payload silently
-		// instead is what makes the two orders the same call.
+		// Whatever the Overload order. A probe reads the payload silently, so a
+		// candidate that decides nothing leaves no report or Error behind.
 		it("decides one from the Argument position whatever the Overload order", async () => {
 			let program = `implementation {
 				choice Pair<A, B> { Both { a: A, b: B }, Left { a: A }, None }
@@ -1354,22 +1287,14 @@ describe("Choices", () => {
 			])
 		})
 
-		// A unit Case has no payload to read a decision off and no Choice
-		// name to apply Type Arguments to, so the bare spelling of one is asked to
-		// be decided exactly as the prefixed form is. Every position that decides
-		// the prefixed form decides this one; nothing around it at all is what
-		// reports, instead of the Choice's own Type Parameters standing here as the
-		// Type of a value.
+		// A bare unit Case has no payload and no written Type Arguments, so only
+		// its position decides it. Where nothing does, it is reported.
 		describe("A unit Case of a generic Choice", () => {
 			const box = `choice Box<Value> { Full { value: Value }, Empty }`
 
-			// `Optional` is a generic Choice in every Program's scope now, and
-			// its empty Case is spelled `#Empty` — so a Choice of one's own that
-			// names a unit Case the same way makes the BARE spelling ambiguous
-			// before anything gets as far as asking what decides it. Which is what
-			// this second Choice is for: the undecided rail is only reachable
-			// through a unit Case name nothing ELSE in scope declares, and the
-			// collision the shared `box` now has is pinned on its own below.
+			// `Optional` declares `#Empty` too, so a bare `#Empty` is ambiguous
+			// before anything asks what decides it. This Choice names its unit Case
+			// `Blank` to reach the undecided report.
 			const blankBox = `choice Box<Value> { Full { value: Value }, Blank }`
 
 			it("reports one nothing decides", () => {
@@ -1393,13 +1318,8 @@ describe("Choices", () => {
 				).toBe(true)
 			})
 
-			// And a bare `#Empty` is answered by the ambiguity rail rather
-			// than the undecided one, because which Choice is meant has to be
-			// settled before its Type Arguments can be: `Optional` declares one too,
-			// and a Program that declares a second is told to prefix the spelling.
-			// The rails downstream are unchanged — every test below hands the bare
-			// form a position that names `Box`, and a position that decides which
-			// Choice is meant decides this one as well.
+			// Which Choice is meant is settled before its Type Arguments, so a bare
+			// `#Empty` is ambiguous. A position naming `Box` settles both.
 			it("reports a bare one the builtin Optional also declares", () => {
 				let source = `implementation { ${box}
 					constant empty = #Empty
@@ -1415,15 +1335,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// The Help has to ask for the Type Arguments where the Choice
-			// it names is generic, because picking the Choice is only half of
-			// what the position is missing: `Optional#Empty` written from a Help
-			// that stopped at the name resolves the ambiguity and then meets
-			// `undecided-type-arguments`, whose own Help asks for the Arguments.
-			// The ellipsis stands in for them rather than the Choice's Parameter
-			// names, which are not in scope here and are `unknown-type` written
-			// back. A non-generic Choice is offered the bare name, since that
-			// spelling is the whole answer there.
+			// For a generic Choice the Help also asks for the Type Arguments, with
+			// an ellipsis for each. A non-generic Choice gets the bare prefixed name.
 			it("asks a generic Choice's Help for the Type Arguments too", () => {
 				expect(
 					helpsOf(`implementation { ${box}
@@ -1447,11 +1360,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// The `data` carries the NAMES and stops there — the `<…>`
-			// the Help shows is a shape rather than a spelling, and a Quick Fix
-			// writing it would produce source that does not parse. Prefixing
-			// settles the ambiguity, `undecided-type-arguments` asks for the
-			// rest, and both halves are what the Helps already describe.
+			// The `data` carries only the names, since a Quick Fix writing `<…>`
+			// would not parse.
 			it("carries the candidate Choices as data, generic or not", () => {
 				expect(
 					diagnosticsOf(`implementation { ${box}
@@ -1498,10 +1408,8 @@ describe("Choices", () => {
 				).toEqual(['"empty"'])
 			})
 
-			// And waits for the Argument beside it that decides the Parameter,
-			// the same holding-back the prefixed form gets: matching a Case that
-			// binds nothing first would only read a Parameter Type nothing has
-			// decided yet.
+			// It is matched after the Argument that decides the Parameter, as the
+			// prefixed form is.
 			it("waits for an Argument that decides the Parameter", async () => {
 				expect(
 					await run(`implementation { ${box}
@@ -1522,13 +1430,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// `case Choice#Case` says which Choice's Case is meant. A Case the
-	// matched value can not be is the bare form's error, and used to be a
-	// Validator Warning here — the Handler stood, typed by the DECLARED Case,
-	// whose members are still the Choice's Type Parameters. A bounded one then
-	// solved its bound against a hidden conformance Parameter of a Choice
-	// nothing in sight applied, and the emitted Handler read a name no `const`
-	// declares.
+	// `case Choice#Case` names which Choice is meant. A Case the matched value
+	// cannot be is an error, as it is for the bare form.
 	describe("Prefixed Case Matchers", () => {
 		it("rejects a Case of a foreign Choice", () => {
 			expect(
@@ -1548,10 +1451,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// The near miss is looked for among the matched Union's Cases OF
-		// THIS CHOICE, because a Quick Fix replaces the NAME and nothing else —
-		// which is also why the underline stops short of the prefix, exactly as
-		// the bare form's does.
+		// A Quick Fix replaces only the name, so the near miss is sought among
+		// this Choice's Cases in the matched Union.
 		it("suggests a Case of this Choice the matched value still has", () => {
 			let [diagnostic] = diagnosticsOf(`implementation {
 					choice Stride { Walk, Walks }
@@ -1577,10 +1478,8 @@ describe("Choices", () => {
 			})
 		})
 
-		// Where the PREFIX is what went wrong, no rewrite of the name
-		// answers — `B#Wait` on an `A` is not a misspelling of anything — so
-		// nothing is suggested rather than a rewrite that changes the spelling
-		// without changing the answer.
+		// Where the prefix is wrong, no rewrite of the name helps, so nothing is
+		// suggested.
 		it("suggests nothing where the prefix names another Choice", () => {
 			let [diagnostic] = diagnosticsOf(`implementation {
 					choice A { Wait, Go }
@@ -1644,13 +1543,9 @@ describe("Choices", () => {
 		})
 	})
 
-	// Regression tests — a Case's runtime tag is shared by every
-	// instantiation of it, so `Box<Integer>#Full` and `Box<String>#Full` are
-	// both "Box#Full" and no Matcher and no dispatch branch can tell them apart
-	// by tag. The Enricher typed a Matcher by the FIRST instantiation the Union
-	// happened to name, so `@.value::add(1)` compiled clean over a payload that
-	// was a String at runtime and printed "hello1", and a dispatch on such a
-	// Union sent every value to the first branch.
+	// Every instantiation of a Case shares its runtime tag, so no Matcher or
+	// dispatch branch can tell `Box<Integer>#Full` from `Box<String>#Full` by tag.
+	// A Matcher is typed by what every instantiation carries.
 	describe("Cases of Several Instantiations", () => {
 		const box = `choice Box<Value> {
 			Full { value: Value },
@@ -1703,9 +1598,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// The bare form used to call these an ambiguity and name one
-		// Choice twice — an ambiguity a prefix could not have resolved, since
-		// the prefix says which CHOICE is meant and both candidates are its.
+		// Instantiations of one Choice are no ambiguity, since a prefix could
+		// not tell them apart either.
 		it("takes a bare Matcher for the instantiations of one Choice", async () => {
 			expect(await run(describeBox("#Full", "#Empty"))).toEqual([
 				'"hello"',
@@ -1762,22 +1656,16 @@ describe("Choices", () => {
 		})
 	})
 
-	// A bound on a Choice's Type Parameter is a promise the APPLICATION
-	// has to keep — nothing downstream asks again, so `Box<Function>` used to
-	// substitute a Type with no equality into a payload declared Equatable and
-	// only fall over when something reached for the witness.
+	// The application must keep a bound on a Choice's Type Parameter, since
+	// nothing downstream asks again.
 	describe("Bounded Generic Choices", () => {
 		const boundedBox = `choice Box<T is Equatable> {
 			Full { value: T },
 			Empty,
 		}`
 
-		// The same Choice with its unit Case spelled so nothing else in
-		// scope declares it. The builtin `Optional` declares an `#Empty` of its
-		// own, so a BARE `#Empty` no position decides is answered by the ambiguity
-		// rail before the undecided one is reached — and it is the undecided one
-		// under test here. Every other test in this block hands the bare form a
-		// position that names `Box`, which settles the ambiguity as it goes.
+		// `Optional` declares `#Empty` too, so this Choice's unit Case is named
+		// `Blank` to reach the undecided report.
 		const blankBox = `choice Box<T is Equatable> {
 			Full { value: T },
 			Blank,
@@ -1807,9 +1695,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// The Parameter beside the Protocol, because the Quick Fix edits
-		// the DECLARATION and the Diagnostic is reported at the use — the name is
-		// the only thing that leads from one to the other.
+		// The Quick Fix edits the declaration while the Diagnostic stands at the
+		// use, so the data names the Parameter.
 		it("carries that Parameter and Protocol as data", () => {
 			expect(
 				diagnosticsOf(`implementation { ${boundedBox}
@@ -1824,9 +1711,8 @@ describe("Choices", () => {
 			})
 		})
 
-		// And no Parameter where the Type that failed is a concrete one:
-		// what that asks for is a Namespace declaring the conformance, which is a
-		// Declaration rather than an edit to a span.
+		// A concrete Type needs a Namespace declaring the conformance, which is
+		// no edit to a span, so no Parameter is named.
 		it("names no Parameter for a concrete Type that does not conform", () => {
 			expect(
 				diagnosticsOf(`implementation { ${boundedBox}
@@ -1839,9 +1725,8 @@ describe("Choices", () => {
 			})
 		})
 
-		// The Type Argument the annotation decides is what answers for the
-		// bound — the payload never decides one, so a construction whose payload
-		// is a Function is a `Box<Function>` only where something said so.
+		// The annotation's Type Argument answers for the bound, since a prefixed
+		// construction's payload decides nothing.
 		it("rejects a construction whose Type Argument does not conform", () => {
 			expect(
 				codesOf(`implementation { ${boundedBox}
@@ -1851,11 +1736,9 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		// The bare form carrying a payload is the one place a payload still
-		// decides, so it is the one place a payload can still decide BADLY — and it
-		// answers for the bound where it does. A payload that mentions no Generic at
-		// all decides none and is asked nothing, which is what keeps an `#Empty` a
-		// position DID decide from being an error on sight.
+		// A bare Case's payload can decide a Type Argument, so it answers for
+		// the bound. A payload mentioning no Generic decides nothing and is asked
+		// nothing.
 		it("holds a bare construction's payload to the bound it decides", () => {
 			expect(
 				codesOf(`implementation { ${boundedBox}
@@ -1864,11 +1747,7 @@ describe("Choices", () => {
 			).toEqual(["unsatisfied-bound"])
 		})
 
-		// A unit Case has no payload to decide with, so a bare one nothing
-		// around decides is undecided rather than free. It used to stand as a Box of
-		// the Choice's OWN Type Parameter: the raw GenericUse left here for the rest
-		// of the Program, where the bound had nothing to ask about and the Type
-		// Arguments named something no declaration in sight applies.
+		// A bare unit Case that nothing decides is undecided, not free.
 		it("refuses a bare unit construction nothing decides", () => {
 			let source = `implementation { ${blankBox}
 				constant b = #Blank
@@ -1904,17 +1783,9 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// A Choice's Type Parameters are APPLIED, never inferred — so an
-		// undecided construction is no longer a state a Program can reach. It used
-		// to be: `Holder#Bare` bound nothing at all and stood as a Holder of its
-		// own Type Parameter, and `Holder#Full(f)` let its payload decide, which
-		// is the one place a plain Generic behaved as if it were marked `infer`.
-		// Both are `undecided-type-arguments` now, and the rails that used to
-		// consume the undecided value can not be reached from a construction at
-		// all. What is still reachable is a value typed BY a Type Parameter inside
-		// generic code, which is a different thing and out of scope here — the
-		// annotation that names `Holder<Item>` is what answers for the bound, and
-		// the last two of these pin that it still does.
+		// A Choice's Type Parameters are applied, never inferred, so `Holder#Bare`
+		// and `Holder#Full(f)` with nothing deciding them are undecided. Inside
+		// generic code, an annotation naming `Holder<Item>` answers for the bound.
 		describe("The decision a prefixed construction asks for", () => {
 			const holder = `choice Holder<Item is Equatable> {
 				Bare,
@@ -1932,9 +1803,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// Identically — the payload is checked against the instantiation,
-			// it never picks one, so carrying one changes nothing about whether
-			// this construction is decided.
+			// A prefixed payload is checked against the instantiation and never
+			// picks one, so carrying one changes nothing here.
 			it("reports a prefixed construction with a payload identically", () => {
 				expect(
 					codesOf(`implementation { ${holder}
@@ -1954,9 +1824,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// And the parentheses stay on where the Case CARRIES a payload.
-			// The prefixed rail dropped them, so `Holder#Full` written out of the
-			// Help met `missing-payload` on the very next run.
+			// The Help keeps the parentheses on a Case that carries a payload, or
+			// following it would meet `missing-payload`.
 			it("keeps the payload on a Case that takes one", () => {
 				expect(
 					helpsOf(`implementation { ${holder}
@@ -2013,10 +1882,8 @@ describe("Choices", () => {
 				).toEqual(['"bare"', '"full"'])
 			})
 
-			// An item stands in the item position of whatever the List is
-			// expected to be, and a member in the position its name has in the
-			// expected Record — the same decision the annotation makes for a Case
-			// written directly under it.
+			// A List item and a Record member stand in the positions the expected
+			// Type gives them.
 			it("takes the decision from a List's item position", async () => {
 				expect(
 					await run(`implementation { ${holder}
@@ -2037,11 +1904,8 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// And from the payload position of the Case around it, which is
-			// a position like any other once the Case that carries it is decided —
-			// so a nesting whose outer Type is spelled out in full decides every
-			// construction inside it, however deep and through whatever stands
-			// between them.
+			// A decided Case's payload is a position too, so a fully spelled outer
+			// Type decides every construction nested inside it.
 			it("takes the decision from the payload position around it", async () => {
 				expect(
 					await run(`implementation {
@@ -2073,10 +1937,8 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// Through the one-member shorthand and through the Record it is
-			// shorthand FOR, and through a List and a Record standing between two
-			// constructions — every position that hands an expected Type down
-			// hands down what the Case decided for it.
+			// Through the one-member shorthand, its Record, a List and a Record
+			// standing between two constructions.
 			it("reaches through what stands between two constructions", () => {
 				expect(
 					messagesOf(`implementation {
@@ -2106,12 +1968,9 @@ describe("Choices", () => {
 				).toEqual(["true"])
 			})
 
-			// Which instantiation a position offering several of them meant
-			// is what the payload answers — so the payload is read once per
-			// candidate, under that candidate's own members, and a payload that
-			// can not be read under one has not fit it. Read once with no context
-			// instead, a nested construction came out an Error, an Error fits
-			// everything, and the FIRST arm won whatever was written.
+			// The payload is read once per offered instantiation, under its own
+			// members. See "Case construction" in
+			// packages/compiler/src/enricher/DEVELOPMENT.md.
 			it("reads the payload under each instantiation the position offers", () => {
 				expect(
 					valueTypeOf(
@@ -2139,11 +1998,8 @@ describe("Choices", () => {
 				})
 			})
 
-			// What arm selection asks is asked silently, and the reading it
-			// settles on is the one that reports — so a payload that is wrong is
-			// wrong once, however many instantiations were offered, and a reading
-			// only the LOSING candidate would have complained about says nothing at
-			// all.
+			// Selection is silent, and only the committed reading reports, so a
+			// losing candidate's complaints are never seen.
 			it("reports the reading it committed, and only that one", () => {
 				expect(
 					codesOf(`implementation {
@@ -2164,23 +2020,10 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// The reading arm selection chose BY is the reading committed —
-			// it was made under the very Case the payload ends up standing in, so
-			// reading it again would read the whole subtree beneath it again. Read
-			// afresh, a nesting N deep costs 2^N readings of its innermost value:
-			// the twenty levels here took two seconds and every added level
-			// doubled it, against one reading per level.
-			//
-			// A construction nested under a position offering ONE instantiation
-			// never asks in the first place, and is here so that stays true —
-			// paying per candidate where there is nothing to choose between would
-			// be the same cost by another route.
-			//
-			// A time, because a count of readings is not something a Program
-			// can be asked for — but a generous one: a thousandth of the ceiling
-			// when the readings are kept, four times it when they are not, and
-			// further apart with every level. Its other half is the shared-Type
-			// walk pinned in helpers.spec, which the same nesting depends on.
+			// The chosen reading is committed rather than read again, or a
+			// nesting would be read exponentially often. A single instantiation is
+			// never chosen at all. No Program reports a count of readings, so the
+			// limit is a generous time.
 			it("reads a nesting's payload once per level", () => {
 				let nesting = (level: number): string =>
 					level === 0 ? "1" : `Box#Full(${nesting(level - 1)})`
@@ -2215,12 +2058,9 @@ describe("Choices", () => {
 				}
 			}, 30000)
 
-			// An Argument is matched by a Case's MEMBERS, and a payload that
-			// does not fit them is a Diagnostic one stage later — too late to keep
-			// an overload from winning on it. So the probe answers with the
-			// declared Case where the payload does not fit what the Parameter
-			// decided, and the overload whose payload does fit is the one that
-			// wins.
+			// A payload that does not fit is reported only a stage later, so the
+			// probe answers the declared Case where it does not fit. The overload
+			// whose instantiation the payload fits wins.
 			it("picks the overload whose instantiation the payload fits", async () => {
 				expect(
 					await run(`implementation {
@@ -2239,12 +2079,8 @@ describe("Choices", () => {
 				).toEqual(['"integer"', '"string"'])
 			})
 
-			// And the bare twin picks the same one. The bare form asks the
-			// position first now, so a candidate that decides but does NOT fit
-			// must leave no recording behind: the enrichment pass reads that
-			// recording back, and `#Full(5)` became a `Box<String>#Full` off the
-			// candidate it never picked, reported one stage later for a payload
-			// that was an Integer all along.
+			// The bare spelling asks the position first, so a candidate that
+			// decides but does not fit must leave no recording behind.
 			it("picks the same overload from the bare spelling", async () => {
 				expect(
 					await run(`implementation {
@@ -2263,9 +2099,8 @@ describe("Choices", () => {
 				).toEqual(['"integer"', '"string"'])
 			})
 
-			// A partially generic decision is still a decision — `Item` is
-			// the enclosing Function's Type Parameter, and the construction is a
-			// Holder OF it rather than of nothing.
+			// `Item` is the enclosing Function's Type Parameter, so this is a
+			// decision.
 			it("takes a partially generic decision inside generic code", async () => {
 				expect(
 					await run(`implementation { ${holder}
@@ -2281,14 +2116,8 @@ describe("Choices", () => {
 				).toEqual(['"full"'])
 			})
 
-			// The other side of that — a Parameter Type mentioning the
-			// CALL's own Type Parameters decides nothing, because nothing has
-			// decided them either. Recorded as a decision it built the undecided
-			// state outright: the construction became a `Holder<Item>` whose
-			// payload was then forbidden from deciding `Item`, so nothing ever
-			// did, and what the reader was shown was a payload reported for not
-			// fitting a Type Parameter, followed by an Internal Compiler Error
-			// from a call forwarding a conformance witness no caller declares.
+			// A Parameter Type mentioning the call's own open Type Parameters
+			// decides nothing, so the construction is undecided.
 			it("refuses a Parameter Type the call has not decided either", () => {
 				let source = `implementation { ${holder}
 					function take<infer Item is Equatable>(_ h: Holder<Item>) -> String {
@@ -2318,9 +2147,7 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			// With no bound in sight either — the shape that used to blame
-			// the payload for not being an unsolved Type Parameter, with no help
-			// and no mention of Type Arguments at all.
+			// The same without any bound.
 			it("refuses one carrying no bound", () => {
 				expect(
 					codesOf(`implementation {
@@ -2335,9 +2162,8 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
-			// And says it ONCE. The unsolved Type Parameter used to travel
-			// out through the return Type, where the next Method call searched a
-			// Namespace named after the Compiler's own conformance Parameter.
+			// Reported once, since no unsolved Type Parameter leaves through the
+			// return Type to be reported again.
 			it("says so once, and lets nothing carry the Parameter onward", () => {
 				let source = `implementation {
 					choice Outcome<Value is Equatable> { Ok { value: Value } }
@@ -2356,10 +2182,8 @@ describe("Choices", () => {
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
 			})
 
-			// The three spellings that DO decide such a call, which is what
-			// makes refusing it a Diagnostic rather than a wall: the Arguments
-			// written at the construction, the bare sigil the Parameter's own
-			// Choice resolves, and a Constant annotated on the way in.
+			// Spellings that do decide such a call: written Type Arguments, the
+			// bare sigil, and an annotated Constant.
 			it("takes every spelling that decides such a call", async () => {
 				expect(
 					await run(`implementation { ${holder}
@@ -2376,11 +2200,8 @@ describe("Choices", () => {
 				).toEqual(['"took"', '"took"', '"took"'])
 			})
 
-			// And an Argument beside it that DOES decide the Parameter is
-			// waited for, the way a callback's Argument is: a construction binds
-			// nothing, so matching it before the Arguments that can bind only
-			// reads a Parameter Type nothing has decided yet. Which of the two is
-			// written first decides nothing at all.
+			// A construction binds nothing, so it is matched after an Argument that
+			// decides the Parameter, whichever is written first.
 			it("waits for an Argument that decides the Parameter", async () => {
 				let orElse = `
 					choice Outcome<Value is Equatable> {
@@ -2407,11 +2228,9 @@ describe("Choices", () => {
 				).toEqual(['"1"', '"7"'])
 			})
 
-			// A receiver is not a position that decides, and deliberately
-			// so: dispatch READS the receiver's Type to find the Namespace, so a
-			// Namespace found by handing one down would be the Namespace deciding
-			// what it is being called on. A construction written directly on a
-			// `::` decides for itself or not at all.
+			// Dispatch reads the receiver's Type to find the Namespace, so the
+			// receiver position decides nothing. A construction on a `::` decides
+			// for itself.
 			it("offers a construction no decision from the receiver position", () => {
 				let namespaces = `
 					choice Box<Value> { Full { value: Value }, Empty }
@@ -2434,9 +2253,7 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// The Alias application rail is where the bound is kept, and the
-			// construction reads its instantiation off exactly that — so writing
-			// the Type Argument out is as strict here as in any annotation.
+			// An application here is held to the bound as in any annotation.
 			it("holds the Choice's own application as strictly as ever", () => {
 				let source = `implementation { ${holder}
 					function take(_ holder: Holder<(_ x: Integer) -> Integer>) -> Integer {
@@ -2450,11 +2267,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// What is left of the "Type Parameter does not conform" rail: a
-			// value typed by a Type Parameter inside generic code, where the
-			// annotation naming `Holder<Item>` is the site that answers. No
-			// construction can reach it any more, because no construction can
-			// leave an Argument undecided.
+			// Inside generic code, the annotation naming `Holder<Item>` answers for
+			// the bound.
 			it("still reports an unbounded Type Parameter at the annotation", () => {
 				let source = `implementation { ${holder}
 					function bare<Item>() -> Holder<Item> { <- Holder#Bare }
@@ -2477,12 +2291,9 @@ describe("Choices", () => {
 			})
 		})
 
-		// The other half of the decision — the Type Arguments written at the
-		// construction itself, which is the spelling for every position that hands
-		// none down. It is the SAME application an annotation's `Holder<Integer>`
-		// is, routed through the same rail, so everything the annotation is held to
-		// holds here: the arity, the bounds, and the refusal of a Type that takes
-		// no Arguments at all.
+		// Type Arguments written at the construction are the same application as
+		// an annotation's, held to the same arity and bounds. See "Written Type
+		// Arguments at a construction" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		describe("Type Arguments applied at the construction", () => {
 			const holder = `choice Holder<Item is Equatable> {
 				Bare,
@@ -2504,9 +2315,8 @@ describe("Choices", () => {
 				).toEqual(["true"])
 			})
 
-			// Read through `.value` rather than through a Match, because the
-			// construction's own Type is the CASE — a Match wants the Choice's
-			// Union, which is what an annotation would have made of it.
+			// Read through `.value`, since the construction's Type is the Case,
+			// not the Choice's Union a Match wants.
 			it("decides a Case carrying a payload", async () => {
 				expect(
 					await run(`implementation { ${holder}
@@ -2517,9 +2327,8 @@ describe("Choices", () => {
 				).toEqual(['"1"'])
 			})
 
-			// The Arguments decide, and THEN the payload is checked against
-			// what they decided — which is the one-member shorthand's Record here,
-			// wrapped after the instantiation exactly as everywhere else.
+			// The Arguments decide first, then the shorthand is wrapped into the
+			// instantiated Record.
 			it("takes the one-member shorthand", async () => {
 				expect(
 					await run(`implementation { ${holder}
@@ -2584,7 +2393,7 @@ describe("Choices", () => {
 			})
 
 			// The payload is checked against the instantiation the Arguments
-			// decided, which is the whole point of them deciding first.
+			// decided.
 			it("checks the payload against what the Arguments decided", () => {
 				expect(
 					codesOf(`implementation { ${holder}
@@ -2611,9 +2420,8 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// The written Arguments win, so a position that wanted something
-			// else is an ordinary value-does-not-fit — no Diagnostic of its own,
-			// because there is nothing special about this way of disagreeing.
+			// The written Arguments win, so a disagreeing position is an ordinary
+			// value that does not fit.
 			it("leaves a disagreeing annotation to the assignment", () => {
 				let source = `implementation { ${holder}
 					constant left: Holder<String> = Holder<Integer>#Full(1)
@@ -2635,14 +2443,9 @@ describe("Choices", () => {
 				).toEqual(["argument-type-mismatch"])
 			})
 
-			// Both of those are seen because the Case's members differ
-			// under the two instantiations. A Case that carries nothing the Type
-			// Parameters reach is the same Record under all of them — which
-			// `matchesType` reads as one Type on purpose — so nothing downstream
-			// could say a word, and the identical mistake was accepted one Case
-			// over from where it was reported. The written Arguments are compared
-			// against the position's own here, under the code the rail it stands
-			// in would have used.
+			// A Case whose members mention no Type Parameter is one Type under every
+			// instantiation. So its written Arguments are compared with the position's
+			// directly, under the code the position would use.
 			const tagged = `choice Box<Value> {
 				Full { value: Value },
 				Tag { name: String },
@@ -2683,10 +2486,8 @@ describe("Choices", () => {
 				).toEqual(["assignment-type-mismatch"])
 			})
 
-			// Agreement is assignability, not sameness — a `Box<Integer>`
-			// stands under a `Box<Integer | String>` for the same reason its
-			// payload-carrying twin does, and a Union position offering several
-			// instantiations is answered by matching any one of them.
+			// Agreement is assignability, and a Union position is answered by any
+			// one of its instantiations.
 			it("takes Arguments the position's own accept", () => {
 				expect(
 					messagesOf(`implementation {
@@ -2699,12 +2500,9 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// An Argument's position is a Parameter Type, and a Parameter
-			// Type is only decided once the call is: `id(Box<Integer>#Empty, 1)`
-			// is matched while `T` is still open and the Argument beside it is
-			// what decides it. Compared against the position as it stood at that
-			// moment, every one of these was refused for disagreeing with a `T`
-			// the caller can not even name — and the help said to write it.
+			// A Parameter Type is decided only once the call is, so the comparison
+			// uses the finished call. In `id(Box<Integer>#Empty, 1)` the second
+			// Argument decides `T`.
 			it("compares against the position the call finally decided", async () => {
 				let box = `choice Box<Value> { Full { value: Value }, Empty }`
 				let tagged = `choice Tagged<Value> {
@@ -2755,9 +2553,7 @@ describe("Choices", () => {
 				).toEqual(['"ok"'])
 			})
 
-			// And still disagrees where the decided position says so — with
-			// a note and a help naming the Type the call decided, which is a
-			// spelling the caller can write.
+			// A real disagreement names the Type the call decided.
 			it("says which Arguments the call decided on", () => {
 				let source = `implementation {
 					choice Box<Value> { Full { value: Value }, Empty }
@@ -2779,10 +2575,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// A Type Parameter nothing ever decided is left standing, and
-			// left to the call to report — one Diagnostic saying nothing inferred
-			// it, rather than that one and a disagreement with the undecided
-			// Parameter on top of it.
+			// A Type Parameter nothing decides is left to the call's own report,
+			// with no disagreement on top.
 			it("leaves an undecided call its own Diagnostic", () => {
 				expect(
 					codesOf(`implementation {
@@ -2812,10 +2606,8 @@ describe("Choices", () => {
 				).toEqual(['"empty"'])
 			})
 
-			// A `<` after an Identifier opens nothing else in expression
-			// position, but the reading is speculative all the same — what makes it
-			// a construction is the `#` on the far side of the Arguments. Reaching
-			// no `#` has to leave the Identifier readable as itself.
+			// Only the `#` after the Arguments makes a construction, so the reading
+			// is speculative. Without a `#` the Identifier reads as itself.
 			it("leaves an Identifier that opens no application alone", () => {
 				expect(
 					messagesOf(`implementation {
@@ -2826,10 +2618,8 @@ describe("Choices", () => {
 				).toEqual([])
 			})
 
-			// An application is written on one line, in a value position for
-			// the reason it is in a Type position — a `<` that opens the NEXT line
-			// begins something of its own, and reading across the break would let
-			// it be swallowed.
+			// An application stays on one line, so a `<` opening the next line
+			// begins something else.
 			it("does not read Type Arguments across a line break", () => {
 				expect(
 					codesOf(`implementation {
@@ -2841,14 +2631,9 @@ describe("Choices", () => {
 				).toEqual(["syntax-error"])
 			})
 
-			// The far side of the same rule. A `#` reaches this parse only
-			// when it sits directly against what precedes it — that is what keeps
-			// `label #Case` readable as a labelled Argument — and an application
-			// standing between the two must not be the way around it.
-			//
-			// Under its own code, which is what carries the refusal out of
-			// the speculative reading it is written in. Under the generic one it
-			// was rewound and the message a reader got named the wrong character.
+			// A `#` must sit directly against what precedes it, which keeps
+			// `label #Case` a labelled Argument. Its own code carries the refusal out
+			// of the speculative reading.
 			it("does not read a '#' that opens the next line", () => {
 				expect(
 					codesOf(`implementation {
@@ -2860,9 +2645,8 @@ describe("Choices", () => {
 				).toEqual(["case-application-across-lines"])
 			})
 
-			// The line the `#` is held to is the one the Arguments CLOSE
-			// on, not the one they open on, so a list written over several lines
-			// still constructs.
+			// The `#` is held to the line the Arguments close on, so they may span
+			// several lines.
 			it("holds the '#' to the line the Arguments close on", () => {
 				expect(
 					messagesOf(`implementation {
@@ -2878,10 +2662,8 @@ describe("Choices", () => {
 	})
 
 	describe("Contextual Case Resolution", () => {
-		// `A` and `B` deliberately share the Case name `Go` — the scope
-		// scan alone can not resolve it, so these only pass when the expected
-		// Type of the position is consulted first, like a Matcher consults
-		// the scrutinee.
+		// `A` and `B` both declare `Go`, so these pass only when the position's
+		// expected Type is consulted before the scope scan.
 		const sharedCaseChoices = `
 			choice A { Go { speed: Integer }, Stop }
 			choice B { Go { speed: Integer }, Wait }
@@ -2983,11 +2765,9 @@ describe("Choices", () => {
 		})
 	})
 
-	// Every Choice is Equatable without anyone writing it — a Case is
-	// decided by its tag and its payload is a Record, which the language
-	// already compares. These cover the four things that has to mean: the
-	// Methods resolve, the conformance solves, a written Namespace still wins,
-	// and a Type that is not a Choice derives nothing.
+	// Every Choice is Equatable without a written Namespace, since a Case is its
+	// tag and a Record payload. The Methods resolve, the conformance solves, and
+	// a Type that is not a Choice derives nothing.
 	describe("Derived Equality", () => {
 		const colourChoice = `
 			choice Colour {
@@ -3066,11 +2846,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// Printing is derived on narrower terms than equality. A Choice
-	// compares by its tags whatever anyone says, but how it READS is a
-	// decision — so the Namespace has to declare `is Printable`, and every Case
-	// has to carry no payload, because a Case with one has more to say than its
-	// name.
+	// How a Choice reads is a decision, so printing is derived only where a
+	// Namespace declares `is Printable` and no Case carries a payload.
 	describe("Derived Printing", () => {
 		const colourChoice = `
 			choice Colour {
@@ -3091,9 +2868,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// `inspect` rather than `print`, because that is the write this
-		// harness captures. It renders a String with the quotes a Literal is
-		// written with, which is why every expectation below carries them.
+		// `inspect` is what the harness captures, and it quotes a String.
 		it("answers the Case's name, without the sigil", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3107,9 +2882,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"', '"a Red one"'])
 		})
 
-		// The witness a bounded Method is handed has to be the derived
-		// Method too, or `Terminal.print` would refuse what a direct call
-		// answers.
+		// A bounded Method's witness is the derived Method too.
 		it("hands the derived Method over as a Printable witness", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3141,9 +2914,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"'])
 		})
 
-		// The Namespace is what makes the decision, so a Choice nobody
-		// declared `is Printable` for prints through nothing — the same Choice,
-		// the same Cases, and no conformance for a hole or `print` to reach.
+		// Without a Namespace declaring `is Printable`, nothing is derived.
 		it("derives nothing for a Choice no Namespace declares Printable", () => {
 			expect(
 				messagesOf(`implementation { ${colourChoice}
@@ -3154,8 +2925,8 @@ describe("Choices", () => {
 			).not.toEqual([])
 		})
 
-		// A Case carrying a payload has no name that stands for it, so
-		// the declaration is refused rather than half-answered.
+		// A Case carrying a payload has no name that stands for it, so the
+		// declaration is refused.
 		it("refuses a declared 'is Printable' on a Choice with a payload", () => {
 			expect(
 				codesOf(`implementation { ${calculatorChoice}
@@ -3168,9 +2939,8 @@ describe("Choices", () => {
 			).toContain("nonconforming-namespace")
 		})
 
-		// The derive is a fallback, never an override — a Namespace that
-		// writes `toString` keeps it, at the call AND in the witness a bounded
-		// Method is handed.
+		// A written `toString` wins over the derive, at the call and in the
+		// witness.
 		it("keeps a written 'toString' at the call and in the witness", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3195,12 +2965,9 @@ describe("Choices", () => {
 		})
 	})
 
-	// The third derive, and the one whose answer is the Choice itself
-	// rather than a value of it: `Enumerable::cases` is a static, so it is
-	// spelled on the Choice's name. It is derived like equality rather than
-	// like printing — nothing declares it — and it is withheld for a Choice
-	// that carries a payload anywhere, because there is no value of such a Case
-	// to list without inventing one.
+	// `Enumerable::cases` is a static spelled on the Choice's name. Like
+	// equality it is derived without a declaration. A Choice with a payload
+	// anywhere derives none, since such a Case has no value to list.
 	describe("Derived Case Listing", () => {
 		const colourChoice = `
 			choice Colour {
@@ -3210,8 +2977,7 @@ describe("Choices", () => {
 			}
 		`
 
-		// The order is the DECLARATION order, which is the promise the
-		// `§§` makes and the only order a caller can build a menu on.
+		// The Cases come in declaration order, as the `§§` promises.
 		it("answers every Case of a builtin Choice in declaration order", async () => {
 			expect(
 				await run(`implementation {
@@ -3221,10 +2987,7 @@ describe("Choices", () => {
 			).toEqual(['"[Start, End, BothEnds]"', '"[Less, Equal, Greater]"'])
 		})
 
-		// A Choice with no Namespace at all still answers. The name in
-		// the base position is the Choice's, and the derive is what it reads
-		// through — which is what keeps `cases()` from costing an empty
-		// Namespace nobody would otherwise write.
+		// A Choice with no Namespace still answers through the derive.
 		it("answers for a Choice no Namespace was written for", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3243,9 +3006,8 @@ describe("Choices", () => {
 			).toEqual(['"[Red, Green, Blue]"'])
 		})
 
-		// The answer's Type is `NonEmptyList`, so `firstItem` answers an
-		// item rather than an Optional. A Choice declares at least one Case,
-		// which is what makes the proof honest.
+		// A Choice declares at least one Case, so the answer is a `NonEmptyList`
+		// and `firstItem` answers an item.
 		it("answers a List proven to hold an item", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3256,8 +3018,7 @@ describe("Choices", () => {
 			).toEqual(['"Red"'])
 		})
 
-		// A Case with a payload has no value the Choice itself can name,
-		// so nothing is derived and the name is simply not a member.
+		// A Choice with a payload derives no `cases`.
 		it("derives nothing for a Choice with a payload", () => {
 			expect(
 				codesOf(`implementation {
@@ -3280,11 +3041,8 @@ describe("Choices", () => {
 			).toEqual(["unknown-member"])
 		})
 
-		// A written `cases` replaces the derive where the Namespace
-		// DECLARES the conformance, and both rails answer it — the direct one
-		// through the Choice's own name, the bounded one through the witness.
-		// Without the declaration the two used to disagree in silence, which is
-		// what `undeclared-conformance` now refuses.
+		// A written `cases` replaces the derive where the Namespace declares the
+		// conformance, on the direct and the bounded rail alike.
 		it("keeps a written 'cases' in place of the derived one", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3302,12 +3060,8 @@ describe("Choices", () => {
 			).toEqual(["1"])
 		})
 
-		// The three spellings a written `cases` can be reached through,
-		// each asked on BOTH rails. The Namespace's NAME used to decide which
-		// answer a Program got: one spelled like the Choice is a value in Scope
-		// and shadows the Type-named rail away, one of any other name did not,
-		// so `Colour.cases()` derived while a bounded call read the written
-		// Method.
+		// A written `cases` reached through the Choice's name, the Namespace's
+		// name and a bound, whatever the Namespace is called.
 		const bothRails = (
 			namespaceName: string,
 		) => `implementation { ${colourChoice}
@@ -3353,11 +3107,8 @@ describe("Choices", () => {
 			).toContain("Colours.cases()")
 		})
 
-		// The derive is built from the CHOICE and never consults a
-		// Namespace nobody declared the clause on, so a written Method that
-		// does not declare it answers the direct rail while the derive answers
-		// every bounded call. Refused at the Namespace rather than left to
-		// diverge — the Help is the one line that makes the two agree.
+		// Without the clause the direct rail would read the written Method and a
+		// bound would read the derive. So the Namespace is refused.
 		it("refuses a written 'cases' the Namespace does not declare", () => {
 			let source = `implementation { ${colourChoice}
 				namespace Colours for Colour {
@@ -3378,8 +3129,8 @@ describe("Choices", () => {
 			])
 		})
 
-		// The Protocol alone — what carries a conformance here is the
-		// Namespace's own head, and there is no Type Parameter in the question.
+		// The conformance belongs on the Namespace's head, so no Parameter is
+		// named.
 		it("carries that Protocol as data with no Parameter", () => {
 			expect(
 				diagnosticsOf(`implementation { ${colourChoice}
@@ -3401,10 +3152,8 @@ describe("Choices", () => {
 			})
 		})
 
-		// The guard is by NAME, exactly as the derive's own replacement
-		// rule is — so a `cases` of the wrong shape suppresses the listing as
-		// surely as a right one would, and is told so here rather than leaving
-		// `Colour.cases()` typed as whatever it happens to answer.
+		// The guard is by name, as the derive's replacement is, so a `cases` of
+		// the wrong shape is refused too.
 		it("refuses a written 'cases' of the wrong shape", () => {
 			expect(
 				codesOf(`implementation { ${colourChoice}
@@ -3422,12 +3171,8 @@ describe("Choices", () => {
 			).toEqual(["undeclared-conformance"])
 		})
 
-		// Equality splits the same way and always did — the derive is
-		// unconditional for a Choice, so a Namespace writing `is` without the
-		// clause answered one thing directly and another through a bound. Only
-		// the REQUIREMENT is refused: `isNot` is provided, and a Namespace
-		// writing that name stands beside the Protocol's own const on the
-		// ladder rather than instead of it.
+		// Equality splits the same way, so a written `is` without the clause is
+		// refused. `isNot` is provided rather than required, so it is accepted.
 		it("refuses a written 'is' the Namespace does not declare", () => {
 			let source = `implementation { ${colourChoice}
 				namespace Colours for Colour {
@@ -3467,10 +3212,8 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// Printing derives ONLY where a Namespace declares it, so a
-		// written `toString` without the clause replaces nothing and splits
-		// nothing — which is why the refusal above names two Protocols and not
-		// three.
+		// Printing derives only where a Namespace declares it, so a written
+		// `toString` without the clause replaces nothing and is accepted.
 		it("accepts a written 'toString' the Namespace does not declare", () => {
 			expect(
 				codesOf(`implementation { ${colourChoice}
@@ -3488,8 +3231,8 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// And a Choice carrying a payload derives no listing at all, so
-		// writing `cases` for it replaces nothing either.
+		// A Choice with a payload derives no listing, so a written `cases`
+		// replaces nothing.
 		it("accepts a written 'cases' for a Choice that derives none", () => {
 			expect(
 				codesOf(`implementation {
@@ -3511,8 +3254,8 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// A Namespace may say so, and saying so is neither needed nor
-		// refused — exactly what a Choice declaring `is Equatable` does.
+		// Declaring a conformance the Choice already has is neither needed nor
+		// refused.
 		it("accepts a declared conformance a Choice already has", () => {
 			expect(
 				messagesOf(`implementation { ${colourChoice}
@@ -3547,10 +3290,8 @@ describe("Choices", () => {
 			).toEqual(["nonconforming-namespace"])
 		})
 
-		// The Protocol earns its keep here: a body bounded by it calls
-		// the static on the Type Parameter, and the witness the call is handed
-		// is what answers. `T.cases()` is the only spelling a static
-		// requirement has, there being no value of `T` to call it on.
+		// A bounded body calls the static on its Type Parameter, as
+		// `T.cases()`, and the witness answers.
 		it("answers through a Protocol bound, from an Essence body", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3569,9 +3310,7 @@ describe("Choices", () => {
 			).toEqual(["3", "3"])
 		})
 
-		// And a Choice that carries a payload reaches the same bound by
-		// writing the Method, which is the whole of what a conformance the
-		// derive withholds costs.
+		// A Choice with a payload reaches the bound by writing the Method.
 		it("answers through a bound for a written conformance", async () => {
 			expect(
 				await run(`implementation {
@@ -3600,10 +3339,8 @@ describe("Choices", () => {
 			).toEqual(["2"])
 		})
 
-		// A receiver narrowed to ONE Case does not conform. `Self` stands
-		// in the ANSWER here, so a Case binding would promise a List of that
-		// Case and hand back the Choice's — which is why the Case rail equality
-		// takes is no rail for this. The Choice conforms; the Case is refused.
+		// `Self` stands in the answer, so a single Case would promise a List of
+		// that Case but get the Choice's. The Case is refused.
 		it("refuses a bound bound to a single Case", () => {
 			let source = `implementation { ${colourChoice}
 				function countOf <infer T is Enumerable>(_ example: T) -> Integer {
@@ -3614,17 +3351,13 @@ describe("Choices", () => {
 			}`
 
 			expect(codesOf(source)).toEqual(["unsatisfied-bound"])
-			// The Help a Case gets names the CHOICE, because the one
-			// every other binding gets can not be written for it — `namespace X
-			// for Colour#Red is Enumerable` does not parse, and a Namespace's
-			// target is never one Case of a Choice.
+			// No Namespace can target one Case, so the Help names the Choice.
 			expect(helpsOf(source)).toEqual([
 				"Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
 			])
 		})
 
-		// And a value annotated at the Choice is what the Help asks for,
-		// which is the call the page shows beside the bounded example.
+		// A value annotated at the Choice, as the Help asks.
 		it("answers a bound for a value annotated at the Choice", async () => {
 			expect(
 				await run(`implementation { ${colourChoice}
@@ -3639,10 +3372,7 @@ describe("Choices", () => {
 			).toEqual(["3"])
 		})
 
-		// Every mode Choice the library declares answers, and none of
-		// them says so — which is the whole of what deriving without a
-		// declaration means. `Step`, `Optional` and `Result` are left out
-		// because each carries a payload.
+		// Every payload-free library Choice answers without declaring it.
 		it("answers for every mode Choice the library declares", async () => {
 			expect(
 				await run(`implementation {
@@ -3671,11 +3401,9 @@ describe("Choices", () => {
 			])
 		})
 
-		// A GENERIC Choice of payload-free Cases answers through a bound,
-		// where the receiver's Type Arguments are already applied — the Cases
-		// carry no payload, so what they bind to decides nothing about the
-		// values. Its own NAME answers nothing: it resolves to a Generic Alias,
-		// and the spelling has nowhere to put the Type Arguments.
+		// A generic payload-free Choice answers through a bound, where its Type
+		// Arguments are applied. Its bare name is no value, so `Flag.cases()` is
+		// an `unknown-name`.
 		it("answers a generic Choice through a bound, and not on its name", async () => {
 			const flag = `
 				choice Flag<T> {
@@ -3703,11 +3431,8 @@ describe("Choices", () => {
 			).toEqual(["unknown-name"])
 		})
 
-		// The emission is the runtime helper curried with the tags, for
-		// the reason a static has to be: there is no receiver at the call for
-		// the Choice to be recovered from. The tags are the very strings a Case
-		// value carries — a Choice a Module declares is prefixed by its path,
-		// which a source parsed without one has none of.
+		// A static has no receiver to read the Choice from, so the helper is
+		// curried with the Case tags.
 		it("emits the helper curried with the Case tags", () => {
 			let js = generate(`implementation { ${colourChoice}
 				Terminal.print(Colour.cases()::length()::toString())
@@ -3719,12 +3444,10 @@ describe("Choices", () => {
 		})
 	})
 
-	// A *generic* Choice can only derive Equatable CONDITIONALLY — its
-	// payloads may be Type Parameters, which are equal exactly when the Types
-	// they bind to say so. The derive gains a `where <each payload Parameter> is
-	// Equatable` bound, compares each generic payload through that Parameter's
-	// witness, and is withheld entirely when a Type Argument brings no equality.
-	// Non-generic Choices keep emitting the flat `choiceIs`, byte for byte.
+	// A generic Choice derives Equatable conditionally: each payload Parameter
+	// is bounded and compared through its witness. The derive is withheld when a
+	// Type Argument has no equality. A non-generic Choice emits the flat
+	// `choiceIs`.
 	describe("Generic Derived Equality", () => {
 		const maybe = `choice Maybe<T> { Some { value: T }, None }`
 		const bag = `choice Bag<T> { Full { items: List<T> } }`
@@ -3764,11 +3487,8 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// A payload Union of one generic arm and one concrete one — the
-		// concrete arm claims its own tag and the generic arm is the fallback
-		// everything else falls through to, so a value of the concrete arm is
-		// never compared through the Type Argument's witness and the other way
-		// round. `Opt<Integer>` is what makes the two tell apart at all.
+		// The concrete arm of a payload Union claims its own tag and the generic
+		// arm takes the rest. Neither is compared through the other's witness.
 		it("discriminates a Union payload's concrete arm from its generic arm", async () => {
 			expect(
 				await run(`implementation { ${opt}
@@ -3796,9 +3516,8 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// The whole point of routing generic payloads through witnesses
-		// rather than the flat structural comparison — `1/2` and `2/4` are equal
-		// by Rational's own `is`, and the witness is what carries that here.
+		// The witness carries Rational's own `is`, by which `1/2` and `2/4` are
+		// equal.
 		it("compares a Rational payload by its own equality, not by structure", async () => {
 			expect(
 				await run(`implementation { ${wrap}
@@ -3825,8 +3544,7 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// A payload whose Type carries no equality withholds the derive
-		// rather than crashing — the conformance Diagnostic surfaces instead.
+		// A payload without equality withholds the derive and reports the bound.
 		it("withholds the derive when a payload is not Equatable", () => {
 			let diagnostics = diagnosticsOf(`implementation { ${maybe}
 				constant f: Maybe<(_ x: Integer) -> Integer> =
@@ -3858,8 +3576,7 @@ describe("Choices", () => {
 			expect(generated).toContain('"k": "w"')
 		})
 
-		// The nested witness for `List<Maybe<Integer>>` is the derive
-		// curried with the Integer equality it compares payloads through.
+		// The nested witness is the derive curried with Integer's equality.
 		it("wraps the nested derive witness in boundConformance", () => {
 			let generated = generate(`implementation { ${maybe}
 				constant items: List<Maybe<Integer>> = [#Some({ value = 1 })]
@@ -3871,9 +3588,8 @@ describe("Choices", () => {
 			expect(generated).toContain("$helpers.boundChoiceIs(")
 		})
 
-		// The shape the whole derive exists for — a List of a generic
-		// Choice compares as a List, which needs the Choice's conditional
-		// conformance as a nested witness rather than a Namespace anybody wrote.
+		// A List of a generic Choice compares through the Choice's conditional
+		// conformance as a nested witness.
 		it("compares two Lists of a generic Choice", async () => {
 			expect(
 				await run(`implementation { ${maybe}
@@ -3887,9 +3603,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// The same withholding one level out — the bound is reported where
-		// the List asks its Item for equality, rather than the derive quietly
-		// comparing a Function structurally.
+		// The bound is reported where the List asks its item for equality.
 		it("reports the bound at a List element site too", () => {
 			expect(
 				codesOf(`implementation { ${maybe}
@@ -3901,11 +3615,8 @@ describe("Choices", () => {
 			).toContain("unsatisfied-bound")
 		})
 
-		// Only the Parameters some payload MENTIONS are bounded — a
-		// phantom Parameter is equal to nothing and compares nothing, so
-		// demanding equality of it would refuse a Choice that never holds one.
-		// The Rational payload is what says the remaining witness is still the
-		// right one: it is compared by its own equality, not by structure.
+		// Only Parameters a payload mentions are bounded, so a phantom Parameter
+		// needs no equality. The Rational payload shows the witness still applies.
 		it("needs no bound for a Parameter no payload mentions", async () => {
 			expect(
 				await run(`implementation { ${tagged}
@@ -3921,9 +3632,8 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// The condition a derive solves can be another derive — the outer
-		// `Maybe`'s witness for its payload is the inner `Maybe`'s own
-		// conditional one, curried with Integer's equality.
+		// The outer `Maybe`'s payload witness is the inner `Maybe`'s derive,
+		// curried with Integer's equality.
 		it("chains one derive's condition onto another's", async () => {
 			expect(
 				await run(`implementation { ${maybe}
@@ -3938,10 +3648,8 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"false"'])
 		})
 
-		// The fallback rule holds for a generic Choice exactly as it does
-		// for a plain one — a written Namespace decides equality at the call AND
-		// in the witness a List reaches for, so both answer the Namespace's way
-		// rather than the derive's structural one.
+		// A written Namespace beats the derive at the call and in the witness, as
+		// for a plain Choice.
 		it("lets a written Namespace beat the derive for a generic Choice", async () => {
 			expect(
 				await run(`implementation { ${maybe}
@@ -3973,14 +3681,8 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// The shape the derive was written for and could not answer: a
-		// generic helper over a generic Choice, both spelling their Type
-		// Parameter `T`. The derived Methods borrowed the Choice's names, so the
-		// caller's `T` and the Choice's were one symbol, and the receiver's Type
-		// Argument — pinned as a `defaultType` — was alpha-renamed along with the
-		// Parameter it pinned, pinning `T` to itself. The derive then matched
-		// nothing and the call reported `no-matching-overload` naming a Case
-		// nobody wrote a Method for, for the likeliest name in the language.
+		// A generic helper and the Choice both name their Type Parameter `T`.
+		// The caller's `T` must stay apart from the Choice's own.
 		it("derives for a caller whose Type Parameter shares the Choice's name", async () => {
 			expect(
 				await run(`implementation { ${maybe}
@@ -4004,9 +3706,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"', '"false"'])
 		})
 
-		// Per NAME, not per position — one Parameter colliding was enough
-		// to lose the whole derive, so the mixed case is pinned rather than only
-		// the all-colliding one.
+		// Collisions are per name, so a partly colliding caller works too.
 		it("derives where only some of the caller's names collide", async () => {
 			expect(
 				await run(`implementation {
@@ -4029,10 +3729,7 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// And the Diagnostic the missing bound gets is the same one it gets
-		// under any other name. The collision degraded it to a
-		// `no-matching-overload` about `Maybe#Some`, which points nowhere near
-		// the `is Equatable` the declaration is missing.
+		// A missing bound is reported the same way under a colliding name.
 		it("names the missing bound the same way under a colliding name", () => {
 			const unbounded = (parameter: string) =>
 				`implementation { ${maybe}
@@ -4051,8 +3748,7 @@ describe("Choices", () => {
 			expect(codesOf(unbounded("Elem"))).toEqual(["unsatisfied-bound"])
 		})
 
-		// The nested-witness rail carried the collision all along — it is
-		// pinned beside the direct one so the two can not drift apart again.
+		// The List witness handles a colliding name too.
 		it("takes a colliding name through the List witness too", async () => {
 			expect(
 				await run(`implementation { ${maybe}
@@ -4070,12 +3766,9 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"'])
 		})
 
-		// The written Namespace above wins because it is written with
-		// `infer`. Without the marker it is not a competitor at all — its Type
-		// Parameter binds to nothing, so the Namespace matches no receiver and
-		// the derive answered `is` in its place, contradicting the Method in the
-		// file with no Diagnostic anywhere. That spelling is refused at the
-		// declaration now, which is what keeps the fallback rule honest.
+		// Without `infer` the Namespace's Type Parameter binds nothing, so it
+		// would match no receiver and the derive would answer instead. The
+		// declaration is refused.
 		it("refuses a written Namespace that forgot 'infer' rather than deriving past it", () => {
 			expect(
 				codesOf(`implementation { ${maybe}
@@ -4104,11 +3797,8 @@ describe("Choices", () => {
 			).toEqual(["uninferred-namespace-parameter"])
 		})
 
-		// A generic RECORD needs none of this. Its equality is the
-		// runtime's structural one, which reads each member's own Type key and
-		// answers by it — so a Rational member is compared as a Rational without
-		// any compile-time witness deciding that. There is nothing to derive and
-		// nothing to bound, which is why only Choices grew the machinery above.
+		// A generic Record needs no derive: its members compare by their own
+		// Types, so a Rational member compares as a Rational.
 		it("leaves a generic Record comparing structurally", async () => {
 			expect(
 				await run(`implementation {
@@ -4125,13 +3815,9 @@ describe("Choices", () => {
 			).toEqual(['"true"', '"false"', '"true"'])
 		})
 
-		// Regression tests — a payload Union with SEVERAL arms mentioning
-		// the Type Parameter emitted several fallback arms (`tag: null`), and
-		// the runtime took the first one it found for everything no arm
-		// claimed. A `T | List<T>` payload therefore compared every List
-		// through T's own witness: `#Val([2]) is #Val([10])` answered true, and
-		// so did `#Val([2]) is #Val(2)`. What tells the arms apart is what the
-		// receiver's Type Arguments made of them.
+		// A `T | List<T>` payload has two arms mentioning `T`. The receiver's Type
+		// Arguments tell them apart, so a List is not compared through `T`'s
+		// witness.
 		describe("Several generic arms in one payload", () => {
 			const wrapped = `choice Wrapped<T is Equatable> {
 				Val { v: T | List<T> },
@@ -4170,18 +3856,10 @@ describe("Choices", () => {
 				).toEqual(['"true"'])
 			})
 
-			// With no Type Arguments to shape the arms with, both stand
-			// for whatever the eventual Argument turns out to be — no
-			// descriptor can be right about that, so the comparison is refused
-			// rather than emitted wrong.
-			//
-			// Written inside generic code, because that is the only place
-			// left where a Choice's Type Argument IS a Type Parameter — a
-			// construction can not leave one undecided any more. The whole set is
-			// asserted, not just the refusal: the caller's `T` carries the bound
-			// its declaration wrote and the derive has to see THAT `T` rather than
-			// the Choice's same-named one, so anything beside the refusal here
-			// would be the borrowed names failing, which a `toContain` would hide.
+			// Where the Type Argument is a Type Parameter, as inside generic code,
+			// no descriptor can tell the arms apart, so the comparison is refused.
+			// The whole list is asserted, since the derive must see the caller's
+			// bounded `T`, not the Choice's.
 			it("refuses the comparison where no Type Argument tells them apart", () => {
 				expect(
 					codesOf(`implementation { ${wrapped}
@@ -4195,8 +3873,7 @@ describe("Choices", () => {
 				).toEqual(["indistinguishable-union-arms"])
 			})
 
-			// One generic arm is the fallback it always was, and the
-			// descriptor it emits is the one it always emitted.
+			// A single generic arm is a plain fallback with no shape.
 			it("leaves a single generic arm carrying no shape", () => {
 				let generated = generate(`implementation {
 					choice Opt<T is Equatable> { Holding { value: T | String } }
@@ -4211,9 +3888,7 @@ describe("Choices", () => {
 			})
 		})
 
-		// A non-generic Choice carries no descriptor, so it keeps emitting
-		// the flat helper — the guarantee that this whole feature adds nothing to
-		// the code a non-generic Choice already generated.
+		// A non-generic Choice carries no descriptor and emits the flat helper.
 		it("leaves a non-generic Choice emitting the flat helper", () => {
 			let generated = generate(
 				`implementation {
@@ -4249,16 +3924,9 @@ describe("Choices", () => {
 			expect(generated).toContain("$helpers.choiceIsNot(")
 		})
 
-		// A written Namespace is not merely PREFERRED over the derive at
-		// the call — the WITNESS has to be the written Method too, or a bounded
-		// Method would compare by tag while a direct call compared the
-		// Namespace's way, and the same two values would be both equal and not.
-		// Both spellings are asserted for exactly that reason.
-		//
-		// Asserted by what the Colour call sites emit rather than by the
-		// absence of `choiceIs` anywhere: the standard library's own Choices
-		// derive their equality now, so an inlined `List.contains` drags
-		// `Ordering`'s derived `is` into this Program no matter what Colour does.
+		// The witness is the written Method too, or a bounded call and a direct
+		// one would disagree. The spec reads Colour's call sites, since the
+		// library's own Choices bring `choiceIs` in anyway.
 		it("emits the written Method at the call AND in the witness", () => {
 			let generated = generate(`implementation {
 				choice Colour { Red, Green }
@@ -4289,17 +3957,11 @@ describe("Choices", () => {
 
 			expect(generated).toContain("Colour.is(red,")
 			expect(generated).toContain("is: Colour.is")
-			// And `isNot` with it, though it is `Equatable`'s PROVIDED
-			// Method: a Namespace that writes one has replaced it, and the
-			// witness is what a bounded call reads — an override that stayed out
-			// of the map would answer a bounded call with the Protocol's body
-			// while a direct call answered with this one.
+			// A written `isNot` replaces the provided one in the witness too.
 			expect(generated).toContain("isNot: Colour.isNot")
 		})
 
-		// One helper for every Choice of every Program — the whole cost of
-		// the printing derive. A per Choice `match` over the Case names is what
-		// this asserts is NOT emitted.
+		// One helper serves every Choice, rather than a `match` per Choice.
 		it("emits the runtime helper for a derived 'toString'", () => {
 			let generated = generate(`implementation {
 				choice Colour { Red, Green }
@@ -4318,10 +3980,7 @@ describe("Choices", () => {
 		})
 
 		it("emits tagged Case constructions", () => {
-			// Printed rather than merely declared, because a Constant
-			// nothing reads is a value the Program builds and drops —
-			// `eliminate-dead-code` takes one out, and a Program with nothing
-			// left in it emits nothing to ask about.
+			// Printed, since `eliminate-dead-code` drops a Constant nothing reads.
 			let generated = generate(`implementation { ${calculatorChoice}
 				constant operation: CalculatorOperation = CalculatorOperation#Add({ left = 1, right = 1 })
 				constant cleared: CalculatorOperation = CalculatorOperation#ClearAll
@@ -4330,16 +3989,11 @@ describe("Choices", () => {
 				Terminal.inspect(cleared)
 			}`)
 
-			// A Case carrying a payload is built in one allocation, its
-			// tag written straight onto the object its members are written into
-			// — `collapse-construction`, which is what a Case construction
-			// comes out as unless that pass is turned off.
+			// `collapse-construction` builds a payload Case in one object literal.
 			expect(generated).toContain(
 				'[$type.typeKeySymbol]: "CalculatorOperation#Add"',
 			)
-			// A unit Case keeps its constructor: `createCase` hands out
-			// one instance per tag rather than building a literal per
-			// construction.
+			// A unit Case keeps `createCase`, which hands out one instance per tag.
 			expect(generated).toContain(
 				'$type.createCase("CalculatorOperation#ClearAll")',
 			)
@@ -4355,17 +4009,14 @@ describe("Choices", () => {
 				})
 			}`
 
-			// Nominal, and by the tag alone — the Choice and the Case are
-			// what the value was stamped with, and `compile-type-tests` proved
-			// the stamp is the whole question here: `#Add` is the only member of
-			// this Choice carrying that tag, and its payload is Integers the
-			// Matcher does not narrow.
+			// `compile-type-tests` reduces the Matcher to a tag test. `#Add` is the
+			// only member carrying that tag, and the Matcher does not narrow its
+			// Integer payload.
 			expect(generate(source)).toContain(
 				'_self[$type.typeKeySymbol] === "CalculatorOperation#Add"',
 			)
 
-			// The same nominal question as the descriptor the runtime
-			// walks, with the pass that compiles it away turned off.
+			// Without the pass, the runtime walks a descriptor.
 			let unoptimised = generate(source, withoutCompiledTypeTests)
 
 			expect(unoptimised).toContain('type: "Case"')
@@ -4382,10 +4033,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// A bare or prefixed construction resolves to the DECLARED Case, whose
-	// members are still GenericUses; the position it stands in instantiates it,
-	// so the value carries a concrete CaseType. This is the shape WP4/WP6/WP7
-	// read back.
+	// A construction resolves to the declared Case, and its position
+	// instantiates it, so the value carries a concrete CaseType.
 	describe("Generic Case Instantiation", () => {
 		it("instantiates a constructed Case from the position it stands in", () => {
 			let type = valueTypeOf(
@@ -4406,10 +4055,8 @@ describe("Choices", () => {
 			expect(type.choiceGenerics).toBeUndefined()
 		})
 
-		// A payload that mentions ONE of the Choice's Generics used to leave
-		// the others standing as their own Type Parameters, because it was the
-		// payload that decided them. The annotation decides every one of them now,
-		// the ones no member mentions included.
+		// The annotation decides every Generic, including one no member
+		// mentions.
 		it("decides a Generic no payload mentions", () => {
 			let type = valueTypeOf(
 				`implementation {
@@ -4433,9 +4080,8 @@ describe("Choices", () => {
 			).toEqual([])
 		})
 
-		// Plain assignability (null inference context) must REJECT a value
-		// of a different instantiation — the whole reason `matchTypes` recurses
-		// into Case members rather than trusting the shared tag.
+		// Plain assignability refuses another instantiation, since it compares
+		// Case members rather than the shared tag.
 		it("rejects a value of a different instantiation", () => {
 			expect(
 				messagesOf(`implementation { ${progressChoice}
@@ -4474,9 +4120,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// `#Case(value)` on a single-member Case may hand the value directly;
-	// the Enricher wraps it into the one-member Record the rest of the pipeline
-	// expects. A payload that already fits the Record is never rewrapped.
+	// `#Case(value)` on a single-member Case is wrapped into the one-member
+	// Record. A payload that already fits the Record is not rewrapped.
 	describe("Single-member Shorthand", () => {
 		it("wraps a bare value for a single-member Case", () => {
 			expect(
@@ -4487,9 +4132,7 @@ describe("Choices", () => {
 		})
 
 		it("emits the same Record whether written long or short", () => {
-			// Printed for the same reason as above: a Constant nothing
-			// reads is one `eliminate-dead-code` drops, and two Programs that
-			// emit nothing are equal for a reason that is not this one.
+			// Printed, since `eliminate-dead-code` drops a Constant nothing reads.
 			let short = generate(`implementation { ${progressChoice}
 				constant done: Progress<String, Integer> = #Stopped(5)
 
@@ -4504,9 +4147,8 @@ describe("Choices", () => {
 			expect(short).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
 			expect(short).toContain("value")
 			expect(long).toContain('[$type.typeKeySymbol]: "Progress#Stopped"')
-			// The whole claim, and the reason the two above are worth
-			// asserting separately: the shorthand is REWRAPPED into the Record
-			// the long form writes, so the two emit the same text.
+			// The shorthand is rewrapped into the long form's Record, so both emit
+			// the same text.
 			expect(short).toBe(long)
 		})
 
@@ -4566,8 +4208,7 @@ describe("Choices", () => {
 		})
 	})
 
-	// The load-bearing case — a user-defined generic Choice and a user
-	// Namespace static Method shaped like the general loop driver, with the
+	// A user's generic Choice and a static Method shaped like `loop`, with the
 	// callback's `Result` inferred through the `#Stopped` payload.
 	describe("End-to-end Inference", () => {
 		const driver = `${progressChoice}
@@ -4660,9 +4301,8 @@ describe("Choices", () => {
 		})
 	})
 
-	// `case #Value(item)` — the binder names what the CONSTRUCTOR takes,
-	// which is the whole rule. `@` is deliberately untouched by it, so these
-	// pin BOTH: the bound name reads the payload, and `@` still reads the Case.
+	// In `case #Value(item)` the binder names what the constructor takes, and
+	// `@` still reads the whole Case.
 	describe("Case Matcher payload bindings", () => {
 		const shape = `choice Shape {
 				Circle { radius: Integer },
@@ -4705,8 +4345,7 @@ describe("Choices", () => {
 		})
 
 		it("hands the whole Case onwards from a bound arm", async () => {
-			// The reason `@` is not redefined as the payload — rebuilding
-			// the Case to pass it on would be the cost of that choice.
+			// `@` stays the Case, so passing it on needs no rebuilt Case.
 			expect(
 				await run(`implementation {
 					${shape}
@@ -4750,9 +4389,8 @@ describe("Choices", () => {
 			)
 		})
 
-		// A NAME is what a multi-member Case has nothing single to bind;
-		// a Pattern is the form that takes such a payload apart, and the help
-		// names it rather than sending the reader back to `@.member`.
+		// A multi-member Case has no single value to bind a name to, so the
+		// Help offers a Pattern that takes it apart.
 		it("refuses a NAME on a Case that carries several, naming them", () => {
 			let source = `implementation {
 				${shape}
@@ -4778,10 +4416,9 @@ describe("Choices", () => {
 		})
 
 		it("lets a Guard name the binding", async () => {
-			// The Guard is emitted into the Handler's test, which runs
-			// before the body's constant exists — so the name resolves there
-			// into the `@.radius` it stands for instead. Safe because the
-			// Matcher's own check is ANDed in front of it.
+			// The Guard runs in the Handler's test, before the body's constant
+			// exists, so the name reads `@.radius` there. The Matcher's own check
+			// runs first.
 			expect(
 				await run(`implementation {
 					${shape}
@@ -4804,9 +4441,8 @@ describe("Choices", () => {
 		})
 
 		it("lets a Handler's own binding shadow the one a Guard was lent", async () => {
-			// The alias is read off the Scope that declares the name, so
-			// the callback's Parameter wins inside the callback — the List is
-			// what is searched, not the payload.
+			// The callback's own Parameter `radius` shadows the binding inside
+			// the callback.
 			expect(
 				await run(`implementation {
 					${shape}
@@ -4860,11 +4496,9 @@ describe("Choices", () => {
 		})
 	})
 
-	// A payload shape may carry a `= { … }` the construction is filled out
-	// of. Unlike a Parameter's default there is no callee to fill it in at — a
-	// Case is built where it is written, and that may be a Module that never
-	// named the Choice — so the value travels on the Case Type and is spliced
-	// per site, which is what the rules below are all about.
+	// A payload default travels on the Case Type and is spliced into each
+	// construction. See "Case payload defaults" in
+	// packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("Case payload defaults", () => {
 		let fetchChoice = `choice Fetch {
 			Get { url: String, retries: Integer } = { retries = 0 },
@@ -4910,10 +4544,8 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Get { url = "/x", retries = 3 }'])
 		})
 
-		// A payload is merged into its default exactly as an Argument is
-		// merged into a Parameter's, so it takes path keys for the same reason —
-		// and the Case is filled in where it is CONSTRUCTED, so the merge is
-		// spliced per site rather than made at a callee.
+		// A payload merges into its default as an Argument does into a
+		// Parameter's, so it takes path keys. The merge is spliced per site.
 		describe("a path key in a payload", () => {
 			let limited = `type Limits = { calls: Integer, burst: Integer }
 
@@ -4935,10 +4567,8 @@ describe("Choices", () => {
 				])
 			})
 
-			// The members a level WROTE come first and the ones the
-			// default filled in follow, one level down exactly as they do at the
-			// top — `#Get({ url = "/x" })` prints `url` before `retries` for the
-			// same reason.
+			// Written members come first and defaulted ones follow, at every
+			// level.
 			it("takes a braced descend the same way", async () => {
 				expect(
 					await run(`implementation { ${limited}
@@ -4951,9 +4581,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// A member written WHOLE replaces, which is the one difference
-			// between the two spellings and the reason a path key is spelled at
-			// all.
+			// A member written whole replaces the default rather than merging.
 			it("leaves a member written whole a replacement", async () => {
 				expect(
 					await run(`implementation { ${limited}
@@ -4999,9 +4627,8 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Blank { tags = [], title = "" }'])
 		})
 
-		// A bare `#Case` stays a UNIT Case's spelling however much of a
-		// payload is defaulted — the rule the marshaller's bare-Case strings
-		// live by, and the reason `#Blank({})` above is the spelling.
+		// A bare `#Case` stays a unit Case's spelling however much of the payload
+		// is defaulted, as the marshaller's bare-Case strings assume.
 		it("still refuses a bare Case whose payload is defaulted in full", () => {
 			expect(
 				codesOf(`implementation { ${fetchChoice}
@@ -5023,9 +4650,8 @@ describe("Choices", () => {
 			)
 		})
 
-		// The same `data` an Argument's own partial carries — a payload
-		// is a Record Literal measured against a default, and one scaffold
-		// answers both.
+		// The same `data` an Argument's partial carries, so one scaffold answers
+		// both.
 		it("carries those members as data for the scaffold", () => {
 			expect(
 				diagnosticsOf(`implementation { ${fetchChoice}
@@ -5034,8 +4660,8 @@ describe("Choices", () => {
 			).toEqual({ kind: "missing-members", names: ["url"] })
 		})
 
-		// A member with the wrong Type is not a partial of the payload at
-		// all, so the payload is measured whole and named whole.
+		// A member of the wrong Type is no partial, so the payload is measured
+		// whole.
 		it("keeps payload-type-mismatch for a member of the wrong Type", () => {
 			expect(
 				codesOf(`implementation { ${fetchChoice}
@@ -5044,10 +4670,9 @@ describe("Choices", () => {
 			).toContain("payload-type-mismatch")
 		})
 
-		// Only a payload WRITTEN as a Record Literal may leave a member
-		// out: width subtyping lets any other value carry more members than its
-		// Type names, and the members the splice fills in are exactly the ones
-		// its Type left it without.
+		// Only a Record Literal payload may leave a member out. Any other value
+		// may carry members its Type does not name, which the splice would
+		// overwrite.
 		it("refuses a partial payload that is not a Record Literal", () => {
 			expect(
 				codesOf(`implementation { ${fetchChoice}
@@ -5101,10 +4726,8 @@ describe("Choices", () => {
 			).toContain("case-default-not-a-literal")
 		})
 
-		// A Case is constructed wherever its Choice is in reach, so no
-		// Expression may be spliced into a construction — but a Constant of the
-		// declaring Module can be READ there, at the declaration, and its value
-		// baked into the Case Type as data. What travels is a value either way.
+		// A Constant of the declaring Module is read at the declaration and its
+		// value baked into the Case Type as data.
 		describe("a default value that names a Constant", () => {
 			it("bakes the Constant's value in", async () => {
 				expect(
@@ -5179,9 +4802,8 @@ describe("Choices", () => {
 				)
 			})
 
-			// The refusal follows the CHAIN — a Constant that holds a
-			// written Record whose member is worked out is not a literal either —
-			// and reports at the name the default wrote, not at the leaf.
+			// The refusal follows the chain of Constants and reports at the name
+			// the default wrote.
 			it("refuses a Constant that reaches a worked-out value", () => {
 				let reported = diagnosticsOf(`implementation {
 					constant sizes = [1, 2, 3]
@@ -5203,10 +4825,8 @@ describe("Choices", () => {
 				)
 			})
 
-			// A Pattern Declaration is the Constants an author could have
-			// written, and each one reads a member off the value — a Lookup, and
-			// no literal. It is refused for what it IS rather than for a name
-			// this Module supposedly does not declare.
+			// A Constant bound by a Pattern reads a member off a value, so it holds
+			// no literal and is refused as such.
 			it("refuses a Constant a Pattern Declaration binds", () => {
 				let reported = diagnosticsOf(`implementation {
 					constant sizes = { small = 1, large = 9 }
@@ -5223,9 +4843,8 @@ describe("Choices", () => {
 				expect(reported[0].message).toBe(
 					"The Constant 'small' does not hold a literal",
 				)
-				// The binding's value stands at the span of the name it
-				// binds, so the declaration label would repeat one already
-				// there.
+				// The binding's value stands at its name's span, so no separate
+				// declaration label is added.
 				expect(reported[0].labels).toHaveLength(2)
 			})
 
@@ -5246,11 +4865,9 @@ describe("Choices", () => {
 				)
 			})
 
-			// The standard library is a graph of Modules like any other
-			// and its files carry a top level Scope of their own, so the rule
-			// holds there too — one map per FILE, which is also what keeps the
-			// Diagnostic pointing inside the file being reported on. The loader
-			// throws on any Diagnostic, so loading IS the assertion.
+			// Each standard library file has its own top-level Scope, so the rule
+			// holds there too. The loader throws on any Diagnostic, so loading is
+			// the assertion.
 			it("holds in a standard library file", () => {
 				expect(() =>
 					loadStdlibFrom([
@@ -5271,9 +4888,8 @@ describe("Choices", () => {
 				).not.toThrow()
 			})
 
-			// A Constant does not hoist, and a payload default is read at
-			// the Choice's own Statement — so one written below it is not there
-			// yet, and `unknown-name` is the whole of the answer.
+			// A Constant does not hoist and the default is read at the Choice, so
+			// a later Constant is an `unknown-name`.
 			it("refuses a Constant declared below the Choice", () => {
 				expect(
 					codesOf(`implementation {
@@ -5286,9 +4902,8 @@ describe("Choices", () => {
 				).toEqual(["unknown-name"])
 			})
 
-			// The Constant a name stands for is read off the Scope that
-			// DECLARES it, so a binding closer in answers with nothing rather than
-			// with the Module Constant it hides.
+			// The Constant is read off its declaring Scope, so a closer binding
+			// that shadows it answers nothing.
 			it("refuses a binding that shadows a Constant", () => {
 				expect(
 					codesOf(`implementation {
@@ -5343,10 +4958,8 @@ describe("Choices", () => {
 			).toContain("case-default-on-generic-choice")
 		})
 
-		// The one-member shorthand asks whether the payload fits the
-		// payload Record; with a default it asks whether it is a PARTIAL of one,
-		// so `#Only({})` is a payload and not the member's value. Everything
-		// that is not a Record Literal is wrapped exactly as before.
+		// With a default, the shorthand asks whether the payload is a partial of
+		// the Record, so `#Only({})` is a payload. Anything else is wrapped.
 		describe("against the one-member shorthand", () => {
 			let wrapChoice = `choice Wrap {
 				Only { inner: { a: Integer } } = { inner = { a = 1 } },
