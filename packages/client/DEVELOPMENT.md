@@ -292,3 +292,87 @@ exactly where `labelsOf` lets the interpreter answer a labelled call.
 
 A Parameter is named by its label. A `_` Parameter has none, and a label TypeScript would misread, such as `first?`, is
 no better. Both fall back to `p` and the position, prefixed with `_` until no other Parameter has that name.
+
+## The interpreter
+
+`marshal-runtime.ts` is the run-time half of the boundary: every conversion, refusal and call, over Descriptors rather
+than Types. A bundler ships it to a browser, so it must not reach the compiler. Its imports that lead to compiler files
+are `import type`, which is erased, and `descriptor.spec.ts` checks every specifier the bundled file reaches. Beside
+`errors.ts` and `rational.ts`, its one value import is `bare-cases.ts`. That file holds a rule, imports `./descriptor`
+for types alone, and is shared with `dts.ts` so the two never disagree.
+
+### Two directions
+
+The two directions are not mirror images. Coming out, a value says what it is. Every Essence value but a Function
+carries its Type on the bundle's Type key, and `toJS` reads that tag. A Function carries nothing, so the Descriptor its
+position declared travels beside it, through Record members and List items. Where that Descriptor names exactly one
+signature, the Function crosses as a callable that marshals around its calls.
+
+Going in, a JavaScript value says nothing. `7` could be an Integer, a Rational, an `Optional<Integer>` or one arm of a
+Union. What the Module declared decides, so the way in is built from the Descriptor. A Function goes both ways, and
+its directions turn around inside it. A callback the Module calls is handed values crossing out, and answers with one
+crossing in. So each direction reaches the other, and every rule is written once for both.
+
+### Compiled rules
+
+Every Descriptor is fixed when the Module is built. Each question the interpreter asks of a shape has one answer for
+the life of a binding. `compileIn` and `compileOut` ask them once per Descriptor node and keep the closure that
+answers, in a `WeakMap` keyed by the node. A call runs closures and touches no Descriptor. A Descriptor nobody holds any
+more takes its closures with it. A Descriptor is a tree, since `describe` answers a Type that reaches itself with a
+`refused` node. Compiling a node's children while compiling the node therefore terminates.
+
+An answer has a table of its own. A Future is work everywhere else and a `Promise` as an answer, and one Descriptor
+node can stand in both positions through a Type Alias. One table would hand both positions whichever rule was compiled
+first.
+
+### Values from the bundle
+
+The Type key every tag is read through, and every constructor a value is built by, come from the bundle through the
+bridge. A value built any other way carries a Symbol the Module has never seen, and every Method it reaches would find
+it untyped. `createInterpreter` reads them off the bridge once. They are the runtime's own Functions rather than
+Methods, so they call the same when held apart from the bridge.
+
+A value the way in builds fits its Descriptor by construction. Each member is built against the member's own
+Descriptor, and each Union arm is the arm that took the value. So the runtime's `isValueOfType` is not asked
+afterwards. It would need a Type whose Case identities are the compiling machine's canonical paths, while the values
+carry entry-relative tags. Translating one into the other would be a second copy of the rule `emittedIdentity` states.
+
+A Record or a payload Case the interpreter builds is tagged in place. The bridge's constructor would copy it into a
+second object. The result has the runtime's own shape, with the members and the Type key on
+one object, as the Rewriter writes a static construction. Only objects the interpreter made itself are tagged this way,
+and a host is still handed the copying constructors.
+
+A Case payload default is the one value built from nothing a host handed over. A Case is built where it is written,
+and no callee stands between the host's object and the Case to fill a default in. `buildFill` builds it once, when the
+reader is compiled, and every value that leaves the member out shares it, since Essence values are immutable.
+
+The Dictionary and Future doors of the bridge exist only where the boundary names a Dictionary or work, as
+`runtimeBridgeModules` decides. Where one is missing, a Descriptor that names it comes from another compile. The shape
+then compiles to a refusal that says so, such as `noDictionaryDoor`.
+
+### Bare Case names
+
+Whether a Case crosses as a bare string is a fact about its Choice, and a value carries nothing that says so. A
+declared position knows it, but `toJS` with nothing declared does not. `bareCaseNames` reads every unit Choice Case the
+Module names, once, so `toJS` answers the same string either way and a host can hand it back. The table is complete for
+what a host can reach, since a value leaves only through an export, and an export names its Type. That is why an
+interpreter requires the Module.
+
+### List boxes
+
+`ListBox` is the only place this package knows the runtime's List layout, and `packages/runtime/src/List.ts` is the
+authority. A List is two runs with a view into each: the back run stored forward in `value`, and the front run stored
+reversed in `front`. The runs are shared between the boxes of one chain, and each box says how much of each run is its
+own. An absent `length` means the back view is the whole Array, and an absent `front` means the box never prepended.
+Reading `value` alone answers neither the right items nor the right number of them.
+
+The interpreter reads a box and never writes it. The runtime's `materialise` leaves the combined Array on the box for
+the natives to read again. The interpreter reads it once and hands JavaScript an Array of its own. Handing over the
+box's Array would let a host edit a value the Module still holds.
+
+A positional write changes the back run in place and counts a version up, which leaves the run's other boxes behind.
+`packages/runtime/src/listWrites.ts` is the authority. A box's `writes` holds the log of what each write overwrote, and
+the version this box views. `backRunSeenBy` undoes the writes made since, into a copy of the box's own view. It repeats
+the runtime's `caughtUp` rather than importing it, because `caughtUp` writes the replayed run back onto the box. The
+runtime repairs such a box wherever it reads one. `tests/undoReplay.spec.ts` holds this copy and the one in
+`tools/bench.ts` against the runtime's own.

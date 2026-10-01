@@ -5,9 +5,7 @@ import type {
 	Descriptor,
 	Fill,
 	FunctionDescriptor,
-	// Renamed on the way in, because `Members` is already the name of the
-	// COMPILED members below — the readers a shape was turned into. This is the
-	// shape itself, as the Descriptor states it.
+	// Renamed, since `Members` here names the compiled readers of a shape.
 	Members as DescribedMembers,
 	ModuleDescriptor,
 	NamespaceDescriptor,
@@ -16,97 +14,23 @@ import type {
 import { EssenceCallError, EssenceMarshalError } from "./errors"
 import { EssenceRational } from "./rational"
 
-// The RUN-TIME half of the boundary — every conversion, every refusal and
-// every call, over Descriptors rather than over Types. It knows nothing about the
-// Compiler and can not be made to: the two imports above that reach a file the
-// Compiler is in are `import type`, which is erased before anything runs, and
-// `descriptor.spec.ts` reads this file back to say so. `bare-cases.ts` is the
-// one VALUE import that is not `errors` or `rational`, and it holds a RULE
-// rather than a tool — it reads a Descriptor's shape and names `./descriptor`
-// under an `import type` of its own, so nothing followable leads out of it
-// either. It is imported rather than written out here because the generated
-// declarations read the same rule, and a second copy is the only way the two
-// could come to disagree about which positions this boundary refuses. That is
-// the whole of what "one marshaller" costs — a boundary that ships to a browser
-// has to be a boundary that does not bring a Compiler with it, and there is
-// exactly one of them either way.
-//
-// The two directions across the boundary, and they are not mirror images.
-//
-// Coming OUT, a value says what it is: every Essence value but a Function carries
-// its Type on the bundle's own hidden key, so `toJS` reads the tag and answers.
-// The exception is the one untagged value: a Function says nothing, so the
-// Descriptor its position DECLARED travels beside it — through the members of a
-// Record and the items of a List — and where that Descriptor names exactly one
-// signature, the Function crosses as a callable that marshals around its calls
-// rather than as the raw emitted one.
-//
-// Going IN, a JavaScript value says nothing. `7` could be an Integer, a Rational,
-// an `Optional<Integer>` or one arm of a Union, and which of them it has to become
-// is decided by what the Module DECLARED — so the way in is built out of the
-// Descriptor. That is what makes the boundary lossless in both directions rather
-// than merely plausible.
-//
-// A Function goes in as well as out, and it is the one value whose two directions
-// turn around inside it: a callback the Module calls is handed the Module's own
-// values, which cross OUT, and answers with one that crosses IN. So both
-// directions are reached from both, and every rule below is written once for both
-// callers.
-//
-// Every rule is COMPILED rather than asked on every value. A Descriptor is
-// fixed long before the first value crosses against it — it is written when the
-// Module is built — so every question this file puts to a shape has one answer
-// for the whole life of a binding: which branch a `list` takes, whether an
-// `Optional` holds another one, what a Case's tag is spelled as, which Parameter
-// is named `argument 2`. `compileIn` and `compileOut` ask them ONCE per
-// Descriptor node and hand back the closure that is the answer, so a call runs
-// closures and touches no Descriptor at all.
-//
-// The switch did not move, it moved a line up: each branch used to compute a
-// value and now returns the Function that computes it, out of the same rule
-// written in the same place. That is the whole of the change — there is still
-// ONE marshaller, rather than an interpreter and a compiler that would have to
-// be kept agreeing.
-//
-// Nothing here guesses at the runtime. The Symbol every tag is read through
-// and every constructor a value is built by come out of the BUNDLE, through the
-// bridge — a value built any other way carries a Symbol the Module has never seen,
-// and every Method it reaches would find it untyped.
-//
-// A value the way in builds is admitted by the Descriptor it was built
-// against BY CONSTRUCTION — each member is built against the member's own
-// Descriptor and each arm of a Union is the arm that took the value — so the
-// runtime's own `isValueOfType` is not asked afterwards. Asking would mean
-// handing it a Type descriptor whose Case identities are the canonical paths of
-// the machine that compiled, while the values' tags are entry-relative;
-// rendering a whole descriptor tree to match would be a SECOND copy of the rule
-// `emittedIdentity` states, and a second copy is the only way the two could ever
-// disagree. What is worth checking is checked where the value is built.
+// The run-time half of the boundary: every conversion, refusal and call, over
+// Descriptors. Nothing here may lead to the compiler. See "The interpreter" in
+// DEVELOPMENT.md.
 
-// The two tags the runtime's own `Optional` carries. Every other Choice
-// belongs to a Module, and a Module's tags are spelled relative to the entry —
-// which is why a Descriptor bakes those and not these. `Optional` is declared
-// where no Module path can qualify it, so its two Cases are spelled the same in
-// every bundle there will ever be.
+// The tags of the runtime's own `Optional`, which no Module path qualifies, so
+// they are the same in every bundle. A Descriptor carries every other tag.
 const OPTIONAL_VALUE = "Optional#Value"
 const OPTIONAL_EMPTY = "Optional#Empty"
 
-// Where the value under discussion sits, for an Error to name. The root is
-// what the caller called it — `argument 2`, `PI`, `return value` — and every step
-// below it is a JavaScript accessor, so a failure deep inside a List of Records
-// reads `argument 2 → .items[0].width` rather than `expected Integer`.
-//
-// A CHAIN rather than a string, and a converter is handed the place it is
-// INSIDE plus the one step from there to the value it was given —
-// `(value, at, step)`. Spelling is the one piece of work the boundary would
-// otherwise do on every value and needs on almost none, so it is done where an
-// Error is thrown and nowhere else. A leaf therefore builds nothing at all: only
-// a container, which has children to name themselves to, links a place of its
-// own, and the root of a walk is spelled by its step alone with nothing above it.
+// Where a value sits, for an Error to name, as in `argument 2 → .items[0].width`.
+// A converter gets the place it is inside and one step, `(value, at, step)`.
+// The chain is spelled only when an Error is thrown, and only a container links
+// a place of its own.
 type Path = { at: Path | null; step: Step }
 
-// A member name or a position in a List — `.width` and `[3]` — and at the
-// root, the whole of what the caller called the value.
+// A member name or a List position, as `.width` and `[3]`. At the root, the
+// caller's name for the value.
 type Step = string | number
 
 function spell(at: Path | null, step: Step): string {
@@ -131,12 +55,8 @@ function accessor(step: Step): string {
 	return typeof step === "number" ? `[${step}]` : `.${step}`
 }
 
-// A place of its own INSIDE the value at this one — a callback's own
-// Arguments and its answer, which are not parts of the Function the way a member
-// is part of a Record. Everything reached from there is spelled below the whole
-// of where the callback was, so a refusal reads `argument 2 → return value →
-// .width` and names the Function the caller actually passed. What comes back is
-// a ROOT, because nothing above it is the Module's to name.
+// A new root inside a callback, for its Arguments and its answer, so a refusal
+// reads `argument 2 → return value → .width`.
 function within(at: string, what: string): string {
 	return `${at} → ${what}`
 }
@@ -144,29 +64,15 @@ function within(at: string, what: string): string {
 // How many names an Error spells out before it starts counting.
 const NAMES_SHOWN = 5
 
-// Every Type key an interpreter in this process has been built over. A
-// value tagged with one of them and handed to an interpreter built over ANOTHER
-// is the failure that has no symptom of its own: it reads as a plain object, is
-// refused as "not from this Module", and the host is left staring at a value
-// that plainly is one. It happens in exactly two ways — a Module was loaded
-// AGAIN, after an edit, and a value from the load before is still in the host's
-// hands; or two bundles that never shared a runtime are exchanging values — and
-// both deserve to be named as what they are rather than as an object with the
-// wrong keys. The set is only ever read on the way to an Error.
-//
-// The runtime describes its key as `$type`, and a copy of the runtime this
-// package never bound — a host that imported `@essence-lang/runtime` itself
-// beside a bundle — mints a Symbol under that description too. It is looked for
-// as well, so that the case is named the same way; a Symbol is a hidden key on
-// a value nobody else stamps, and reading its description is the whole of what
-// is done with it.
+// Every Type key an interpreter in this process was built over. A value from
+// another load or another bundle would otherwise read as a plain object, so a
+// refusal names it as such. A Symbol described as `$type` from an unbound copy of
+// the runtime counts too. Only an Error reads these.
 const mintedTypeKeys = new Set<symbol>()
 const TYPE_KEY_DESCRIPTION = "$type"
 
-// The tag a value carries under a Type key that is not the one being read
-// with — or `null` where it carries none such. Every own Symbol is examined:
-// there are never more than a few, and this runs only once a value has already
-// been refused.
+// The tag a value carries under a foreign Type key, or `null`. It runs only
+// after a refusal.
 function foreignTag(value: object, own: symbol): string | null {
 	for (let key of Object.getOwnPropertySymbols(value)) {
 		if (
@@ -185,40 +91,29 @@ function foreignTag(value: object, own: symbol): string | null {
 
 export type EssenceFunction = (...args: Array<EssenceValue>) => EssenceValue
 
-// One entry of a Dictionary as the two halves it is made of, which is what
-// the bridge hands over and what it takes back — the shape a `Map` iterates and
-// the shape its constructor reads, so neither side of the boundary has to lay
-// one out for the other.
+// A Dictionary entry as the bridge hands it over and takes it back, the shape a
+// `Map` iterates and its constructor reads.
 type Entry = [EssenceValue, EssenceValue]
 
-// One shape's rule, compiled — the way in and the way out of a single
-// Descriptor node, as the Function each of them is. Everything a call does is
-// one of these being run.
+// One Descriptor node's rule, compiled, for each direction.
 type Inbound = (value: unknown, at: Path | null, step: Step) => EssenceValue
 
 type Outbound = (value: unknown, at: Path | null, step: Step) => unknown
 
-// What a link that was never made is released by. One Function rather
-// than a `null` to test for, because the release is run on a path that has just
-// waited for work: a branch there buys nothing and reads worse.
+// Releases a link that was never made, so a release needs no `null` test.
 function nothing(): void {}
 
-// The members of one Record or one Case's payload, compiled — the readers
-// under the names a value carries them under, and the same readers in the order
-// the Type declares them. Which of the two answers is asked first is the whole
-// of the difference between them; see `compiledMembers`.
+// The compiled readers of a Record's or payload's members, by name and in
+// declared order. See `compiledMembers`.
 type Members = {
 	names: Array<string>
 	readers: Array<Outbound>
 	named: Map<string, Outbound>
 }
 
-// Everything about a call that its SIGNATURE settles: which labels it may
-// be written with, the reader for every Parameter and for the answer, and what
-// an Error calls each Argument written either way. None of it depends on the
-// Function it wraps or on the name that Function was met under, so all of it is
-// settled once per FunctionDescriptor rather than once per value that crosses;
-// see `compiledCall`.
+// What a signature settles about a call: its labels, the readers for each
+// Parameter and the answer, and each Argument's name in an Error. It is
+// compiled once per signature, by `compiledCall`.
 type Call = {
 	arity: number
 	labels: Array<string> | null
@@ -229,10 +124,9 @@ type Call = {
 }
 
 export type Interpreter = {
-	// An Essence value out, as the JavaScript it maps to. The optional name
-	// is what an Error calls the value, and everything below it is spelled
-	// relative to that; the optional Descriptor is for the one value that carries
-	// none of its own.
+	// An Essence value out, as the JavaScript it maps to. `path` is what an
+	// Error calls the value. `expected` matters for a Function, which carries no
+	// Type.
 	toJS: (value: unknown, path?: string, expected?: Descriptor) => unknown
 	// A JavaScript value in, as the shape it is being handed to.
 	fromJS: (
@@ -240,10 +134,8 @@ export type Interpreter = {
 		expected: Descriptor,
 		path?: string,
 	) => EssenceValue
-	// The same two doors for a caller that will cross the SAME shape more
-	// than once — a constant read again and again, a host's own hot loop. The
-	// Descriptor is walked here and never again; what comes back takes the value
-	// alone.
+	// The same two doors for a caller that crosses one shape many times. The
+	// Descriptor is walked once, and the answer takes the value alone.
 	compileIn: (
 		expected: Descriptor,
 		path?: string,
@@ -252,10 +144,9 @@ export type Interpreter = {
 		expected: Descriptor,
 		path?: string,
 	) => (value: unknown) => unknown
-	// One Essence Function as a JavaScript one: Arguments marshalled
-	// against the Parameters the Module declared, the call made positionally —
-	// which is how every Essence call is emitted, labels and all — and the answer
-	// marshalled back.
+	// One Essence Function as a JavaScript one. Arguments are marshalled against
+	// the declared Parameters and passed by position, as every Essence call is
+	// emitted.
 	wrapFunction: (
 		target: EssenceFunction,
 		signature: FunctionDescriptor,
@@ -263,22 +154,8 @@ export type Interpreter = {
 	) => (...args: Array<unknown>) => unknown
 }
 
-// A List box as the runtime lays one out, and the only place this package
-// knows that layout. `packages/runtime/src/List.ts` is the authority: a List is
-// TWO runs and a view into each — the back run stored forward in `value`, the
-// front run stored REVERSED in `front` — because the runs are SHARED between the
-// boxes of one chain, and what tells those boxes apart is how much of each run
-// each one says is its own. So `length` absent means the back view is the whole
-// Array, `front` absent means the box never prepended, and reading `value` on its
-// own answers neither the right items nor the right number of them.
-//
-// Read, never written back. The runtime's own `materialise` combines the
-// two runs and leaves the result ON the box, because the natives will read that
-// box again; marshalling reads it once and hands JavaScript an Array of its own,
-// so there is nothing here worth caching and no reason for this side of the
-// boundary to write into a bundle's values at all. It also may not hand the
-// combined Array over — that Array is the box's, and a host that pushed onto it
-// would be editing a value the Module still holds.
+// A List box as the runtime lays it out, read and never written. See "List
+// boxes" in DEVELOPMENT.md.
 export type ListBox = {
 	value: Array<unknown>
 	length?: number
@@ -294,20 +171,8 @@ export type ListBox = {
 	}
 }
 
-// The back run AS THIS BOX SEES IT. A positional write changes that Array
-// IN PLACE and counts a version up, leaving every other box on the run behind —
-// `packages/runtime/src/listWrites.ts` is the authority, and `writes` holds the
-// log of what each write overwrote beside the version this box views. A box that
-// is behind undoes the writes made since it looked, into a copy of its own view.
-//
-// Repeated rather than imported because the runtime's `caughtUp` writes
-// the replayed run back onto the box, and this side never writes into a
-// bundle's values. The runtime repairs such a box wherever it reads one, so a
-// box left alone here loses nothing by it.
-//
-// Exported for `tests/undoReplay.spec.ts`, which holds this copy and the
-// one in `tools/bench.ts` against the runtime's own. An export nothing else
-// reaches is shaken out of a bundle, so it costs a host nothing.
+// The back run as this box sees it, with later writes undone in a copy. See
+// "List boxes" in DEVELOPMENT.md.
 export function backRunSeenBy(list: ListBox): Array<unknown> {
 	let writes = list.writes
 
@@ -335,18 +200,9 @@ export function backRunSeenBy(list: ListBox): Array<unknown> {
 	return own
 }
 
-// What a binding knows that a Descriptor does not — today the one thing:
-// the host's own `AbortSignal`, if it has one. It belongs to the INTERPRETER
-// rather than to a call because it is a fact about the whole binding: every run
-// this boundary starts belongs under it, so stopping it stops everything the
-// host asked this Module for and nothing else.
 export type InterpreterOptions = {
-	// The ROOT context of every run the boundary starts, rather than a
-	// second mechanism beside the one the language already has. A Program's own
-	// `start` makes a child of the context it was written in and `::within` and
-	// `::race` stop their losers through exactly such a child — so a host that
-	// hands a signal over is handing over the top of that same tree, and
-	// everything below it is stopped the way everything else is.
+	// The host's stop, the root context of every run this binding starts.
+	// Aborting it stops them as `::within` and `::race` stop their losers.
 	signal?: AbortSignal
 }
 
@@ -355,28 +211,15 @@ export function createInterpreter(
 	module: ModuleDescriptor,
 	options: InterpreterOptions = {},
 ): Interpreter {
-	// The bundle's own Type key and constructors, read off the bridge ONCE.
-	// Every value that crosses reaches one of them, and a property load on the
-	// way to each call is exactly the sort of work the compile step exists to
-	// have already done. None of them is a Method — the bridge hands over the
-	// runtime's own Functions — so a name held apart from the object it arrived
-	// on calls the same way.
+	// The bundle's Type key and constructors, read off the bridge once. See
+	// "Values from the bundle" in DEVELOPMENT.md.
 	let typeKey = bridge.typeKey
 	let makeCase = bridge.case
 
 	mintedTypeKeys.add(typeKey)
 
-	// A Record or a payload Case this reader BUILDS is tagged in place
-	// rather than handed to the bridge's constructor, which spreads what it is
-	// given into a second object — one allocation per value that this reader,
-	// having just built the first, has no reason to pay: a quarter of a tree of
-	// Cases crossing in was that spread. The shape written is the runtime's own,
-	// the members and the Type key on one object, and it is the shape the
-	// Rewriter already writes as a literal where a construction is static; this
-	// reader is the same kind of caller — inside the contract, building an
-	// object nothing else holds. Nothing here reaches a host: the bridge still
-	// hands a host the copying constructors, and every object tagged this way
-	// was made on this line's side of the boundary.
+	// Tags an object this reader built in place, rather than copying it through
+	// the bridge. See "Values from the bundle" in DEVELOPMENT.md.
 	function ownRecord(fields: Record<string, EssenceValue>): EssenceValue {
 		;(fields as Record<symbol, unknown>)[typeKey] = "Record"
 
@@ -392,17 +235,8 @@ export function createInterpreter(
 		return payload
 	}
 
-	// A Case payload default's value, built. It is the one value this side
-	// makes out of nothing a host handed over — every other one is read off
-	// something — because a Case is BUILT where it is written and a host writing
-	// one is where it is written: there is no callee between the object and the
-	// Case for a default to be filled in at, the way there is for a Record
-	// Parameter.
-	//
-	// Built once, when the reader is compiled, and handed to every value
-	// that leaves the member out. Essence values are immutable, and the Compiler
-	// shares a literal across its own construction sites for the same reason —
-	// `pool-constants` is that very sharing.
+	// A Case payload default, built once when the reader is compiled and shared.
+	// See "Values from the bundle" in DEVELOPMENT.md.
 	function buildFill(fill: Fill): EssenceValue {
 		switch (fill.kind) {
 			case "integer":
@@ -443,66 +277,31 @@ export function createInterpreter(
 	let makeString = bridge.string
 	let makeBoolean = bridge.boolean
 	let makeList = bridge.list
-	// The two halves of the Dictionary door, which a bundle carries only
-	// where its boundary names a Dictionary — see `runtimeBridgeModules`, which
-	// says why it is not carried always. Undefined where it is not, and a
-	// Descriptor that names a Dictionary is then a Descriptor from another
-	// compile, so the shape compiles to the sentence that says so rather than to
-	// a `TypeError` about `undefined` from inside a walk.
+	// The Dictionary door, undefined where the boundary names no Dictionary.
+	// See "Values from the bundle" in DEVELOPMENT.md.
 	let makeDictionary = bridge.dictionary
 	let dictionaryEntries = bridge.dictionaryEntries
-	// And the three of the asynchrony door, carried under the same rule —
-	// see `runtimeBridgeModules`. Undefined where the boundary names no Future
-	// and no Started, and a Descriptor that names one is then a Descriptor from
-	// another compile, which is what `noFutureDoor` says.
+	// The Future door, undefined where the boundary names no work.
 	let makeFuture = bridge.future
 	let makeFutureContext = bridge.futureContext
 	let futureAnswer = bridge.futureAnswer
 	let hostSignal = options.signal
-	// Every unit Choice Case the MODULE names, under the tag its values
-	// carry. Whether a Case crosses as a bare string is a fact about the Choice
-	// and a value carries nothing that says it, so the general walk — which
-	// reads a value by what it says it is — could otherwise only answer it
-	// where the position that was crossed declared the Case. This is the other
-	// place the answer can come from: the whole Descriptor, read once here, so
-	// that `toJS` with nothing declared hands back the same string a declared
-	// position would have and a host can hand it straight back.
-	//
-	// Bounded by the Descriptor, and complete for what a host can reach:
-	// a value only leaves this boundary through an export, and an export names
-	// its Type. The Module is required for the same reason — an interpreter
-	// built without one would walk a Case into its object form at an undeclared
-	// position and into a string at a declared one, which is the disagreement
-	// this table exists to prevent.
+	// Every unit Choice Case the Module names, by tag. See "Bare Case names" in
+	// DEVELOPMENT.md.
 	let bareCases = bareCaseNames(module)
 
 	// #region Compiling
 
-	// One compiled rule per Descriptor NODE, kept against the node itself.
-	// A Descriptor outlives every value that crosses against it — a bound Module
-	// holds its own for as long as it is bound — so a shape is compiled once and
-	// never again, while a Descriptor nobody holds any more takes its closures
-	// with it rather than filling a table that only grows.
-	//
-	// A Descriptor is a TREE — `describe` answers a Type that reaches
-	// itself with a `refused` node rather than following it — so compiling a
-	// node's children while compiling the node terminates, and a call finds every
-	// converter below it already built.
+	// One compiled rule per Descriptor node. See "Compiled rules" in
+	// DEVELOPMENT.md.
 	let inbound = new WeakMap<Descriptor, Inbound>()
 	let outbound = new WeakMap<Descriptor, Outbound>()
-	// A table of its own, because an ANSWER is the one position that reads
-	// a shape differently from every other: a Future is work everywhere and a
-	// `Promise` here. The same Descriptor node can stand in both — a Type Alias
-	// for a Future, answered by one Function and held by a Record somewhere else
-	// — and one table would then hand whichever rule was compiled first to both.
+	// An answer reads a Future differently, so it has a table of its own.
 	let answers = new WeakMap<Descriptor, Outbound>()
 	let outboundMembers = new WeakMap<DescribedMembers, Members>()
 	let calls = new WeakMap<FunctionDescriptor, Call>()
-	// What a position that declared nothing reads its members by — no
-	// names to guess with and no reader to find, so every member of it is read
-	// by the walk the VALUE directs. One of them rather than a `null` to branch
-	// on, because a Record nothing was declared for is read by the same loop as
-	// every other.
+	// The members of a position that declared nothing, each read by the walk
+	// the value directs. It spares the loop a `null` test.
 	let noMembers: Members = { names: [], readers: [], named: new Map() }
 
 	function compileIn(expected: Descriptor): Inbound {
