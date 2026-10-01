@@ -9846,33 +9846,10 @@ function makeArgumentTyper(
 
 			let type = noteErrors(enrichOnce(value).type)
 
-			// The one answer that is a Type the Expression itself was
-			// never resolved to. A value written down where a refinement stands
-			// is admitted by deciding the predicate while compiling: `3` really
-			// is a NonZeroInteger, so the Argument answers with the refinement
-			// and the call needs no branch in front of it.
-			//
-			// The Node keeps its own Type and nothing is written to it. That is
-			// what makes this safe under the Overload probes: the admission is an
-			// answer about THIS position, given to whichever candidate asked, and
-			// a candidate that loses leaves nothing behind for the winner to read.
-			// It is also why the Node needs nothing — a refinement erases to its
-			// base, which is the Type the literal already has.
-			//
-			// Asked about the refinement THIS value decides rather than about
-			// the Parameter Type as it stands — the two differ only where the
-			// Parameter's own Type Arguments are still open, and there the Parameter
-			// as it stands is not yet a Type any value could be of. What comes back
-			// is matched against the Parameter as DECLARED, which is what binds the
-			// Type Parameter the value just decided. A Parameter naming a refined
-			// ITEM Type is the same question asked of each written item, and what
-			// comes back is a List of what they decided.
-			//
-			// And not while the caller's proof is erased. The re-probe that
-			// erases it asks what this same Argument would have decided had the
-			// caller held nothing, so a `2` standing where a NonZeroInteger does
-			// stays the ordinary Integer it is written as, and an Argument whose
-			// own Type is a refinement arrives as the Type it is refined from.
+			// A written value where a refinement stands is admitted by deciding
+			// the predicate, so `3` answers as a NonZeroInteger. The Node keeps
+			// its own Type, so a losing candidate leaves nothing behind.
+			// Skipped while the caller's proof is erased.
 			if (!erasingRefinementProof) {
 				let asked = admitted(value, expectedType)
 
@@ -9906,15 +9883,8 @@ function makeArgumentTyper(
 		decideArgument(value, decided) {
 			let enriched = cache.get(value)
 
-			// A Parameter Type still mentioning one of the CALL's own
-			// unsolved Type Parameters is no decision, the same way it is none
-			// for a prefixed Case construction: `pick([], ["a"], [])` over a
-			// `pick <infer T, infer U>(_ a: T, _ b: T, _ c: List<U>)` would write
-			// `List<U>` onto the third Argument's brackets, under the freshened
-			// name only a call still matching can produce. Nothing bound `U`, so
-			// the call is refused as uninferable — but a Node carrying a Type
-			// Parameter no Declaration declares is not a thing to leave behind on
-			// the way there.
+			// A Parameter Type mentioning the call's own unsolved Type
+			// Parameters is no decision, and must not be written onto a Node.
 			if (
 				enriched === undefined ||
 				mentionsUnsolvedTypeParameter(decided)
@@ -9934,10 +9904,8 @@ function makeArgumentTyper(
 				return
 			}
 
-			// Written through the probe recordings, exactly as a
-			// contextually typed Function literal's resolution is: the decision
-			// belongs to ONE candidate, and a candidate that loses must leave
-			// nothing behind on a Node the winner reads.
+			// Written through the probe recordings, so a losing candidate
+			// leaves nothing on a Node the winner reads.
 			recordDecidedArgument(() => {
 				cache.set(value, node)
 			})
@@ -9955,12 +9923,9 @@ function makeArgumentTyper(
 	}
 }
 
-// A Function literal's Type. Every annotation present makes it a plain
-// signature (resolved on the Resolver side); an omitted one is worked out
-// contextually — from the expected Type while an invocation is matched, or from
-// the body when the expected Type leaves it Generic. The result is recorded per
-// Node so the separate enrichment pass, which has no expected Type left, reads
-// it back rather than re-deriving it.
+// A Function literal's Type. A fully annotated one is a plain signature. An
+// omitted annotation is worked out from the expected Type or the body, and
+// recorded per Node for the enrichment pass to read back.
 function resolveFunctionDefinitionType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
@@ -10016,29 +9981,23 @@ function resolveFunctionDefinitionType(
 	return resolved
 }
 
-// The result of inferring one invocation against one signature —
-// `unboundGenerics` lists Type Parameters that neither a default, the
-// receiver nor any Argument could bind. They are substituted as Error Types
-// in `returnType`; the caller reports them once the candidate is selected.
+// One Invocation inferred against one signature. `unboundGenerics` are the Type
+// Parameters nothing bound, substituted as Error in `returnType` and reported
+// once a candidate is selected.
 type InferredInvocation = {
 	returnType: common.Type
 	unboundGenerics: Array<string>
-	// What the invocation bound each Type Parameter to — conformance
-	// resolution for Protocol bounds reads the winning candidate's bindings.
+	// What each Type Parameter was bound to, read for the winner's
+	// conformances.
 	bindings: GenericBindings
-	// Which Parameters this call wrote no Argument for, indexed over the
-	// FULL signature — the receiver Parameter included, since that is the list
-	// the Simplifier emits an Argument list against. Empty for every call that
-	// omits nothing, which is every call in a Program that declares no default.
+	// The Parameters this call wrote no Argument for, indexed over the full
+	// signature, receiver included, as the simplifier emits Arguments.
 	omittedParameterIndices: Array<number>
 }
 
-// Matches an invocation's Arguments left to right against a signature,
-// binding `infer` Generics on their first occurrence (for Methods the
-// receiver is the first Argument), and seeding plain Generics with their
-// definition-time defaults. Returns undefined when the Arguments do not
-// match; a fresh context per call keeps bindings from leaking between
-// overload candidates.
+// Matches the Arguments left to right against a signature, binding `infer` Type
+// Parameters on first occurrence. Undefined when they do not match. A fresh
+// context per call keeps bindings from leaking between candidates.
 function inferInvocation(
 	signature: common.BaseFunction,
 	matchableArguments: Array<MatchableArgument>,
@@ -10069,14 +10028,9 @@ function inferInvocation(
 		inference: context,
 	})
 
-	// Asked before the match is answered with, because what it answers is
-	// the same match run again under the Types this one left open — and asked of
-	// a match that FAILED as well, because a Parameter bound to something with a
-	// slot nobody decided is a reason a match fails: `[[]]::append([1])` binds
-	// the item Type to `List<Unknown>` off the seed, and the `List<Integer>` that
-	// follows has to DECIDE that slot rather than be measured against it. Only
-	// the second match's answer counts either way — see
-	// `invocationWithDecidedSeeds`.
+	// Asked even of a failed match, since an undecided seed can be why it
+	// failed. `[[]]::append([1])` must decide the item Type rather than be
+	// measured against it. See `invocationWithDecidedSeeds`.
 	let decided = invocationWithDecidedSeeds(
 		signature,
 		parameterTypes,
@@ -10101,18 +10055,8 @@ function inferInvocation(
 	)
 }
 
-// The Type Parameters this call bound to a Type carrying a slot nobody
-// decided. An empty `[]` seed is the whole of how one arises: `reduce(startingWith
-// [], …)` binds `Answer := List<Unknown>`, which says the fold carries a List and
-// nothing at all about what it holds — and `Unknown` is bottom as an Argument and
-// top as a Parameter, so every later occurrence of `Answer` is waved through
-// against it. A slot nobody decided may be READ as bottom; a WRITE has to decide
-// it, and this is the set of bindings a write is still owed for.
-//
-// One walk per binding, and a walk that stops at the first shape holding no Type
-// Argument — so a call whose Arguments named Types for themselves, which is every
-// call in a Program that writes no empty seed, is answered by walking a handful of
-// small Types.
+// The Type Parameters this call bound to a Type with an undecided slot, as an
+// empty seed does. See "Seeds an Invocation decides" in DEVELOPMENT.md.
 function undecidedBindingNames(
 	context: GenericInferenceContext,
 ): Set<common.GenericName> {
@@ -10127,33 +10071,9 @@ function undecidedBindingNames(
 	return undecided
 }
 
-// This call's bindings with every slot its Arguments left open filled in
-// from what the call says ELSEWHERE, under the Generics the signature declares —
-// or null where there was nothing open, which is the answer for every call that
-// writes no empty seed.
-//
-// Three things can say it, in this order. The position the whole Invocation
-// stands in comes first: `constant kept: List<String> = words::reduce(startingWith
-// [], …)` decides the fold's `Answer` before a single Argument of it is re-read,
-// because an annotation is a decision somebody wrote down and inference never
-// overrules one. Then the Arguments that were CHECKED against the open Parameter
-// rather than having bound it — `[[]]::append([1])` binds the item Type off the
-// seed and has nothing left to do with the `List<Integer>` beside it but agree.
-// And last a Function literal Argument's BODY: the combiner of
-// `words::reduce(startingWith [], (kept, word) { <- kept::append(word) })` answers
-// a `NonEmptyList<String>`, so the fold carries a List of Strings whatever the
-// brackets that seeded it left open.
-//
-// Each is read the same way — the DECLARED Type unified against the answer, with
-// everything the Arguments did decide substituted into it first, so the open
-// Parameter is the only one standing in it. Unification at the outermost position
-// binds a Type Parameter to a refinement's BASE (see `matchTypes`), which is
-// exactly right here: the seed was empty, so what the fold carries is a List, not
-// the `NonEmptyList` one turn of the combiner happens to answer.
-//
-// Only Unknown slots are filled, through `resolveUnknownSlots` — a binding the
-// Arguments DECIDED is never overruled, and a Parameter nothing bound at all stays
-// unbound and is reported as uninferable exactly as before.
+// This call's bindings with the slots its Arguments left open filled from the
+// position, the checked Arguments and literal bodies, or null. See "Seeds an
+// Invocation decides" in DEVELOPMENT.md.
 function decidedSeedBindings(
 	signature: common.BaseFunction,
 	parameterTypes: common.BaseFunction["parameterTypes"],
@@ -10168,10 +10088,8 @@ function decidedSeedBindings(
 		return null
 	}
 
-	// What the Arguments DID decide, kept apart so it can be substituted
-	// into the Types below while the open Parameters stay standing in them. They
-	// are the freshened names, which is what makes them recognisable as this
-	// call's own further down.
+	// What the Arguments did decide, under freshened names, substituted into
+	// the Types while the open Parameters stay standing.
 	let settled: GenericBindings = new Map()
 
 	for (let [name, type] of context.bindings) {
@@ -10182,10 +10100,8 @@ function decidedSeedBindings(
 
 	let decisions: GenericBindings = new Map()
 
-	// One unification, against a context bindable over exactly the
-	// Parameters still open — so a Parameter this answer does not mention is left
-	// alone rather than bound to whatever stands opposite it, and a failed
-	// unification decides nothing at all.
+	// One unification, bindable over only the open Parameters. A failed one
+	// decides nothing.
 	let decideFrom = (declared: common.Type, answer: common.Type): void => {
 		let open = new Set(
 			[...undecided].filter((name) => !decisions.has(name)),
@@ -10195,16 +10111,9 @@ function decidedSeedBindings(
 			return
 		}
 
-		// An answer built out of branches is unified BRANCH BY BRANCH.
-		// Unification reads one Type against another, and a Union is not one
-		// Type: a `step` body answering `#Continue(kept::append(number))` in one
-		// arm and `#Continue(kept)` in the other answers two instantiations of
-		// the same Choice, and asking `Progress<State, Result>` about the pair of
-		// them binds nothing, so the branch that says what the accumulator holds
-		// was never heard. Each branch is asked on its own and what they found is
-		// collected per Parameter; a branch the declared Type can not be read
-		// against says nothing and is skipped, which is what a Union arm of
-		// another shape entirely is.
+		// An anonymous Union answer is unified branch by branch, since a Union
+		// is not one Type. A branch the declared Type can not be read against
+		// is skipped.
 		let anonymous =
 			answer.type === "UnionType" &&
 			answer.name === undefined &&
@@ -10237,10 +10146,8 @@ function decidedSeedBindings(
 			}
 		}
 
-		// The branches' answers are handed over as the Union they are, so
-		// `resolveUnknownSlots` weighs them the one way this rule weighs branches
-		// anywhere: slot by slot, a blank taking what the branches that fill it
-		// agree on and staying blank where they disagree.
+		// The branches' findings join as a Union, which `resolveUnknownSlots`
+		// weighs slot by slot.
 		for (let [name, found] of candidates) {
 			let bound = context.bindings.get(name)
 
@@ -10257,9 +10164,7 @@ function decidedSeedBindings(
 	}
 
 	if (expectedType !== null) {
-		// The signature's return Type under THIS call's freshened names,
-		// which `createFreshenedInference` renamed the Parameter Types to. The
-		// rename it used is its `freshToOriginal` read backwards.
+		// The return Type under this call's freshened names.
 		let rename: GenericBindings = new Map()
 
 		for (let [fresh, original] of freshToOriginal) {
@@ -10279,13 +10184,8 @@ function decidedSeedBindings(
 			(name) => undecided.has(name) && !decisions.has(name),
 		)
 
-	// The Arguments that were CHECKED against the open Parameter rather
-	// than having bound it. A Parameter binds on its first occurrence and is only
-	// checked on every later one, and an undecided slot accepts every check — so
-	// `[[]]::append([1])` binds the item Type to `List<Unknown>` off the seed and
-	// waves the `List<Integer>` that follows straight through it. What the later
-	// Argument says is read here, where the whole call is in hand and the binding
-	// can be filled in rather than merely agreed with.
+	// The Arguments checked against an open Parameter rather than binding it.
+	// An undecided slot accepts every check, so what they say is read here.
 	for (let [index, parameter] of parameterTypes.entries()) {
 		let argument = argumentFor(index)
 
@@ -10306,12 +10206,7 @@ function decidedSeedBindings(
 		)
 	}
 
-	// The bindings as this reading has them SO FAR — what the Arguments
-	// decided, with everything settled since written over it. A body is read
-	// against these rather than against the Arguments' own answer, because a
-	// decision already made is one the body is entitled to see: an annotation
-	// deciding the accumulator should have the combiner read with the
-	// accumulator decided.
+	// The bindings so far, so a body is read with what is already decided.
 	let bindingsSoFar = (): GenericBindings => {
 		let bindings = new Map(context.bindings)
 
@@ -10322,17 +10217,8 @@ function decidedSeedBindings(
 		return bindings
 	}
 
-	// Rounds, because one body can answer two Parameters and answer the
-	// second only once the first is decided. `loop(startingWith [], step (kept) {
-	// … <- #Done(kept) … <- #Continue(kept::append("x")) })` decides the State
-	// from the arm that APPENDS, and only a reading under that decision can say
-	// that what the loop ANSWERS is the same List of Strings — read under the
-	// blank, `#Done(kept)` hands back the blank it was given.
-	//
-	// A round that decides nothing ends it, so a call with nothing open pays for
-	// no round at all and the usual call with one open Parameter pays for one. At
-	// worst there is a round per open Parameter, because a round that does not
-	// decide one stops.
+	// Rounds, because one body may decide a second Type Parameter only once a
+	// first is decided. A round that decides nothing ends the loop.
 	let decidedBefore = -1
 
 	while (decisions.size > decidedBefore && decisions.size < undecided.size) {
@@ -10349,13 +10235,9 @@ function decidedSeedBindings(
 				continue
 			}
 
-			// The literal is read against its Parameter Types as the seed
-			// left them — `(kept: List<Unknown>, word: String)`, which is what its
-			// body was going to be enriched under anyway — and against a return
-			// Type left UNSOLVED, which is what makes `resolveContextualReturnType`
-			// read the body rather than hand the position's own answer back. That
-			// answer is the undecided Type itself, and a call that asked it would
-			// be told what it already knew.
+			// Read against the Parameter Types as the seed left them, with the
+			// return Type left unsolved, so `resolveContextualReturnType` reads
+			// the body.
 			let bindings = bindingsSoFar()
 			let substituted = applyGenericBindings(parameter.type, bindings)
 			let open = applyGenericBindings(parameter.type, settled)
@@ -10364,14 +10246,8 @@ function decidedSeedBindings(
 				continue
 			}
 
-			// Silent, because the position it asks about is one no reading
-			// of this call will ever commit to: the return Type is held open ON
-			// PURPOSE, and a literal whose body answers nothing is told its return
-			// Type can not be inferred from it — where the call itself had already
-			// decided that position and the body's real complaint is that it
-			// returns nothing at all. What it says here is a question's echo, not
-			// a reading. The two readings that ARE kept report for themselves, one
-			// of them right below.
+			// Silent, since the return Type is held open on purpose and no
+			// reading commits to it. The kept readings report for themselves.
 			let { result: answered } = collectDiagnostics(() =>
 				argument.getType(
 					{ ...substituted, returnType: open.returnType },
@@ -10398,50 +10274,8 @@ function decidedSeedBindings(
 	return unfreshenBindings(decided, freshToOriginal)
 }
 
-// The invocation matched a SECOND time, with the slots its Arguments left
-// open decided — and undefined where there was nothing to decide or nothing
-// decided it, which is every call in a Program that writes no empty seed.
-//
-// The second match is what makes a decision worth anything: the Arguments that
-// react to their position are re-read under the decided Parameter Types, so the
-// combiner of a `reduce(startingWith [], …)` is resolved against `(_: List<String>,
-// _: String) -> List<String>` and the `kept` its body reads is a List of Strings
-// rather than the undecided List the seed named. It is the recording of THAT
-// resolution the enrichment pass reads back, which is where a body misreading the
-// accumulator — `Number.sum(kept)` over a List of Strings — is finally refused.
-//
-// Held on both rails while it runs, exactly as a speculative Overload probe is,
-// and both are handed on where it holds up: the recordings are committed and the
-// Diagnostics reported. A second match that does NOT hold up is discarded whole,
-// which is what the holding is for.
-//
-// Reporting them is not a nicety. The first match stops at its first mismatch,
-// and after a blank seed that mismatch is often the very Argument that would
-// decide it — so an Argument standing after it is READ here for the first time,
-// and `enrichOnce` keeps what it read. A Diagnostic held here is held forever:
-// `triple(empty, ["a"], record.missing)` checked clean and emitted the member
-// that is not there. An Argument BOTH matches read says the same thing twice, and
-// `report` drops an exact repeat — so it is reported once, by whichever match
-// said it first.
-//
-// An erroring second match still wins. It is the only reading there is: the first
-// match failed, which is why a second one ran at all, and the Argument that
-// errored was read under these Types and no others. `sawErrorArgument` travels
-// with it, so a Type Parameter left unbound by an Error Argument is not reported
-// on top of the Argument's own Diagnostic.
-//
-// A fresh inference, seeded with the decision, rather than the first one
-// with a binding overwritten — and made where no match is in flight, which is
-// what makes it safe. `markBindings` and `restoreBindings` undo a failed match
-// attempt by dropping everything bound PAST a mark, and the mark is a count: a
-// binding replaced in place keeps its position and its key, so the rollback that
-// runs between the members of an expected Union can neither see it nor undo it,
-// and the attempt that failed would decide the attempts after it. That rollback
-// is only reachable while a Type is being matched, which is exactly what this is
-// not: the first match is over, and the second one is handed its seeds before it
-// matches anything, so they sit ahead of every mark it can take. Nothing
-// overwrites them either — `matchGenericUse` binds a Parameter's FIRST occurrence
-// and only ever checks one that is already bound.
+// The Invocation matched a second time with the open slots decided, or
+// undefined. See "Seeds an Invocation decides" in DEVELOPMENT.md.
 function invocationWithDecidedSeeds(
 	signature: common.BaseFunction,
 	parameterTypes: common.BaseFunction["parameterTypes"],
@@ -10450,18 +10284,11 @@ function invocationWithDecidedSeeds(
 	matchableArguments: Array<MatchableArgument>,
 	typer: ArgumentTyper,
 ): InferredInvocation | undefined {
-	// Whether reading an Argument under the decided Types produced an Error
-	// belongs to the decision, and only where the decision is the one the call
-	// keeps: a second match that does not hold up is discarded whole, and an Error
-	// it saw on the way would otherwise stand against the reading that IS kept.
+	// An Error Argument seen here belongs to the decision, and counts only if
+	// the second match is kept.
 	let { result, sawErrorArgument } = typer.probeErrorArguments(() => {
-		// Under a recording of its own, which is dropped. Working the
-		// decision out means asking Arguments what they make of a position — and
-		// an Argument that reads its position RECORDS the one it was read against,
-		// which the enrichment pass reads back. The positions asked about here are
-		// this reading's own working, one of them a return Type deliberately held
-		// open; the position the call commits to is the one the match below
-		// settles on, and it records that for itself.
+		// Under a recording of its own, which is dropped. The match the call
+		// keeps records its own positions.
 		let { result: decided } = probeContextualFunctionTypes(() =>
 			decidedSeedBindings(
 				signature,
@@ -10495,10 +10322,7 @@ function invocationWithDecidedSeeds(
 			),
 		)
 
-		// The decision is a reading of the call, not a judgement on it — a
-		// second match that fails leaves the first one's answer standing, and the
-		// undecided Type it carries is what the refusal of a WRITE against an
-		// undecided slot is there to catch.
+		// A second match that fails leaves the first one's answer standing.
 		if (result.result.type !== "Match") {
 			return undefined
 		}
@@ -10529,24 +10353,9 @@ function invocationWithDecidedSeeds(
 	return result
 }
 
-// The decision written onto the Argument Nodes it was made for — the
-// brackets that wrote nothing taking the Type the call worked out for them, so
-// that the typed Program says what the call decided rather than what its
-// Arguments happened to say on their own.
-//
-// It is what keeps the typed tree answerable twice. Every stage after the
-// Enricher reads a call off its Nodes, and the Validator re-matches the committed
-// signature against exactly those Types: a seed still typed `List<Unknown>` beside
-// a combiner typed `(_: List<String>, _: String) -> List<String>` is a call no
-// re-match can make sense of, since the seed is what a re-match binds the
-// Parameter from. Both halves say the same thing here.
-//
-// Only what was WRITTEN as a container Literal is decided, and only through
-// `resolveUnknownSlots`, so nothing a value carries for itself is overwritten. A
-// NAME standing at the same position is deliberately left alone: what an empty
-// `[]` bound to a name decides is that Declaration's business, decided where the
-// name is, and a call that pinned the Type at one of its uses would say something
-// the Declaration never said.
+// The decision written onto Argument Nodes written as container literals, so
+// the validator's re-match agrees. A name keeps its Declaration's Type. See
+// "Seeds an Invocation decides" in DEVELOPMENT.md.
 function decideWrittenArguments(
 	parameterTypes: common.BaseFunction["parameterTypes"],
 	context: GenericInferenceContext,
@@ -10561,10 +10370,8 @@ function decideWrittenArguments(
 	}
 }
 
-// The Argument standing at each Parameter, or undefined where the call
-// wrote none — a Parameter filled in by its default has no Argument to ask
-// anything of, and neither has any Parameter of a call whose Arguments could not
-// be paired up at all, which is a call no match accepts.
+// The Argument at each Parameter, or undefined where the call wrote none or its
+// Arguments could not be paired.
 function argumentsByParameter(
 	parameterTypes: common.BaseFunction["parameterTypes"],
 	matchableArguments: Array<MatchableArgument>,
@@ -10580,9 +10387,8 @@ function argumentsByParameter(
 	}
 }
 
-// Substitutes the collected bindings into the return Type — Generics
-// that stayed unbound are substituted as Error Types, so that a single
-// "Could not infer" Diagnostic does not cascade.
+// Substitutes the bindings into the return Type. An unbound Type Parameter
+// becomes an Error, so one report does not cascade.
 function substituteInferredReturnType(
 	signature: common.BaseFunction,
 	bindings: GenericBindings,
@@ -10609,11 +10415,8 @@ function substituteInferredReturnType(
 	}
 }
 
-// The Overload an Invocation settled on: which slot it was, what it
-// inferred, and the conformances its bounds solved to. `diagnostics` are what
-// probing that candidate reported, held back rather than reported — a candidate
-// is probed before it is known to win (and a Method is probed once per
-// Namespace), so the caller replays them only for the candidate it commits.
+// The Overload an Invocation settled on. `diagnostics` are what probing it
+// reported, held until the candidate is committed.
 type SelectedOverload = {
 	index: number
 	inferred: InferredInvocation
@@ -10624,27 +10427,23 @@ type SelectedOverload = {
 type ProbedOverload = {
 	inferred: InferredInvocation
 	conformances: Array<common.Conformance>
-	// What solving this candidate's bounds reported. Held back always, on
-	// both rails of the loop below: which bound failed is only news once the
-	// candidate that failed it is the one being committed to.
+	// What solving this candidate's bounds reported, held until it is
+	// committed.
 	diagnostics: Array<common.Diagnostic>
-	// Whether typing an Argument against THIS candidate's Parameter Types
-	// produced an Error — which is not a candidate matching but a candidate the
-	// Arguments could not be read under at all.
+	// Whether an Argument typed as Error against this candidate's Parameter
+	// Types.
 	sawErrorArgument: boolean
 }
 
-// One candidate, matched and its bounds solved, with the bound solve's
-// reports and the Errors its Argument typing produced handed back rather than
-// left where the caller can not tell them apart from the Invocation's own.
+// One candidate matched and its bounds solved, with its reports and Argument
+// Errors handed back separately.
 function probeOverload(
 	overload: common.BaseFunction,
 	matchableArguments: Array<MatchableArgument>,
 	scope: enricher.Scope,
 	position: common.Position,
 	typer: ArgumentTyper,
-	// Carried, not read — `resolveConformances` is what it decides a Help
-	// in, and only the site that read the callee's name can say it. See
+	// Carried for `resolveConformances`, which decides one Help by it; see
 	// `printingEscapeHelps`.
 	atPrintingCall = false,
 ): ProbedOverload | undefined {
@@ -10675,36 +10474,8 @@ function probeOverload(
 	return { ...result, sawErrorArgument }
 }
 
-// The order the candidates are PROBED in, which is not the order they were
-// written in as soon as one of them asks for evidence. Selection is first fit and
-// a refinement is freely assignable to its base, so an entry taking the base Type
-// accepts every Argument a refined entry would have taken — a refined entry
-// written after it could never win a single call. The entries asking for a
-// refinement are probed first instead, and the base entry becomes what a value
-// carrying no evidence falls through to. That is also what lets the Standard
-// Library APPEND its refined entries rather than write them where they need to be
-// read: an Overload's slot is emitted into its name (`divide__overload$3`) and its
-// native binding is keyed by position, so declaration order there is not free.
-//
-// The partition is stable, and answers with the written order when no entry asks
-// for anything: an Overload set with no refinement in it anywhere is probed in
-// exactly the order it always was, which is the whole of what changes for a
-// Program that declares none. Each candidate carries the slot it was DECLARED in
-// either way — that index is what the Simplifier mangles the callee with, not the
-// order it was tried in.
-//
-// A lone candidate is answered without asking anything: every plain Function,
-// SimpleMethod and static Method invocation in a Program comes through here as an
-// Overload set of one, and one candidate has no order to put it in.
-//
-// The RECEIVER is not evidence any entry asked for. A Method's Parameter 0
-// is the receiver, and it is the same Type in every entry of one Namespace's
-// Overload — so it can not tell two entries apart, and reading it here put every
-// entry of a Namespace over a refinement in the same partition. The partition was
-// then a no-op and the order stayed the one they were written in, which is the
-// one place an APPENDED refined entry can never win from: `NonZeroInteger::raise`
-// answered its `(to Integer)` entry for a written `2` while the `(to
-// NonNegativeInteger)` entry beside it went unread.
+// The order candidates are probed in: entries asking for a refinement first,
+// then the rest, stably. See "Choosing an Overload" in DEVELOPMENT.md.
 function overloadProbeOrder(
 	overloads: Array<common.BaseFunction>,
 	receiverParameters: number,
@@ -10735,38 +10506,19 @@ function overloadProbeOrder(
 	return asking.length === 0 ? candidates : [...asking, ...rest]
 }
 
-// Bounds are part of selecting an Overload, not a check run on the
-// Overload that matching happened to pick first: a candidate whose Type
-// Parameter bounds the Arguments can not satisfy is no candidate at all while a
-// later one takes them. Neither is a candidate the Arguments only match because
-// reading one of them against its Parameter Types failed — a prefixed Case
-// construction against a Parameter Type that mentions the call's own unsolved
-// Type Parameters types as Error, and `matchTypes` lets an Error match anything.
-// Without either rule, an Invocation resolved or failed depending on the order
-// the Overloads were declared in.
-//
-// The probe's conformances are handed back so the winner is solved exactly once
-// — solving again on the way out would report every Diagnostic twice, and
-// `resolveConformances` is not free.
-//
-// When no candidate holds up, the FIRST arg-matching one is selected anyway: its
-// Diagnostics say which bound failed and how to satisfy it, which is what a call
-// with one plausible Overload needs to hear. Turning it into "no Overload
-// accepts these Arguments" would be a worse report about a call whose Arguments
-// were accepted. First is first in `overloadProbeOrder`, which is where a
-// refinement-asking entry is read as if it stood where it needs to be read.
+// Selects an Overload, counting bounds and Error Arguments as part of fitting.
+// Falls back on the first candidate whose Arguments matched. See "Choosing an
+// Overload" in DEVELOPMENT.md.
 function selectOverload(
 	overloads: Array<common.BaseFunction>,
 	matchableArguments: Array<MatchableArgument>,
 	scope: enricher.Scope,
 	position: common.Position,
 	typer: ArgumentTyper,
-	// How many leading Parameters stand for something the call did not
-	// write — one for a Method, whose receiver is unshifted in front of the
-	// Arguments, and none for anything else. Read only by `overloadProbeOrder`.
+	// How many leading Parameters the call did not write: one for a Method's
+	// receiver, else none. Read only by `overloadProbeOrder`.
 	receiverParameters = 0,
-	// Handed straight on to every probe, for the one Help it decides. A
-	// Method call is never a print, so the `::` rail leaves it alone.
+	// Handed to every probe for the one Help it decides.
 	atPrintingCall = false,
 ): SelectedOverload | undefined {
 	let firstArgumentMatch:
@@ -10777,16 +10529,9 @@ function selectOverload(
 		overloads,
 		receiverParameters,
 	)) {
-		// Up to and including the first candidate whose Arguments match, a
-		// probe reports and records where it stands — an Argument is enriched
-		// exactly once, so a report held back there would be held back forever.
-		// Past that candidate a probe is speculative, since a candidate to settle
-		// on already exists, and one that loses must leave nothing behind: an
-		// unannotated Function literal Argument is re-resolved against every
-		// candidate's Parameter Types and reports from inside its own body, so
-		// probing on turned calls that used to compile red. A speculative probe's
-		// reports and recordings are therefore held, and only the candidate the
-		// call commits to hands them on.
+		// Up to the first candidate whose Arguments match, a probe reports and
+		// records. Later probes are speculative, so their reports and
+		// recordings are held until one is committed.
 		let probe = () =>
 			probeOverload(
 				overload,
@@ -10833,10 +10578,8 @@ function selectOverload(
 		return undefined
 	}
 
-	// Nothing held up, so the Invocation owns this candidate's Error
-	// Argument after all — it is why a Type Parameter went unbound, and
-	// `reportUnboundGenerics` asks for exactly that before reporting a cascade on
-	// top of the Argument's own Diagnostic.
+	// Nothing held up, so the Invocation owns this candidate's Error Argument,
+	// which `reportUnboundGenerics` asks about.
 	if (firstArgumentMatch.sawErrorArgument) {
 		typer.noteErrorArgument()
 	}
@@ -10844,10 +10587,8 @@ function selectOverload(
 	return firstArgumentMatch.selected
 }
 
-// The one written Argument that is a Function literal with no `-> Type` of
-// its own. Null where the call passes none, and null where it passes several —
-// with two of them nothing here can say WHICH one leaves the Parameter standing,
-// and a Help that names the wrong literal is worse than the general one.
+// The one written Argument that is a Function literal without `-> Type`. Null
+// for none or several, since a Help naming the wrong literal misleads.
 function unannotatedLiteralArgument(
 	writtenArguments: Array<parser.ArgumentNode>,
 ): parser.FunctionValueNode | null {
@@ -10864,30 +10605,23 @@ function unannotatedLiteralArgument(
 		: null
 }
 
-// Silent when an Argument already typed as Error — that Argument's own
-// Diagnostic has been reported, and it is exactly why nothing bound the Type
-// Parameter: `matchTypes` short-circuits an Error to a match without binding
-// anything. Reporting on top of it would point at the call rather than at the
-// Argument that actually failed, which is the cascade the poison Type exists to
-// prevent.
+// Silent when an Argument already typed as Error: its own Diagnostic explains
+// why nothing bound the Type Parameter, since an Error matches without binding.
 function reportUnboundGenerics(
 	unboundGenerics: Array<string>,
 	position: common.Position,
 	typer: ArgumentTyper,
 	receiver: parser.ExpressionNode | null = null,
-	// The call's own written Arguments. A Function literal among them is
-	// what decides both halves of this report — whether there is anything to say
-	// at all, and, where there is, which edit binds the Parameter. Defaulted for
-	// the sites that pass none, which report exactly as they did.
+	// The call's written Arguments. A Function literal among them decides
+	// whether to report and which edit binds the Parameter.
 	writtenArguments: Array<parser.ArgumentNode> = [],
 ): void {
 	if (typer.hasErrorArgument() || unboundGenerics.length === 0) {
 		return
 	}
 
-	// And silent over a receiver that has already been refused for being
-	// read before its own Type was decided. What that receiver would have bound
-	// is unbound BECAUSE of it, and there is no second edit to make.
+	// Silent over a receiver already refused for being read before its Type was
+	// decided.
 	if (
 		receiver?.nodeType === "Identifier" &&
 		capturesReportedUndecided.has(receiver)
@@ -10897,22 +10631,15 @@ function reportUnboundGenerics(
 
 	let literal = unannotatedLiteralArgument(writtenArguments)
 
-	// One mistake, one report. A literal whose own return Type could not be
-	// read has ALREADY been refused for exactly that, and every Type Parameter
-	// written in its answer Type is unbound because of it — `Result::andThen`'s
-	// `Other` is not a second thing the reader got wrong. Only the literal that
-	// answered NOTHING silences this; a literal that simply left its `-> Type`
-	// off still reports here, because there the missing annotation is news.
+	// A literal whose return Type could not be read was already refused, and
+	// its answer Type's Parameters are unbound because of it. A literal that
+	// only left `-> Type` off still reports here.
 	if (literal !== null && literalsAnsweringNothing.has(literal.value)) {
 		return
 	}
 
-	// `[=]::length()` binds neither of a Dictionary's two Type
-	// Parameters, and one report per Parameter is the same sentence twice about
-	// one pair of brackets — with a Help that can not be followed, since
-	// `length` takes no Type Argument to write. The empty Dictionary is one
-	// mistake with one fix: say what the brackets do not decide, and name the
-	// annotation that decides it.
+	// `[=]::length()` binds neither of a Dictionary's Type Parameters, so the
+	// empty Dictionary gets one report naming the annotation that decides it.
 	if (
 		receiver?.nodeType === "DictionaryValue" &&
 		receiver.entries.length === 0
@@ -10936,23 +10663,17 @@ function reportUnboundGenerics(
 		return
 	}
 
-	// What the literal's ANSWER Type is asked to be — the return Type of
-	// the Parameter Type it was matched against, `Step<State, Answer>` for
-	// `loop`'s step. It is what decides which of the unbound names the literal's
-	// missing `-> Type` would actually bind: a signature can write a Type
-	// Parameter somewhere else entirely, and telling that reader to write the
-	// literal's return Type leaves them looking at the identical code and the
-	// identical report.
+	// The return Type of the Parameter Type the literal was matched against,
+	// such as `Step<State, Answer>` for `loop`. Only the names it mentions does
+	// the literal's `-> Type` bind.
 	let literalAnswers =
 		literal === null
 			? null
 			: (recordedContextualFunctionType(literal.value)?.expectedType
 					?.returnType ?? null)
 
-	// By the names as they are SHOWN. Inference alpha-renames a callee's
-	// Generics for the span of one call — `Answer` is `Answer` and a counter
-	// behind an invisible separator inside the Types — and the report spells the
-	// name the signature wrote.
+	// Compared by the names as shown, since inference renames a callee's Type
+	// Parameters for one call.
 	let answeredNames = new Set(
 		[...genericNamesMentioned(literalAnswers ?? { type: "Unknown" })].map(
 			displayGenericName,
@@ -10973,32 +10694,10 @@ function reportUnboundGenerics(
 						"nothing here determines what it binds to",
 					),
 				],
-				// There is no such thing as writing a Type Argument —
-				// `blank<Integer>()` is itself a `foreign-syntax` refusal — so
-				// the Help that offered one sent a reader from this report
-				// straight into that one. Nor does the annotation on the
-				// binding reach back into the call: a Type Parameter is bound
-				// by the ARGUMENTS and by nothing else, which is what leaves a
-				// signature that names one only in its answer Type unbindable
-				// from anywhere. So: the two ends a reader can actually hold.
-				//
-				// Neither end is the reader's to hold where the call
-				// passes a Function literal that wrote no `-> Type` AND this
-				// name is what the literal's answer Type would bind. The
-				// Parameter has its place among the Parameters already —
-				// `Result::andThen` writes `Other` in the step's own answer
-				// Type — and the signature it has its place in belongs to the
-				// standard library, which is not a file the reader edits. What
-				// IS theirs is the annotation the literal left off, and it is
-				// the only thing that binds the Parameter.
-				//
-				// Read off the literal's expected answer Type rather than
-				// off the presence of a literal, because a signature is free to
-				// write a Type Parameter the literal never mentions —
-				// `make<infer A, infer B>(_ step: (_ n: Integer) -> A) ->
-				// Dictionary<String, B>` has nothing whatever to say about `B`
-				// in the literal, and a reader who wrote the `-> Type` it asked
-				// for got the same report back.
+				// No Type Argument can be written at a call, and an annotation
+				// on the binding does not reach into it. Where the literal's
+				// `-> Type` would bind this name, that is the edit; otherwise
+				// the Helps name the signature and the value.
 				helps: boundByTheLiteral
 					? [
 							`Write the Function literal's return Type — '-> Type' after its Parameter list — which is what binds '${name}'.`,
@@ -11012,10 +10711,8 @@ function reportUnboundGenerics(
 	}
 }
 
-// What every written Argument offers a match — its label, its Type under
-// whichever Parameter Type is being tried, and the four answers only the typer
-// can give. Spelled once for the three sites that build it, which had three
-// copies of one object literal between them.
+// What every written Argument offers a match: its label, its Type under the
+// Parameter Type tried, and the typer's other answers.
 function argumentMatchables(
 	args: Array<parser.ArgumentNode>,
 	typer: ArgumentTyper,
@@ -11034,17 +10731,9 @@ function argumentMatchables(
 	}))
 }
 
-// The Arguments of a `::` call as matching reads them, with the receiver
-// unshifted in front of them: it occupies the first Parameter of every
-// non-static Method signature. One builder for selection and for the report that
-// explains a failed selection — a second spelling of this list would be a second
-// answer to what the call passed, and the report would be describing a call
-// nothing resolved.
-//
-// `receiverType` stands in for the receiver where a Union receiver's dispatch
-// resolves the Method once per member, so each member is matched as if the
-// receiver had that Type. Otherwise the receiver is the Type the base was
-// already enriched to.
+// The Arguments of a `::` call with the receiver in front, as it occupies every
+// instance Method's first Parameter. Shared by selection and its failure
+// report. `receiverType` stands in per member of a Union receiver.
 function methodMatchableArguments(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -11057,8 +10746,7 @@ function methodMatchableArguments(
 	]
 }
 
-// Where each of those Arguments is WRITTEN — the receiver's place first,
-// which is left of the `::`, and each written Argument's own after it.
+// Where each of those Arguments is written, the receiver first.
 function methodArgumentPositions(
 	node: parser.MethodInvocationNode,
 ): Array<common.Position> {
@@ -11068,11 +10756,8 @@ function methodArgumentPositions(
 	]
 }
 
-// What each written Argument came to. ENRICHES, which is why it is only
-// ever asked by the report that falls back to the call's shape — see
-// `overloadRefusalReport`. An Argument enriched here is enriched exactly once
-// all the same: the typer holds one Node per Argument and the Invocation's own
-// enrichment reads it back.
+// What each written Argument came to. It enriches, so only the fallback report
+// asks; the typer keeps the one Node per Argument.
 function writtenArgumentTypes(
 	args: Array<parser.ArgumentNode>,
 	typer: ArgumentTyper,
@@ -11096,20 +10781,16 @@ function resolveInvokedMethodInNamespace(
 			unboundGenerics: Array<string>
 			conformances: Array<common.Conformance>
 			omittedParameterIndices: Array<number>
-			// What selecting this Overload reported, for the caller to
-			// replay once it commits to this Namespace — see `selectOverload`.
+			// What selecting this Overload reported, replayed once the caller
+			// commits to this Namespace.
 			selectionDiagnostics: Array<common.Diagnostic>
 	  }
 	| undefined {
 	let methodType = resolvedNamespace.methods[node.member.content]
 
-	// `value::method(…)` is instance-call syntax, and a static Method has
-	// no receiver Parameter for the value to occupy — resolving one here would
-	// match the written Arguments against the whole signature and leave the
-	// Simplifier to prepend the receiver anyway, shifting every runtime
-	// Argument one place to the right. Static Methods are filtered out before
-	// resolution reaches this (`reportStaticMethodOnValue` says so); refusing
-	// them again here is what keeps that filtering from being load-bearing.
+	// A static Method has no receiver Parameter for `value::method(…)`. Static
+	// Methods are filtered out earlier, and refusing them here keeps that
+	// filter from being load-bearing.
 	if (isStaticMethod(methodType)) {
 		return
 	}
@@ -11121,9 +10802,8 @@ function resolveInvokedMethodInNamespace(
 		receiverType,
 	)
 
-	// A SimpleMethod is its own single candidate — one signature to match
-	// and one set of bounds to solve is what `selectOverload` does for one
-	// Overload, so both Method shapes take the same path and can not drift.
+	// A SimpleMethod is a set of one candidate, so both Method shapes take the
+	// same path.
 	let overloads =
 		methodType.type === "SimpleMethod"
 			? [methodType]
@@ -11148,10 +10828,8 @@ function resolveInvokedMethodInNamespace(
 		return undefined
 	}
 
-	// Collected rather than reported, and handed on beside what selecting
-	// the Overload had to say — this Namespace is one candidate among those
-	// probed, and a Warning about the entry it chose is only news once the call
-	// commits to it.
+	// Collected, since a Warning about the chosen entry is news only once the
+	// call commits to this Namespace.
 	let { diagnostics: nestingDiagnostics } = collectDiagnostics(() =>
 		reportAmbiguousNestingLevel(
 			node,
@@ -11175,10 +10853,9 @@ function resolveInvokedMethodInNamespace(
 	}
 }
 
-// Failed Method Invocations resolve to a placeholder Namespace and an
-// Error Type — the Diagnostic has already been reported, and later stages
-// only run when there are no Error Diagnostics. Dispatched Invocations reuse
-// the placeholder Namespace: their targets live in `dispatch` instead.
+// A failed Method Invocation resolves to a placeholder Namespace and an Error
+// Type, after its Diagnostic. A dispatched one reuses the placeholder and keeps
+// its targets in `dispatch`.
 function placeholderNamespace(): { name: string; type: common.NamespaceType } {
 	return {
 		name: "",
@@ -11199,14 +10876,11 @@ type ResolvedMethodInvocation = {
 	overloadedMethodIndex: number | null
 	conformances: Array<common.Conformance>
 	omittedParameterIndices: Array<number>
-	// Set only for a *generic* Choice's derived `is`/`isNot` — the plan
-	// its widened runtime helper interprets. Absent for every other call, so a
-	// non-generic Choice emits the plain `choiceIs`.
+	// Set only for a generic Choice's derived `is` or `isNot`, the plan its
+	// runtime helper interprets.
 	derivedDescriptor?: common.DerivedEquatableDescriptor
-	// Set only for a RECORD receiver that routes a declared member — the
-	// names its runtime helper is curried with, lined up with the conformances
-	// beside them. Absent for every all-structural Record, which is what keeps
-	// those calls emitting the native member read they always did.
+	// Set only for a Record receiver that routes a declared member: the names
+	// its runtime helper is curried with, in the order of the conformances.
 	derivedMembers?: Array<string>
 	dispatch: Array<common.DispatchCase> | null
 }
@@ -11222,20 +10896,16 @@ function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 	}
 }
 
-// A Namespace has to be imported before a Method can dispatch through it,
-// which makes a forgotten import indistinguishable from a misspelling by
-// everything the Scope can see. So the Modules this one depends on are asked as
-// well, by exactly the rule dispatch is decided by — `namespacesTargeting` — and
-// what comes back names the Namespace AND the Module it is in, which is what the
-// auto-import Quick Fix reads. Empty for a Program that is no Module, so a single
-// file compile's Diagnostics are the ones it always had.
+// A Namespace in a Module this one depends on but did not import, found by the
+// rule dispatch uses. The Help names the Namespace and its Module for the
+// auto-import Quick Fix. Empty outside a Module.
 function unimportedNamespaceHelps(
 	memberName: string,
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): Array<string> {
-	// `Object.hasOwn`, since every Namespace's table would otherwise
-	// answer `valueOf` and `toString` off `Object.prototype`.
+	// `Object.hasOwn`, so `valueOf` and `toString` are not read off the
+	// prototype.
 	let candidates = unimportedNamespacesOf(scope).filter((candidate) =>
 		Object.hasOwn(candidate.namespace.methods, memberName),
 	)
@@ -11262,9 +10932,7 @@ function unimportedNamespaceHelps(
 		)
 }
 
-// Every Method name a set of Namespaces declares, for the near miss two
-// unknown-method reports each want — the one for a plain receiver, and the one
-// per-member dispatch raises for a Union.
+// Every Method name a set of Namespaces declares, for near-miss suggestions.
 function methodNamesOf(
 	namespaces: Map<string, common.NamespaceType>,
 ): Array<string> {
@@ -11279,32 +10947,20 @@ function methodNamesOf(
 	return [...methodNames]
 }
 
-// What a receiver HOLDS. It answers the one question "no such Method" can
-// be wrong about in a way a reader can not see: the Method may well exist, one
-// level in. `first::add(1)` on a `List<Integer>` was told "Did you mean 'pad'?"
-// while `add` sat on `Integer`, which is exactly what the List holds.
-//
-// Five shapes hold something. Two hold it behind a wait — a `Future` describes
-// work that answers it and a `Started` is one run of that work — two hold it in
-// a container, and a Case holds it in its payload, which is how `Optional` and
-// `Result` are reached along with every Choice a Program declares.
-//
-// A Record is deliberately absent. Its members are reached with a `.`, and a
-// `::` call on one is `unknown-method` about the Record itself; nothing there is
-// one level in.
+// What a receiver holds, since a Method missing on the receiver may exist one
+// level in: `first::add(1)` on a `List<Integer>`. A Future, a Started, a List,
+// a Dictionary and a Case hold something; a Record's members are reached with
+// `.`.
 type HeldValue = {
 	type: common.Type
 	kind: "future" | "started" | "list" | "dictionary" | "case"
-	// Which Case carries it, spelled as a report writes it. Set for the
-	// Case shape and for it alone, because that is the only one whose sentence
-	// names something other than the receiver.
+	// Which Case carries it, as a report spells it. Set only for a Case.
 	carrier?: string
 }
 
 function heldValuesOf(receiverType: common.Type): Array<HeldValue> {
-	// Refinements erased first, so a `NonEmptyList<Integer>` holds its
-	// items exactly as the `List<Integer>` underneath it does. What the proof
-	// says is about the List, never about what is in it.
+	// Refinements erased first, so a `NonEmptyList<Integer>` holds what its
+	// List does.
 	let type = eraseRefinements(receiverType)
 
 	switch (type.type) {
@@ -11335,14 +10991,9 @@ function payloadsOf(caseType: common.CaseType): Array<HeldValue> {
 	}))
 }
 
-// Whether a `::` call of this name would resolve for this Type — asked
-// with the very lookup a call is decided by, rather than by scanning the
-// standard library for the name. A Namespace a Program writes over its own item
-// Type counts exactly as `Integer` does, and a Namespace it has not imported
-// counts for neither, which is what keeps this evidence honest.
-//
-// Answered on the FAILURE path only: every caller has already been told that no
-// Method of the name answers for the receiver itself.
+// Whether a `::` call of this name resolves for this Type, by the lookup a call
+// uses, so unimported Namespaces do not count. Asked only after the call failed
+// on the receiver itself.
 function methodAnswersFor(
 	methodName: string,
 	receiverType: common.Type,
@@ -11369,17 +11020,10 @@ function methodAnswersFor(
 	)
 }
 
-// The ways a value is read OUT of the thing holding it, tried in this
-// order and printed at most once. Each is checked against the receiver's own
-// Namespaces before it reaches a Help: the name has to be declared, the labels
-// have to be the ones the Overload takes, and the Overload has to ANSWER the
-// held value rather than another wrapper around it.
-//
-// The return check is what earns the table its keep. `List::firstItem()` answers
-// an `Optional<ItemType>`, so offering it would trade one refusal for the same
-// refusal one level along — while `NonEmptyList::firstItem()` answers the item
-// outright and is the right thing to print for a List that carries the proof.
-// Neither the name nor the labels can tell those two apart.
+// The ways a value is read out of its holder, tried in order. Each must be
+// declared with these labels and answer the held value itself:
+// `List::firstItem()` answers an Optional, while `NonEmptyList::firstItem()`
+// does not.
 const readingSpellings: Array<{ name: string; labels: Array<string> }> = [
 	{ name: "firstItem", labels: [] },
 	{ name: "value", labels: ["defaultingTo"] },
@@ -11392,9 +11036,8 @@ function readingSpellingFor(
 	receiverType: common.Type,
 	held: common.Type,
 ): string | null {
-	// Specialized against the receiver, so what a signature ANSWERS is the
-	// Type the reader would get — `List<Integer>::item(at:, defaultingTo:)` is an
-	// `Integer` here rather than an `ItemType` nobody wrote.
+	// Specialized against the receiver, so the answer is the Type the reader
+	// gets.
 	let specialized = specializedNamespacesFor(namespaces, receiverType)
 
 	for (let spelling of readingSpellings) {
@@ -11426,11 +11069,8 @@ function readingSpellingFor(
 	return null
 }
 
-// Whether `::map` would hand the held value straight to a Function the
-// reader writes. Asked of the receiver's own Namespaces, and asked about the
-// TRANSFORM rather than about the name: `Dictionary::map` takes a
-// `{ key, value }` and never the value on its own, so the Help that would have
-// bound one is not offered for a Dictionary at all.
+// Whether `::map` hands the held value straight to the reader's Function. Asked
+// about the transform, since `Dictionary::map` passes a `{ key, value }`.
 function mapsOverHeldValue(
 	namespaces: Map<string, common.NamespaceType>,
 	receiverType: common.Type,
@@ -11465,12 +11105,8 @@ function mapsOverHeldValue(
 	return false
 }
 
-// The report a receiver that HOLDS the answer gets, in place of the near
-// miss by edit distance. It is the one thing this Diagnostic knows and did not
-// say: the reader did not misspell anything, they wrote the call one level out.
-//
-// Null where nothing is held or where the name answers for nothing that is held,
-// which leaves every other `unknown-method` exactly as it was.
+// What `unknown-method` says when the receiver holds something that answers the
+// Method, in place of a near miss. Null where nothing held answers it.
 function heldValueEvidence(
 	node: parser.MethodInvocationNode,
 	receiverType: common.Type,
@@ -11486,10 +11122,8 @@ function heldValueEvidence(
 		return null
 	}
 
-	// The Arguments as the call already writes them, which a Help must not
-	// invent: what to pass is the reader's to say, and an ellipsis says so. A
-	// call that passes none is spelled with the empty parentheses it has, so the
-	// whole Help compiles as it stands.
+	// The Arguments are not invented: an ellipsis stands for them, and a call
+	// without Arguments keeps its empty parentheses.
 	let call = `::${methodName}${node.arguments.length === 0 ? "()" : "(…)"}`
 	let inner = describeType(held.type)
 	let binder =
@@ -11509,12 +11143,8 @@ function heldValueEvidence(
 	let reading = readingSpellingFor(namespaces, receiverType, held.type)
 
 	if (held.kind === "case") {
-		// Two Helps, the way the postfix habits are answered — the
-		// spellings that reach the value in one sentence, and the `match` that
-		// takes it apart in the other. A Choice always has the second; which of
-		// the two spellings it has is asked of its own Namespaces, and a Choice
-		// a Program declares itself usually has neither — which is why the
-		// `match` opens on "Or" only where something stands in front of it.
+		// Two Helps: the spellings that reach the value, where the Choice's
+		// Namespaces have them, and a `match`, which always works.
 		let reaching =
 			reading === null && through === null
 				? []
@@ -11558,22 +11188,9 @@ function heldValueEvidence(
 	}
 }
 
-// And the two shapes whose answer is not "reach in" but "wait". What the
-// reader has to write is decided by the POSITION rather than by the Type: a
-// `complete` only stands in a body that answers a Future, so the Help that names
-// the word is withheld wherever writing it would be refused — the same rule
-// `methodSeparatorHelps` follows, and the one yesterday's review was written
-// about.
-//
-// The note about the chain is the half nobody can work out from the report. This
-// language has no grouping parentheses and `complete` takes the whole postfix
-// chain behind it, so the obvious edit — the word in front of the receiver —
-// waits for the very call that was refused and reports this Diagnostic again.
-//
-// `::map` is offered beside it and never instead of it, with what it answers
-// said out loud: it hands the Method the value all right, and what comes back is
-// another Future, which is a different Program from the one the reader was
-// writing.
+// A Future or a Started needs a wait rather than a reach. A `complete` is
+// offered only where it may stand, and the note warns that it takes the whole
+// chain behind it. `::map` is offered beside it, answering another Future.
 function asynchronyEvidence(
 	node: parser.MethodInvocationNode,
 	receiverType: common.Type,
@@ -11616,11 +11233,9 @@ function asynchronyEvidence(
 				]
 			: [
 					...reaching,
-					// The edit the position itself admits, which for the
-					// four barriers is not the enclosing Declaration — a
-					// property body has no enclosing Function to declare, and a
-					// Parameter's default is filled in before its Function's own
-					// asynchrony begins either way.
+					// The edit the barrier admits. A property body has no
+					// Function to declare, and a default is filled in before
+					// its Function's asynchrony begins.
 					...(barred.helps.length > 0
 						? barred.helps
 						: [
@@ -11630,38 +11245,28 @@ function asynchronyEvidence(
 	}
 }
 
-// The Namespaces that were searched are the useful half of "no such
-// Method" — without them the reader can not tell whether they misspelled the
-// Method or the value is not the Type they thought it was. The near miss is
-// offered from the same set, so a suggestion is always a Method that would
-// actually resolve.
+// Names the Namespaces searched, so the reader can tell a misspelling from a
+// wrong Type. The near miss comes from the same set, so it would resolve.
 function reportUnknownMethod(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	namespaces: Map<string, common.NamespaceType>,
 	scope: enricher.Scope,
 ): void {
-	// A Method the Parser dropped out of its Namespace is a Method this
-	// Program declares, so every call of it is the syntax error once more rather
-	// than a name the reader got wrong — see `memberDeclarationWasAbandoned`,
-	// which is the FILE-WIDE question because a member name is not lexical.
+	// A Method the Parser dropped from its Namespace is declared, so a call of
+	// it is no misspelling; see `memberDeclarationWasAbandoned`.
 	if (memberDeclarationWasAbandoned(scope, node.member.content)) {
 		return
 	}
 
 	let held = heldValueEvidence(node, baseType, namespaces, scope)
-	// The near miss is the LAST thing tried, and is not tried at all where
-	// the value holds the answer: a guess by edit distance standing beside a
-	// Method the Compiler actually found is a guess the reader has to rule out,
-	// and the Quick Fix behind it would rewrite the name rather than the call.
+	// The near miss is tried last, and not where the value holds the answer.
+	// Its Quick Fix would rewrite the name rather than the call.
 	let suggestion = held === null ? closestMethodName(node, namespaces) : null
 	let namespaceNames = [...namespaces.keys()]
 
-	// A Protocol-bounded receiver — the `@` of a provided Method, or a
-	// value of a bounded Type Parameter — is known by its bound and by nothing
-	// else, and saying so is far more use than listing the pseudo Namespaces the
-	// bound was searched through. It is the Diagnostic a provided Method's body
-	// meets whenever it reaches past the Protocol's surface.
+	// A receiver known only by its Protocol bound, such as `@` in a provided
+	// Method, is told the Protocol's surface.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
 		let surface = Object.keys(
 			protocolOf(baseType.constraint, scope).methods,
@@ -11743,25 +11348,9 @@ function reportUnknownMethod(
 	)
 }
 
-// The near miss for a Method name, drawn FIRST from the names whose call
-// this call could have been. A name is only a near miss if writing it would
-// leave the line standing, and an Overload that takes two labelled Arguments is
-// no answer to a call that wrote one: `Did you mean 'index'?` for a call passing
-// a Function is a suggestion whose Quick Fix trades one refusal for another.
-//
-// Then, where those name nothing close, every Method name the Namespaces
-// declare — under two conditions, because this is the pool the fitting names
-// were introduced to keep out of the report. The call has to have written a
-// LABEL, and the name has to be one edit away.
-//
-// `primes::lenght(of 1)` is both, and is what this door was opened for: the
-// fitting names can not answer it — nothing near takes an `of` — while `length`
-// is one transposition off, and the `of` is a second mistake standing beside the
-// first rather than a reason to say nothing about the name. A call that labelled
-// nothing is measured against the fitting names alone: `primes::indx()` is one
-// edit from `index(on:)`, and a reader reaching for a Method that takes a
-// labelled Argument would have written the label. Neither door opens for
-// `primes::indexOf(2)`, which labels nothing and is two edits from `index`.
+// The near miss for a Method name, first from the names whose shape fits the
+// call. Where none is close, any declared name one edit away counts, but only
+// for a call that wrote a label: `primes::lenght(of 1)` suggests `length`.
 function closestMethodName(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
@@ -11786,10 +11375,8 @@ function closestMethodName(
 		: null
 }
 
-// Measured on the SHAPE alone — how many Arguments, and which labels —
-// because the Types were never matched here: no candidate was selected, so no
-// Argument was enriched against one, and enriching them to rank a guess would
-// report against Parameters nothing committed to.
+// Measured on the shape alone, since no candidate was selected to enrich the
+// Arguments against.
 function methodNamesFittingCall(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,
@@ -11814,10 +11401,8 @@ function methodNamesFittingCall(
 	)
 }
 
-// Whether these Arguments could be paired with these Parameters at all —
-// the same greedy walk `pairArguments` makes, read down to what is decidable
-// without a single Type: a Parameter answers the Argument in front of it when
-// their labels agree, and a defaulted one may be stepped over instead.
+// Whether these Arguments could pair with these Parameters, by the walk
+// `pairArguments` makes, read without Types.
 function callShapeFits(
 	parameters: common.BaseFunction["parameterTypes"],
 	written: Array<string | null>,
@@ -11835,13 +11420,9 @@ function callShapeFits(
 	return next === written.length
 }
 
-// A Protocol's PROVIDED Methods are reached through the Protocol, exactly
-// as a Namespace's Methods are reached through the Namespace — so a Module that
-// imported the conforming Namespace and not the Protocol sees the written
-// Methods and none of the provided ones. Nothing else in the report says so:
-// the Namespaces were searched and the name was not among them, which is true
-// and unhelpful. Named here, once per Protocol, on the Namespaces that DECLARE
-// the conformance.
+// A Protocol's provided Methods are reached through the Protocol, so a Module
+// that did not import it sees only the written Methods. Named once per Protocol
+// the searched Namespaces declare.
 function undeclaredProtocolHelps(
 	namespaces: Map<string, common.NamespaceType>,
 	scope: enricher.Scope,
@@ -11856,8 +11437,8 @@ function undeclaredProtocolHelps(
 				continue
 			}
 
-			// Under the name its Module publishes it as, and where
-			// something here holds that name, the import needs one of its own.
+			// Under the name its Module exports it as. Where this file holds
+			// that name, the import needs a name of its own.
 			let importing = protocolImport(identity, scope)
 			let imported = importing?.exportedAs ?? name
 			let taken =
@@ -11900,11 +11481,8 @@ function undeclaredProtocolHelps(
 	return [...missing.keys()].sort().map((name) => missing.get(name)!)
 }
 
-// The Method is there, it is simply not called this way — which is a
-// different mistake from a misspelling, and the only one of the two whose fix
-// is a rewritten call rather than a rewritten name. `memberType` is set only
-// for a Union receiver's per-member dispatch, where the Namespace that
-// declared it static was found for ONE member rather than for the value.
+// The Method exists but is static, so the fix rewrites the call, not the name.
+// `memberType` is set only for one member of a Union receiver's dispatch.
 function reportStaticMethodOnValue(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
@@ -11938,11 +11516,9 @@ function reportStaticMethodOnValue(
 				(name) =>
 					`'${name}' declares '${node.member.content}' as static.`,
 			),
-			// The hedge goes wherever the signature settles it. A static
-			// takes no receiver, so the value this was written ON either
-			// belongs among the Arguments or does not belong at all, and the
-			// arity says which — asked here so that the Help and the two Quick
-			// Fixes keyed on the same answer agree.
+			// A static takes no receiver, so the arity decides whether the
+			// value belongs among the Arguments. The Help and both Quick Fixes
+			// share this answer.
 			helps: [
 				staticCallHelp(
 					namespaceNames[0],
@@ -11950,9 +11526,8 @@ function reportStaticMethodOnValue(
 					accepted,
 				),
 			],
-			// The first Namespace, which is the one the Help writes too —
-			// a static is reached through the Namespace that declares it, and a
-			// call rewritten to name any other would resolve nothing.
+			// The first Namespace, the one the Help names, since only a
+			// declaring Namespace reaches the static.
 			data: {
 				kind: "static-owner",
 				namespace: namespaceNames[0],
@@ -11962,17 +11537,9 @@ function reportStaticMethodOnValue(
 	)
 }
 
-// Which of the two rewrites the static's own signature accepts. The
-// receiver is not a Parameter of a static, so a `value::make(1)` is either
-// `Namespace.make(value, 1)` or `Namespace.make(1)` — and offering both whatever
-// the arity meant one of them always ended in `argument-count-mismatch`, which is
-// a fix that trades one refusal for another.
-//
-// Every Overload is asked, since one accepting the shape is what makes it
-// writable. A signature accepts a count between the Parameters it requires and
-// the Parameters it has; nothing found — a Method the lookup could not reach —
-// answers yes to both, which is the hedge this replaces and the safe way to be
-// wrong.
+// Which rewrite the static's signatures accept: `Namespace.make(value, 1)` or
+// `Namespace.make(1)`. Every Overload is asked. A Method that can not be read
+// answers yes to both.
 function staticCallArities(
 	method: common.Type | undefined,
 	writtenArguments: number,
@@ -11999,10 +11566,7 @@ function staticCallArities(
 	}
 }
 
-// And the Help built from that answer. Where only one of the two shapes
-// fits, the Help names it outright; where both do — an Overload set that takes
-// either count, or a Method nothing could be read off — it keeps the hedge it
-// always had, which is honest exactly there.
+// The Help built from that answer. Where both or neither fit, it hedges.
 function staticCallHelp(
 	namespace: string,
 	methodName: string,
@@ -12021,39 +11585,29 @@ function staticCallHelp(
 	return `Write '${call}(…)', passing the value as an Argument if it needs one.`
 }
 
-// One entry a refused call was measured against, as a report names it.
-// `signature` is what the Arguments were matched against and `receiverParameters`
-// is how much of its front the call did not write: the receiver occupies the
-// first Parameter of every non-static Method signature, but a `::` call writes it
-// to the LEFT of the parentheses, so listing it among the Arguments would
-// describe a call nobody can write. It is also what `Parameter 1` counts from —
-// and, where the refusal is the receiver itself, what says so instead of naming a
-// Parameter the reader can not find in the call.
+// One entry a refused call was measured against. `receiverParameters` is how
+// many leading Parameters the call wrote left of the parentheses, so the report
+// leaves them out and counts `Parameter 1` after them.
 type OverloadCandidate = {
-	// Spelled as a report writes it, quotes and all — `'String::append'`,
-	// `'Number.sum'`, and the bare "This callee" a call whose callee is an
-	// Expression rather than a name is left with.
+	// Spelled as a report writes it, quotes included, or "This callee" for a
+	// callee that is no name.
 	name: string
-	// The half a PROVIDED Method needs beside its name — a reader who never
-	// wrote `isLessThan` anywhere needs both which Namespace's rung rejected them
-	// and where the body lives. Empty for a written Method.
+	// For a provided Method: the Protocol that wrote it, beside the Namespace
+	// that reached it. Empty for a written Method.
 	qualifier: string
 	signature: common.BaseFunction
 	receiverParameters: number
 }
 
-// Why one candidate refused this call — the first Parameter it could not
-// answer, or null where the Arguments could not be paired with its Parameters at
-// all, which is a count nobody can report per Argument.
+// Why one candidate refused the call: the first Parameter it could not answer,
+// or null where the Arguments could not be paired at all.
 type CandidateRefusal = {
 	candidate: OverloadCandidate
 	detail: ArgumentMismatchDetail | null
 }
 
-// The signatures one Method declares, with the receiver still on the front
-// — see `OverloadCandidate`. A name no Namespace declares answers with none,
-// which is the answer for a Diagnostic that was handed a Namespace reached
-// another way.
+// The signatures one Method declares, receiver still in front. None for a name
+// no Namespace declares.
 function methodOverloadSignatures(methodType: common.Type | undefined): {
 	signatures: Array<common.BaseFunction>
 	receiverParameters: number
@@ -12072,17 +11626,9 @@ function methodOverloadSignatures(methodType: common.Type | undefined): {
 	}
 }
 
-// The candidates a `::` call reached, each read off the Namespace
-// SPECIALIZED against this receiver — a `List<Integer>` is told its `prepend`
-// takes an `Integer`, not an `ItemType`. The reader is being shown what the
-// call would have had to pass, and a Namespace Generic is not something they
-// wrote. Matching is measured against the same specialized signature, so the
-// Type a report names as expected is the Type the report also refuses against.
-//
-// A PROVIDED Method is named by the Namespace whose conformance put it in
-// reach, with the Protocol that wrote it said beside it — a reader who never
-// wrote `isLessThan` anywhere needs both halves to find it: which Namespace's
-// rung rejected them, and where the body lives.
+// The candidates a `::` call reached, read off Namespaces specialized against
+// the receiver, so a `List<Integer>` is told `prepend` takes an `Integer`. A
+// provided Method also names the Protocol that wrote it.
 function methodCandidates(
 	node: parser.MethodInvocationNode,
 	namespaces: Map<string, common.NamespaceType>,

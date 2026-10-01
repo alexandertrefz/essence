@@ -467,3 +467,66 @@ recording either. So a candidate it does not fit can not decide it.
 A member path records any position that names a Function of one Parameter, even where its steps do not read
 there. The enrichment then reports about the steps rather than about a missing context. A path whose steps do not read
 answers an Error, which matches every Parameter, so the readable Arguments decide the candidate.
+
+### Seeds an Invocation decides
+
+An empty seed binds a Type Parameter to a Type with an undecided slot: `reduce(startingWith [], …)` binds
+`Answer := List<Unknown>`. `Unknown` is bottom as an Argument and top as a Parameter, so every later occurrence
+of `Answer` passes against it. A read may treat the slot as bottom, but a write has to decide it.
+`undecidedBindingNames` finds such bindings, and `decidedSeedBindings` fills their slots from what the call says
+elsewhere, in this order:
+
+1. The position the Invocation stands in. `constant kept: List<String> = words::reduce(startingWith [], …)`
+   decides `Answer` first, because an annotation is a written decision that inference never overrules.
+2. The Arguments that were checked against the open Parameter rather than binding it. `[[]]::append([1])`
+   binds the item Type from the seed, and the `List<Integer>` beside it decides the slot.
+3. A Function literal Argument's body. In `words::reduce(startingWith [], (kept, word) { <- kept::append(word) })`
+   the combiner answers a List of Strings. It is read with its return Type held open, so its body answers.
+
+Each source unifies the declared Type, with everything already decided substituted in, against its answer. An
+anonymous Union answer is unified branch by branch, and the branches' findings join through
+`resolveUnknownSlots`. Unifying at the outermost position binds a refinement's base, so a seed that was empty
+carries a List rather than a `NonEmptyList`. Bodies are read in rounds, because one body may decide a second
+Type Parameter only after a first is decided. A round that decides nothing ends the loop. Only Unknown slots
+are filled, so a binding the Arguments decided is never overruled.
+
+`invocationWithDecidedSeeds` then matches the call a second time with the decided bindings as seeds. The
+Arguments that read their position are re-read under the decided Parameter Types. A combiner's `kept` is then a
+List of Strings, and a body misusing it is refused. The working of the decision runs under a recording of its own,
+which is dropped. The second match runs under held recordings and Diagnostics. If it holds up, both are
+committed; otherwise it is discarded whole and the first match's answer stands. Its Diagnostics must be
+reported, because the first match stops at its first mismatch. An Argument after that one is read here for the
+first time. An erroring second match still wins, since it is the only reading of those Arguments.
+
+The second match uses a fresh inference seeded with the decision rather than overwriting a binding of the first.
+`markBindings` and `restoreBindings` undo a failed attempt by count, so a binding replaced in place could not be
+rolled back. The seeds are set before the second match takes any mark, and a Type Parameter binds only on its
+first occurrence, so nothing overwrites them.
+
+`decideWrittenArguments` writes the decision onto the Argument Nodes that were written as container literals.
+The validator re-matches the committed signature against the Argument Types, and a seed still typed
+`List<Unknown>` beside a decided combiner would not re-match. A name at the same position keeps its Type, since
+what an empty literal bound to a name holds is decided at its Declaration.
+
+### Choosing an Overload
+
+`selectOverload` takes the first candidate that fits. A refinement is assignable to its base, so an entry taking
+the base Type accepts every Argument a refined entry would. A refined entry written after it could never win.
+`overloadProbeOrder` therefore probes the entries that ask for a refinement first, in a stable partition. The
+standard library can then append its refined entries, whose slots are fixed by their emitted names
+(`divide__overload$3`) and native bindings. A Method's receiver Parameter is the same Type in every entry of one
+Namespace's Overload, so it is not counted as asking. Each candidate keeps the index it was declared at, which the
+simplifier mangles the callee with.
+
+Bounds are part of selection. A candidate whose Type Parameter bounds the Arguments can not satisfy is no candidate
+while a later one fits. Neither is a candidate that fits only because an Argument read as an Error against its
+Parameter Types, since an Error matches anything. Without these rules, a call would resolve or fail by the order
+its Overloads were written in. The probe's conformances are kept, so the winner's bounds are solved once.
+
+When no candidate holds up, the first one whose Arguments matched is selected anyway. Its Diagnostics say which
+bound failed, which helps more than a report that no Overload accepts the Arguments.
+
+Up to and including that first match, a probe reports and records where it stands, since each Argument is
+enriched once. Probes after it are speculative: an unannotated Function literal is re-resolved for each candidate
+and reports from inside its body. So their reports and recordings are held, and only the committed candidate
+hands them on.
