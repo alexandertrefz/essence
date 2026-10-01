@@ -4,25 +4,17 @@ import * as path from "node:path"
 
 import { optimiserPassNames } from "@essence-lang/compiler/optimiser"
 
-// "Every Optimiser pass is documented" is a completion gate, not an
-// aspiration — the name is what `--without-optimisation` takes, and a pass
-// nobody can look up is a flag nobody can use. The registry is the source of
-// truth and can be read directly, unlike the Diagnostic codes next door: a pass
-// is a value at run time rather than a member of a union that leaves nothing
-// behind.
+// Every Optimiser pass must be documented, since `--without-optimisation` takes
+// its name. The registry holds the passes as values, so it is read directly.
 
-// This spec lives in the documentation's own package, beside the page it
-// holds to account — the published one, read as a file, so what the gate holds
-// is what a reader of `/docs/reference/optimisations` is shown and moving the
-// site means moving them together.
+// The published page, read as a file, as a reader is shown it.
 const OPTIMISATIONS_PAGE = path.resolve(
 	import.meta.dirname,
 	"../src/content/docs/reference/optimisations.mdx",
 )
 
-// The headings of ONE section, so that the pass list and the runtime
-// improvements — which are documented on the same page, in the same style, and
-// are deliberately not passes — can not be mistaken for one another.
+// The headings of one section, so the passes and the runtime improvements on
+// the same page are never mistaken for each other.
 function headingsUnder(section: string): Array<string> {
 	let documentation = readFileSync(OPTIMISATIONS_PAGE, "utf8")
 	let start = documentation.indexOf(`## ${section}\n`)
@@ -43,19 +35,13 @@ function headingsUnder(section: string): Array<string> {
 
 describe("Optimisation Passes", () => {
 	it("documents every registered pass, in the order they run", () => {
-		// An exact list rather than a set comparison, because the order
-		// the passes run in is part of what the page states — and a pass
-		// documented out of order would describe a Compiler that does not
-		// exist.
+		// An exact list, since the page states the order the passes run in.
 		expect(headingsUnder("Passes")).toEqual([...optimiserPassNames])
 	})
 
 	it("documents every runtime improvement, by name", () => {
-		// These have no registry to be read out of — they are how the
-		// runtime works rather than values a Compiler holds — so the list is
-		// written out here, and this spec is what makes them nameable at all. A
-		// runtime improvement that is renamed, dropped or added without the page
-		// following fails, which is the whole of the gate for them.
+		// No registry holds the runtime improvements, so they are listed here,
+		// and a change the page does not follow fails.
 		expect(headingsUnder("Runtime improvements")).toEqual([
 			"interned-booleans",
 			"interned-unit-cases",
@@ -83,11 +69,8 @@ describe("Optimisation Passes", () => {
 	})
 
 	it("documents every emitted shape, by name", () => {
-		// Written out here for the reason the runtime improvements are:
-		// there is no registry to read them out of, because they are decisions
-		// the Rewriter makes while writing a Program out rather than values a
-		// Compiler holds. One that is renamed, dropped or added without the page
-		// following fails.
+		// Listed here too, since these are Rewriter decisions that no registry
+		// holds. A change the page does not follow fails.
 		expect(headingsUnder("Emitted shapes")).toEqual([
 			"tag-binding",
 			"unboxed-loop-state",
@@ -96,9 +79,8 @@ describe("Optimisation Passes", () => {
 	})
 
 	it("keeps the emitted shapes apart from the passes", () => {
-		// The distinction the section is FOR. An emitted shape has no name
-		// `--without-optimisation` takes, so one that shared a name with a pass
-		// would be a flag that half worked.
+		// The section's point: an emitted shape is not something
+		// `--without-optimisation` can name, so it must not share a pass's name.
 		expect(
 			headingsUnder("Emitted shapes").filter((name) =>
 				(optimiserPassNames as Array<string>).includes(name),

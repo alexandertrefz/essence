@@ -251,8 +251,6 @@
 	"packages/vscode-extension/tests/testModel.spec.ts": {"sentence-length": 11, "em-dash": 8, "all-caps": 5, "position": 1},
 	"packages/vscode-extension/tests/testView.spec.ts": {"sentence-length": 12, "em-dash": 11, "all-caps": 5, "block-length": 1},
 	"packages/vscode-extension/tests/vscodeStub.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 5, "citation": 1},
-	"packages/website/tests/navigation.spec.ts": {"sentence-length": 2, "em-dash": 2, "position": 1, "block-length": 1},
-	"packages/website/tests/optimisationPasses.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 2},
 	"packages/website/tests/projectSchema.spec.ts": {"sentence-length": 3, "em-dash": 4, "all-caps": 1, "block-length": 1},
 	"packages/website/tests/stdlibMembers.spec.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 2, "position": 1, "block-length": 1},
 	"scripts/generateProjectSchema.ts": {"sentence-length": 2},

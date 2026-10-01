@@ -13,10 +13,8 @@ import {
 	stepAnchor,
 } from "../src/lib/navigation.ts"
 
-// The rules that decide what is a chapter and what is a lookup table,
-// checked on a hand-made collection rather than on the real one — the real
-// one is whatever the writers have published so far, and the rules must not
-// bend with it.
+// The navigation rules, checked on a hand-made collection, so they do not bend
+// with whatever has been published.
 
 function entry(
 	id: string,
@@ -237,13 +235,9 @@ describe("the sidebar's groups", () => {
 	})
 })
 
-// The one check on the published pages. Every rule above is held on a
-// hand-made collection, as the note at the top says — but "every page of a
-// grouped section names its group" is a rule about what gets published, and
-// the page it has to catch is the next one a writer adds. So the real pages go
-// through `getSidebar` too, which is where the rules throw. They are read as
-// files, as every doc gate reads them, because `astro:content` only resolves
-// inside an Astro build.
+// The one check on the published pages: they go through `getSidebar`, which
+// throws when a grouped section's page names no group. They are read as files,
+// since `astro:content` only resolves inside an Astro build.
 const DOCS_DIRECTORY = path.resolve(import.meta.dirname, "../src/content/docs")
 
 function pagesUnder(directory: string): string[] {
