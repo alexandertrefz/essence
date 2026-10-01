@@ -87,20 +87,91 @@ walk: it breaks real sources at many sites and holds the walk to never throwing.
 
 A Namespace is emitted as a `class`, whose binding does not exist until its Declaration runs. So code that runs
 before a top-level Namespace's Declaration and names it compiles clean and then fails. `checkNamespaceIsDeclared`
-reports it as `use-before-declaration`, for every way a Namespace is named: a Method's home, a dispatch branch's
-target, a static member's base, a bare reference, and a `namespace` witness a call spells in.
+reports it as `use-before-declaration`. It covers every way a Namespace is named: a Method's home, a dispatch
+branch's target, a static member's base, a bare reference, and a `namespace` witness a call spells in.
 
 `topLevelNamespaces` records each top-level Namespace's index in the Statement list and its name's Position. It is
 read off the typed Statements, because a hoisted Namespace never enters the enricher's declarations and its Type
 carries no Position. The first Declaration of a name is recorded. A nested Namespace and every builtin are absent,
 so the check stays silent for them.
 
-`executingTopLevelIndex` is the index of the top-level Statement whose execution is being validated. A Function or
-Method body runs when it is called, not where it is written, so while one is walked the index is null and nothing
-in it is a top-level use. A Parameter's default runs in the body's frame and is held to the same rules.
+`executingTopLevelIndex` is the index of the top-level Statement whose execution is being validated. A Function or Method body runs when it is called, not where it is written. While one is walked the index is null,
+and nothing in it is a top-level use. A Parameter's default runs in the body's frame and is held to the same rules.
 
 Static Properties are the same fault one level in. They are emitted as static fields, initialised in written order. An
 initialiser that reads a Property of its own Namespace written at or after itself reads `undefined`.
 `initialisingProperty` holds the Namespace's name and the Properties still unbound, and `checkPropertyIsBound`
 reports such a read. A Method is installed with the class before every initialiser, and a Function literal inside an initialiser runs
 when it is called. Neither is a problem.
+
+## Holes
+
+An Error Type is a hole the enricher left where it reported a mistake. A check measured against a hole answers that mistake again, in words about the wrong thing. So checks stand down
+where what they judge contains an Error.
+A Signature holding one measures no call. A hole in a positional Argument shifts every Argument after it, so the whole call stands down. A labelled hole
+shifts nothing, and the rest of the call is still measured. A Match whose
+value or runtime Matchers hold a hole gets no exhaustiveness or reachability verdict. The Handlers' bodies are
+still walked, since a mistake inside one is its own.
+
+## Match
+
+A Match over a Union must handle every member. Union members are flattened first, so a member that is itself a
+Union is discharged by Handlers for its members. Only an unconditional Handler discharges a member: one with no
+literal, member literal, payload requirement or Guard. One `missing-case` reports every unhandled member, since
+they share a cause and a fix.
+
+A Handler is dead in two ways:
+
+- It overlaps no member of the Union. `unreachable-case` is a Warning tagged `unnecessary`, so editors grey it out,
+  and removing it is always safe.
+- Every member it could match was claimed by an earlier Handler. The first Handler that fits runs, so this one
+  never does, whatever its own Guard says.
+
+A Handler claims a member when its emitted test accepts every value of it and nothing else of the Handler can
+decline afterwards. Payload requirements are part of the test: `runtimeMatcherOf` grafts them onto the Matcher, so
+`case #Apply({ fn: IntFn })` claims as its Record spelling does. A literal, a member literal or a Guard decides
+after the test and claims nothing (`claimsWhatItsTestAccepts`).
+
+Where the earlier Handler covers this one through erasure rather than assignability, the dead Case is an Error,
+`erased-case-conflict`, not a Warning. The Program would answer with the wrong value: `case Value` above
+`case String` returns the String where the Signature promised a `Value`. The Notes name the erasure, since the two
+Types look unrelated without it. Reordering is offered only where the covered Matcher is narrower than the one
+covering it. Two Matchers asking the same question swallow each other in either order, and the only edit is to make
+them ask two.
+
+### Runtime overlap
+
+Reachability is decided by what the emitted check does at runtime, which is a wider question than assignability.
+Three things erase before a Match runs:
+
+- A Generic Matcher, and the wildcard's `Unknown`, have no Type left to check, so they accept every value.
+- A Function's Signature: the check only asks whether the value is callable.
+- A refinement's predicate: the check asks only about the base.
+
+`acceptsAllAtRuntime` answers whether a Matcher's check accepts every value of a Type. Records are structural and open, and a Case adds its tag. A List or Dictionary Matcher is answered by the items or
+entries a value holds.
+`overlapsAtRuntime` answers whether it can accept some value. It differs in one place. An empty List holds no item to disagree about, so it is a value of every List Type, and
+every List Matcher takes it. An empty Dictionary is the
+same. Everywhere else `overlapsAtRuntime` is conservative, since false promises that no value reaches the Matcher.
+A member that is still a Type Parameter is not counted as an overlap. Sorting its values out is what the Handlers
+around it are for. Both functions are exported, so a spec can hold them to the runtime's `isValueOfType`.
+
+A partial overlap through an empty container gets its own Warning, `empty-list-overlap` or
+`empty-dictionary-overlap`, on the later Handler. `case List<String>` above `case List<Integer>` takes the empty
+`List<Integer>`. The Help guards the Cases with `hasItems()` or `hasEntries()` and gives the empty value a Case of
+its own. `emptyCrossoverKind` asks about a List first. Other partial overlaps are Matchers taking exactly the values
+they name, in order, and are not reported.
+
+Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
+two conflicts between dispatch branches.
+
+## Literal Matches
+
+A Match on an Integer or a String whose Cases name values, `match n { case 0 { … } case _ { … } }`, takes the value
+apart rather than its Type. Its rule is a shape. Every Case but the last names a value of the matched Type without a Guard, and the last answers
+for every other value. The last Case is also evidence. Reaching it proves the value is none of the values named,
+which is the `isNot` a refinement is declared by, and the enricher reads that.
+
+Only Integer and String qualify, because their literal Matcher asks what their `is` asks. The runtime's `anyIs`
+compares Integers as bigints and Strings normalised, as `Integer.is` and `String.is` do. Every other scrutinee,
+and an Integer or String Match naming no value, is `match-on-non-union`.

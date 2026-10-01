@@ -821,11 +821,8 @@ function validateMethodInvocation(
 	validateExpression(node.base)
 
 	if (node.dispatch !== null) {
-		// A dispatch branch's own copy of a contextually typed Argument is
-		// a whole Expression that reaches the emitted Program, and the shared
-		// Argument walked above is a DIFFERENT compilation of the same source —
-		// so every check the shared one gets, each copy has to get too, or a
-		// fault the copies alone carry would be emitted unexamined.
+		// Each dispatch branch carries its own compilation of a contextually
+		// typed Argument, which is emitted, so each copy is checked too.
 		for (let dispatchCase of node.dispatch) {
 			for (let { argument } of dispatchCase.contextualArguments) {
 				validateExpression(argument.value)
@@ -838,10 +835,8 @@ function validateMethodInvocation(
 
 	let describeCallee = () => `'${node.namespace.name}::${node.member.name}'`
 
-	// A dispatched Invocation names no Namespace of its own — each branch
-	// carries its target by NAME, with no Type to read a Signature off — so the
-	// arity of its witnesses is the one thing here that can not be cross-checked.
-	// Their scopes still can be, and are, for every branch.
+	// A dispatch branch names its target without a Type to read a Signature
+	// off, so only its witnesses' scopes are checked, not their count.
 	if (node.dispatch === null) {
 		checkConformanceArity(
 			node,
@@ -884,12 +879,9 @@ function validateMethodInvocation(
 	return node
 }
 
-// The dispatch branches are the Cases of a Match nobody wrote — the
-// receiver's runtime Type picks one, the first that fits wins, and the same two
-// things that let a Case swallow the Case below it let a branch swallow the
-// branch below it. The Enricher orders them most specific first, so a branch
-// still covering another after that is covering it through something that does
-// not survive to runtime, which no order can fix.
+// Dispatch branches are picked like Match Cases, so a branch can swallow a
+// later one through what the runtime can not see. See "Runtime overlap" in
+// DEVELOPMENT.md.
 function validateDispatchCases(
 	node: common.typed.MethodInvocationNode,
 	dispatchCases: Array<common.DispatchCase>,
@@ -919,13 +911,8 @@ function validateDispatchCases(
 							"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
 							"A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.",
 						],
-						// The Match clause is gone. A dispatch branch and a
-						// Match Case are picked the same way, so a Match written
-						// over these two member Types reports the very same
-						// conflict one line further down — the reader followed
-						// the Help and met it again wearing the Match's wording.
-						// A Signature is not a runtime question anywhere, and
-						// telling the members apart is the only answer there is.
+						// A Match would meet the same conflict, so the Help asks
+						// for member Types the runtime can tell apart.
 						helps: [
 							"Tell the two member Types apart by something that survives to runtime — a member whose Type is not a Function.",
 						],
@@ -936,11 +923,7 @@ function validateDispatchCases(
 			}
 
 			if (overlapsAtRuntime(earlierType, laterType)) {
-				// Which container's empty value crosses. The dispatch
-				// question is `overlapsAtRuntime` and it is asked of every pair,
-				// so a pair that crosses through neither container keeps the
-				// List's wording it has always had — this only tells the reader
-				// about a Dictionary where a Dictionary is what crosses.
+				// The List wording, unless a Dictionary is what crosses.
 				let dictionary =
 					emptyCrossoverKind(earlierType, laterType) === "Dictionary"
 
@@ -970,13 +953,8 @@ function validateDispatchCases(
 								? "Key and value Types erase before a branch is picked, so a Dictionary is placed by the entries it holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is."
 								: "Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
 						],
-						// A Match alone narrows nothing here — its Cases are
-						// picked by the same erased question the branches were,
-						// so the reader who wrote one met this report again in
-						// the Match's own wording. What decides an empty
-						// container is a GUARD, which is why the Help spells the
-						// whole shape: guarded Cases, and a Case of its own for
-						// the empty value that reaches none of them.
+						// A Match alone meets the same overlap. A Guard decides
+						// an empty container, so the Help spells guarded Cases.
 						helps: [
 							dictionary
 								? "Guard the Cases of a Match with 'where @::hasEntries()', answer for the empty Dictionary in a Case of its own, and call the Method inside each arm."
@@ -1001,13 +979,8 @@ function validateFunctionInvocation(
 		validateNoBoundFunctionValue(argumentNode.value)
 	}
 
-	// The callee is not walked as an Expression of its own — a static call
-	// (`Namespace.method(…)`) is the one shape whose callee names something that
-	// can be too early, so it is asked about here rather than through
-	// `validateIdentifier`, which would never see it. The Property behind the
-	// call is asked about for the same reason: a static Property holding a
-	// Function is CALLED through the very Lookup that reads it, so the read
-	// would go unexamined.
+	// The callee is not walked as an Expression, so a static call's Namespace
+	// and the static Property it calls through are checked here.
 	if (
 		node.name.nodeType === "Lookup" &&
 		node.name.base.nodeType === "Identifier" &&
@@ -1021,9 +994,7 @@ function validateFunctionInvocation(
 		checkPropertyIsBound(node.name)
 	}
 
-	// An Identifier callee names itself; a Lookup and an Expression that
-	// answers with a Function have no one name to give, and the Position the
-	// Diagnostic carries says which call is meant either way.
+	// Only an Identifier callee has a name to give.
 	let describeCallee = () =>
 		node.name.nodeType === "Identifier"
 			? `'${node.name.content}'`
@@ -1045,12 +1016,8 @@ function validateFunctionInvocation(
 		functionType.type !== "OverloadedMethod" &&
 		functionType.type !== "OverloadedStaticMethod"
 	) {
-		// Silent where the Enricher already refused this call. It reports the
-		// same sentence at the callee's own name, which is the narrower span of the
-		// two, and it answers the Invocation with an Error to say so — the ordinary
-		// reading of a hole, and the one every other check here makes. Both stages
-		// run on every file, so without this a reader met one mistake twice, a line
-		// apart, with the Helps on only one of them.
+		// Silent where the enricher already refused this call and typed it
+		// an Error.
 		if (functionType.type !== "Error" && node.type.type !== "Error") {
 			reportError("This Expression is not a Function", node.position, {
 				code: "not-a-function",
@@ -1070,28 +1037,14 @@ function validateFunctionInvocation(
 		return node
 	}
 
-	// And a SIGNATURE the Enricher could not establish measures nothing
-	// either. A Method in a Namespace with no target Type is refused where it
-	// is written and left carrying an Error receiver, so every call of it
-	// counted one Parameter more than the reader can see and answered with
-	// `argument-count-mismatch` — the Namespace's mistake, reported again as
-	// something wrong with a call that is written exactly right.
+	// A Signature holding an Error measures nothing. See "Holes" in
+	// DEVELOPMENT.md.
 	if (typeContainsError(functionType)) {
 		return node
 	}
 
-	// An Argument the Enricher could not type is an Argument that fits
-	// nothing, so measuring the call against its Signature answers the hole
-	// rather than the call — and a hole in a POSITIONAL Argument moves every
-	// Argument after it, so the whole call stands down rather than the position
-	// that carries it. The mistake has been reported where the Argument was
-	// written.
-	//
-	// A LABELLED Argument can not move anything: it is matched by its
-	// label, so the Arguments around it line up whatever it came to. Where
-	// every hole is labelled, the rest of the call is still measured, and the
-	// second mistake in `f(first undeclared, second 99)` is reported in the same
-	// run as the first.
+	// A hole in a positional Argument moves every Argument after it, so the
+	// call stands down. A labelled hole moves nothing, and the rest is measured.
 	if (holesShiftTheCall(node.arguments)) {
 		return node
 	}
@@ -1107,10 +1060,8 @@ function validateFunctionInvocation(
 			node.position,
 		)
 	} else {
-		// Every other callee: a Method with a receiver called through
-		// `.`, as `Namespace.method(…)`, and an Overload set, an `overload
-		// function` called by its name among them. A `::` call is
-		// `validateMethodInvocation`'s.
+		// A Method called through `.`, as `Namespace.method(…)`, or an
+		// Overload set.
 		if (
 			functionType.type === "OverloadedMethod" ||
 			functionType.type === "OverloadedStaticMethod"
@@ -1153,9 +1104,8 @@ function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): common.typed.FunctionDefinitionNode {
-	// The hidden conformance Parameters this Function is emitted with —
-	// the Simplifier reads them off these same Generic Declarations, so what a
-	// witness inside the body may forward is exactly what is pushed here.
+	// The hidden conformance Parameters this Function is emitted with, read off
+	// the Generics as the simplifier reads them.
 	witnessScopes.push(
 		new Set(
 			node.generics
@@ -1179,36 +1129,20 @@ function validateFunctionDefinition(
 		),
 	)
 
-	// A body does not run where it is written — it runs when the Function
-	// is called, which is at the earliest the statement that calls it — so
-	// nothing inside it is a top-level use, however far above a Declaration it
-	// stands. A Function literal written INSIDE a static Property's initialiser
-	// is such a body too: what it names is read when it is called, by which time
-	// every Property of its Namespace is bound.
+	// A body runs when called, so nothing in it is a top-level use. See "Use
+	// before declaration" in DEVELOPMENT.md.
 	let enclosingIndex = executingTopLevelIndex
 	let enclosingProperty = initialisingProperty
 
 	executingTopLevelIndex = null
 	initialisingProperty = null
-	// The declared Type rather than the Parser's `completing` mark, which
-	// says only that a `complete` is ALREADY written. A `-> Future<…>` body that
-	// has not written its first one is exactly the body a report is most likely
-	// to be offering the word to, and it may have it.
+	// The declared Type rather than the parser's `completing` mark, so a
+	// `-> Future<…>` body that has not written a `complete` yet may.
 	waitingBodies.push(node.returnType.type === "Future" ? true : "plain-body")
 
 	try {
-		// A default runs when the Function is CALLED, in the frame the
-		// body runs in — so it is held to everything the body is held to, under
-		// the same suspended top-level index, and it is checked ahead of the
-		// body because that is where it stands. Nothing inside a `= expression`
-		// was checked at all while this walked only the body: a call with the
-		// wrong Arguments, a Match missing a Case, a name read above its
-		// Declaration.
-		//
-		// Everything but waiting: a default is filled in before any of the
-		// body's own asynchrony begins, which is the Enricher's
-		// `parameter-default` barrier, so `complete` is refused there however
-		// the Function around it is declared.
+		// A default runs in the body's frame when the Function is called, so it
+		// is held to the body's rules, except that it may not wait.
 		insideBody("parameter-default", () => {
 			for (let defaultValue of parameterDefaults(node.parameters)) {
 				validateExpression(defaultValue)
@@ -1243,10 +1177,8 @@ function writtenBoundOf(
 	return displayProtocolName(parameter.constraint)
 }
 
-// A native Method has no body, and the frame the Compiler synthesizes for
-// its defaults is the only Essence it owns — so it is the only thing here to
-// check, and checking it is what keeps a `declarations { … }` Program held to
-// what every other Program is held to.
+// A native Method has no body, so only its synthesized frame for defaults is
+// checked.
 function validateNativeShim(shim: common.typed.NativeShimNode): void {
 	let enclosingIndex = executingTopLevelIndex
 	let enclosingProperty = initialisingProperty
@@ -1275,17 +1207,8 @@ function validateLookup(
 	return node
 }
 
-// A static Property read out of the initialiser of a Property of the SAME
-// Namespace, where the one being read is written at or below the one reading it.
-// The Namespace is emitted as a `class` and its Properties as static fields,
-// which are initialised in the order they are written, so the read answers
-// `undefined` — a value of no Type at all, out of a Program that compiled green.
-//
-// It is the same fault `checkNamespaceIsDeclared` reports one level up, and
-// carries the same code: something that runs above a Declaration reaches for
-// what that Declaration binds. A Method is not among them — it is installed with
-// the class, ahead of every initialiser — and neither is a body, which runs when
-// it is called.
+// A static Property initialiser reading a Property of its own Namespace not
+// yet bound. See "Use before declaration" in DEVELOPMENT.md.
 function checkPropertyIsBound(node: common.typed.LookupNode): void {
 	if (
 		initialisingProperty === null ||
@@ -1319,10 +1242,8 @@ function checkPropertyIsBound(node: common.typed.LookupNode): void {
 	)
 }
 
-// A name is nothing but a name in every other respect — the one thing it
-// can be wrong about on its own is naming a Namespace from above the Declaration
-// of it. A static Method call and a static Property read both reach here through
-// the base of their Lookup, which is where the Namespace is written.
+// The one thing a name can be wrong about on its own is naming a Namespace
+// before its Declaration.
 function validateIdentifier(
 	node: common.typed.IdentifierNode,
 ): common.typed.IdentifierNode {
@@ -1333,25 +1254,14 @@ function validateIdentifier(
 	return node
 }
 
-// Whether anything this Match is judged BY is a hole — the value it
-// matches, or a Matcher the Enricher could not resolve. Every verdict below is
-// a comparison between the two, and a comparison against an Error answers the
-// mistake that left it rather than the Cases the reader wrote: a Case naming a
-// Choice whose Declaration went missing is not unreachable, it is unresolved,
-// and calling it dead would grey out the four Cases beside it too.
-//
-// The SHAPE is a second way to be judging something that was not written, and
-// it is a separate question: a Handler the Parser dropped leaves a Match that
-// handles fewer Cases than the file does.
+// Whether a verdict about this Match means anything: neither its value nor a
+// runtime Matcher is a hole, and the parser read it whole. See "Holes" in
+// DEVELOPMENT.md.
 function matchIsJudgeable(node: common.typed.MatchNode): boolean {
 	return (
 		!typeContainsError(node.value.type) &&
-		// The RUNTIME Matcher, which is the Matcher with the Handler's
-		// payload requirements grafted onto it — that is the Type every verdict
-		// below is computed from, and a requirement naming a member nothing
-		// declares leaves its hole there rather than in the Matcher itself.
-		// `case #Going({ missing as … })` really can never match, and saying so
-		// answers the hole one column over from the report that explains it.
+		// The runtime Matcher, where a requirement naming an undeclared
+		// member leaves its hole.
 		!node.handlers.some((handler) =>
 			typeContainsError(runtimeMatcherOf(handler)),
 		) &&
@@ -1363,19 +1273,15 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	validateExpression(node.value)
 
 	if (!matchIsJudgeable(node)) {
-		// The Handlers' BODIES are still walked — everything below the
-		// early return covers them, and a mistake written inside a Handler is
-		// its own, whatever the Match around it came to.
+		// The Handlers' bodies are still walked.
 		validateMatchHandlers(node)
 
 		return node
 	}
 
 	if (node.value.type.type === "UnionType") {
-		// Flattened, so that a Union member that is itself a Union — a
-		// Choice composed as `CalculatorOperation | String`, or `Number |
-		// String` — is discharged by Handlers for its *members* rather than
-		// demanding one Handler for the nested Union as a whole.
+		// Flattened, so a nested Union is discharged by Handlers for its
+		// members. See "Match" in DEVELOPMENT.md.
 		let memberTypes = flattenUnionMembers(node.value.type)
 		let unhandledTypes: Array<common.Type> = []
 
@@ -1391,10 +1297,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			}
 		}
 
-		// One Diagnostic for the whole Match rather than one per
-		// unhandled member — they all have the same cause and the same fix,
-		// and a Union of six unhandled members would otherwise bury the rest
-		// of the output.
+		// One Diagnostic for every unhandled member, which share a cause and
+		// a fix.
 		if (unhandledTypes.length > 0) {
 			let descriptions = unhandledTypes.map(describeType)
 
@@ -1415,22 +1319,15 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					helps: [
 						`Add ${descriptions.map((description) => `'case ${description}'`).join(", ")}, or a 'case _' that covers the rest.`,
 					],
-					// The same spellings once more, in declaration
-					// order, for the Quick Fix that writes the Handlers out.
+					// The same spellings, for the Quick Fix that writes the
+					// Handlers.
 					data: { kind: "missing-case", unhandled: descriptions },
 				},
 			)
 		}
 
-		// Which Handler already answers for each member of the Union, by
-		// index — a Handler is dead not only when its Matcher names a Type the
-		// Union does not have, but also when every Type it could match was
-		// already taken by an earlier Handler. A Handler takes one when its
-		// emitted TEST accepts every value of it and nothing else of the
-		// Handler could still decline — a payload requirement is part of that
-		// test, so `case #Apply({ fn: IntFn })` claims exactly as its Record
-		// spelling does, while a literal or a Guard declines after the test and
-		// leaves the Type for whatever comes after it.
+		// The index of the Handler that claimed each Union member.
+		// See "Match" in DEVELOPMENT.md.
 		let claimedBy: Array<number | null> = memberTypes.map(() => null)
 		let runtimeMatchers = node.handlers.map(runtimeMatcherOf)
 
@@ -1441,11 +1338,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		) {
 			let handler = node.handlers[handlerIndex]
 			let runtimeMatcher = runtimeMatchers[handlerIndex]
-			// The members SOME value of which can take this Handler's
-			// test — overlap, not acceptance, because a test that narrows (a
-			// Record member, a payload requirement) still runs for the values
-			// that pass it. Acceptance here called such a Handler dead while
-			// the runtime took it.
+			// The members some value of which passes this Handler's test.
+			// Overlap, since a narrowing test still runs for what passes it.
 			let matchedMemberIndices: Array<number> = []
 
 			for (
@@ -1461,10 +1355,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 			}
 
 			if (matchedMemberIndices.length === 0) {
-				// Tagged `unnecessary` so that clients grey the case out
-				// instead of underlining it — it is dead, not wrong. The
-				// Position is the Matcher's, so only the dead Handler is
-				// greyed out rather than the whole Match.
+				// Tagged `unnecessary`, so editors grey out the dead Matcher.
 				reportWarning(
 					`This Case can never match`,
 					handler.matcherPosition,
@@ -1483,17 +1374,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 								`this is ${withArticle(describeType(node.value.type))}`,
 							),
 						],
-						// Removal is safe here and nowhere else in this
-						// function: this Case overlaps NO member, so taking it
-						// out changes nothing about what the Match answers for
-						// — a Case the exhaustiveness check never counted can
-						// not be the one holding exhaustiveness up. The Quick
-						// Fix that removes it was already offered and the Help
-						// naming it was not.
-						//
-						// The second clause is for the Matcher that names
-						// something the Union does not hold, which is as often a
-						// name written from memory as it is a Case nobody needs.
+						// Removal is safe, since the Case overlaps no member. A
+						// Matcher naming something the Union lacks may be misspelt.
 						helps: [
 							handler.memberTypes === null
 								? `Remove this Case, or name a member of ${describeType(node.value.type)}.`
@@ -1515,44 +1397,26 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				}
 			}
 
-			// Every Type this Handler could match is spoken for, and the
-			// first Handler that fits is the one that runs — so this one never
-			// does, whether it is a duplicated `case Integer` or a Case written
-			// below the `case _` that swallows it. Its own Guard or literal
-			// makes no difference: the earlier Handler decides first.
+			// Every Type this Handler could match is claimed, so it never runs.
 			if (claimingHandlerIndices.length === matchedMemberIndices.length) {
 				let claimingHandlerIndex = Math.min(...claimingHandlerIndices)
 				let claimingHandler = node.handlers[claimingHandlerIndex]
 				let claimingMatcher = runtimeMatchers[claimingHandlerIndex]
 
-				// WHY the earlier Case answers for this one decides what
-				// there is to say about it, and two of the three reasons are
-				// nowhere in the source. A Generic Matcher covers its members
-				// because there is nothing left to check by the time it runs,
-				// and a Function-typed member covers a differently-signed one
-				// because a Signature is not a runtime question — in both cases
-				// the Diagnostic names two Types that look unrelated, and
-				// without the reason it reads like a mistake.
+				// Why the earlier Case covers this one decides the Notes. See
+				// "Runtime overlap" in DEVELOPMENT.md.
 				let notes = [
 					"Cases are tried in order, and the first one that fits wins.",
 				]
-				// Reordering is only an answer where the covered Matcher
-				// is NARROWER than the one covering it. Two Matchers that ask
-				// the same question — a `case #Red` written twice — swallow each
-				// other whichever way round they are written, so "write it above"
-				// moved the report to the other Case and left the reader circling
-				// between two spellings of one duplicate.
+				// Reordering helps only where this Matcher is narrower than the
+				// one covering it.
 				let helps = [
 					matchesType(runtimeMatcher, claimingMatcher)
 						? "Remove this Case — the Case above answers for every value it would take, in whichever order the two are written."
 						: "Remove this Case, or write it above the one that covers it.",
 				]
-				// The two reasons that are ERASURE rather than dead code.
-				// A Case shadowed by a Type that covers it is a Case nobody
-				// needed; a Case shadowed by a Type the source says it is
-				// unrelated to is a Program answering with the wrong value —
-				// `case Value` above `case String` returned the String where
-				// the Signature promised a Value, and a Warning let that build.
+				// Covered through erasure, the Program answers with the wrong
+				// value, so the report is an Error.
 				let erased = false
 
 				if (claimingHandler.matcher.type === "GenericUse") {
@@ -1562,15 +1426,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						`Types erase before a Match runs, so the Generic Case '${describeType(claimingHandler.matcher)}' narrows nothing and accepts every value that reaches it.`,
 					)
 
-					// Reordering is an answer only where THIS Case is
-					// narrower than the one covering it. Where both Cases name
-					// Type Parameters neither is narrower — both accept every
-					// value that reaches them — so "write it above" moved the
-					// report to the other Case, whose own Help moved it back,
-					// and a reader could swap the two arms forever. What is
-					// wrong there is the signature rather than the order of the
-					// arms, and it is the same thing `undispatchable-method`
-					// says about the call this Match was written to replace.
+					// Two Generic Cases accept the same values in either order,
+					// so the Help addresses the signature, as `undispatchable-method`
+					// does.
 					helps =
 						handler.matcher.type === "GenericUse"
 							? undispatchableHelps(
@@ -1584,14 +1442,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 									`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
 								]
 				} else if (!matchesType(claimingMatcher, runtimeMatcher)) {
-					// The earlier test does not accept this one's Type at
-					// all, so what it claimed it claimed through erasure.
-					// Reordering can not help here: whichever of the two is
-					// written first swallows the other. WHICH erasure decides
-					// the explanation — a refinement erases to its base, so
-					// where the bases alone reconcile the two, that is the
-					// whole story; anything else that claims without
-					// assignability is a Function's Signature.
+					// Claimed through erasure: a refinement's, where the bases
+					// reconcile the two, and otherwise a Function's Signature.
 					erased = true
 
 					notes.push(
@@ -1603,17 +1455,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 							: "A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
 					)
 
-					// A Guard is no answer here, in either position, and
-					// the clause offering one is gone. On THIS Case it changes
-					// nothing — the earlier one decides first and never reaches
-					// it, which is what the Label already says. On the Case
-					// ABOVE it takes that Case's claim away and no Case is left
-					// to make it: `missing-case`, whose own answers are a Case
-					// for the Type (covered by the other one — this report
-					// again) or a `case _` (covered by the other one — this
-					// report again). Two Matchers asking one erased question
-					// admit no exhaustive Match at all, so the only edit is to
-					// make them ask two.
+					// A Guard helps on neither Case. Two Matchers asking one
+					// erased question admit no exhaustive Match.
 					helps = [
 						"Tell the two Cases apart by a member that survives to runtime — a member whose Type is not a Function.",
 					]
@@ -1645,9 +1488,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						},
 					)
 				} else {
-					// Tagged `unnecessary` so that clients grey the Case
-					// out instead of underlining it — it is dead, not wrong,
-					// which is exactly what the erased pair above is not.
+					// Tagged `unnecessary`: dead, not wrong.
 					reportWarning(
 						`This Case can never match`,
 						handler.matcherPosition,
@@ -1701,12 +1542,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				notes: [
 					"Matching a Type with only one possible shape has only one outcome.",
 				],
-				// The two forms that DO ask about a value with one shape,
-				// which is what a reader reaching for `match` here wanted. Named
-				// in the order they answer: a question with two answers is an
-				// `if`, and one with several is a `define`. An Integer or a
-				// String never reaches this — a Match that names a value is a
-				// literal Match, and this is what is left.
+				// The forms that ask about a value with one shape.
 				helps: [
 					"Ask about the value with an 'if', or choose between answers with a 'define'.",
 				],
@@ -1719,23 +1555,16 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 	return node
 }
 
-// What every Handler is made of, judged whatever the Match around it came
-// to. Split out because a Match nothing can be said ABOUT still holds Handlers
-// whose bodies are ordinary Statements — the reader's own — and skipping them
-// with the exhaustiveness verdict would take a whole branch of the Program out
-// of the Validator's reach for want of one resolved Case name.
+// Validates every Handler's Guard, literals and body, whatever the verdict on
+// the Match.
 function validateMatchHandlers(node: common.typed.MatchNode): void {
 	for (let handler of node.handlers) {
-		// A Guard decides, per value, whether its Handler runs — it is a
-		// Condition, and is held to what every other Condition is held to.
+		// A Guard is a Condition like any other.
 		if (handler.guard !== null) {
 			validateCondition(handler.guard, "A Case Guard")
 		}
 
-		// A Matcher's literals are Expressions of their own — only a
-		// Literal can stand there, so in practice this is `case 1/0`'s
-		// denominator, but a Matcher is no more exempt from the walk than any
-		// other place a value is written.
+		// A Matcher's literals are Expressions too, such as `case 1/0`.
 		if (handler.literal !== null) {
 			validateExpression(handler.literal)
 		}
@@ -1746,10 +1575,8 @@ function validateMatchHandlers(node: common.typed.MatchNode): void {
 			}
 		}
 
-		// Synthetic — a Match handler is validated as if it were a
-		// Function body so that its `<-` Statements are checked against the
-		// Match's Type. It has no Parameter list of its own, so nothing here
-		// is ever inferred or hinted.
+		// A Handler is validated as a Function body, so its `<-` Statements
+		// are checked against the Match's Type.
 		let handlerContext: common.typed.FunctionDefinitionNode = {
 			nodeType: "FunctionDefinition",
 			generics: [],
@@ -1769,10 +1596,8 @@ function validateMatchHandlers(node: common.typed.MatchNode): void {
 	}
 }
 
-// Nothing here walks sub-Expressions on its own — every Validator recurs
-// by hand — so an arm this does not visit is an arm nothing validates at all.
-// Both halves of every arm are Expressions the Program evaluates, and the
-// `otherwise` arm's value is one as much as the rest.
+// Validates both halves of every arm. The validator recurs by hand, so an arm
+// not visited here is not validated at all.
 function validateDefine(
 	node: common.typed.DefineNode,
 ): common.typed.DefineNode {
@@ -1782,9 +1607,7 @@ function validateDefine(
 		checkDefineAnswer(node, arm.value)
 		validateExpression(arm.value)
 
-		// An arm's Condition picks the path exactly as an `if` does, and
-		// is held to what every other Condition is held to: Essence has no
-		// truthiness, so only a Boolean may decide.
+		// An arm's Condition must be a Boolean, as an `if`'s must.
 		validateCondition(arm.condition, "A Define Condition")
 	}
 
@@ -1794,24 +1617,10 @@ function validateDefine(
 	return node
 }
 
-// A `define` whose only arm is the `otherwise` one asks nothing. It is
-// the value it answers with, written the long way round, and every reader who
-// meets it has to read the braces before they find that out.
-//
-// A Warning, and never anything more: this is exactly the shape a ladder has
-// while it is being written, and an Error here would refuse a file half way
-// through the edit that fixes it. Tagged `unnecessary` so that clients grey the
-// `define` out rather than underline it — what is wrong with it is that it does
-// nothing, not that it is wrong.
-//
-// The Validator rather than the Parser, because the Node is perfectly
-// well-formed: it has the one arm every `define` must have, and this is a
-// judgment about what that arm is worth rather than about how it was written.
+// A `define` whose only arm is the `otherwise` one asks nothing. A Warning
+// tagged `unnecessary`, since a ladder being written has this shape.
 function reportCaselessDefine(node: common.typed.DefineNode): void {
-	// And silent for a `define` the Parser did not read whole — see
-	// `partiallyRead`. A ladder whose arms were dropped has no cases HERE and
-	// every one of them in the file, which is the syntax error above wearing a
-	// Warning's clothes.
+	// Silent where the parser dropped the arms. See `partiallyRead`.
 	if (node.arms.length > 0 || partiallyRead(node.position)) {
 		return
 	}
@@ -1829,17 +1638,8 @@ function reportCaselessDefine(node: common.typed.DefineNode): void {
 	})
 }
 
-// Every arm answers where the `define` stands, so every arm is held to
-// the `define`'s answer Type. Asked of the Type whatever decided it: where the
-// arms decided it themselves it is the Union of exactly these values and each
-// of them fits by construction, so one check covers the arrow and the position
-// around the `define` without the Node having to say which of them spoke.
-//
-// Reported at the arm's VALUE, which is the part a reader can change —
-// the arrow's Type has no Position of its own, and the position around a
-// `define` is a Declaration's annotation somewhere above it. Same reason a `<-`
-// is reported where it is, and the same code: an arm is what a `define`
-// returns.
+// Every arm is held to the `define`'s answer Type, and reported at its value
+// with the code a `<-` gets.
 function checkDefineAnswer(
 	node: common.typed.DefineNode,
 	value: common.typed.ExpressionNode,
@@ -1892,24 +1692,8 @@ function checkDefineAnswer(
 	)
 }
 
-// A Case that an earlier one takes the EMPTY VALUES of a container from
-// without covering it: an empty List fits every List Matcher, so
-// `case List<String>` above `case List<Integer>` answers for an empty
-// `List<Integer>` and this Case never sees one. Nothing said so before, in
-// either direction — the Validator called the two unrelated and the runtime took
-// the earlier branch. Only that crossover is reported here: a Matcher that
-// narrows a member by Type overlaps the Cases below it too, but the values it
-// takes are exactly the ones it names, which is Cases being tried in order and
-// nothing to warn about.
-//
-// The empty DICTIONARY crosses in exactly the same way and is reported in
-// exactly the same place, under a Warning of its own — a Dictionary reader is
-// told about its two slots and helped with `hasEntries()`, where a List reader
-// is told about item Types and helped with `hasItems()`.
-//
-// One Diagnostic per Handler, on the first earlier Case that overlaps it.
-// Members the earlier Case takes ENTIRELY are none of this: those are the
-// dead-Case reports above, and this Handler still runs for the rest.
+// A Case whose empty container values an earlier Case takes. One Diagnostic
+// per Handler. See "Runtime overlap" in DEVELOPMENT.md.
 function reportEmptyContainerOverlap(
 	node: common.typed.MatchNode,
 	handlerIndex: number,
@@ -1979,29 +1763,8 @@ function reportEmptyContainerOverlap(
 	}
 }
 
-// A Match that takes a VALUE apart rather than a Type — `match n { case 0
-// { … } case _ { … } }`. There is no Union here to be exhaustive over, so what
-// stands in for exhaustiveness is the SHAPE: every Case names a value, and the
-// last one answers for every value the Cases above it did not name.
-//
-// That last Case is also where evidence comes from. Reaching it proves the
-// value is none of the values named above, which is the `isNot` a refinement is
-// declared by — `refinedSelfType` in the Enricher is what reads it — so the
-// shape is a rule about what the Program MEANS rather than a matter of style.
-//
-// Integer and String, and no other Type. They are the two whose literal
-// Matcher asks exactly what their Namespace's `is` asks: `anyIs` compares
-// Integers as bigints and Strings NFC-normalised, which is what `Integer.is`
-// and `String.is` answer, so a Case that declined really does prove `isNot`.
-// A Rational would carry the same argument — it is a refinable base too, and
-// `anyIs` cross-multiplies its parts exactly as `Rational.is` does — but
-// admitting a third scrutinee is a change to `match` that nobody has weighed.
-// A Boolean's two values are an `if` written the long way, and everything else,
-// a Rational included, keeps `match-on-non-union`.
-//
-// A Match on one of the two that names NO value at all is not one of
-// these. It asks nothing about the value it was given, which is the one-outcome
-// Match `match-on-non-union` has always been about, and it still reports.
+// A Match on an Integer or a String whose Cases name values.
+// See "Literal Matches" in DEVELOPMENT.md.
 function isLiteralMatch(node: common.typed.MatchNode): boolean {
 	let scrutinee = eraseRefinements(node.value.type)
 
@@ -2011,10 +1774,7 @@ function isLiteralMatch(node: common.typed.MatchNode): boolean {
 	)
 }
 
-// One Diagnostic per Case that can not stand where it stands, and one more
-// for a Match that does not end in a Case for the rest — each is a mistake of
-// its own at a Position of its own, which is why they are not merged the way
-// `missing-case` merges the members of a Union.
+// One Diagnostic per misplaced Case, and one for a missing last Case.
 function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 	let scrutinee = eraseRefinements(node.value.type)
 	let matchedValue = () =>
@@ -2025,9 +1785,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 	let takesValuesApart = `A Match on ${withArticle(describeType(scrutinee))} takes the VALUE apart: every Case names a value, and the last one answers for every value the Cases above it did not name.`
 	let lastIndex = node.handlers.length - 1
 	let last = node.handlers[lastIndex]
-	// Whether the Match ALREADY ends in a Case for the rest, which is what
-	// decides the Help below — the same question the final check asks, asked once
-	// and read twice so the two can not disagree.
+	// Asked once, for the Help and the final check alike.
 	let endsInACaseForTheRest =
 		last !== undefined &&
 		isUnconditionalHandler(last) &&
@@ -2050,13 +1808,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 						matchedValue(),
 					],
 					notes: [takesValuesApart],
-					// `'case 0'` was an example of a value, and it is a
-					// dead end on a Match over Strings — a Case naming an
-					// Integer there is refused two clauses down. And "move it to
-					// the end" is only an edit where there is no end yet: a
-					// Match that already closes with `case _` has this Case
-					// moved BELOW it, which makes the `case _` the one that does
-					// not name a value and reports in its place.
+					// Moving it to the end helps only where no last Case exists.
 					helps: [
 						endsInACaseForTheRest
 							? "Write the value this Case is about, or remove it — the last Case already answers for every value the Cases above it do not name."
@@ -2097,10 +1849,8 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 			continue
 		}
 
-		// The Case is compared TO the matched value, so a Case naming a
-		// value of another Type is a comparison that is false however it is
-		// written — the same mistake `n::is("zero")` is, in the one place the
-		// Types were never checked against each other.
+		// A Case naming a value of another Type is a comparison that is never
+		// true.
 		if (!matchesType(scrutinee, handler.literal.type)) {
 			reportError(
 				"This Case names a value the Match can never be given",
@@ -2117,11 +1867,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 					notes: [
 						"A Case of such a Match is compared to the matched value, and a comparison across Types can never be true.",
 					],
-					// The Type a value written here has to BE, which the
-					// Label has just said this one is not. Removal is the other
-					// answer and is always safe: a Case comparing across Types
-					// is never true, so the Cases below it already answer for
-					// everything it would have.
+					// Removal is always safe, since the Case is never true.
 					helps: [
 						`Name ${withArticle(describeType(scrutinee))}, or remove this Case.`,
 					],
@@ -2130,14 +1876,7 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 		}
 	}
 
-	// A Match with no Handlers at all is a Parser error, and this runs on a
-	// tree the Parser accepted.
-	//
-	// `endsInACaseForTheRest` is the answer to "unconditional, and
-	// accepting every value that can arrive" — `case _`, or a Case naming the
-	// matched Type itself, which is the same question spelled out. Both are
-	// indistinguishable by the time a Match is typed, and both are total, so
-	// both are the end of a Match on values.
+	// A `case _`, or a Case naming the matched Type, ends a Match on values.
 	if (last === undefined || endsInACaseForTheRest) {
 		return
 	}
@@ -2159,9 +1898,8 @@ function validateLiteralMatchShape(node: common.typed.MatchNode): void {
 	)
 }
 
-// WHY the last Handler is not the end of a Match on values — the three ways
-// it can fail to answer for everything the Cases above it left, each underlining
-// the part of the Handler that decides.
+// Why the last Handler does not end a Match on values, underlining the part
+// that decides.
 function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
 	if (handler.literal !== null || handler.memberLiterals !== null) {
 		return primary(
@@ -2190,11 +1928,8 @@ function finalHandlerLabel(handler: MatchHandler): common.DiagnosticLabel {
 	)
 }
 
-// A Handler with a literal Matcher, a value-constrained Record member or
-// a Guard covers only part of its Matcher's Type — `case 0` leaves every other
-// Integer, and a Guard can decline outright. So only an unconditional Handler
-// discharges a member of the Union, and only an unconditional Handler takes a
-// Type away from the Handlers below it.
+// Whether a Handler covers its Matcher's whole Type: no literal, member
+// literal, payload requirement or Guard.
 function isUnconditionalHandler(handler: MatchHandler): boolean {
 	return (
 		handler.literal === null &&
@@ -2204,12 +1939,8 @@ function isUnconditionalHandler(handler: MatchHandler): boolean {
 	)
 }
 
-// Whether the Handler's emitted TEST is its whole question — nothing left
-// that could decline a value the test accepted. Payload requirements stay in:
-// they are part of the test itself, which `runtimeMatcherOf` folds into the
-// Matcher, so a requirement that erases at runtime claims the Cases below it
-// exactly as the equivalent Record Matcher does. A literal, a member literal or
-// a Guard decides AFTER the test, and takes nothing from anyone.
+// Whether the Handler's emitted test is its whole question. A payload
+// requirement is part of the test; a literal or a Guard decides after it.
 function claimsWhatItsTestAccepts(handler: MatchHandler): boolean {
 	return (
 		handler.literal === null &&
@@ -2218,12 +1949,8 @@ function claimsWhatItsTestAccepts(handler: MatchHandler): boolean {
 	)
 }
 
-// The question a Handler's emitted test asks, as ONE Type — the Matcher
-// with the payload requirements grafted onto the members their spines reach.
-// `case #Apply({ fn: IntFn })` and `case { fn: IntFn }` are two spellings of
-// one test, and reachability has to read them as one: a requirement kept
-// beside the Matcher was invisible here, and a requirement whose check erases
-// (a Function's Signature) claimed nothing while the runtime took everything.
+// The question a Handler's emitted test asks, as one Type: the Matcher with
+// its payload requirements grafted on.
 function runtimeMatcherOf(handler: MatchHandler): common.Type {
 	if (handler.memberTypes === null) {
 		return handler.matcher
@@ -2264,46 +1991,22 @@ function graftRequirement(
 		),
 	}
 
-	// A grafted Record is built fresh rather than spread over, because a
-	// member narrowed by a requirement is a shape no Alias declared: a
-	// `Standing` whose `points` a Pattern requires to be a `NonZeroInteger` is
-	// not what `Standing` says, and this Type is PRINTED — the reachability
-	// report reads it through `describeType`. A Case keeps its own name, which
-	// is not a spelling of its members but WHICH Case a value is, and is what
-	// the emitted tag asks about.
+	// A grafted Record drops its Alias name, since its shape is no longer the
+	// Alias's and it is printed. A Case keeps its name, which the tag asks.
 	return type.type === "Record"
 		? { type: "Record", members }
 		: { ...type, members }
 }
 
-// Whether the check emitted for `matcher` answers TRUE for EVERY value of
-// `memberType` — which decides reachability, and is a WIDER question than
-// assignability. Some of what a Matcher names does not survive to runtime, and
-// what does not survive can not narrow: assignability answers what a Case may
-// assume about the values it accepts, this answers which values reach it at all.
-//
-// Two things erase, and each one is a Case that swallowed everything below
-// it with nothing here to say so. A Generic Matcher (and the wildcard's Unknown,
-// which is the same answer spelled differently) has no Type left to check, so
-// `isValueOfType` returns true unconditionally — `case Value` above `case
-// String` left the second Case dead, and the Program answered the String where
-// its own Signature promised a `Value`. A Function's Signature is equally gone:
-// the emitted check can only ask whether the value is callable, so a Record
-// Matcher naming a callback member accepts every Record carrying one, whatever
-// that callback's Parameters and Return Type were declared as.
-//
-// Exported so the agreement between this and the runtime can be tested
-// directly — every value this accepts, `isValueOfType` has to accept too, and
-// `overlapsAtRuntime` below is the other side of the same sandwich.
+// Whether the check emitted for `matcher` accepts every value of
+// `memberType`. See "Runtime overlap" in DEVELOPMENT.md. Exported for the spec
+// that holds it to the runtime's `isValueOfType`.
 export function acceptsAllAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
-	// A checked refinement is the third thing that erases, and the most
-	// completely: its predicate is not a check the runtime declines to make, it
-	// is a check the runtime never hears of. So both sides are unwrapped before
-	// anything else is asked, and a refinement answers exactly as its base does
-	// — which is what the emitted check will do.
+	// A refinement's predicate never reaches the runtime, so both sides are
+	// unwrapped first.
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
 		return acceptsAllAtRuntime(
 			eraseRefinements(matcher),
@@ -2319,9 +2022,8 @@ export function acceptsAllAtRuntime(
 		return true
 	}
 
-	// A Union is decided member by member, on whichever side it stands:
-	// every value of a matched Union has to pass, and a Matcher that is a Union
-	// passes a value as soon as one of its arms does.
+	// Every arm of a matched Union has to pass. A Union Matcher passes a value
+	// as soon as one of its arms does.
 	if (memberType.type === "UnionType") {
 		return flattenUnionMembers(memberType).every((armType) =>
 			acceptsAllAtRuntime(matcher, armType),
@@ -2338,15 +2040,13 @@ export function acceptsAllAtRuntime(
 		return memberType.type === "Function"
 	}
 
-	// Structural and open, exactly as the runtime check is — the value
-	// has to carry every member the Matcher names, and may carry more besides.
+	// Structural and open: the value carries every member the Matcher names.
 	if (matcher.type === "Record" && memberType.type === "Record") {
 		return membersAcceptAllAtRuntime(matcher.members, memberType.members)
 	}
 
-	// The Record check with the tag in front of it, which is what the
-	// runtime does for a Case — the tag is shared by every instantiation, so
-	// the payload is what tells `Box<Integer>#Full` from `Box<String>#Full`.
+	// The Record check after the tag. The payload tells `Box<Integer>#Full`
+	// from `Box<String>#Full`.
 	if (matcher.type === "Case" && memberType.type === "Case") {
 		return (
 			matcher.choice === memberType.choice &&
@@ -2355,10 +2055,8 @@ export function acceptsAllAtRuntime(
 		)
 	}
 
-	// A List Matcher is answered by the items the value HOLDS, so it takes
-	// every List whose item Type its own accepts — and one naming no item Type
-	// at all (a bare `List`) takes every List there is. A member Type whose own
-	// items are undecided could hold anything, so it is not all of anything.
+	// A List Matcher is answered by the items a value holds. A bare `List`
+	// takes every List, and a List of undecided items is not all of anything.
 	if (isRuntimeList(matcher) && isRuntimeList(memberType)) {
 		let matcherItemType = runtimeItemType(matcher)
 		let memberItemType = runtimeItemType(memberType)
@@ -2373,9 +2071,8 @@ export function acceptsAllAtRuntime(
 		)
 	}
 
-	// A Dictionary Matcher is answered by the entries the value HOLDS, as
-	// a List Matcher is answered by its items — the tag first, then each slot on
-	// its own terms.
+	// A Dictionary Matcher is answered by the entries a value holds, slot by
+	// slot.
 	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
 		return (
 			slotAcceptsAllAtRuntime(
@@ -2392,22 +2089,14 @@ export function acceptsAllAtRuntime(
 	return false
 }
 
-// Whether the check emitted for `matcher` can answer TRUE for SOME value
-// of `memberType`. It differs from `acceptsAllAtRuntime` in exactly one place,
-// and that place is the whole reason it exists: an empty List holds no item to
-// disagree about, so it is a value of every List Type there is and every List
-// Matcher takes it. `case List<String>` above `case List<Integer>` therefore
-// runs for an empty `List<Integer>`, which assignability — and so the Validator
-// — used to call impossible while the runtime did it.
-//
-// Conservative everywhere else: an answer of false is a promise that no
-// value of `memberType` reaches this Matcher, so anything not known to overlap
-// is answered exactly as `acceptsAllAtRuntime` answers it.
+// Whether the check emitted for `matcher` accepts some value of
+// `memberType`, empty containers included. See "Runtime overlap" in
+// DEVELOPMENT.md.
 export function overlapsAtRuntime(
 	matcher: common.Type,
 	memberType: common.Type,
 ): boolean {
-	// Unwrapped for the reason its sibling above unwraps.
+	// Unwrapped as in `acceptsAllAtRuntime`.
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
 		return overlapsAtRuntime(
 			eraseRefinements(matcher),
@@ -2419,12 +2108,8 @@ export function overlapsAtRuntime(
 		return true
 	}
 
-	// A member Type that is still a Type Parameter is NOT counted as an
-	// overlap, though its Argument could be anything: every Match over a
-	// `Value | String` would report one, and a Type Parameter's values are
-	// exactly what the Handlers around it are written to sort out. What this
-	// answers about is the values a Type NAMES, which is what the emitted
-	// check is written from.
+	// A Type Parameter member is not counted as an overlap; sorting its values
+	// out is what the Handlers are for.
 	if (memberType.type === "UnionType") {
 		return flattenUnionMembers(memberType).some((armType) =>
 			overlapsAtRuntime(matcher, armType),
@@ -2458,8 +2143,7 @@ export function overlapsAtRuntime(
 		return true
 	}
 
-	// And the empty Dictionary, which holds no entry to disagree about
-	// either of its slots over.
+	// And the empty Dictionary.
 	if (isRuntimeDictionary(matcher) && isRuntimeDictionary(memberType)) {
 		return true
 	}
@@ -2467,18 +2151,8 @@ export function overlapsAtRuntime(
 	return false
 }
 
-// Whether the values that cross from `memberType` into `matcher` are the
-// EMPTY ones of a container — a Matcher somewhere in the overlap whose own slots
-// do not take the member's. That crossover is the one `overlapsAtRuntime` exists
-// to see, and the one worth a warning: every other partial overlap is a Matcher
-// taking exactly the values it names, in order, as Matchers do.
-//
-// The empty DICTIONARY crosses in exactly the same way, and is asked about
-// under its own `kind` rather than folded into the List's answer. The two
-// Warnings are not one Warning — a List reader is told about item Types and
-// helped with `hasItems()`, and a Dictionary reader about its two slots and
-// `hasEntries()` — so what is shared is the WALK and not the text. One walk,
-// two leaves, and no way for the pair to drift apart.
+// Whether the values crossing from `memberType` into `matcher` are the empty
+// ones of a container of `kind`.
 function overlapsThroughEmptyContainer(
 	matcher: common.Type,
 	memberType: common.Type,
@@ -2528,9 +2202,7 @@ function overlapsThroughEmptyContainer(
 	return false
 }
 
-// Which container's empty value crosses, or null where nothing does. A
-// List is asked about FIRST, so a Program that crosses through both — a Record
-// holding one of each — reports the List's Warning it has always reported.
+// Which container's empty value crosses, or null. A List is asked about first.
 type EmptyCrossover = "List" | "Dictionary"
 
 function emptyCrossoverKind(
@@ -2552,9 +2224,8 @@ function membersAcceptAllAtRuntime(
 	matcherMembers: Record<string, common.Type>,
 	memberTypes: Record<string, common.Type>,
 ): boolean {
-	// `Object.hasOwn` before the read — a member named after one of
-	// `Object.prototype`'s would otherwise be checked against a JavaScript
-	// function the value does not carry.
+	// `Object.hasOwn`, so a member named like an `Object.prototype` property
+	// is not read off the prototype.
 	return Object.entries(matcherMembers).every(
 		([name, memberMatcher]) =>
 			Object.hasOwn(memberTypes, name) &&
