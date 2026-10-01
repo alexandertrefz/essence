@@ -41,16 +41,10 @@ import {
 import { createPalette, createTheme } from "../theme"
 import { capture, withFiles as withProject } from "./harness"
 
-// A bundle cache of this spec's own, and a result cache beside it. They
-// are assigned rather than exported because where a cache lives is read off the
-// environment every time it is asked for, and restored afterwards so that a
-// suite running beside this one keeps the directories it named.
-//
-// Directories rather than `off` for both, so that what these specs drive
-// is what a reader's own `essence test` does — including the store a second run
-// answers out of. Nothing here may reach the user's caches: a spec that filled
-// one would make the next real run replay a fixture, and a spec that read one
-// would answer out of a project it has never seen.
+// This spec's own bundle and result caches, assigned into the environment and
+// restored afterwards so a suite beside this one keeps its own. They are real
+// directories, so a second run answers from the store as a user's would. No spec
+// ever reads or fills the user's caches.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-test-cache-"))
 let resultCache = mkdtempSync(path.join(tmpdir(), "essence-test-results-"))
 let previousCache: string | undefined
@@ -99,8 +93,8 @@ const reportContext: ReportContext = {
 	quiet: false,
 }
 
-// A directory of this suite's own, so one left behind by a crash says
-// which spec made it. The harness under it is the one `mutation.spec` drives.
+// A directory of this suite's own, so one a crash leaves names its spec. The
+// harness under it is the one `mutation.spec` drives.
 function withFiles<Value>(
 	files: Record<string, string>,
 	body: (directory: string) => Promise<Value>,
@@ -108,11 +102,8 @@ function withFiles<Value>(
 	return withProject(files, body, "essence-tests-")
 }
 
-// One job unless a test asks for more. What a run of this suite is about
-// is what `essence test` REPORTS, and every worker it boots is a thread that
-// imports the Compiler to answer the same thing the main one would have — so
-// the default stays here, and the one test that is about the pool itself names
-// its own.
+// One job unless a test asks for more: this suite is about what `essence test`
+// reports, and workers would only repeat the main thread's work.
 function runTests(
 	directory: string,
 	essenceArguments: Array<string> = [],
@@ -133,21 +124,10 @@ function runTests(
 	)
 }
 
-// The same run, spawned rather than driven in this process, and pointed
-// at the directory it should START in — which is the point of it: a project's
-// settings are found by walking up from where the run was started, so a spec
-// about a configured project has to stand in one.
-//
-// Spawned rather than driven with `process.chdir`, because a run also
-// COMPILES. The bundler's own child process is started once per process and
-// keeps the working directory it was started in, so a compile driven from
-// inside a directory this spec then removes leaves every later build in this
-// process — including the ones in other spec files — resolving against a
-// directory that is no longer there. A child of its own takes its working
-// directory with it.
-//
-// `input` is what the run is piped. Without one the child's input is
-// empty, so a Program that reads can not wait on a terminal.
+// The same run, spawned in the directory it starts in, since a project's settings
+// are found by walking up from there. A spawn rather than `process.chdir`, because
+// the bundler's child process keeps the working directory it started in. `input`
+// is piped to the run; without it the input is empty, so a read never waits.
 async function runTestsIn(
 	directory: string,
 	essenceArguments: Array<string> = [],
@@ -166,10 +146,8 @@ async function runTestsIn(
 		],
 		{
 			cwd: directory,
-			// Carried over rather than inherited: the two caches this
-			// suite names are assigned into `process.env` above, and a child
-			// answering out of the reader's own stores is a child answering
-			// about a project it has never seen.
+			// Passed on explicitly, so the child uses this suite's caches rather than the
+			// user's.
 			env: { ...process.env },
 			input,
 		},
@@ -207,7 +185,7 @@ const passing = [
 	"",
 ].join("\n")
 
-// A tests section that does not COMPILE, rather than one that fails.
+// A tests section that does not compile, rather than one that fails.
 const broken = [
 	"tests {",
 	'\ttest "asserts a String" {',
@@ -226,11 +204,9 @@ const failing = [
 	"",
 ].join("\n")
 
-// A table test whose row is not a value of what its Parameter declares,
-// and whose NAME interpolates that row. Nothing but the Enricher ever checks a
-// row, and this shape of a mistyped one did not merely fail: the name asked
-// `Rational::toString` how to print an Integer before the body had run at all,
-// and the reduction of a pair of members it does not carry spun forever.
+// A table test whose row does not match its Parameter's Type, and whose name
+// interpolates that row. The Enricher refuses the row, so the file must not
+// compile, and nothing renders the name.
 const interpolatedRow = [
 	"implementation {}",
 	"",
@@ -244,8 +220,7 @@ const interpolatedRow = [
 	"",
 ].join("\n")
 
-// A Module another one imports from, so that two entries reach one
-// tests section.
+// A Module another imports from, so two entries reach one tests section.
 const exporting = [
 	"implementation {",
 	"\tfunction double(_ value: Integer) -> Integer {",
@@ -293,8 +268,8 @@ const focused = [
 	"",
 ].join("\n")
 
-// A name worked out where the test stands, so that what a report calls a
-// test can be checked against what it is called when it never runs.
+// A name interpolated where the test stands, so a report's name for it can be
+// checked even when it never runs.
 const interpolated = [
 	"tests {",
 	"\tconstant scored = 2",
@@ -360,8 +335,8 @@ describe("essence test — discovery", () => {
 		)
 	})
 
-	// `tests` is a contextual keyword, so a walk answers by PARSING —
-	// with a read of the text first, which can only rule a file out.
+	// `tests` is a contextual keyword, so a walk parses the file. Reading the text
+	// first can only rule a file out.
 	it("leaves a file that merely writes the word alone", async () => {
 		await withFiles(
 			{
@@ -394,9 +369,7 @@ describe("essence test — discovery", () => {
 					await discoverTestFiles([broken], testCommand, "essence"),
 				).toHaveLength(1)
 
-				// The same file nobody named is left alone — an unrelated
-				// broken source under the working directory is not what
-				// `essence test` was asked about.
+				// An unrelated broken source nobody named is left alone.
 				expect(
 					await discoverTestFiles(
 						[],
@@ -458,11 +431,8 @@ describe("essence test — discovery", () => {
 // #region Configuration
 
 describe("essence test — project configuration", () => {
-	// Every project holds sources that are not its own tests — a corpus
-	// of deliberately broken files is the one this repository holds, and it is
-	// what made `essence test` unrunnable at its own root. What the file itself
-	// reads, and how a mistake in it is reported, is the Compiler's own spec;
-	// what is here is what the COMMAND does with the answer.
+	// Every project holds sources that are not its tests, such as this repository's
+	// broken examples. This spec covers what the command does with the settings.
 	it("stays out of the directories a project excludes", async () => {
 		await withFiles(
 			{
@@ -488,11 +458,8 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
-	// `essence test` with nothing typed is about the PROJECT, and a
-	// project is where its `essence.json` is — so the same command run in a
-	// nested directory runs the same tests. Before, the walk started at the
-	// working directory, and a run from `packages/cli` reported a green project
-	// while the twelve packages beside it went unasked.
+	// `essence test` with nothing typed runs the project around its `essence.json`,
+	// so a run from a nested directory runs the same tests.
 	it("walks the whole project from a directory inside it", async () => {
 		await withFiles(
 			{
@@ -518,8 +485,7 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
-	// A path that WAS typed narrows the run and is read where the run was
-	// started, because that is what a path typed into a shell means.
+	// A typed path narrows the run and is read from where the run started.
 	it("narrows to a path that was typed, against the working directory", async () => {
 		await withFiles(
 			{
@@ -572,8 +538,7 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
-	// A file asked about BY NAME is answered about. The setting narrows
-	// the search, which is the half nobody asked for.
+	// A file named on the command line runs: `exclude` only narrows the walk.
 	it("still compiles an excluded file that was named", async () => {
 		await withFiles(
 			{
@@ -596,8 +561,7 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
-	// The whole point of configuring a default: a project that skips
-	// `slow` every day is a project where the nightly job asks for it by name.
+	// A project that skips `slow` by default still runs it with `--tag slow`.
 	it("lets --tag ask for a tag the project skips by default", () => {
 		expect(
 			resolveFilters({ filter: undefined, tag: ["slow"], skipTag: [] }, [
@@ -622,9 +586,7 @@ describe("essence test — project configuration", () => {
 		})
 	})
 
-	// And the goals are a union with the setting, which `--no-contracts`
-	// beats in either direction — a project that always tests its declarations
-	// still gets a plain run on demand.
+	// `--contracts` unions with the setting, and `--no-contracts` beats both.
 	it("unions the goals with the setting, and lets one run out", () => {
 		let flags = { contracts: false, noContracts: false }
 
@@ -638,11 +600,8 @@ describe("essence test — project configuration", () => {
 		expect(resolveContracts(flags, false)).toBe(false)
 	})
 
-	// What the settings could not be read out of is a Warning with a
-	// span, rendered by the renderer every other Diagnostic goes through and
-	// printed ahead of the run — which happens anyway, with that setting at its
-	// default. The manifest key is the one a project moving to `essence.json`
-	// is most likely to still be holding.
+	// A setting that cannot be read is a Warning with a span, printed before the run,
+	// which goes on with the default. The manifest key is the likeliest leftover.
 	it("renders what it could not read, and runs the project anyway", async () => {
 		await withFiles(
 			{
@@ -665,8 +624,7 @@ describe("essence test — project configuration", () => {
 		)
 	})
 
-	// And under `--verbose`, which file the settings came from — the
-	// question a project with more than one of them asks first.
+	// Under `--verbose`, the run says which file the settings came from.
 	it("names the file the settings came from under --verbose", async () => {
 		await withFiles(
 			{ "essence.json": `{}`, "Rules.es": passing },
@@ -745,9 +703,7 @@ describe("essence test — running", () => {
 		})
 	})
 
-	// The refusal names every test the focus was left on, as an ordinary
-	// Diagnostic over the source — "which ones" is the whole question a person
-	// asks when they read it.
+	// The refusal names every focused test, as a Diagnostic over the source.
 	it("runs only the focused tests, and exits two in a plain run", async () => {
 		await withFiles({ "Focus.tests.es": focused }, async (directory) => {
 			let { code, err, out } = await runTests(directory)
@@ -761,8 +717,7 @@ describe("essence test — running", () => {
 		})
 	})
 
-	// Focusing while iterating is ordinary working practice; it is only a
-	// run nobody narrowed that a leftover `focused` may not survive.
+	// Under a filter, a leftover focus is ordinary practice and is not refused.
 	it("says nothing about focus under a filter", async () => {
 		await withFiles({ "Focus.tests.es": focused }, async (directory) => {
 			let { code, err } = await runTests(directory, ["-f", "runs"])
@@ -772,10 +727,8 @@ describe("essence test — running", () => {
 		})
 	})
 
-	// Three tests are not focused — the one beside the focus, and the two
-	// of the other file that are not skipped — and the skipped one still
-	// reports as skipped, because what a test says about itself is read before
-	// what the run says about the rest.
+	// Three tests are not focused: the focus's sibling and the other file's two
+	// unskipped tests. The skipped one still reports as skipped.
 	it("silences a whole file when another one holds the focus", async () => {
 		await withFiles(
 			{ "Focus.tests.es": focused, "Rules.es": passing },
@@ -790,10 +743,8 @@ describe("essence test — running", () => {
 		)
 	})
 
-	// A test silenced by another file's focus is reported by the name it
-	// would have run under, not by the template it was written as — the runtime
-	// works both out the same way, which is why the CLI hands the whole run to
-	// it rather than writing the deselections itself.
+	// A test silenced by another file's focus is reported by its interpolated name,
+	// which the runtime works out.
 	it("names a silenced test the way a run would have named it", async () => {
 		await withFiles(
 			{
@@ -858,10 +809,8 @@ describe("essence test — running", () => {
 		})
 	})
 
-	// Both files are entries, and the graph of the second holds the
-	// first, so both bundles carry the first Module's manifest. Running it
-	// twice would report every test of every shared Module once per entry that
-	// reaches it.
+	// Both files are entries, and the second's graph holds the first, so both bundles
+	// carry its tests. They must be reported once.
 	it("runs a Module's tests once however many entries reach it", async () => {
 		await withFiles(
 			{ "Rules.es": exporting, "Rules.tests.es": importing },
@@ -877,14 +826,9 @@ describe("essence test — running", () => {
 		)
 	})
 
-	// The same run through the worker pool, which is what an ordinary
-	// project gets — six entries reach for workers on their own, and `--jobs`
-	// reaches for them at any size. A worker is opened in the run's MODE, and a
-	// pool that opened its workers as builds compiled every file of a test run
-	// without the section the run exists to check: a whole project reported as
-	// having nothing to run, and an `unused-import` about a Type only its tests
-	// read. Three entries in two graphs, so the batch is spread over two
-	// workers and the shared Module still reports its tests once.
+	// The same run through the worker pool. Workers must open in the run's mode, or
+	// they compile a test run without its tests. Three entries in two graphs spread
+	// over two workers, and the shared Module still reports once.
 	it("runs the tests of a batch compiled in workers", async () => {
 		await withFiles(
 			{
@@ -917,10 +861,8 @@ describe("essence test — running", () => {
 		)
 	})
 
-	// A project with one half-typed file in it is exactly the project
-	// whose other twenty files are worth hearing about, so the broken entry is
-	// named and left out and the rest of the run happens. The run still ends
-	// non-zero: something in it could not be compiled.
+	// A file that does not compile is named and left out, the rest runs, and the
+	// run ends non-zero.
 	it("reports a compile error, leaves that entry out and runs the rest", async () => {
 		await withFiles(
 			{
@@ -938,11 +880,8 @@ describe("essence test — running", () => {
 		)
 	})
 
-	// Spawned rather than run in process, and on a clock. What this is
-	// about is a run that FINISHES, and the hang it guards against was a
-	// synchronous loop on the very thread a spec runs on — an in-process one
-	// would take the whole suite down with it instead of failing, and no
-	// timeout a test runner offers can interrupt a loop that never yields.
+	// Spawned and timed, since this guards against a synchronous hang. In process,
+	// it would hang the whole suite where no test timeout can interrupt it.
 	it("finishes on a mistyped row a test name interpolates", async () => {
 		await withFiles(
 			{ "Rows.tests.es": interpolatedRow },
@@ -963,8 +902,8 @@ describe("essence test — running", () => {
 					{ env: { ...process.env } },
 				)
 
-				// The deadline rejects a hang; this catches a child
-				// killed by some other signal, where `code` is null.
+				// The deadline rejects a hang; this catches a child killed
+				// by another signal, where `code` is null.
 				expect(result.signal).toBeNull()
 				expect(result.stderr).toContain("table-row-type-mismatch")
 				expect(result.stderr).toContain("did not compile")
@@ -973,8 +912,8 @@ describe("essence test — running", () => {
 		)
 	})
 
-	// The stream is bracketed whatever happened, because a consumer
-	// reading it a line at a time has nothing else to tell it the run is over.
+	// The stream is bracketed whatever happens, since a line-by-line consumer has no
+	// other sign that the run is over.
 	it("brackets the event stream when an entry did not compile", async () => {
 		await withFiles(
 			{
@@ -1017,9 +956,8 @@ describe("essence test — running", () => {
 
 // #region The event stream
 
-// `check` is the command a project runs to be told whether it is
-// correct. A build drops the tests section, and a gate that answered about less
-// than the editor does would pass a file the next step can not compile.
+// `check` compiles the tests section too, so it fails a file whose tests do not
+// compile, as the editor does.
 describe("essence check — the tests section", () => {
 	it("reports what a tests section says that does not compile", async () => {
 		await withFiles({ "Broken.tests.es": broken }, async (directory) => {
@@ -1090,10 +1028,9 @@ describe("essence test --json", () => {
 		})
 	})
 
-	// `Terminal.inspect` renders a whole line and writes it through
-	// `console.log`, which does not go through `process.stdout.write` — so a
-	// Module that inspects a value as it is evaluated is the one way a byte
-	// that is not an event could reach stdout.
+	// `Terminal.inspect` writes through `console.log`, which bypasses
+	// `process.stdout.write`, so a Module inspecting a value as it loads could reach
+	// stdout.
 	it("keeps what a Module inspected as it loaded off stdout", async () => {
 		await withFiles(
 			{
@@ -1144,9 +1081,8 @@ describe("essence test --json", () => {
 		})
 	})
 
-	// A Module's own top-level output is written as the bundle is
-	// evaluated, with no test to attribute it to — stdout is the event stream,
-	// so it goes to stderr rather than into the middle of a JSON document.
+	// A Module's top-level output belongs to no test and goes to stderr, outside the
+	// event stream.
 	it("keeps a Module's own printing off stdout", async () => {
 		await withFiles(
 			{
@@ -1323,10 +1259,8 @@ describe("the test reporter", () => {
 		).toMatchSnapshot()
 	})
 
-	// The design's own tail on the summary line. It is about the COMPILE
-	// and the duration beside it is about the run, so a reader is only told it
-	// where it is true of every entry — which the runner works out and the
-	// report is handed.
+	// The compile cache note is shown only when every entry was cached, which the
+	// runner works out.
 	it("notes a warm compile cache, and only when it was one", () => {
 		let run = collectTestRun(events)
 
@@ -1341,9 +1275,8 @@ describe("the test reporter", () => {
 		)
 	})
 
-	// The kind the command line writes when it replays an entry it already
-	// held the answer for. It says nothing about any test — the events after it
-	// are that entry's own — so the fold counts it and changes nothing else.
+	// Written before a replayed entry's events. It says nothing about any test, so
+	// the fold only counts it.
 	it("counts a replayed entry without disturbing the tests it stands for", () => {
 		let plain = collectTestRun(events)
 		let replayed = collectTestRun([
@@ -1371,13 +1304,12 @@ describe("the test reporter", () => {
 		expect(renderTestSummary(run, reportContext, 0, false, 0, 3)).toContain(
 			"2 of 3 entries cached",
 		)
-		// Both notes at once is the ordinary second run of a project: it
-		// compiled nothing and it ran only what had moved.
+		// Both notes at once is a project's ordinary second run: nothing compiled, and
+		// only what moved ran.
 		expect(renderTestSummary(run, reportContext, 0, true, 0, 3)).toContain(
 			"compile cache warm",
 		)
-		// A run that asked the cache nothing says nothing. `entries` is
-		// zero for a watching session, which never reads this store at all.
+		// A run that asked the result cache nothing says nothing, as a watch session.
 		expect(
 			renderTestSummary(run, reportContext, 0, false, 0, 0),
 		).not.toContain("cached")
@@ -1421,12 +1353,8 @@ describe("the test reporter", () => {
 		expect(diagnostic.notes).toEqual(["`is` compared 3 with 2"])
 	})
 
-	// A test NAME is the reader's own text and it is PRINTED rather than
-	// quoted, which was fine while no Program could write a control character
-	// at all. `\u{…}` made one writable, and `"\u{1B}[2K"` in a name erases the
-	// line the report had just written; an override reorders it. Every printer
-	// of a name spells those, and only those — a name is not a value, so
-	// nothing else about it is escaped.
+	// A test name is printed rather than quoted, so terminal control characters in it
+	// are spelled as `\u{…}` escapes. Nothing else about a name is escaped.
 	it("spells the characters in a name that act on the terminal", () => {
 		let nasty = "erase\u001B[2Khere‮reversed\u0007"
 		let spelled = "erase\\u{1B}[2Khere\\u{202E}reversed\\u{7}"
@@ -1478,9 +1406,8 @@ describe("the test reporter", () => {
 		)
 	})
 
-	// A table test whose name interpolates nothing renders the same text
-	// for every row, under a heading that already says it — so the row says
-	// which row it is instead, in the tree and in the Diagnostic alike.
+	// A table row whose name interpolates nothing says which row it is, in the tree
+	// and in the Diagnostic.
 	it("names the row a name did not name", () => {
 		let rows: Array<TestEvent> = [
 			{
@@ -1532,8 +1459,7 @@ describe("the test reporter", () => {
 		)
 	})
 
-	// "A hundred cases held" is as much an answer as a counterexample is,
-	// and it is the only thing that tells a property test apart in the tree.
+	// A property test shows its case count, whether it held or not.
 	it("says how many cases a property test ran", () => {
 		let run = collectTestRun([
 			{
@@ -1577,10 +1503,8 @@ describe("the test reporter", () => {
 		)
 	})
 
-	// The frames name a bundle in a temporary directory and the files of
-	// the runner that staged it — a path that will not exist by the time
-	// anybody reads the report. The message says what happened; `--verbose`
-	// keeps the rest, because a Compiler bug is reported out of it.
+	// The frames name a staged bundle that is already gone, so only `--verbose`
+	// keeps them.
 	it("shows a thrown error without its JavaScript frames", () => {
 		let run = collectTestRun([
 			{
@@ -1652,8 +1576,8 @@ describe("the test reporter", () => {
 		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	// A value whose rendering is its own source explains nothing, and a
-	// difference over two scalars is what the note above it already said.
+	// A value whose rendering is its own source explains nothing, and the note
+	// already compares two scalars.
 	it("drops a Label that only repeats what is written there", () => {
 		let run = collectTestRun(events)
 		let failed = run.tests.find((test) => test.state === "failed")!
@@ -1675,10 +1599,8 @@ describe("the test reporter", () => {
 		expect(diagnostic.labels).toHaveLength(1)
 	})
 
-	// The reporting half of a benchmark, driven off events rather than off
-	// a clock — what a measurement looks like in the tree, in the failures and
-	// in the tally is the report's business, and asserting it against a real one
-	// would be asserting something about this machine today.
+	// The reporting half of benchmarks, driven by events rather than a clock, so
+	// nothing depends on this machine's speed.
 	function measured(
 		status: "written" | "matched" | "regressed" | "improved",
 		nanoseconds: number,
@@ -1796,8 +1718,8 @@ describe("the test reporter", () => {
 
 // #region Coverage
 
-// A file with something to miss in it: an `else` no test enters, an arm
-// no value takes and a Case nothing builds.
+// A file with something to miss: an `else` no test enters, an arm no value takes
+// and a Case nothing builds.
 const covered = [
 	"implementation {",
 	"\tchoice Fixture {",
@@ -1942,9 +1864,8 @@ describe("essence test --coverage", () => {
 	})
 
 	it("writes no file for a run that counted nothing", async () => {
-		// A `Foo.tests.es` of imports and tests has nothing to count, so
-		// there is nothing to write — and an empty tracefile is not an empty
-		// report: a viewer reads it as a valid claim about zero files.
+		// A `Foo.tests.es` of imports and tests counts nothing, so nothing is written: a
+		// viewer reads an empty tracefile as a claim about zero files.
 		await withFiles(
 			{ "Bare.tests.es": failing.replace("5", "4") },
 			async (directory) => {
@@ -1962,10 +1883,8 @@ describe("essence test --coverage", () => {
 		)
 	})
 
-	// A place to write and nothing to write there costs a whole run to
-	// discover — the table appears, the directory does not, and nothing says
-	// why. It is refused unless the PROJECT named a format, which is what makes
-	// the flag meaningful on its own.
+	// `--coverage-out` without a format is refused, unless the project names a
+	// format.
 	it("refuses a place to write with nothing to write there", () => {
 		let resolve = (configuration: ProjectConfiguration) =>
 			resolveProjectOptions(
@@ -2095,9 +2014,8 @@ describe("essence test — snapshots", () => {
 		)
 	})
 
-	// A stored entry no run visited is KEPT — a run narrowed by a filter
-	// has not asked about every test, and deleting what it did not ask about
-	// would lose a snapshot for the price of a `-f`.
+	// A stored entry no run visited is kept, since a filtered run did not ask about
+	// every test.
 	it("keeps a stored entry a narrowed run never visited", async () => {
 		await withFiles({ "Greeting.es": snapshots }, async (directory) => {
 			await runTests(directory)
@@ -2113,11 +2031,8 @@ describe("essence test — snapshots", () => {
 	})
 })
 
-// The whole of asynchrony, driven through the real command. A test body
-// may `complete` whatever it likes, and what these ask is that the RUNNER waits
-// for it: that a value only a finished run can hold reaches an `expect`, that
-// what a test writes after its first wait is still that test's output, and that
-// two tests never overlap.
+// Asynchrony through the real command. The runner waits for what a test body
+// completes, keeps output after a wait as that test's, and never overlaps tests.
 describe("essence test — a test that waits", () => {
 	const waiting = [
 		"implementation {",
@@ -2169,11 +2084,8 @@ describe("essence test — a test that waits", () => {
 		})
 	})
 
-	// The claim the output sink makes. What a test writes AFTER its first
-	// wait is still that test's, which is only true because the sink lasts as
-	// long as the run rather than as long as the call that installed it. And
-	// the two tests never overlap: the second one's line stands after the first
-	// one's, in a stream where each line names the test it belongs to.
+	// What a test writes after its first wait is still its own, because the sink
+	// lasts the whole run. The second test's line follows the first test's.
 	it("keeps what a test writes after its wait, under the test that wrote it", async () => {
 		await withFiles({ "Waiting.es": waiting }, async (directory) => {
 			let { out } = await runTests(directory, ["--json"])
@@ -2192,8 +2104,7 @@ describe("essence test — a test that waits", () => {
 				["waits for the answer", "after the wait\n"],
 				["runs after the one before it", "beside it\n"],
 			])
-			// One test at a time: everything the first one emitted
-			// stands before the second one started.
+			// One test at a time: all the first one emitted precedes the second's start.
 			expect(
 				events.flatMap((event) =>
 					event.kind === "test-start" || event.kind === "test-pass"
@@ -2221,9 +2132,8 @@ describe("essence test — a test that waits", () => {
 	})
 })
 
-// A run a signal ends never reaches the code that removes its staging, so
-// the next run sweeps it. Both runs are children pointed at a temporary
-// directory of this spec's own, so everything staged there is theirs.
+// A run a signal ends never removes its staging, so the next run sweeps it. Both
+// runs are children pointed at a temporary directory of this spec's own.
 describe("essence test — staging", () => {
 	const sleeping = [
 		"tests {",
@@ -2296,9 +2206,8 @@ describe("essence test — staging", () => {
 	}, 60_000)
 })
 
-// Piped, because what is asserted is that the run's own input never
-// reaches a test: not in the pass that renders names, not in a test, and not
-// after a test's wait.
+// Piped, since the run's own input must never reach a test: not while names
+// render, not in a test and not after a wait.
 describe("essence test — a test's input", () => {
 	const reading = [
 		"tests {",
@@ -2329,12 +2238,11 @@ describe("essence test — a test's input", () => {
 	})
 })
 
-// What a property test looks like from the command line: the report a
-// failure prints, the replay it names, and the two flags that pin a run.
+// A property test from the command line: a failure's report, the replay it
+// names, and the flags that pin a run.
 describe("essence test — property tests", () => {
-	// The draws fold in the file's path, which is new every run, so the
-	// failing property breaks on any List of five or more items, which every
-	// sequence draws, and each one shrinks to the same five zeros.
+	// The draws fold in the file's path, which is new every run. So the property
+	// fails on any List of five or more, and every draw shrinks to five zeros.
 	const properties = [
 		"tests {",
 		'\ttest "add commutes" for any (a: Integer, b: Integer) {',
@@ -2365,19 +2273,10 @@ describe("essence test — property tests", () => {
 		})
 	})
 
-	// THE claim `--seed` makes: the command a failure printed reproduces
-	// the failure, filter and all.
-	//
-	// Two runs in ONE directory, with the corpus removed between them. A
-	// property's seed is the run's folded together with the test's id, and a
-	// test's id opens with the path of the Module it was written in — so the
-	// same file in two different directories draws two different sequences, and
-	// what one run shrinks to the other may draw outright. One directory is also
-	// what the claim is ABOUT: the command a failure printed is typed again in
-	// the project the failure happened in.
-	//
-	// The `__counterexamples__` the first run wrote goes, because a run that
-	// read it would answer the same thing without drawing anything at all.
+	// The command a failure prints reproduces it, filter and all. A property's
+	// seed folds in the test's id, which starts with its Module's path. So both
+	// runs share one directory, as a reader retyping the command does. The corpus is removed
+	// between them, or the second run would replay without drawing.
 	it("draws the same counterexample for the same seed", async () => {
 		await withFiles({ "Properties.es": properties }, async (directory) => {
 			let whole = await runTests(directory, ["--seed", "deadbeef"])
@@ -2462,9 +2361,8 @@ describe("essence test — property tests", () => {
 	})
 })
 
-// What `--contracts` looks like from the command line: the goals a
-// project's own declarations promise, run beside the tests it wrote and
-// reported under a suite nobody typed.
+// `--contracts` from the command line: a project's declared goals, run beside its
+// written tests under a suite of their own.
 describe("essence test --contracts", () => {
 	const declarations = [
 		"implementation {",
@@ -2485,8 +2383,7 @@ describe("essence test --contracts", () => {
 		"",
 	].join("\n")
 
-	// A file with nothing but declarations in it, which a plain run does
-	// not even look at — and which is exactly the file a contract run exists
+	// A file of declarations only, which a plain run ignores and a contract run is
 	// for.
 	const undocumented = [
 		"implementation {",
@@ -2523,10 +2420,8 @@ describe("essence test --contracts", () => {
 		})
 	})
 
-	// The setting is read from the nearest `package.json` walking up from
-	// the working directory rather than from the directory a run was pointed
-	// at, so the union is asserted where it is decided rather than through a
-	// process this spec would have to move.
+	// The setting comes from the nearest `essence.json` above the working
+	// directory, so the union is asserted on `resolveContracts` directly.
 	it("takes the flag and the project's own setting as a union", () => {
 		let flags = (contracts: boolean, noContracts = false) => ({
 			contracts,
@@ -2538,8 +2433,7 @@ describe("essence test --contracts", () => {
 		expect(resolveContracts(flags(false), false)).toBe(false)
 	})
 
-	// The way out of a configured setting — a project that always tests
-	// its declarations still gets a plain run on demand.
+	// A project that always tests its declarations still gets a plain run on demand.
 	it("lets --no-contracts beat the setting and the flag", () => {
 		expect(
 			resolveContracts({ contracts: false, noContracts: true }, true),
@@ -2549,10 +2443,8 @@ describe("essence test --contracts", () => {
 		).toBe(false)
 	})
 
-	// THE cache-key claim. A contract compile enriches a suite that is
-	// not in the file at all, out of sources that are byte for byte the same —
-	// so the graph's own hash can not tell the two bundles apart, and a plain
-	// run handed the contract run's bundle would report goals nobody asked for.
+	// A contract compile enriches a suite from byte-identical sources. So the mode
+	// is in the bundle key, and a plain run never reuses the contract bundle.
 	it("does not serve a contract bundle to a plain run", async () => {
 		await withFiles({ "Counting.es": declarations }, async (directory) => {
 			let goals = await runTests(directory, ["--contracts"])
@@ -2565,9 +2457,8 @@ describe("essence test --contracts", () => {
 		})
 	})
 
-	// Said once per Namespace, and quietly — an `information` Diagnostic
-	// rather than a failure, because a Method nothing can build a goal for is
-	// not a mistake anybody made.
+	// Said once per Namespace, as `information` rather than a failure: a Method no
+	// goal can be built for is nobody's mistake.
 	it("says once which Methods got no goal", async () => {
 		await withFiles(
 			{
@@ -2613,12 +2504,9 @@ describe("essence test --contracts", () => {
 	})
 })
 
-// What a benchmark looks like from the command line. Nothing here asserts
-// a TIME: the times are the machine's, and a spec that read one would be a
-// scheduled flake. What is asserted is what the run WROTE, what it did with a
-// baseline it was handed, and what a run that did not ask to measure says
-// instead — and every baseline it is handed is written by this spec, so the
-// status a measurement reaches is arithmetic rather than luck.
+// A benchmark from the command line. Nothing asserts a time, which belongs to
+// the machine. The spec writes every baseline itself, so each status follows by
+// arithmetic.
 describe("essence test — benchmarks", () => {
 	const benchmarks = [
 		"implementation {",
@@ -2643,9 +2531,7 @@ describe("essence test — benchmarks", () => {
 		return path.join(directory, "__benchmarks__", "Doubling.es.bench")
 	}
 
-	// A baseline the spec chose rather than one a run measured, so that
-	// what the next run reports is decided here. Anything a real body measures
-	// is far away from both of the numbers used below.
+	// A baseline the spec chose, far from anything a real body measures.
 	function recordBaseline(directory: string, nanoseconds: number): void {
 		let filePath = baselineFile(directory)
 
@@ -2710,9 +2596,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// The one way a filter matches something and still runs nothing:
-	// it named benchmarks, and the run is not measuring. Without the sentence
-	// the run ends green with the reader's target never run.
+	// A filter that matches only benchmarks in a run that does not measure runs
+	// nothing, and must say so.
 	it("says so where a filter names only benchmarks", async () => {
 		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
 			let { code, err } = await runTests(directory, [
@@ -2727,10 +2612,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// No measurement writes a zero — the driver floors at a nanosecond —
-	// so one can only be a hand-edited or merge-mangled file. Holding a run to
-	// it would fail every later measurement as infinitely slower; it is
-	// re-recorded instead.
+	// No measurement writes a zero, since the driver floors at a nanosecond, so a
+	// zero baseline is a mangled file. It is recorded again rather than enforced.
 	it("re-records a baseline of nothing rather than failing against it", async () => {
 		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
 			recordBaseline(directory, 0)
@@ -2745,9 +2628,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// A measurement is taken before the reported run, so a body that then
-	// fails has already been measured — and a number measured off a failing
-	// benchmark is not a baseline.
+	// A body is measured before its reported run, so a benchmark that then fails
+	// must not keep its measurement as a baseline.
 	it("writes no baseline for a benchmark that failed", async () => {
 		let failing = benchmarks.replace(
 			"expect double(500)::is(1000)",
@@ -2762,9 +2644,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// Faster is news rather than a problem, and the baseline stands until
-	// somebody moves it — ten seconds a run is a baseline nothing on any machine
-	// will fail to beat.
+	// Faster is news, not a failure, and the baseline stands until someone records
+	// a new one.
 	it("passes a measurement that got faster, and records nothing", async () => {
 		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
 			recordBaseline(directory, 10_000_000_000)
@@ -2780,8 +2661,7 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// `--update` is one flag, and a run that did not ask to measure has
-	// measured nothing — so there is nothing for it to record either way.
+	// Without `--bench` nothing is measured, so `--update` records no baseline.
 	it("touches no baseline in a run that is not measuring", async () => {
 		await withFiles({ "Doubling.es": benchmarks }, async (directory) => {
 			recordBaseline(directory, 1)
@@ -2812,9 +2692,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// Two suites holding a benchmark of the same name, both a long way
-	// off their baselines. A filter spelled the way the file heads an entry
-	// re-records that one and leaves the other alone.
+	// Two suites hold a benchmark of one name, both far off their baselines. A
+	// filter spelled as the file heads one entry records only that one.
 	it("re-records the one benchmark a suite path names", async () => {
 		let twice = [
 			"implementation {",
@@ -2872,9 +2751,8 @@ describe("essence test — benchmarks", () => {
 		})
 	})
 
-	// The rows of a table benchmark share their suites and their name,
-	// and only the heading a row is stored under ends in the row. Given whole,
-	// that heading re-records the one row.
+	// A table benchmark's rows share their suites and name, and only a row's stored
+	// heading ends in the row. That heading records one row.
 	it("re-records the one row of a table benchmark its heading names", async () => {
 		let rows = [
 			"implementation {",
@@ -2960,12 +2838,11 @@ describe("essence test — benchmarks", () => {
 	})
 })
 
-// The failing-example corpus from the command line: what a failure leaves
-// on disk, and what the run after it does with what it found.
+// The failing-example corpus from the command line: what a failure stores, and
+// what the next run does with it.
 describe("essence test — the failing-example corpus", () => {
-	// A property NO value satisfies, so that nothing below depends on
-	// which one was drawn. The shrink walks an Integer towards zero and every
-	// candidate still fails, so the stored value is `0` at any seed.
+	// A property no value satisfies, so nothing depends on the draw. The shrink walks
+	// an Integer to zero, so the stored value is `0` at any seed.
 	const broken = [
 		"tests {",
 		'\ttest "is never itself" for any (n: Integer) {',
@@ -2984,9 +2861,8 @@ describe("essence test — the failing-example corpus", () => {
 		"",
 	].join("\n")
 
-	// The same test over a Parameter of another Type, which is what makes
-	// every stored value of it unreadable — the change a corpus has to survive
-	// by dropping what it holds rather than by replaying it as something else.
+	// The same test over a Parameter of another Type, so every stored value becomes
+	// unreadable and must be dropped.
 	const retyped = [
 		"tests {",
 		'\ttest "is never itself" for any (n: String) {',
@@ -3043,9 +2919,8 @@ describe("essence test — the failing-example corpus", () => {
 		})
 	})
 
-	// THE claim the corpus makes. The second run does not go looking: it
-	// asks about the value the first run found, finds it still failing, and
-	// reports that rather than a fresh case.
+	// The second run replays the stored value, finds it still failing, and reports
+	// that rather than a fresh case.
 	it("replays what it stored before it draws anything", async () => {
 		await withFiles({ "Numbers.es": broken }, async (directory) => {
 			await runTests(directory)
@@ -3076,9 +2951,7 @@ describe("essence test — the failing-example corpus", () => {
 		})
 	})
 
-	// A stored value that now holds is KEPT and re-run for ever: what it
-	// is worth is exactly that it goes on being asked, and a run that dropped
-	// it the moment it passed would drop it the moment it mattered.
+	// A stored value that now holds is kept and replayed on every run.
 	it("keeps re-running a stored value once the code is fixed", async () => {
 		await withFiles({ "Numbers.es": broken }, async (directory) => {
 			await runTests(directory)
@@ -3108,9 +2981,8 @@ describe("essence test — the failing-example corpus", () => {
 		})
 	})
 
-	// The Type moved under the entry. It is not a counterexample and not
-	// a failure — it is an entry nothing can read, and the run that met it is
-	// what takes it off the disk.
+	// The Type changed under the entry, so the entry is unreadable rather than a
+	// failure, and the run removes it.
 	it("drops an entry the Types no longer read back", async () => {
 		await withFiles({ "Numbers.es": broken }, async (directory) => {
 			await runTests(directory)
@@ -3126,13 +2998,11 @@ describe("essence test — the failing-example corpus", () => {
 	})
 })
 
-// What a second `essence test` over an untouched project does. The claim
-// a replay makes is that these tests ran and said this, so every spec here is
-// about one of the two halves of that claim: what makes a run answerable out of
-// the store, and what makes an answer in the store no longer this run's.
+// A second run over an untouched project. These specs cover what makes a run
+// answerable from the store, and what makes a stored answer stale.
 describe("essence test — the result cache", () => {
-	// A Module with no tests of its own, so that touching it moves what
-	// another entry ANSWERS without moving which entry claims what.
+	// A Module without tests, so touching it changes another entry's answer but not
+	// which entry claims what.
 	const library = [
 		"implementation {",
 		"\tfunction triple(_ value: Integer) -> Integer {",
@@ -3192,9 +3062,8 @@ describe("essence test — the result cache", () => {
 		"",
 	].join("\n")
 
-	// A store of this spec's own, so that counting what is in it counts
-	// only what this spec put there. The variable is read every time the store
-	// is asked for, so setting it here reaches the run below.
+	// A store of this spec's own, so counting its records counts only this spec's.
+	// The variable is read on every access, so it reaches the run.
 	async function withResults<Value>(
 		body: (store: string) => Promise<Value>,
 	): Promise<Value> {
@@ -3220,19 +3089,16 @@ describe("essence test — the result cache", () => {
 		return readdirSync(store).filter((name) => name.endsWith(".json"))
 	}
 
-	// The note a run that replayed anything ends on, in both spellings: a
-	// run of one entry says "1 of 1 entry cached".
+	// The note a run that replayed anything ends on, in either spelling.
 	const replayed = /\d+ of \d+ (entry|entries) cached/
 
 	function bundles(): Array<string> {
 		return readdirSync(bundleCache).filter((name) => name.endsWith(".mjs"))
 	}
 
-	// The honest proof that a replayed entry is never loaded. A bundle is
-	// content-addressed, so its name is a function of the sources and not of what
-	// is inside the file — poison the bytes and a run that still passes is a run
-	// that never imported them. Only this fixture's bundles are touched: every
-	// spec compiles out of a directory of its own, so no other name can collide.
+	// A replayed entry is never loaded: bundles are content-addressed, so a run that
+	// passes with poisoned bytes never imported them. Each spec compiles in its own
+	// directory, so no other bundle is touched.
 	function poison(before: Array<string>): number {
 		let written = bundles().filter((name) => !before.includes(name))
 
@@ -3253,9 +3119,7 @@ describe("essence test — the result cache", () => {
 			.map((line) => JSON.parse(line) as TestEvent)
 	}
 
-	// The report without its tally, which is the one line a warm run and a
-	// cold one are meant to differ on — the duration is the run's own and the
-	// note beside it is what says the run was warm.
+	// The report without its tally, the one line where a warm and a cold run differ.
 	function tree(out: string): string {
 		return out
 			.split("\n")
@@ -3310,10 +3174,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// The whole point of keying on the graph rather than on the entry: a
-	// Module with no tests of its own still decides what the tests that reach it
-	// answer, so touching it has to reach the entry that imports it and nothing
-	// else.
+	// A Module without tests still decides what its importers' tests answer, so
+	// touching it reruns the importing entry and nothing else.
 	it("re-runs the entry a touched dependency reaches, and only it", async () => {
 		await withResults(async () => {
 			await withFiles(
@@ -3371,8 +3233,8 @@ describe("essence test — the result cache", () => {
 		"",
 	].join("\n")
 
-	// A test reads an empty input, but a Module's own statements read the
-	// run's as the bundle loads, and the key holds none of it.
+	// A Module's own statements read the run's input as the bundle loads, which no
+	// key holds.
 	it("never remembers an entry whose Module read its input as it loaded", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3423,8 +3285,7 @@ describe("essence test — the result cache", () => {
 		"",
 	].join("\n")
 
-	// What the machine answered is in no key, whether a test drew it or
-	// a Module's own statements did as the bundle loaded.
+	// Entropy is in no key, whether a test or a Module's statements drew it.
 	it("never remembers an entry that drew the machine's entropy", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3446,8 +3307,7 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// A seeded source answers the same draws for the same code, which is
-	// in the key.
+	// A seeded source draws the same values for the same code, which is in the key.
 	it("remembers an entry whose tests drew from a seeded source", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3465,9 +3325,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// Fresh entropy every run is what a property test IS. Freezing a
-	// hundred cases under a name would end its search, and the values it has
-	// already failed on are the corpus's business rather than this store's.
+	// A property test draws fresh values every run, so it is never recorded. Its
+	// past failures live in the corpus.
 	it("never remembers an entry holding a property test", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3487,10 +3346,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// A first run WRITES the file the key reads, so a record of it would
-	// be keyed against a disk that no longer exists. One run later the entry has
-	// compared itself against what it wrote and matched, and that run is the one
-	// worth keeping.
+	// A first run writes the snapshot the key reads, so it is not recorded. The next
+	// run matches what it wrote and is recorded.
 	it("waits a run out where a snapshot was recorded", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3515,8 +3372,7 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// A stored snapshot is in the key, so accepting one by hand is a
-	// different question and not the same one answered again.
+	// A stored snapshot is in the key, so accepting one by hand asks a new question.
 	it("re-runs an entry whose stored snapshot changed", async () => {
 		await withResults(async () => {
 			await withFiles(
@@ -3548,11 +3404,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// Each of these is a run whose answer is not the question this store
-	// asks — one that writes the files the key reads, one that measures a
-	// machine, one that says which values a property draws. None of them may
-	// read the store either: a replay would leave the run without the very thing
-	// it was asked for.
+	// These runs write the files the key reads, measure the machine, or choose
+	// property draws. None reads or writes the store.
 	it("is inert under the flags that mean something else", async () => {
 		for (let flags of [
 			["--update"],
@@ -3581,9 +3434,8 @@ describe("essence test — the result cache", () => {
 		}
 	})
 
-	// A focus silences every other test of the run, so a replayed stream
-	// would claim runs that must not happen. One focused live bundle discards
-	// every hit and everything runs — and nothing at all is remembered out of it.
+	// A focused live bundle discards every hit, everything runs, and nothing is
+	// recorded.
 	it("discards every hit once a live entry turns out to be focused", async () => {
 		await withResults(async (store) => {
 			await withFiles(
@@ -3604,19 +3456,16 @@ describe("essence test — the result cache", () => {
 					expect(out).not.toMatch(replayed)
 					expect(out).toContain("1 passed")
 					expect(out).toContain("2 not focused")
-					// Nothing new was written: a focused run reports what a
-					// narrowing decided rather than what the code says.
+					// Nothing new was written: a focused run reports what the focus decided.
 					expect(records(store)).toHaveLength(1)
 				},
 			)
 		})
 	})
 
-	// Two entries reaching one Module WITH tests, which is the arrangement
-	// `claimRegistries` exists for: only one of them may run that Module, and
-	// which one is decided across the whole run in the order the entries were
-	// named. A replayed entry is a bundle nobody loaded, so the claim it was
-	// recorded under is checked against the claim this run would give it.
+	// Two entries reach one Module with tests, and only one may run them. A
+	// replayed entry's recorded claim is checked against the claim this run gives
+	// it.
 	const shared = [
 		"implementation {",
 		"\tconstant answer = 42",
@@ -3663,9 +3512,8 @@ describe("essence test — the result cache", () => {
 				async (directory) => {
 					await runTests(directory)
 
-					// Only the entry that CLAIMED the shared Module moves.
-					// The other one is replayed, and what it claimed — nothing —
-					// is what this run would give it too.
+					// Only the entry that claimed the shared Module reruns. The other, which claimed
+					// nothing, is replayed.
 					writeFileSync(
 						path.join(directory, "Reader.tests.es"),
 						reader.replace("::is(42)", "::isNot(0)"),
@@ -3682,10 +3530,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// The case a replay would otherwise lose a whole Module to. The entry
-	// that had been running the shared tests stops reaching it, so the run hands
-	// them to the entry whose record says it runs nothing — and a record read
-	// back under a claim that has moved is refused rather than replayed.
+	// The entry running the shared tests stops reaching them, so they move to an
+	// entry whose record claims nothing. That record's claim has moved, so it reruns.
 	it("re-runs a replayed entry whose claim has moved", async () => {
 		await withResults(async () => {
 			await withFiles(
@@ -3711,9 +3557,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// A tag only the replayed half of a project carries is a tag the run
-	// knows. Warning about it would make the warning fire because the cache was
-	// warm, which is the one thing it must never mean.
+	// A tag only replayed entries carry is a known tag, so a warm cache never makes
+	// it look unknown.
 	it("knows the tags of an entry it replayed", async () => {
 		await withResults(async () => {
 			await withFiles({ "Rules.es": passing }, async (directory) => {
@@ -3730,8 +3575,8 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// The filters are in the key rather than a reason to refuse the store,
-	// so a narrowed run is an answer of its own beside the whole one.
+	// The filters are in the key, so a narrowed run is remembered as an answer of its
+	// own.
 	it("keeps a narrowed run apart from the run it narrowed", async () => {
 		await withResults(async (store) => {
 			await withFiles({ "Rules.es": passing }, async (directory) => {
@@ -3748,12 +3593,9 @@ describe("essence test — the result cache", () => {
 		})
 	})
 
-	// What a replay CLAIMS is that these tests ran and said this, so the
-	// report of a warm run has to be the report of the cold one it stands in for
-	// — the same files in the same order, every test where it was. Only the tally
-	// differs, which is where the run says so. Nothing in the tree is timed
-	// except a benchmark's measurement, and measuring is one of the runs this
-	// store is inert under.
+	// A warm run's report must match the cold run's: the same files, order and
+	// tests. Only the tally differs. A benchmark's measurement, the one timed
+	// part, shows only under `--bench`, which never uses the store.
 	it("reads exactly as the run it stands in for", async () => {
 		await withResults(async () => {
 			await withFiles(
@@ -3840,10 +3682,8 @@ describe("the test command's own documentation", () => {
 		expect(testCommand.description.join(" ")).toContain("essence.json")
 	})
 
-	// `/docs/reference/optimisations` documents `--no-optimise --coverage`
-	// and turning `instrument-coverage` off by name, and --coverage is a flag of
-	// this command alone — so both documented combinations have to be spellable
-	// here.
+	// The documentation shows `--no-optimise --coverage` and turning
+	// `instrument-coverage` off by name, so both must parse.
 	it("takes the two flags that turn the Optimiser down", () => {
 		expect(testCommand.options.map((option) => option.name)).toEqual(
 			expect.arrayContaining(["no-optimise", "without-optimisation"]),

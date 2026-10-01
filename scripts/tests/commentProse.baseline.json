@@ -20,7 +20,6 @@
 	"packages/cli/src/tests/oneAnalysis.spec.ts": {"sentence-length": 8, "em-dash": 4, "all-caps": 4, "history": 4},
 	"packages/cli/src/tests/resultCache.spec.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 5, "position": 2, "block-length": 1},
 	"packages/cli/src/tests/terminalInput.spec.ts": {"sentence-length": 11, "em-dash": 7, "all-caps": 2},
-	"packages/cli/src/tests/testRunner.spec.ts": {"sentence-length": 67, "em-dash": 47, "all-caps": 32, "position": 4, "block-length": 3, "counts": 1},
 	"packages/cli/src/tests/testWatch.spec.ts": {"sentence-length": 9, "em-dash": 5, "all-caps": 9, "block-length": 1},
 	"packages/cli/src/tests/twoMistakes.spec.ts": {"sentence-length": 17, "em-dash": 13, "all-caps": 13, "position": 5},
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
