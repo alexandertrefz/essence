@@ -28,41 +28,25 @@ import {
 import type { CodeActionEdit, CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// The one refactoring here that edits files the reader never opened: the
-// Module the Declaration lands in, and every Module that named it in an entry.
-// That is why the refusal, `readsMovableNames`, is read as the whole of what
-// makes this safe: a Declaration whose body reads something private to the file
-// it is leaving would land somewhere it can not compile, and no edit here can
-// invent the name for it.
-//
-// The Statement travels as WRITTEN — the text of its lines, its `§§` block
-// included — rather than printed back from its Node. A Declaration is the
-// author's prose as much as their code, and moving it is not the moment to
-// reflow either.
+// Moves a top-level Declaration, as written, to another Module, and fixes
+// every entry that named it. See "Moving a Declaration" in DEVELOPMENT.md.
 
-// What a Statement has to be for this to say anything about it: one
-// top-level Declaration under one name. A `variable` is deliberately absent —
-// no Module may export one, so there is nowhere for it to go — and so is a
-// Declaration that binds a Pattern, which declares as many names as it takes
-// apart and has no single one to move.
+// A top-level Declaration of one name. A `variable` cannot be exported, and a
+// Pattern declares several names, so neither is movable.
 type Declared = {
 	name: parser.IdentifierNode
 	documentation: common.Documentation | null
 }
 
-// The Module an entry of another file could name this from, and what it
-// holds — read once for the whole request, because every action offered
-// measures its edits against the same two.
+// A Module the Declaration could move to, and what it holds.
 type Target = {
 	filePath: string
-	// Null for the Module this action would WRITE, which is the one that
-	// has neither yet.
+	// Null for a Module this action would create.
 	sourceText: string | null
 	program: parser.Program | null
 }
 
-// One entry of one other Module that named the Declaration, with the
-// group it stands in — what says the entry has to be retargeted, and how.
+// One entry of another Module that named the Declaration, with its group.
 type NamedEntry =
 	| {
 			section: "imports"
@@ -82,24 +66,20 @@ type Naming = {
 	entries: Array<NamedEntry>
 }
 
-// Everything about the move that does not depend on where it is going,
-// worked out once rather than once per Module offered.
+// Everything about the move that does not depend on its destination.
 type Move = {
 	context: ImportContext
 	lines: Array<string>
 	name: string
-	// The Statement together with the `§§` block above it, which documents
-	// it and belongs to it.
+	// The Statement with its `§§` block.
 	span: common.Position
 	text: string
-	// The names the Statement READS that this Module publishes. They are
-	// in scope where it stands because it is written here; where it lands they
-	// are an import, which is the entry the move writes into the target.
+	// The published names of this Module the Statement reads, which the
+	// destination imports.
 	needed: Array<string>
 	removal: CodeActionEdit
-	// The edit that stops this Module publishing it, and null where this
-	// Module never did — which is also what says whether the Module it lands in
-	// has to publish it in turn.
+	// The edit that stops this Module publishing it, or null where it never
+	// did.
 	unpublish: CodeActionEdit | null
 	usedHere: boolean
 	namings: Array<Naming>
@@ -130,9 +110,8 @@ export function moveActions(
 	})
 }
 
-// The Declaration whose NAME the request's range touches — a refactoring
-// offered on a body would be offered on every Statement of it, and what a reader
-// with the cursor inside a Function body is doing is editing that body.
+// The Declaration whose name the range touches, so a cursor in a body does
+// not offer it.
 function movableAt(
 	context: ImportContext,
 	lines: Array<string>,
@@ -142,11 +121,9 @@ function movableAt(
 	let program = context.program
 	let block = program.implementation.position
 
-	// An ordinary Module and nothing else. A `declarations { … }` Program
-	// is the standard library's one shared declaration space rather than a
-	// Module with names to give away, and a file that is nothing but tests
-	// carries an implementation section spanning its `tests { … }` block — so
-	// what would be moved out of it is a test.
+	// Only an ordinary Module. A `declarations { … }` Program is the standard
+	// library's shared space, and a tests-only file's implementation section
+	// spans its tests.
 	if (program.kind !== "implementation") {
 		return null
 	}
@@ -164,9 +141,8 @@ function movableAt(
 			end: statement.position.end,
 		}
 
-		// Whole lines are what is carried over, so a Statement sharing a
-		// line with the block's own braces has nothing to carry: taking its
-		// lines would take the block with it.
+		// Whole lines move, so the Statement must not share a line with the
+		// block's braces.
 		if (
 			span.start.line <= block.start.line ||
 			span.end.line >= block.end.line
@@ -174,11 +150,8 @@ function movableAt(
 			return null
 		}
 
-		// The request's own index rather than one built here. Indexing a
-		// Program costs what a Rename costs, the Workspace already holds one
-		// per file and version, and this is reached on every Code Action
-		// request whose range touches a Declaration's name — which a
-		// whole-document request is, for the first Declaration in the file.
+		// The Workspace's cached index, since indexing costs what a Rename
+		// does.
 		let { index } = indexed()
 		let needed = readsMovableNames(program, index, span)
 
@@ -229,8 +202,8 @@ function movableAt(
 function declarationOf(node: parser.ImplementationNode): Declared | null {
 	switch (node.nodeType) {
 		case "FunctionStatement":
-			// A Function Statement's `§§` block is handed down to the
-			// literal it declares, which is where the Parser writes it.
+			// The Parser puts a Function Statement's `§§` block on its
+			// literal.
 			return {
 				name: node.name,
 				documentation: node.value.documentation,
@@ -249,21 +222,9 @@ function declarationOf(node: parser.ImplementationNode): Declared | null {
 	}
 }
 
-// THE refusal, and what the move OWES the Module it lands in. Every name
-// the Statement reads has to mean the same thing there, and there are exactly
-// four ways it can: it is a builtin, it is something this file imports, it is
-// declared inside the Statement itself, or it is something this file publishes
-// — which the Module it lands in can then import back, and does. A name this
-// file keeps to itself is none of them, and moving the Statement away from it
-// would be moving it away from what it means.
-//
-// Null is the refusal; otherwise the published names the Statement reads, which
-// are the entries the target has to be given. Both come off one walk because
-// they are one question asked of each name.
-//
-// Read off the rename index rather than off the Statement's Nodes, because
-// "what does this name resolve to" is the question the index exists to answer,
-// and answering it again here would be a second scoping rule to keep in step.
+// Whether every name the Statement reads means the same in its destination.
+// Null refuses the move; otherwise the published names it reads, which the
+// destination imports. See "Moving a Declaration" in DEVELOPMENT.md.
 function readsMovableNames(
 	program: parser.Program,
 	index: RenameIndex,
@@ -283,12 +244,8 @@ function readsMovableNames(
 			continue
 		}
 
-		// A Method is reached through a TYPE rather than by name, so it
-		// is not one of the names a Statement carries — but the NAMESPACE that
-		// declares it is reached by name, and a Namespace this file keeps to
-		// itself is out of scope where the Statement lands. `n::doubled()`
-		// moved away from a private `namespace IntegerExtras for Integer` is
-		// `unknown-method` in a file the reader never opened.
+		// A Method is reached through a Type, but its Namespace must still be
+		// in reach, or `n::doubled()` becomes `unknown-method` elsewhere.
 		if (
 			declaration.kind === "method" ||
 			declaration.kind === "staticMethod"
@@ -332,14 +289,9 @@ function readsMovableNames(
 	return [...needed]
 }
 
-// Whether the Namespace a dispatch resolved to is one the Module it lands
-// in can see, and what it costs the target to see it: null to refuse, and
-// otherwise the name the target has to import, or null again where it has
-// nothing to import — a builtin Namespace, or one the Statement takes with it.
-//
-// A Method whose declaration this file does not hold at all — one another
-// Module declares, reached through an import — is left alone: the entry that
-// brought it is a name of its own, and the walk above already asked about it.
+// Whether the destination can see the Namespace a dispatch resolved to. Null
+// refuses; otherwise the name to import, or null for a builtin Namespace, one
+// the Statement carries, or one this file imports.
 function namespaceReach(
 	program: parser.Program,
 	published: Set<string>,
@@ -365,8 +317,8 @@ function namespaceReach(
 		: null
 }
 
-// The innermost Namespace written around a Position, or null where none
-// is — a Method declared by an imported Module has no Namespace in this tree.
+// The innermost Namespace around a Position, or null, as for an imported
+// Method.
 function namespaceHolding(
 	program: parser.Program,
 	position: common.Position,
@@ -385,12 +337,8 @@ function namespaceHolding(
 	return found
 }
 
-// The kinds a Module binds by NAME, which are the ones a Statement takes
-// with it or leaves behind. A member, a property, a Method and an Argument label
-// are reached through a Type instead — `{ x = 1 }` names the member of whatever
-// Record it is written for, and `by 2` names a Parameter of whatever it is
-// calling — so what has to be in scope where the Statement lands is the name
-// beside them, and that one is an occurrence of its own.
+// The kinds a Module binds by name. Members, properties, Methods and labels
+// are reached through a Type instead.
 function isLexical(kind: DeclarationKind): boolean {
 	switch (kind) {
 		case "member":
@@ -404,10 +352,8 @@ function isLexical(kind: DeclarationKind): boolean {
 	}
 }
 
-// Whether anything OUTSIDE the Statement still reads the name once it is
-// gone — its tests included, which is exactly the reason to ask: a Module that
-// keeps using what it gave away has to import it back. The entry that publishes
-// it is not such a read, since that entry goes along with the Declaration.
+// Whether anything outside the Statement, tests included, still reads the
+// name, so this Module must import it back. Its export entry does not count.
 function usedOutside(
 	index: RenameIndex,
 	definition: common.Position,
@@ -433,11 +379,8 @@ function usedOutside(
 	)
 }
 
-// The Statement's own lines, and the ONE blank line that stops being a
-// separator when they go: a Statement with a blank line on either side of it
-// leaves two behind, and one written against a brace leaves a blank line inside
-// the block. Every other blank line separates two Statements that are both still
-// there, and stays exactly where the author put it.
+// The Statement's lines and the one blank line that would stop separating
+// anything: a second in a row, or one against a brace.
 function removalRange(
 	lines: Array<string>,
 	span: common.Position,
@@ -456,11 +399,8 @@ function removalRange(
 	return lineRange(lines, first, last)
 }
 
-// The name taken out of this Module's export block — and the block taken
-// with it where that name was all it published, since `export {}` says what a
-// Module writing no block at all says, in four characters more. The blank line
-// above the block goes too: it separated the block from the implementation, and
-// there is no longer anything on the far side of it.
+// The name taken out of the export block, or the whole block, with its
+// separating blank line, where it was the only name.
 function unpublishEdit(
 	lines: Array<string>,
 	section: parser.ExportSectionNode,
@@ -473,9 +413,8 @@ function unpublishEdit(
 	return removeSectionEdit(lines, section.position)
 }
 
-// A whole Module block, with the blank line that separated it from the
-// implementation — which is the line UNDER it for a block that opens the file
-// and the line over it for one that closes it.
+// A whole Module block with the blank line separating it from the
+// implementation.
 function removeSectionEdit(
 	lines: Array<string>,
 	position: common.Position,
@@ -492,13 +431,8 @@ function removeSectionEdit(
 	return { range: lineRange(lines, first, last), newText: "" }
 }
 
-// The entries of the Module the Declaration lands in that named it
-// somewhere else. It is declared right there now, so the entry binds a name the
-// file already has — and whatever the entry was the last of goes with it: the
-// group where it was the only name, the block where that was the only group.
-//
-// Entries of the import block and no others, because a Module that FORWARDS the
-// name is not offered as a destination at all — see `forwards`.
+// Removes the destination's imports of the name, which it now declares, with
+// any group or block left empty. A forwarding Module is never a destination.
 function unbindEdits(naming: Naming): Array<CodeActionEdit> {
 	let lines = naming.sourceText.split("\n")
 	let section = naming.program.imports
@@ -526,9 +460,8 @@ function unbindEdits(naming: Naming): Array<CodeActionEdit> {
 	)
 }
 
-// Whole lines, the break that ends the last of them included — and where
-// that is the last line of the file, the break BEFORE the first instead, since
-// a deletion may not end past the end of the document.
+// Whole lines with the last one's line break, or, at the end of the file, the
+// break before the first.
 function lineRange(
 	lines: Array<string>,
 	first: number,
@@ -537,9 +470,8 @@ function lineRange(
 	if (last >= lines.length) {
 		let end = { line: last, column: lineAt(lines, last).length + 1 }
 
-		// The break BEFORE the first line, since a deletion may not end
-		// past the end of the document — and where there is no line before it,
-		// the lines alone, which leaves the empty document an empty document.
+		// A deletion may not end past the document's end. Without a line
+		// before, only the lines go.
 		return first > 1
 			? {
 					start: {
@@ -563,10 +495,7 @@ function isBlank(lines: Array<string>, line: number): boolean {
 	)
 }
 
-// Every other Module in the document's own directory, and the one this
-// would write beside it. A Module further away is deliberately not offered: a
-// list of every file in the workspace is a menu rather than an offer, and the
-// move a reader means is nearly always into a file they can already see.
+// The other Modules in the document's directory, and a new one beside it.
 function targetsFor(move: Move): Array<Target> {
 	let workspace = move.context.workspace
 	let directory = path.dirname(move.context.filePath)
@@ -591,10 +520,7 @@ function targetsFor(move: Move): Array<Target> {
 		targets.push({ filePath: candidate, sourceText, program })
 	}
 
-	// A Module named after what it holds, which is the one name that can
-	// be chosen without asking. A file already standing there is not offered:
-	// choosing between overwriting it and naming the new one something else is
-	// the reader's, and a Code Action has no way to ask.
+	// Named after the Declaration, and not offered where that file exists.
 	let written = path.join(directory, `${move.name}.es`)
 
 	if (workspace.sourceOf(written) === null) {
@@ -604,11 +530,7 @@ function targetsFor(move: Move): Array<Target> {
 	return targets
 }
 
-// A Module that FORWARDS the name is a facade for the Module that
-// declares it, and the Declaration landing inside the facade would have to
-// become the very thing the facade forwards — an entry rewritten into a
-// Declaration rather than a Declaration moved. Not offered, rather than offered
-// and half done.
+// Whether a candidate forwards the name, which rules it out as a destination.
 function forwards(move: Move, candidate: string): boolean {
 	return move.namings.some(
 		(naming) =>
@@ -619,20 +541,16 @@ function forwards(move: Move, candidate: string): boolean {
 
 function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	let specifier = relativeSpecifier(move.context.filePath, target.filePath)
-	// The Module it LANDS in may be one of the Modules that named it —
-	// moving a helper into its one reader is the ordinary reason to move one at
-	// all — and there the entry is not retargeted but dropped: a Module does not
-	// import what it declares.
+	// The destination may already import the name, as when a helper moves
+	// into its one reader; that import is dropped.
 	let landingNamings = move.namings.filter(
 		(naming) => naming.filePath === target.filePath,
 	)
 	let otherNamings = move.namings.filter(
 		(naming) => naming.filePath !== target.filePath,
 	)
-	// The Module it lands in publishes it whenever anything still names
-	// it: another Module that imported it from here, this file's own body, or
-	// this file's export block — which published it to the whole workspace, and
-	// may be read by a Module the workspace has not been asked about.
+	// The destination publishes it while anything still names it: another
+	// Module, this file's body, or this file's export block.
 	let publish =
 		move.unpublish !== null || otherNamings.length > 0 || move.usedHere
 	let landing = landingEdits(move, target, publish)
@@ -674,17 +592,14 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 		kind: "refactor.move",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// Never preferred. Which Module a Declaration belongs in is the
-		// one question here that the Compiler has no opinion about, and an
-		// Editor applying an answer to it without being asked would be moving
-		// somebody's code around behind them.
+		// Where a Declaration belongs is the author's choice.
 		isPreferred: false,
 		edits,
 	}
 }
 
-// What lands in the Module at the other end: the Statement, and the entry
-// that publishes it where anything still names it.
+// What lands in the destination: the Statement, and its export entry where
+// needed.
 function landingEdits(
 	move: Move,
 	target: Target,
@@ -693,10 +608,8 @@ function landingEdits(
 	let sourceText = target.sourceText
 	let program = target.program
 
-	// What the Statement reads and no longer stands beside. Written from
-	// the target back to the Module the Declaration is leaving, which goes on
-	// publishing those names — they are exported by construction, since that is
-	// the only reason the move was offered at all.
+	// The names the Statement reads from this Module, imported back from it,
+	// which still publishes them.
 	let broughtAlong =
 		move.needed.length === 0
 			? null
@@ -708,9 +621,7 @@ function landingEdits(
 					),
 				}
 
-	// A Module that is not there yet and a file holding nothing but
-	// whitespace are one case: there is no implementation block to append to, so
-	// what lands is a whole Program.
+	// A new or blank file gets a whole Program.
 	if (sourceText === null || program === null || sourceText.trim() === "") {
 		let start = { line: 1, column: 1 }
 		let lines = (sourceText ?? "").split("\n")
@@ -737,13 +648,8 @@ function landingEdits(
 	let section = program.implementation
 	let lines = sourceText.split("\n")
 
-	// Measured against the file's own text rather than taken from its
-	// Program, because a Program carries an implementation section whether the
-	// file wrote one or not: a file that did not parse carries an empty one at
-	// the top, a `declarations { … }` Program carries the standard library's
-	// shared declaration space, and a file that is nothing but tests carries one
-	// spanning its `tests { … }` block. Appending to any of those writes the
-	// Statement somewhere it does not belong.
+	// The text must open with `implementation`, since every Program carries
+	// an implementation section, written or not.
 	if (
 		sliceOf(lines, {
 			start: section.position.start,
@@ -758,9 +664,7 @@ function landingEdits(
 		return null
 	}
 
-	// A blank line above it where something is already written there, and
-	// none where the block is empty — a Statement against the opening brace of
-	// an empty block reads as the first thing in it, which is what it is.
+	// A blank line before it, unless the block is empty.
 	let separator = section.nodes.length === 0 ? "" : "\n"
 	let edits: Array<CodeActionEdit> = [
 		{
@@ -814,12 +718,8 @@ function moduleText(
 	return `${imported}implementation {\n${move.text}\n}\n${exported}`
 }
 
-// An entry that named the Declaration in the Module it is leaving, made to
-// name the Module it lands in. A group holding nothing but this name is
-// retargeted WHOLE — one specifier written over, which leaves the entry, its
-// `as` and every Comment around it exactly as they were — and an entry sharing
-// its group with others is taken out and handed to the group of the other
-// Module, which is where the Formatter would put it anyway.
+// Points another Module's entries at the destination. A group of only this
+// name gets a new specifier; a shared entry moves to the destination's group.
 function retargetEdits(
 	move: Move,
 	naming: Naming,
@@ -869,11 +769,8 @@ function retargetEdits(
 	return edits
 }
 
-// Every other Module that named it in an entry, with the entries
-// themselves — asked of the dependency edges rather than of the workspace at
-// large, since a Module that never named this file can not have named anything
-// in it. A re-export counts: a facade forwarding the name is naming the Module
-// behind it, and that Module is about to be a different one.
+// Every other Module that named it in an entry, re-exports included, found
+// through this file's dependents.
 function namingsOf(context: ImportContext, name: string): Array<Naming> {
 	let workspace = context.workspace
 	let found: Array<Naming> = []

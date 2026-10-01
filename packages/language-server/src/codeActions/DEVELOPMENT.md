@@ -152,3 +152,35 @@ Argument's label names the column, and failing that a letter.
 
 A column's Type is spelled where the table will stand, so it resolves there. A Case widens to its Choice: `#Win`
 and `#Loss` make one column of `Outcome`.
+
+## Moving a Declaration
+
+`moveActions` in `moveModule.ts` moves a top-level Declaration to another Module. It edits files the reader may
+never have opened. These are the Module the Declaration lands in, and every Module that named it in an entry. The
+Statement travels as written, its `§§` block included, rather than printed back from its Node.
+
+`readsMovableNames` decides whether the move is safe. Every name the Statement reads must mean the same thing in
+the Module it lands in. It does so if it is a builtin, declared in the Statement, or published by this file, which
+the landing Module then imports back. A name this file imports is let through but not imported into the landing
+Module, which then reports `unknown-name`. A name this file keeps to itself means nothing there, so the move is
+refused. The question is asked of the rename index, which already answers what each name resolves to. A Method is
+reached through a Type rather than by name, but the Namespace declaring it must be in reach too. So a Method of a
+private Namespace refuses the move as well.
+
+The destinations are the other Modules in the same directory, plus a new Module named after the Declaration where
+no such file exists. A Module further away is not offered, since the move a reader means is nearly always into a
+file they can see. A Module that forwards the name is not offered either. Moving the Declaration into it would turn
+an export entry into the Declaration it forwards.
+
+The edits follow from who still names the Declaration:
+
+- The landing Module publishes it whenever anything still names it: another Module, this file's own body or
+  export block.
+- An import of it in the landing Module is dropped, since a Module does not import what it declares.
+- This file stops publishing it, and imports it back where its body still reads it.
+- Each other Module's entry is made to name the landing Module. A group holding only this name gets its specifier
+  rewritten, which keeps its `as` and Comments. A shared group loses the entry, which is added to a group for
+  the landing Module.
+
+Removing the Statement also removes the one blank line that no longer separates anything. No doubled blank line,
+and no blank line against a brace, is left behind.
