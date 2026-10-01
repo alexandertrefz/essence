@@ -54,7 +54,7 @@
 	"packages/cli/src/watch.ts": {"sentence-length": 1, "em-dash": 1, "all-caps": 1, "position": 1},
 	"packages/cli/src/watcher.ts": {"sentence-length": 16, "em-dash": 7, "all-caps": 6, "block-length": 1},
 	"packages/cli/src/worker.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 1},
-	"packages/client/src/marshal-runtime.ts": {"sentence-length": 37, "em-dash": 27, "all-caps": 20, "history": 1, "position": 4, "block-length": 9},
+	"packages/client/src/marshal-runtime.ts": {"sentence-length": 20, "em-dash": 15, "all-caps": 11, "history": 1, "position": 2, "block-length": 5},
 	"packages/client/src/tests/bare-cases.spec.ts": {"sentence-length": 8, "em-dash": 11, "all-caps": 3, "position": 2},
 	"packages/client/src/tests/bind.spec.ts": {"sentence-length": 24, "em-dash": 19, "all-caps": 14, "position": 1, "block-length": 2},
 	"packages/client/src/tests/bun.spec.ts": {"sentence-length": 7, "em-dash": 6, "all-caps": 4},

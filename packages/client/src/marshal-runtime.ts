@@ -2222,9 +2222,9 @@ function bindRaw(
 	return Object.freeze(raw)
 }
 
-// Each Case of a Choice under its own name: a Function of its payload, the
-// value itself, or for a unit Choice the string it crosses as. Nothing is
-// checked here, since the crossing checks. The tag is written last.
+// Each Case of a Choice under its name: a Function of its payload, or the value
+// itself, which for a unit Choice is a string. The crossing checks, not this.
+// The tag is written last.
 function caseConstructors(
 	cases: Array<CaseDescriptor>,
 ): Readonly<Record<string, unknown>> {
@@ -2379,10 +2379,8 @@ function readCall(
 				return ordered
 			}
 
-			// One object that is not a labelled call is only a positional
-			// call while the Function takes exactly one Argument. Where it takes
-			// more, the caller plainly meant the labels and got them wrong, and
-			// saying which is worth more than "takes 2 Arguments, 1 was passed".
+			// One object that is not a labelled call is positional only for a
+			// Function of one Parameter. Otherwise the caller got the labels wrong.
 			if (signature.parameters.length !== 1) {
 				throw new EssenceCallError(
 					`${callShape(signature, labels, name)}. It was passed one object with ${
@@ -2395,12 +2393,9 @@ function readCall(
 
 	let total = signature.parameters.length
 
-	// A positional call may stop early only where every Parameter it stops
-	// BEFORE carries a default. Counting the omittable ones instead would admit
-	// `cut(7n)` against `(from: Integer = 1, to: Integer)` — one Argument, one
-	// default, the count agrees — and pad the REQUIRED `to` with a hole, which
-	// the native then reads as `undefined`. Which Parameters are left out is the
-	// question, never how many.
+	// A positional call may stop early only where every Parameter after it has a
+	// default. A count would admit `cut(7n)` against `(from: Integer = 1, to:
+	// Integer)` and leave the required `to` out.
 	if (args.length > total || !omittableFrom(signature, args.length)) {
 		throw new EssenceCallError(
 			`${callShape(signature, labels, name)}; ${count(
@@ -2410,10 +2405,8 @@ function readCall(
 		)
 	}
 
-	// The holes are filled here so that the bridge below reads one Array of
-	// the signature's own length however the call was written — a Parameter the
-	// call stopped before, and one written as an explicit `undefined`, which the
-	// `.d.ts` admits for an omittable slot and which means the same thing.
+	// Fills every left-out slot, so the call reads one Array of the signature's
+	// length. An explicit `undefined` in an omittable slot is left out too.
 	let holes = args.length < total
 
 	for (let position = 0; !holes && position < total; position++) {
@@ -2441,8 +2434,7 @@ function readCall(
 	return filled
 }
 
-// Whether a positional call that wrote `written` Arguments may stop there
-// — which is whether every Parameter from that position on carries a default.
+// Whether every Parameter from `written` on has a default.
 function omittableFrom(
 	signature: FunctionDescriptor,
 	written: number,
@@ -2460,13 +2452,8 @@ function omittableFrom(
 	return true
 }
 
-// How the Function may be called, as the first half of every refusal — the
-// signature it was declared with, and both ways of writing a call to it. The
-// caller who got one wrong is reading it to find the other.
-//
-// The name goes in FRONT of the signature, which is where `printSignature`
-// writes one — a Descriptor carries the nameless print precisely so that the same
-// signature can be named `labelled` here and `Point.shifted` one Namespace over.
+// How the Function may be called, which opens every call refusal. The name goes
+// in front of the nameless signature a Descriptor carries.
 function callShape(
 	signature: FunctionDescriptor,
 	labels: Array<string> | null,
@@ -2488,18 +2475,9 @@ function callShape(
 			)}`
 }
 
-// The labels a call may be written with, or `null` where it may not be
-// written that way at all. Every Parameter has to carry one: a Function with a
-// single `_` among its Parameters can not be called by label in Essence either,
-// and half a labelled call is no call.
-//
-// A Function of ONE Parameter an object can inhabit is positional whatever
-// its label says. Both readings take an object, and the Parameter is the one that
-// can hold any shape at all — so `describe({ width: 3n, height: 4n })` passes the
-// Rectangle rather than looking for a label named `width`, and a Union or an
-// `Optional` with a Record among what it admits reads the same way. This is the
-// whole of the ambiguity: with two Parameters or more the key set decides, since
-// a labelled call's keys are the labels and a positional call passes no object.
+// The labels a call may be written with, or `null`. Every Parameter needs one.
+// A lone Parameter that admits a Record takes an object positionally, since
+// both readings would take one.
 export function labelsOf(signature: FunctionDescriptor): Array<string> | null {
 	let parameters = signature.parameters
 
@@ -2536,10 +2514,8 @@ function argumentPath(
 		: `argument ${position + 1}`
 }
 
-// Key-set equality is only right where every Parameter must be written.
-// Once one carries a default the rule becomes "every REQUIRED label present, no
-// key that is not a label" — which is exactly what an Essence call is held to,
-// and which is still key-set equality for every signature that has no default.
+// Every required label present, and no key that is not a label, as for an
+// Essence call.
 function sameNames(
 	given: Array<string>,
 	expected: Array<string>,
@@ -2564,27 +2540,19 @@ function sameNames(
 	return true
 }
 
-// The value standing where a call left an Argument out — a slot it stopped
-// before, or an omittable one written as an explicit `undefined`, which the
-// generated `.d.ts` admits and which means the same thing. On a REQUIRED slot an
-// `undefined` is a value the host passed and a Type error like any other, and
-// stays one. The bridge hands `undefined` on for a slot holding this, which is
-// precisely what fires the emitted JavaScript default parameter, and marshals
-// nothing for it: there is nothing to marshal.
+// Marks a left-out Argument, which the call passes as `undefined` to fire the
+// emitted default. An `undefined` in a required slot is a value, and refused.
 const OMITTED: unique symbol = Symbol("omitted")
 
-// How many Arguments a call MUST write, which is where the range in
-// `callShape` starts. Exported because the declaration generator asks the same
-// question of the same Descriptor — see `lastRequiredIndex`.
+// How many Arguments a call must write, where the range in `callShape` starts.
 export function requiredCount(signature: FunctionDescriptor): number {
 	return signature.parameters.filter(
 		(parameter) => parameter.optional !== true,
 	).length
 }
 
-// The last Parameter a call has to write, and `-1` when there is none —
-// where the TRAILING run a call may leave out entirely begins, and therefore the
-// only run TypeScript lets a `?` be written on.
+// The last Parameter a call has to write, or `-1`. After it starts the run a
+// call may leave out, and TypeScript allows `?` there alone.
 export function lastRequiredIndex(
 	parameters: FunctionDescriptor["parameters"],
 ): number {
@@ -2603,10 +2571,7 @@ export function lastRequiredIndex(
 
 // #region Wording
 
-// Bounded, for the reason the note above `describe` gives: the object being
-// described is one a host got wrong, and a parsed JSON document with a thousand
-// keys is exactly that. The first few name the mistake as well as all of them
-// would.
+// The first few names, since a wrong object may have thousands of keys.
 function quoted(names: Array<string>): string {
 	let shown = names
 		.slice(0, NAMES_SHOWN)
@@ -2630,15 +2595,8 @@ function shortened(value: string): string {
 
 // #region Reading a Descriptor
 
-// The spelling a Case is known by on this side — the Choice as it was
-// DECLARED and the Case, with the Module path a bundle qualifies its tags with
-// taken back off. `./Geometry.es#Shape#Circle` is `Shape#Circle` here: a host
-// writes what it reads in the Essence source, and never where the file happened
-// to sit on the machine that compiled it.
-//
-// Read off the VALUE's tag rather than off a Descriptor, because a value
-// coming out is met by its tag alone — this is the same rule `displayChoiceName`
-// states, applied to the Choice half of a tag.
+// A Case as a host spells it, read off a value's tag without the Module path:
+// `./Geometry.es#Shape#Circle` is `Shape#Circle`. The rule is `displayChoiceName`'s.
 function caseName(tag: string): string {
 	let separator = tag.lastIndexOf("#")
 	let choice = tag.slice(0, separator)
