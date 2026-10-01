@@ -228,6 +228,21 @@ it. A rename there would be silently destructive:
 
 A declaration outside every workspace folder is refused for the same reason: its other uses are not indexed.
 
+## Sections
+
+A Program holds more than `implementation.nodes`: the `tests` block, and inside it a body for every test and suite.
+`programSections` in `src/sections.ts` is the one walk that reaches every body, so a feature built on it reaches each
+kind of body at once.
+
+A Section is a body together with the Scope it opens, as the Enricher scopes it. The tests section is a child Scope of
+the implementation, so it sees what the file declares, and what it declares shadows rather than collides. Each suite
+and test body nests inside it, so two tests share only the setup around them. `parent` records the chain, and a walk
+keeping a Scope per Section mirrors the Enricher without knowing anything about tests.
+
+A test's `head` holds what is read outside its body: its name, or a table test's rows. A table test's name goes in
+`nodes`, since it is read where the row is bound and says which row ran. A table's rows are written outside the body
+and cannot name the row. `programBodies` reads both together for walks that ignore Scopes.
+
 ## The Workspace
 
 `createWorkspace` in `src/workspace.ts` holds every file of the workspace folders and everything the server derives

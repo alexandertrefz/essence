@@ -11,18 +11,9 @@ import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 import { programBodies } from "./sections"
 
-// Semantic Tokens classify Identifiers by what they actually resolve
-// to, which the TextMate grammar cannot do — it has no way to tell a
-// Namespace from a Type from a Constant. Every Occurrence the rename index
-// already collects carries its Declaration's kind, so this is mostly a
-// projection of that index rather than a separate walk.
-//
-// Identifiers the Enricher cannot resolve are absent from the index and get
-// no Token, leaving the TextMate grammar's guess in place.
-//
-// Case names are the one construct the index cannot answer for — they resolve
-// through their Choice instead of through a Scope, so nothing ever binds them
-// to a Declaration. They are collected from the Parser AST instead.
+// Semantic Tokens classify Identifiers by what they resolve to, mostly as a
+// projection of the rename index. An unresolved name gets no Token, leaving
+// the TextMate grammar's reading. Case names come from the Parser AST.
 
 type SemanticTokenType =
 	| "namespace"
@@ -41,10 +32,8 @@ type SemanticTokenModifier =
 	| "static"
 	| "defaultLibrary"
 
-// These two arrays ARE the legend the server hands the client — a Token
-// carries indices into them, never names. New entries therefore go at the END:
-// inserting one anywhere else silently recolours every Token past it in
-// editors that are still holding a response encoded against the old legend.
+// The legend the server hands the client; Tokens carry indices into it. New
+// entries go at the end, or a client holding the old legend recolours tokens.
 export const semanticTokenTypes: Array<SemanticTokenType> = [
 	"namespace",
 	"type",
@@ -72,12 +61,8 @@ type SemanticToken = {
 	modifiers: Array<SemanticTokenModifier>
 }
 
-// `import` carries no Token of its own. What an entry binds is whatever
-// the exporting Module declared — a Type, a Namespace, a Function — and one
-// file's index can not say which, so colouring it as any one of them would be
-// wrong wherever the guess missed. Nothing is emitted instead, and the
-// TextMate grammar's own reading of the name stands, exactly as it does for
-// every Identifier the Enricher could not resolve.
+// `import` gets no Token: one file's index cannot say what the other Module
+// declared, so the TextMate grammar's reading stands.
 const tokenTypes: Record<DeclarationKind, SemanticTokenType | null> = {
 	import: null,
 	constant: "variable",
@@ -95,8 +80,8 @@ const tokenTypes: Record<DeclarationKind, SemanticTokenType | null> = {
 	label: "parameter",
 }
 
-// Everything that cannot be reassigned is `readonly` — the Enricher
-// treats Constants, Functions, Namespaces, Parameters and `@` as constant.
+// What cannot be reassigned is `readonly`: Constants, Functions, Namespaces,
+// Parameters and `@`.
 const readonlyKinds = new Set<DeclarationKind>([
 	"constant",
 	"function",
@@ -110,10 +95,8 @@ const readonlyKinds = new Set<DeclarationKind>([
 	"label",
 ])
 
-// `programIndex` is the document's own index where the caller holds one.
-// Building it rebuilds the whole builtin top level Scope — every builtin value
-// and Type as fresh Declarations, because the walk records occurrences onto
-// them — and this request fires on every keystroke over the whole file.
+// `programIndex` is the document's own index where the caller holds one;
+// building one rebuilds the builtin Scope, on every keystroke.
 export function findSemanticTokens(
 	program: parser.Program,
 	enrichedProgram: common.typed.Program | null = null,
@@ -122,8 +105,7 @@ export function findSemanticTokens(
 	let { index } = programIndex ?? indexProgram(program, enrichedProgram)
 	let tokens: Array<SemanticToken> = []
 
-	// Every body the Program holds, the tests section's included — a Case
-	// written in a test body is as much a Case as one written above it.
+	// Every body the Program holds, test bodies included.
 	for (let body of programBodies(program)) {
 		collectCases(body, tokens)
 	}
@@ -154,10 +136,8 @@ export function findSemanticTokens(
 			modifiers.push("static")
 		}
 
-		// What separates a name the standard library gave the user from
-		// one the user wrote. Builtins reach here because the index has to hold
-		// them for shadowing to resolve, even though it rejects them as rename
-		// targets.
+		// Tells a name the standard library gave from one the user wrote. The index
+		// holds builtins for shadowing, though no rename targets them.
 		if (declaration.builtin) {
 			modifiers.push("defaultLibrary")
 		}
@@ -168,8 +148,8 @@ export function findSemanticTokens(
 	return sortTokens(tokens)
 }
 
-// Identifiers never span lines — a multi-line Position would be a
-// Parser bug, and encoding it would corrupt every following Token.
+// Identifiers never span lines; a multi-line Position would corrupt every
+// later Token.
 function pushToken(
 	tokens: Array<SemanticToken>,
 	position: common.Position,
@@ -189,17 +169,9 @@ function pushToken(
 	})
 }
 
-// The three places a Case is named: its declaration, the `#Case` value
-// that constructs it and the `case #Case` Matcher. The `#` sigil is not part
-// of the name's Position and deliberately keeps its grammar scope — a Case
-// reads the same at its declaration, where no sigil is written at all, and the
-// sigil is punctuation the way `::` and `.` are.
-//
-// These Tokens are merged into the same list the index fills before it is
-// sorted, which is what keeps the encoding well formed: nothing here can
-// collide with an indexed Position, because a Case name is precisely what the
-// index cannot bind. The `Choice` prefix of a qualified Case is a Type
-// reference the index does hold, and it sits before the `#`.
+// A Case is named at its declaration, in a `#Case` value and in a
+// `case #Case` Matcher. The `#` keeps its grammar scope as punctuation. These
+// Tokens never overlap the index's, which cannot bind a Case name.
 function collectCases(
 	nodes: Array<parser.ImplementationNode>,
 	tokens: Array<SemanticToken>,
@@ -209,9 +181,7 @@ function collectCases(
 	}
 }
 
-// A Parameter's `= expression` default holds Expressions like any body
-// does, and `= #None` is a Case that would otherwise go uncoloured — the walk
-// below descends into bodies, and a default is not one.
+// A Parameter default holds Expressions, such as the Case in `= #None`.
 function collectCasesFromDefinition(
 	definition: parser.FunctionDefinitionNode,
 	tokens: Array<SemanticToken>,
@@ -241,9 +211,7 @@ function collectCasesFromNode(
 				])
 			}
 
-			// A payload's `= { … }` holds Case values like any other
-			// Expression — `#Empty` written there colours as a Case, not as a
-			// name.
+			// A payload default holds Case values too, such as `#Empty`.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				collectCasesFromNode(defaultValue, tokens)
 			}
@@ -278,8 +246,7 @@ function collectCasesFromNode(
 			}
 
 			return
-		// An arm holds Case values like any other Expression — `as
-		// #Empty if …` colours as a Case and not as a name.
+		// An arm holds Case values too, as in `as #Empty if …`.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
 				collectCasesFromNode(expression, tokens)
@@ -294,9 +261,8 @@ function collectCasesFromNode(
 				}
 			}
 
-			// An `overload` block in declarations mode mixes bodied
-			// Methods with body-less native signatures, so both questions are
-			// asked of every member — see `namespaceMembers`.
+			// An `overload` block may mix bodied Methods and native signatures; see
+			// `namespaceMembers`.
 			for (let member of Object.values(node.methods)) {
 				for (let method of methodsOf(member)) {
 					collectCasesFromDefinition(method.value, tokens)
@@ -413,8 +379,7 @@ function collectCasesFromNode(
 		case "RefusedValue":
 			collectCasesFromNode(node.base, tokens)
 			return
-		// A path holds no Case; its steps colour as members through the
-		// rename index, off the Lookups the Enricher synthesizes for them.
+		// A path holds no Case; its steps colour as members through the index.
 		case "MemberPath":
 		case "TypeAliasStatement":
 		case "Identifier":
@@ -436,11 +401,8 @@ function collectCasesFromArguments(
 	}
 }
 
-// The protocol forbids overlapping Tokens, and the index can hold the
-// same Identifier twice — a Parameter whose internal name doubles as its call
-// site label is one symbol recorded once, but a Namespace member declared in
-// two same-named Namespaces is not. Sorting then dropping repeats of a
-// Position keeps the encoding well formed.
+// The protocol forbids overlapping Tokens, and a member of two same-named
+// Namespaces is indexed twice, so repeats of a Position are dropped.
 function sortTokens(tokens: Array<SemanticToken>): Array<SemanticToken> {
 	let sorted = [...tokens].sort(
 		(a, b) => a.line - b.line || a.column - b.column,
@@ -457,9 +419,8 @@ function sortTokens(tokens: Array<SemanticToken>): Array<SemanticToken> {
 	})
 }
 
-// The protocol encodes Tokens as flat quintuples relative to the
-// previous Token: line delta, column delta (relative to the previous Token
-// only when on the same line), length, Type index, and a Modifier bit set.
+// Flat quintuples relative to the previous Token: line delta, column delta
+// on the same line, length, Type index, Modifier bits.
 export function encodeSemanticTokens(
 	tokens: Array<SemanticToken>,
 ): Array<number> {
