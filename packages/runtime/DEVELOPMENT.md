@@ -272,3 +272,22 @@ digits. An irrational is never zero or a power of ten, so the loop ends.
 Both take `limitDigits` for a Transcendental over several bases, whose value might sit on such a point without
 anyone being able to prove otherwise. The limit is on the width of the enclosure, not on how far the refinement went
 past `places`. So a grid already past the limit answers `null` before any enclosure is taken.
+
+## Rational numbers
+
+A `Rational` holds a pair of bigints exactly as it was built: `Rational.of(4, 2)` holds 4 and 2. `createRational` is
+the gateway, and it keeps two invariants. The sign is on the numerator, so the denominator is positive, and zero is
+`0/1`.
+
+`compare` and the universal equality cross-multiply the raw parts, which is exact because both denominators are
+positive. So `4/2` equals `2/1` without being reduced. Every accessor and every formatter reads the lowest-terms form
+instead, from `reducedParts`, so `4/2` prints as `2`.
+
+Reducing costs a greatest common divisor, and one value is often asked for it several times. So `reducedParts`
+remembers the answer on the value under a Symbol key. A Symbol key is invisible to `Object.keys` and
+`Object.entries`, which is all that Record equality, the printer and the type tests read. A Rational is never
+changed, so the remembered form can not go stale. Callers only read it, so it is handed back without a copy.
+
+The arithmetic natives work on the reduced parts, and the bigint core in `bigRational.ts` answers in lowest terms.
+`createReducedRational` stores those parts and remembers them as the reduced form at once, so a sum holds `1/1`
+rather than `4/4`. Nothing can tell the difference, since every reader reduces anyway.

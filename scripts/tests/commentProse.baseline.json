@@ -455,7 +455,6 @@
 	"packages/runtime/src/PositiveInteger.ts": {"sentence-length": 4, "em-dash": 3},
 	"packages/runtime/src/PositiveRational.ts": {"sentence-length": 2, "em-dash": 3},
 	"packages/runtime/src/Randomness.ts": {"sentence-length": 33, "em-dash": 12, "all-caps": 15, "position": 13, "block-length": 3},
-	"packages/runtime/src/Rational.ts": {"sentence-length": 35, "em-dash": 27, "all-caps": 14, "position": 4, "block-length": 7, "counts": 1},
 	"packages/runtime/src/Record.ts": {"sentence-length": 7, "em-dash": 3, "all-caps": 4, "block-length": 2},
 	"packages/runtime/src/Redirects.ts": {"sentence-length": 1, "em-dash": 1},
 	"packages/runtime/src/ResultFuture.ts": {"sentence-length": 1, "em-dash": 1},
