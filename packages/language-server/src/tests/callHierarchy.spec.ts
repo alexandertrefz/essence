@@ -585,6 +585,34 @@ describe("Call Hierarchy inside a refused value", () => {
 	})
 })
 
+describe("Call Hierarchy inside a Parameter's default", () => {
+	let source = [
+		"implementation {",
+		"\tfunction run(_ f: () -> Integer = () -> Integer {",
+		"\t\tfunction inner() -> Integer {",
+		"\t\t\t<- 1",
+		"\t\t}",
+		"",
+		"\t\t<- inner()",
+		"\t}) -> Integer {",
+		"\t\t<- f()",
+		"\t}",
+		"",
+		"\tTerminal.print(run())",
+		"}",
+	].join("\n")
+
+	it("should prepare a Function declared in the default", () => {
+		expect(prepare(source, { line: 3, column: 12 })?.name).toBe("inner")
+	})
+
+	it("should credit the default's call to the Function it belongs to", () => {
+		expect(summarise(incoming(source, { line: 3, column: 12 }))).toEqual([
+			{ name: "run", kind: "function", container: null, calls: 1 },
+		])
+	})
+})
+
 describe("Call Hierarchy of a refinement's predicate", () => {
 	let source = [
 		"implementation {",

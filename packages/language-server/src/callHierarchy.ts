@@ -308,7 +308,7 @@ function collectItemsFromNode(
 
 			// A Function declared in a body is a free Function, so the container does not
 			// travel into bodies.
-			collectItems(node.value.body, null, items)
+			collectItemsFromDefinition(node.value, items)
 			return
 		case "OverloadedFunctionStatement":
 			addItem(
@@ -323,9 +323,7 @@ function collectItemsFromNode(
 			)
 
 			for (let method of node.methods) {
-				if (method.nodeType === "FunctionValue") {
-					collectItems(method.value.body, null, items)
-				}
+				collectItemsFromSignature(method, items)
 			}
 
 			return
@@ -455,6 +453,32 @@ function collectItemsFromNode(
 	}
 }
 
+// A Function literal written as a default may declare Functions of its own.
+function collectItemsFromDefinition(
+	definition: parser.FunctionDefinitionNode,
+	items: Map<string, CallHierarchyItem>,
+) {
+	for (let defaultValue of parameterDefaults(definition.parameters)) {
+		collectItemsFromNode(defaultValue, null, items)
+	}
+
+	collectItems(definition.body, null, items)
+}
+
+function collectItemsFromSignature(
+	method: parser.FunctionValueNode | parser.NativeMethodSignatureNode,
+	items: Map<string, CallHierarchyItem>,
+) {
+	if (method.nodeType === "FunctionValue") {
+		collectItemsFromDefinition(method.value, items)
+		return
+	}
+
+	for (let defaultValue of parameterDefaults(method.parameters)) {
+		collectItemsFromNode(defaultValue, null, items)
+	}
+}
+
 function collectItemsFromArguments(
 	nodeArguments: Array<parser.ArgumentNode>,
 	container: string | null,
@@ -530,9 +554,7 @@ function collectNamespaceItems(
 		)
 
 		for (let method of methods) {
-			if (method.nodeType === "FunctionValue") {
-				collectItems(method.value.body, null, items)
-			}
+			collectItemsFromSignature(method, items)
 		}
 	}
 }
@@ -581,7 +603,7 @@ function collectProtocolItems(
 
 		for (let { body } of signatures) {
 			if (body !== null) {
-				collectItems(body.value.body, null, items)
+				collectItemsFromDefinition(body.value, items)
 			}
 		}
 	}
