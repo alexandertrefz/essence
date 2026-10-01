@@ -14,21 +14,12 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The Methods that read a List's SHAPE — `windows`, `runs`, `pad`,
-// `transpose` and the two `split` entries that cut at a separator — and the
-// four set-shaped ones beside them: `removeDuplicates`, `hasDuplicates`,
-// `contains(everyItemOf:)`, `everyItem(alsoIn:)` and
-// `removeEvery(contentsOf:)`. Every claim here is about a value a compiled
-// Program answered, because what each of these promises is about the answer
-// and nothing but running one shows it.
+// The Methods that read a List's shape, and the set-shaped ones beside them.
+// Every claim is about a value a compiled Program answered.
 //
-// The set-shaped five hold their seen keys in a Map keyed by the
-// canonical encoding `Dictionary` finds a slot by, which is why the equality
-// tests below matter more than the ordering ones: an encoding that disagrees
-// with a Type's own `is` answers a wrong List quietly. The scan path — a
-// witness a Namespace wrote, which the Compiler does not brand — is exercised
-// on its own, and so is the cross-kind case where one of two equal keys
-// encodes and the other does not.
+// The set-shaped Methods find their seen keys by the canonical encoding a
+// `Dictionary` uses. An encoding that disagreed with a Type's own `is` would
+// answer a wrong List quietly. A witness a Namespace wrote takes the scan path.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -69,19 +60,17 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// One Program per block rather than one per claim: each call is a line of
-// output, and the pipeline runs once for all of them.
+// One Program per block: each call is a line of output, and the pipeline runs
+// once.
 async function answers(...calls: Array<string>): Promise<Array<string>> {
 	return run(`implementation {
 ${calls.map((call) => `\tTerminal.inspect(${call}::toString())`).join("\n")}
 }`)
 }
 
-// A `for any` run of the Program's own `tests { … }` section, driven
-// through the loaded Program's OWN `$tests` — every Essence value carries a
-// hidden Type key belonging to the runtime instance that built it, so the
-// registry the Program filled is the one that has to run it. Mirrored from
-// `randomness.spec.ts`, which states the rule.
+// A `for any` run of the Program's own `tests { … }` section, through the
+// loaded Program's own `$tests`. Every value carries a Type key of the runtime
+// instance that built it.
 type Loaded = { $tests: typeof entryPoints }
 
 async function outcomesOf(source: string): Promise<Array<string>> {
@@ -149,10 +138,8 @@ describe("windows", () => {
 		])
 	})
 
-	// A stretch that would reach past the last item is not a stretch of
-	// the size asked for, so there is none at all rather than a shorter one —
-	// which is what `split(intoGroupsOf:)` answers instead, and the reason
-	// both names exist.
+	// A stretch past the last item is not of the size asked for, so there is
+	// none. `split(intoGroupsOf:)` answers the shorter group instead.
 	it("answers nothing for a size above the length", async () => {
 		expect(
 			await run(`implementation {
@@ -165,9 +152,8 @@ describe("windows", () => {
 		).toEqual(['"[]"', '"[]"'])
 	})
 
-	// The item promise, read where it is spent. A `firstItem` off a
-	// stretch answers the item rather than an Optional, which is only a
-	// Program at all because the stretch is a NonEmptyList.
+	// A stretch is a `NonEmptyList`, so its `firstItem` answers the item
+	// rather than an Optional.
 	it("promises every stretch holds an item", async () => {
 		expect(
 			await answers(
@@ -176,9 +162,8 @@ describe("windows", () => {
 		).toEqual(['"[1, 2]"'])
 	})
 
-	// A size of zero would answer one empty stretch per position, and a
-	// negative one names nothing at all. `PositiveInteger` is what keeps both
-	// out, and a written `0` is its own proof that it is not one.
+	// `PositiveInteger` keeps out a size of zero or less, and a written `0` is
+	// its own proof that it is not one.
 	it("refuses a size of zero at compile time", () => {
 		let parsed = parseWithDiagnostics(`implementation {
 			Terminal.inspect([1, 2]::windows(of 0)::toString())
@@ -213,8 +198,7 @@ describe("runs", () => {
 		).toEqual(['"[]"'])
 	})
 
-	// The item promise again, and the reason this is native: a stretch
-	// is opened by an accepted item, so it holds one.
+	// A stretch is opened by an accepted item, so it holds one.
 	it("promises every stretch holds an item", async () => {
 		expect(
 			await answers(
@@ -223,8 +207,6 @@ describe("runs", () => {
 		).toEqual(['"[3, 5]"'])
 	})
 
-	// The longest-streak question the examples hand-rolled, written the
-	// way the library now answers it.
 	it("answers the longest streak through highestItem", async () => {
 		expect(
 			await answers(
@@ -245,8 +227,7 @@ describe("pad", () => {
 		).toEqual(['"[1, 2, 0, 0]"', '"[1, 2, 0, 0]"', '"[0, 0, 1, 2]"'])
 	})
 
-	// An odd count leaves the extra item at the END, which is
-	// `String::pad`'s own rule for centring.
+	// An odd count leaves the extra item at the end, as `String::pad` centres.
 	it("splits the filler between the ends, extra one last", async () => {
 		expect(
 			await answers(
@@ -256,8 +237,8 @@ describe("pad", () => {
 		).toEqual(['"[0, 0, 1, 2, 0, 0]"', '"[0, 1, 2, 0, 0]"'])
 	})
 
-	// Nothing is ever dropped. A length at or below the one the List has
-	// answers the receiver, however far below it stands.
+	// Nothing is dropped. A length at or below the List's own answers the
+	// receiver.
 	it("answers the receiver where it is already long enough", async () => {
 		expect(
 			await answers(
@@ -295,8 +276,7 @@ describe("transpose", () => {
 		])
 	})
 
-	// The shortest inner List decides, as `pair(with:)` decides how many
-	// pairs — so nothing is invented for a position a row does not have.
+	// The shortest inner List decides, as it does for `pair(with:)`.
 	it("stops with the shortest inner List", async () => {
 		expect(
 			await run(`implementation {
@@ -313,9 +293,8 @@ describe("transpose", () => {
 })
 
 describe("split at a separator", () => {
-	// A separator cuts BETWEEN pieces, so a piece stands before the
-	// first cut and after the last one. That is what makes the count of pieces
-	// one more than the count of separators, and the answer never empty.
+	// A separator cuts between pieces, so there is one more piece than there
+	// are separators.
 	it("answers the pieces around every separator", async () => {
 		expect(
 			await answers(
@@ -345,8 +324,7 @@ describe("split at a separator", () => {
 		).toEqual(['"[[]]"', '"[[]]"'])
 	})
 
-	// The proof, read where it is spent: `firstItem` off the answer is
-	// the piece rather than an Optional of one.
+	// `firstItem` off the answer is the piece rather than an Optional of one.
 	it("promises at least one piece, whatever it was handed", async () => {
 		expect(
 			await run(`implementation {
@@ -358,8 +336,8 @@ describe("split at a separator", () => {
 		).toEqual(['"[]"', '"[2]"'])
 	})
 
-	// The separator entry is the check entry with the items' own `is` as
-	// the check, so the two answer alike wherever a check spells one out.
+	// The separator entry is the check entry with the items' own `is` as the
+	// check.
 	it("answers as the check entry does for the same cuts", async () => {
 		expect(
 			await answers(
@@ -381,9 +359,8 @@ describe("the set-shaped Methods", () => {
 		).toEqual(['"[\\"b\\", \\"a\\", \\"c\\"]"', '"[1]"', '"[3, 1, 2]"'])
 	})
 
-	// The first item met at a key survives, whatever the rest of it
-	// holds — which is what makes this the one-row-per-id Method rather than a
-	// key-flavoured `index(on:)`, whose later item wins.
+	// The first item met at a key survives, unlike `index(on:)`, where the
+	// later item wins.
 	it("keeps the first item met at each key", async () => {
 		expect(
 			await run(`implementation {
@@ -399,10 +376,8 @@ describe("the set-shaped Methods", () => {
 		).toEqual(['"[\\"first\\", \\"second\\"]"', '"3"'])
 	})
 
-	// The rows repeat a key and no whole row, which is what tells the
-	// two entries apart: a `hasDuplicates(on:)` comparing items rather than
-	// keys answers the same `true` over rows that repeat both ways, and only
-	// the golden capture would catch it.
+	// The rows repeat a key and no whole row, which tells the two entries
+	// apart.
 	it("answers whether anything occurs twice, by item and by key", async () => {
 		expect(
 			await run(`implementation {
@@ -434,9 +409,8 @@ describe("the set-shaped Methods", () => {
 		])
 	})
 
-	// The subset question counts nothing, so a receiver holding one `1`
-	// contains every item of a List holding two — and every List contains the
-	// items of the empty one.
+	// The subset question counts nothing, so `[1]` contains every item of
+	// `[1, 1]`, and every List contains the items of the empty one.
 	it("answers whether every item of another List occurs", async () => {
 		expect(
 			await run(`implementation {
@@ -459,9 +433,8 @@ describe("the set-shaped Methods", () => {
 		])
 	})
 
-	// Both are FILTERS over the receiver rather than set operations, so
-	// an item is kept or dropped every time it occurs and the receiver's order
-	// is what the answer stands in.
+	// Both filter the receiver, so an item is kept or dropped every time it
+	// occurs, in the receiver's order.
 	it("intersects and subtracts as a filter does", async () => {
 		expect(
 			await run(`implementation {
@@ -484,8 +457,8 @@ describe("the set-shaped Methods", () => {
 		])
 	})
 
-	// The union has no name of its own, and this is the spelling the
-	// `§§` block of `removeDuplicates` points a reader at.
+	// The union has no name of its own. The `removeDuplicates` docs give this
+	// spelling.
 	it("spells the union as an append and a deduplication", async () => {
 		expect(
 			await answers(
@@ -494,9 +467,8 @@ describe("the set-shaped Methods", () => {
 		).toEqual(['"[3, 1, 2]"'])
 	})
 
-	// The proof, spent on the proven Namespace's own entries. A List
-	// with something in it deduplicates to one with something in it, whichever
-	// entry answers.
+	// A non-empty List deduplicates to a non-empty List, whichever entry
+	// answers.
 	it("carries a receiver's proof through both entries", async () => {
 		expect(
 			await run(`implementation {
@@ -511,10 +483,8 @@ describe("the set-shaped Methods", () => {
 })
 
 describe("what decides that two items are one", () => {
-	// The encoding is the standard library's own `is` in another
-	// spelling, so a Rational and the whole Integer it equals are one item
-	// under a covering `Number` item Type — and `1/2` and `2/4` are one item
-	// whichever way either was written.
+	// The encoding agrees with the standard library's own `is`. A Rational and
+	// the Integer it equals are one item, and so are `1/2` and `2/4`.
 	it("reads two spellings of one number as one item", async () => {
 		expect(
 			await run(`implementation {
@@ -528,9 +498,8 @@ describe("what decides that two items are one", () => {
 		).toEqual(['"[3, 1/2]"', '"[1/2, 3/4]"', '"true"'])
 	})
 
-	// A String is compared in its NFC form, so an accent written as one
-	// code point and the same accent written as a base and a combining mark
-	// are one item — exactly as `is` says they are.
+	// A String is compared in its NFC form, so a composed and a decomposed
+	// accent are one item, as `is` says.
 	it("reads two normalizations of one String as one item", async () => {
 		expect(
 			await run(`implementation {
@@ -544,9 +513,8 @@ describe("what decides that two items are one", () => {
 		).toEqual(['"1"', '"true"'])
 	})
 
-	// A Record and a Case are spelled into a text from their parts, and
-	// the members are read in sorted name order because `Record::is` is
-	// order-insensitive.
+	// A Record and a Case encode from their parts, with members in sorted name
+	// order because `Record::is` ignores order.
 	it("reads a Record and a Case by their parts", async () => {
 		expect(
 			await run(`implementation {
@@ -559,9 +527,8 @@ describe("what decides that two items are one", () => {
 		).toEqual(['"2"', '"[Start, End]"'])
 	})
 
-	// A List key has no encoding at all, so every lookup walks the keys
-	// and asks the witness. It is invisible apart from the time it costs,
-	// which is the whole claim.
+	// A List key encodes through its items, so these Lists reach the encoded
+	// path.
 	it("answers for items of a kind that does not encode", async () => {
 		expect(
 			await run(`implementation {
@@ -574,10 +541,9 @@ describe("what decides that two items are one", () => {
 		).toEqual(['"[[1], [2]]"', '"true"', '"[[1], [1]]"'])
 	})
 
-	// THE SCAN PATH, and the whole of what keeps a user-written `is`
-	// from being ignored. This Namespace calls two Strings equal when they
-	// differ only in case; the Compiler brands no witness it wrote, so the
-	// encoding is never asked and every comparison is this body.
+	// The scan path. This Namespace calls two Strings equal when they differ
+	// only in case. Its witness is not branded, so every comparison runs its
+	// body.
 	it("obeys an equality a Namespace wrote rather than the encoding", async () => {
 		expect(
 			await run(`implementation {
@@ -606,9 +572,8 @@ describe("what decides that two items are one", () => {
 	})
 })
 
-// What each Method promises over EVERY input rather than over the ones a
-// case happened to write down. `for any` draws the Lists; what is asserted is a
-// relation between two calls, never a value.
+// What each Method promises over every input. `for any` draws the Lists, and
+// each assertion relates two calls rather than naming a value.
 describe("properties", () => {
 	it("keeps an intersection inside both Lists", async () => {
 		expect(
@@ -662,9 +627,8 @@ describe("properties", () => {
 		).toEqual(["test-pass: deduplicating leaves no duplicate"])
 	})
 
-	// The count of stretches, which is the one arithmetic promise
-	// `windows` makes: n − k + 1 where the List is long enough, and none at
-	// all where it is not.
+	// `windows` answers n - k + 1 stretches where the List is long enough,
+	// and none where it is not.
 	it("answers one stretch per position a stretch fits at", async () => {
 		expect(
 			await outcomesOf(`implementation {}
@@ -687,9 +651,8 @@ describe("properties", () => {
 		).toEqual(["test-pass: windows count one per fitting position"])
 	})
 
-	// Splitting and joining are inverse over the items a separator does
-	// not pick out, which is the same claim `String::split(on:)` and
-	// `join(with:)` make about text.
+	// A split keeps every item that is not a separator, as
+	// `String::split(on:)` does for text.
 	it("puts every item a split kept back where it was", async () => {
 		expect(
 			await outcomesOf(`implementation {}
@@ -707,9 +670,8 @@ describe("properties", () => {
 		])
 	})
 
-	// Transposing twice is the identity on a rectangular List, which is
-	// the whole of what the operation means — and the shortest inner List is
-	// what makes a ragged one a different claim.
+	// Transposing twice is the identity on a rectangular List. A ragged one
+	// loses what the shortest inner List does not reach.
 	it("answers the receiver when a rectangle is transposed twice", async () => {
 		expect(
 			await outcomesOf(`implementation {
