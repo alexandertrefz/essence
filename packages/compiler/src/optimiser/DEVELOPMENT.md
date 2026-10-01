@@ -33,11 +33,10 @@ A few places in the order matter:
 ### What a pass is handed
 
 `run` receives the Program, the `DeclaredNamespaces` and the options. The Namespaces are computed once per phase by
-`declaredNamespaces`, because answering walks every object the Program holds, Types included. One answer serves every
-pass, since no pass declares a Namespace the simplifier did not. A pass that drops code can drop only a nested
-declaration, and a nested name left in the set only makes a pass hold back. A pass that declares a Namespace computes
-its own answer. A memo keyed on the Program would miss after every pass that changed something, which is why the
-answer is handed in.
+`declaredNamespaces`, because answering walks the whole Program. One answer serves every pass, since no pass
+declares a Namespace the simplifier did not. A pass that drops code can drop only a nested declaration, and a nested
+name left in the set only makes a pass hold back. A pass that declares a Namespace computes its own answer. A memo
+keyed on the Program would miss after every pass that changed something, which is why the answer is handed in.
 
 Only `instrument-coverage` reads the options. Every other pass is right whenever it applies.
 

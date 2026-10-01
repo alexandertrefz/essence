@@ -1,8 +1,10 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { forEachSimpleChild, type SimpleNode } from "../visitor/typedSimple"
+
 // The Namespaces a Program declares, and those it declares below its top
-// level. Asked once per optimisation, since it walks every object the Program
-// holds. See "Namespaces named after builtins" in DEVELOPMENT.md.
+// level. Asked once per optimisation, since it walks the whole Program. See
+// "Namespaces named after builtins" in DEVELOPMENT.md.
 
 export type DeclaredNamespaces = {
 	// Every Namespace the Program declares, wherever it declares one.
@@ -11,67 +13,40 @@ export type DeclaredNamespaces = {
 	nested: ReadonlySet<string>
 }
 
+type Found = { all: Set<string>; nested: Set<string> }
+
 export function declaredNamespaces(
 	program: common.typedSimple.Program,
 ): DeclaredNamespaces {
-	let all = new Set<string>()
-	let nested = new Set<string>()
-
-	// A structural search, since a Namespace may be declared in any body. Each
-	// object is visited once, since Types are shared DAGs.
-	let visited = new Set<object>()
-
-	let visitNested = (value: unknown): void => {
-		if (value === null || typeof value !== "object") {
-			return
-		}
-
-		if (visited.has(value)) {
-			return
-		}
-
-		visited.add(value)
-
-		if (Array.isArray(value)) {
-			for (let entry of value) {
-				visitNested(entry)
-			}
-
-			return
-		}
-
-		let node = value as Record<string, unknown>
-
-		if (node["nodeType"] === "NamespaceDefinitionStatement") {
-			let name = node["name"] as Record<string, unknown> | undefined
-
-			if (typeof name?.["name"] === "string") {
-				all.add(name["name"])
-				nested.add(name["name"])
-			}
-		}
-
-		for (let entry of Object.values(node)) {
-			visitNested(entry)
-		}
-	}
+	let found: Found = { all: new Set(), nested: new Set() }
 
 	for (let node of program.implementation.nodes) {
 		if (node.nodeType === "NamespaceDefinitionStatement") {
-			all.add(node.name.name)
+			found.all.add(node.name.name)
 
-			// What its members declare is nested.
-			visitNested(node.properties)
-			visitNested(node.methods)
+			// The Namespace stands at the top level, but what its members
+			// declare is nested.
+			forEachSimpleChild(node, collectNested, found)
 
 			continue
 		}
 
-		visitNested(node)
+		collectNested(node, found)
 	}
 
 	// Everything a tests section declares is nested.
-	visitNested(program.tests)
+	if (program.tests !== null) {
+		collectNested(program.tests, found)
+	}
 
-	return { all, nested }
+	return found
+}
+
+function collectNested(node: SimpleNode, found: Found): void {
+	if (node.nodeType === "NamespaceDefinitionStatement") {
+		found.all.add(node.name.name)
+		found.nested.add(node.name.name)
+	}
+
+	forEachSimpleChild(node, collectNested, found)
 }
