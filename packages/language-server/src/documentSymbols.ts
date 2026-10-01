@@ -11,7 +11,10 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "./assertionChildren"
+import {
+	assertionExpressions,
+	typedAssertionExpressions,
+} from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
@@ -270,6 +273,9 @@ function symbolsOfNode(
 			)
 		case "CaseValue":
 			return node.value === null ? [] : symbolsOfNode(node.value)
+		case "ExpectStatement":
+		case "RequireStatement":
+			return assertionExpressions(node).flatMap(symbolsOfNode)
 		default:
 			return []
 	}

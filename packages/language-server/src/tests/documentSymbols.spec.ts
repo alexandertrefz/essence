@@ -642,3 +642,43 @@ describe("Document Symbols inside a refused value", () => {
 		expect(detailOf(detailedSymbolsOf(source), "inner")).toBe("Boolean")
 	})
 })
+
+// An assertion is a Statement of the test body, and a Function literal it holds
+// outlines as one anywhere else does.
+describe("Document Symbols inside an assertion", () => {
+	let source = [
+		"implementation {}",
+		"",
+		"tests {",
+		'\ttest "checks" {',
+		"\t\texpect [1]::hasOnlyItems(where (item) {",
+		"\t\t\tconstant expected = item::isGreaterThan(0)",
+		"",
+		"\t\t\t<- expected",
+		"\t\t})",
+		"",
+		"\t\trequire [2]::hasOnlyItems(where (item) {",
+		"\t\t\tconstant required = item::isGreaterThan(0)",
+		"",
+		"\t\t\t<- required",
+		"\t\t})",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should list what a Function literal in an expect or a require declares", () => {
+		let [test] = symbolsOf(source)
+
+		expect(test.children.map((child) => child.name)).toEqual([
+			"expected",
+			"required",
+		])
+	})
+
+	it("should put the inferred Type beside it", () => {
+		let symbols = detailedSymbolsOf(source, { tests: true })
+
+		expect(detailOf(symbols, "expected")).toBe("Boolean")
+		expect(detailOf(symbols, "required")).toBe("Boolean")
+	})
+})
