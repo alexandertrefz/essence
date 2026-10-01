@@ -1053,3 +1053,33 @@ its witness is solved for the receiver itself (`witnessType`). A derive's `Self`
 Case still fits the Parameter. `providedNamespaceMember` answers the `Number.isLessThan(a, b)` spelling the same
 way. A generic Namespace named there has no receiver, so its Type Parameters stay open for the first Argument to
 decide.
+
+## Finding the Namespaces for a receiver
+
+Method resolution asks which visible Namespaces target a receiver once per Invocation. Three memos keep that
+cheap, and each is invalidated by something the code does in place.
+
+`getAllNamespacesInScope` answers the Namespaces a Scope sees: its parent's answer, amended by its own members. A
+member that is a Namespace adds one, and any other member of the name shadows one away. A named lookup, such as
+`::<Name>method()`, stops at the nearest binding of the name, whatever it is. Most Scopes neither declare nor shadow
+a Namespace, so they share their parent's answer by identity, and so does everything derived from it.
+
+Each answer records the version of every Scope on its chain (`scopeVersionSnapshot`), and revalidating compares
+those numbers. A declaration bumps its Scope's version only where it declares a Namespace, or shadows a name some
+Namespace was declared under (`namespaceNames`). Declaring an ordinary Constant leaves every answer standing. The
+hoist writes into Scopes directly and calls `invalidateNamespacesInScope` itself. The conformance memo of each Scope
+is version-guarded the same way.
+
+`namespacesTargeting` then matches the receiver against the visible Namespaces. `buildNamespaceIndex` buckets them
+by the kind of Type they target, since `matchTypes` can only match two Types of one kind. A Union, an Unknown or a
+Type Parameter target can match anything, so those go in a bucket every lookup reads. A Record target is filed
+under its rarest member name, since a receiver must carry every member. A refined receiver reads its base's bucket
+and the refinement bucket, because a refinement keeps every Method of its base. Each bucket is filled in visible
+order, and `mergeCandidateBuckets` merges them, so the candidates keep that order. The ambiguity Diagnostic names
+the Namespaces in it.
+
+The answer for a pair of Namespaces Map and receiver is a pure function of the two, so it is remembered. The Map is
+keyed by identity, which hits because Scopes share it. A receiver whose Type is only its tag, such as Integer, shares
+one entry per tag (`tagOnlyTypes`). Any other receiver is keyed by identity in a `WeakMap`. Poisoning a refinement
+to its base changes a target in place, so it calls `forgetNamespaceTargets` to drop the indexes and answers. The fill
+also writes a pending predicate in place, but no answer can have read it, since reading one throws.

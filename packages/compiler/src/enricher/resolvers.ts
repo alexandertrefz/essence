@@ -8449,9 +8449,8 @@ function reportMemberOperator(
 	return true
 }
 
-// Every name of one kind that is visible from `scope`, innermost first
-// — what a "did you mean" is drawn from, so that a suggestion is always a
-// name the reader could actually have written here.
+// Every name of one kind visible from `scope`, innermost first, which a
+// near miss is drawn from.
 function namesInScope(
 	scope: enricher.Scope,
 	kind: "members" | "types" | "protocols",
@@ -8477,9 +8476,7 @@ export function suggestionInScope(
 	return suggestion === null || suggestion === name ? null : suggestion
 }
 
-// A near miss is a Help rather than part of the message — it is a
-// suggestion, and a message that states one as fact reads as though the
-// Compiler knows something it does not.
+// A near miss is a Help rather than part of the message, since it is a guess.
 export function suggestionHelps(
 	name: string,
 	scope: enricher.Scope,
@@ -8490,9 +8487,8 @@ export function suggestionHelps(
 	return suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
 }
 
-// The same near miss again, for the Quick Fix that applies it. Spread
-// rather than assigned, so a Diagnostic that has no suggestion carries no
-// `data` key at all rather than one holding `undefined`.
+// The near miss for the Quick Fix, spread so that no suggestion means no
+// `data` key.
 export function suggestionData(suggestion: string | null): {
 	data?: common.DiagnosticData
 } {
@@ -8549,9 +8545,9 @@ export function resolveWrittenProtocol(
 	return protocolNamed(identifier.content, scope)
 }
 
-// The Protocol a stored identity names. The nearest Protocol of its name
-// answers where it is the one, and the registry answers everywhere else; an
-// identity neither knows is an Internal Compiler Error.
+// The Protocol a stored identity names: the nearest Protocol of its name
+// where that is the one, else the registry's. An unknown identity is a
+// compiler bug.
 export function protocolOf(
 	identity: string,
 	scope: enricher.Scope,
@@ -8580,9 +8576,8 @@ export function knownProtocol(
 	return protocolRegistryOf(scope)?.get(identity) ?? null
 }
 
-// The name this Scope reads a Protocol under: its declared name where
-// that binds it, otherwise the nearest name that does, such as an import alias,
-// and null where no name here binds it.
+// The name this Scope reads a Protocol under. That is its declared name where
+// that binds it, else the nearest that does, such as an import alias, or null.
 export function protocolSpelling(
 	identity: string,
 	scope: enricher.Scope,
@@ -8611,10 +8606,8 @@ export function protocolSpelling(
 	return null
 }
 
-// What holds a name here that an import of a Protocol would bind, its
-// declared one unless told another, so that the import would collide or name
-// something else: another Protocol, or a Type or member of this Module. Null
-// where the name is free.
+// What already holds the name an import of a Protocol would bind here, its
+// declared name unless told another. Null where the name is free.
 export function protocolNameTaken(
 	identity: string,
 	scope: enricher.Scope,
@@ -8638,11 +8631,8 @@ export function describeProtocol(
 	return protocolSpelling(identity, scope) ?? displayProtocolName(identity)
 }
 
-// The Protocols in scope that declare a Method of this name, alphabetically
-// — the bounds a Type Parameter could be given so that the call resolves at all.
-// An unbounded Parameter reaches no Namespace whatsoever, and a bound is the only
-// thing that gives it one, so this is the half of that refusal a reader can act
-// on.
+// The Protocols in scope declaring a Method of this name, alphabetically: the
+// bounds that would let an unbounded Type Parameter's call resolve.
 export function protocolsDeclaringMethod(
 	methodName: string,
 	scope: enricher.Scope,
@@ -8682,12 +8672,8 @@ function allProtocolsInScope(
 	]
 }
 
-// Method resolution asks which Namespaces a Scope can see once per
-// Method invocation, and the answer only changes when a name is declared into
-// one of the Scopes on the chain. Each Scope therefore carries a version that
-// its own declarations bump, and the memoised answer records the versions it
-// was computed from — revalidating costs a walk up the chain comparing
-// numbers, instead of enumerating every member of every Scope.
+// Each Scope's version, which a declaration bearing on Namespaces bumps. See
+// "Finding the Namespaces for a receiver" in DEVELOPMENT.md.
 let scopeVersions = new WeakMap<enricher.Scope, number>()
 let namespacesInScopeCache = new WeakMap<
 	enricher.Scope,
@@ -8697,10 +8683,8 @@ let namespacesInScopeCache = new WeakMap<
 	}
 >()
 
-// Every name ever declared as a Namespace. A declaration only changes
-// what `getAllNamespacesInScope` answers if it declares a Namespace or
-// shadows one — declaring an ordinary Constant leaves every cached answer
-// intact, and Constants are the overwhelming majority of declarations.
+// Every name ever declared as a Namespace. Only a declaration under such a
+// name changes what `getAllNamespacesInScope` answers.
 let namespaceNames = new Set<string>()
 
 export function invalidateNamespacesInScope(
@@ -8723,9 +8707,8 @@ export function invalidateConformancesInScope(scope: enricher.Scope): void {
 	scopeVersions.set(scope, (scopeVersions.get(scope) ?? 0) + 1)
 }
 
-// The version of every Scope on the chain, innermost first — what a
-// memoised answer records so that `namespaceCacheIsCurrent` can revalidate it
-// by comparing numbers instead of enumerating members.
+// The version of every Scope on the chain, innermost first, which
+// `namespaceCacheIsCurrent` compares.
 function scopeVersionSnapshot(
 	scope: enricher.Scope,
 ): Array<{ scope: enricher.Scope; version: number }> {
@@ -8769,13 +8752,8 @@ function namespaceCacheIsCurrent(
 	return index === cached.versions.length
 }
 
-// The specifiers `reportSpecifierIsNotANamespace` has refused. A
-// `::<total>append("!")` whose `total` names an Integer is one mistake, and the
-// lookup behind it comes back empty, which would read as "no Namespace targets
-// this value" and print a second report about a receiver whose Namespace is
-// right there (`"hello"::append` compiles). Remembered on the Node, so a caller
-// can tell an empty answer it has already been told about from an empty answer
-// that is news.
+// The specifiers `reportSpecifierIsNotANamespace` refused, so a caller does
+// not report the empty lookup behind `::<total>append("!")` a second time.
 let refusedSpecifiers = new WeakSet<parser.IdentifierNode>()
 
 export function specifierWasRefused(
@@ -8784,11 +8762,8 @@ export function specifierWasRefused(
 	return identifier != null && refusedSpecifiers.has(identifier)
 }
 
-// `::<Name>method()` where `Name` means something other than a Namespace
-// here. Reported rather than skipped past: the call site named ONE Namespace,
-// and answering with a Namespace of that name from further out would type-check
-// the call against something the emitted code can not reach — the nearer
-// binding is what the name compiles to.
+// `::<Name>method()` where the nearest `Name` is no Namespace. A Namespace of
+// the name further out would not be what the emitted code reaches.
 function reportSpecifierIsNotANamespace(
 	identifier: parser.IdentifierNode,
 	value: common.Type,
@@ -8824,13 +8799,8 @@ export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
 ): Map<string, common.NamespaceType> {
-	// A named lookup only ever wants one Namespace, so it walks the
-	// Scope chain asking for that one name instead of enumerating members.
-	// It stops at the NEAREST binding of the name, whatever that binding is —
-	// the same shadowing rule the enumeration below implements ("a member that
-	// is anything else shadows one away"). Walking past a Constant to a
-	// Namespace of the same name further out would validate the call against a
-	// Namespace that is not what the name means where the call is emitted.
+	// A named lookup walks to the nearest binding of the name, whatever it
+	// is.
 	if (identifier) {
 		let namespaces: Map<string, common.NamespaceType> = new Map()
 		let name = identifier.content
@@ -8867,11 +8837,7 @@ export function getAllNamespacesInScope(
 		return cached.namespaces
 	}
 
-	// What a Scope can see is what its parent can see, amended by its
-	// own members: a member that is a Namespace adds one, and a member that
-	// is anything else shadows one away. Asking the parent — whose answer is
-	// itself memoised — costs a walk of this Scope's own members instead of
-	// every member of every Scope above it.
+	// The parent's answer, amended by this Scope's own members.
 	let parentNamespaces =
 		scope.parent === null
 			? EMPTY_NAMESPACES
@@ -8890,10 +8856,7 @@ export function getAllNamespacesInScope(
 		}
 	}
 
-	// Most Scopes declare no Namespace and shadow none, so they share
-	// their parent's answer *by identity* — which is what lets everything
-	// derived from it, the candidate index below above all, be computed once
-	// for a whole subtree instead of once per Scope.
+	// A Scope that amends nothing shares its parent's answer by identity.
 	let result = amends ? new Map(parentNamespaces) : parentNamespaces
 
 	if (amends) {
@@ -8916,18 +8879,11 @@ export function getAllNamespacesInScope(
 	return result
 }
 
-// The answer for a rootless Scope — shared so that it, too, is one
-// identity rather than one per Scope.
+// The shared answer for a Scope without a parent.
 const EMPTY_NAMESPACES: Map<string, common.NamespaceType> = new Map()
 
-// Method resolution asks "which of the visible Namespaces target this
-// receiver?" once per invocation, and answered it by matching the receiver
-// against every Namespace in Scope — linear in the size of the program, on
-// every Method call in the program. `matchTypes` can only ever say yes to a
-// pair whose Types have the same kind, plus three blanket cases (a Union
-// target tries its members, an Unknown target accepts anything, a bindable
-// Generic target binds anything), so bucketing the Namespaces by the kind
-// they target lets a receiver skip every bucket that could not match it.
+// The visible Namespaces bucketed by the kind of Type they target. See
+// "Finding the Namespaces for a receiver" in DEVELOPMENT.md.
 type IndexedNamespace = {
 	order: number
 	name: string
@@ -8935,14 +8891,10 @@ type IndexedNamespace = {
 }
 
 type NamespaceIndex = {
-	// Targets that can match a receiver of any kind, so every lookup
-	// pays for them.
+	// Targets that can match any receiver.
 	always: Array<IndexedNamespace>
 	byKind: Map<common.Type["type"], Array<IndexedNamespace>>
-	// A Record target matches only a receiver carrying every one of its
-	// members, so it is filed under whichever of its member names is rarest
-	// among the Record targets — the name that rules out the most Namespaces
-	// for the fewest lookups.
+	// Record targets, each filed under its rarest member name.
 	recordsByMember: Map<string, Array<IndexedNamespace>>
 	// `for {}` targets every Record, so no member name can file them.
 	recordsWithoutMembers: Array<IndexedNamespace>
@@ -8999,8 +8951,7 @@ function buildNamespaceIndex(
 	for (let entry of entries) {
 		let targetType = entry.namespace.targetType
 
-		// A Namespace with no target Type is a Namespace of Static
-		// Methods — never a Method receiver, so it is indexed nowhere.
+		// A Namespace without a target has no receiver.
 		if (targetType === null || targetType === undefined) {
 			continue
 		}
@@ -9015,8 +8966,7 @@ function buildNamespaceIndex(
 			targetType.type === "List" ||
 			targetType.type === "GenericList"
 		) {
-			// The two List spellings match each other, so they share a
-			// bucket rather than being told apart here.
+			// The two List spellings share a bucket.
 			pushInto(index.byKind, "List", entry)
 		} else if (
 			targetType.type === "Dictionary" ||
@@ -9050,19 +9000,9 @@ function buildNamespaceIndex(
 	return index
 }
 
-// The Namespaces worth matching against `baseType`, in the order they
-// are visible in — a superset of those that can match, never a subset, so the
-// matching below decides exactly what it decided when it saw all of them.
-//
-// Visible order is not restored by a sort here, it is never lost:
-// `buildNamespaceIndex` fills every bucket in `order` order, so each bucket is
-// already ascending and the buckets a receiver reads are MERGED rather than
-// concatenated and re-sorted. Order is not cosmetic — the ambiguity Diagnostic
-// names the Namespaces in the order they are visible in, so a merge that got
-// this wrong would rewrite Diagnostics rather than just reorder work.
-//
-// The returned Array is READ-ONLY to its caller: when a receiver reads
-// exactly one bucket, that bucket IS the return value rather than a copy of it.
+// The Namespaces worth matching against `baseType`, a superset of those that
+// match, in visible order. The Array is read-only, since a single bucket is
+// returned itself.
 function namespaceCandidatesFor(
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
@@ -9095,19 +9035,9 @@ function namespaceCandidatesFor(
 
 const EMPTY_CANDIDATES: Array<IndexedNamespace> = []
 
-// The sorted buckets a receiver of this KIND can be answered by —
-// everything but the blanket ones every lookup pays for, which the caller has
-// already put in. Empty buckets are left out so the merge below never walks
-// one.
-//
-// A refined receiver reads two of them. Evidence adds Methods to a Type
-// and never takes any away, so a `NonZeroInteger` keeps every Method an Integer
-// has — and a Namespace written `for NonZeroInteger` is the one place a `divide`
-// that can not fail may live. Left out, the first half would leave a refined
-// value with no Methods at all and the second would make refining one
-// pointless. Every Namespace targeting ANY refinement is offered, which is a
-// superset exactly as this function promises: `matchTypes` is what decides that
-// a `NonEmptyString` Namespace does not answer for a `NonZeroInteger`.
+// The non-empty buckets a receiver of this kind reads, besides the ones every
+// lookup reads. A refined receiver reads its base's and the refinements',
+// and `matchTypes` decides which refinement fits.
 function collectKindCandidates(
 	index: NamespaceIndex,
 	baseType: common.Type,
@@ -9131,8 +9061,7 @@ function collectKindCandidates(
 	}
 
 	if (baseType.type === "List" || baseType.type === "GenericList") {
-		// The two List spellings share one bucket — see
-		// `buildNamespaceIndex`.
+		// The two List spellings share one bucket.
 		pushBucket(buckets, index.byKind.get("List"))
 
 		return
@@ -9160,11 +9089,9 @@ function pushBucket(
 	}
 }
 
-// A k-way merge of buckets that are each already ascending by `order`,
-// which reproduces exactly what sorting their concatenation produced —
-// `order` is unique per Namespace, so there are no ties for a merge rule to
-// decide differently from a sort. `k` is one or two for every receiver but a
-// Record's, so the linear scan for the smallest head beats a heap.
+// A merge of buckets each ascending by `order`, which is unique, so the
+// result is the sorted concatenation. A linear scan for the smallest head
+// suffices for so few buckets.
 function mergeCandidateBuckets(
 	buckets: Array<Array<IndexedNamespace>>,
 ): Array<IndexedNamespace> {
@@ -9205,40 +9132,18 @@ function mergeCandidateBuckets(
 	return merged
 }
 
-// The answer `namespacesTargeting` gave for one (namespaces, receiver)
-// pair. Sound to keep because that answer is a PURE function of the two: the
-// only state the matching below touches is a `createInferenceContext` made
-// fresh per Namespace and thrown away with the loop — what it binds decides
-// whether the Namespace is a candidate and is never read again, because Method
-// resolution re-binds every Generic from the receiver Argument at the
-// invocation. So what is remembered here is the candidate SET and nothing that
-// carries per-call inference state.
-//
-// Keyed by identity twice over, which is what makes it hit. The outer
-// key is the namespaces Map, which `getAllNamespacesInScope` shares across a
-// subtree; the inner key is the receiver Type, where a fresh structural Type
-// is a miss that recomputes. A receiver or a Namespace target changes in place
-// in two ways only: the fill writes a pending predicate, which no answer can
-// have read because reading one throws, and poisoning turns a refinement into
-// its base, which calls `forgetNamespaceTargets`.
+// The remembered answers of `namespacesTargeting` for one Namespaces Map,
+// which are pure: the inference each match makes is thrown away. See
+// "Finding the Namespaces for a receiver" in DEVELOPMENT.md.
 type TargetingAnswers = {
-	// A Type whose whole identity is its tag can not be told apart from
-	// another of the same tag, so all of them share one answer — which is what
-	// makes the everyday receiver (`1::add(2)`) a hit even though the literal
-	// Enricher builds it a fresh `{ type: "Integer" }` every time.
+	// Receivers that are only their tag share one answer per tag.
 	byTag: Map<string, Map<string, common.NamespaceType>>
-	// Everything with structure is keyed by identity instead, in a
-	// WeakMap so that per-compile Types do not pin the answers for them alive:
-	// the entry dies with the Type it is about, and the whole memo dies with
-	// the namespaces Map it hangs off.
+	// Any other receiver, keyed by identity.
 	byType: WeakMap<common.Type, Map<string, common.NamespaceType>>
 }
 
-// The Types with no fields but `type` — see `common.Type`. `List` is NOT
-// here (its `itemType` is part of it), and neither is `GenericList`, whose
-// `generics` is fixed today but is a field a receiver could come to differ in.
-// `Dictionary` and `GenericDictionary` are out for exactly those two reasons,
-// twice over — the two slots are part of the applied Type.
+// The Types with no field but `type`. The List and Dictionary Types are not
+// among them, since their slots are fields.
 const tagOnlyTypes: ReadonlySet<string> = new Set([
 	"Unknown",
 	"Error",
@@ -9255,26 +9160,16 @@ let namespacesTargetingMemos = new WeakMap<
 	TargetingAnswers
 >()
 
-// Drops every candidate index and remembered answer. The index files a
-// Namespace by the kind of its target, so a target rewritten in place leaves
-// it in the wrong bucket as well as leaving the answers stale.
+// Drops every candidate index and remembered answer, for a target rewritten
+// in place.
 export function forgetNamespaceTargets(): void {
 	namespaceIndexes = new WeakMap()
 	namespacesTargetingMemos = new WeakMap()
 }
 
-// Which of the given Namespaces target `baseType`, in the order they were
-// given in. Separated from the Scope walk above because the graph-aware half of
-// "no such Method" asks the same question of Namespaces that are NOT in Scope —
-// the ones a dependency exports and this Module never imported — and the answer
-// has to be decided by exactly the rule dispatch is decided by, or the help
-// would name a Namespace that would not have resolved anyway.
-//
-// The returned Map is SHARED with every other caller that asked the same
-// question, so it is read-only to all of them. Nothing mutates it today —
-// `namespacesDeclaringMethod`, `partitionInstanceMethodNamespaces` and
-// `methodNamesOf` all build their own — and a caller that needs to must copy it
-// at its own mutation site rather than here.
+// Which of the given Namespaces target `baseType`, in the given order. It
+// also answers for Namespaces not in scope, which "no such Method" asks about.
+// The Map is shared, so a caller copies it before changing it.
 export function namespacesTargeting(
 	namespaces: Map<string, common.NamespaceType>,
 	baseType: common.Type,
@@ -9312,21 +9207,16 @@ function computeNamespacesTargeting(
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
-	// Generic Namespaces match their target Type by binding the
-	// Namespace's Generics against the receiver — the bindings are only used
-	// for the selection here, Method resolution re-binds them from the
-	// receiver Argument. `bindNamespaceTarget` alpha-renames those Generics
-	// first, which is what keeps a receiver written in the CALLER's identically
-	// spelled Parameter from binding one of them to a Type mentioning itself.
+	// A generic Namespace matches by binding its Type Parameters, renamed
+	// first by `bindNamespaceTarget`, against the receiver. The bindings only
+	// select.
 	for (let { name, namespace } of namespaceCandidatesFor(
 		namespaces,
 		baseType,
 	)) {
 		if (namespace.targetType) {
 			if (namespace.targetType.type === "UnionType") {
-				// A Union-typed receiver (`Ordering`, `Number`) matches
-				// the Union target as a whole — the per-member loop below only
-				// covers receivers of a single member Type.
+				// A Union receiver matches a Union target as a whole.
 				if (bindNamespaceTarget(namespace, baseType) !== null) {
 					matchingNamespaces.set(name, namespace)
 					continue
@@ -9355,21 +9245,9 @@ function computeNamespacesTargeting(
 	return matchingNamespaces
 }
 
-// The pseudo-Namespace a Protocol-bounded Type Parameter's Methods are
-// reached through — named after the hidden conformance parameter the call is
-// emitted against, with `Self` substituted by the Type Parameter itself. Null
-// for an unbounded one.
-//
-// The whole Protocol surface, requirements and PROVIDED Methods alike — a
-// witness carries an entry for every one of them, which is what makes a bounded
-// call reach the conformer's override where it wrote one and the shared const
-// where it did not. A Protocol's ancestors are in `protocol.methods` already,
-// so one pseudo Namespace answers for the whole chain.
-//
-// It answers both spellings a bound reaches: the `::` call on a value of the
-// Parameter, and the `T.method(…)` Lookup that names the Parameter itself —
-// which is the only spelling a static requirement has, there being no value of
-// `T` to call `cases()` on.
+// The pseudo Namespace a bounded Type Parameter's Methods are reached
+// through, named after its hidden conformance Parameter. It holds the whole
+// Protocol surface, and answers both `value::method()` and `T.cases()`.
 export function conformanceNamespaceFor(
 	baseType: common.GenericUse,
 	scope: enricher.Scope,
@@ -9409,20 +9287,9 @@ export function conformanceNamespaceFor(
 	}
 }
 
-// The Namespace a Lookup reads its member off where the base names no
-// VALUE — `Colour.cases()` on a Choice nobody wrote a Namespace for, and
-// `T.cases()` inside a `<T is Enumerable>` body. Both are Namespaces nobody
-// declared: a Choice's derived `Enumerable`, and a bounded Type Parameter's
-// conformance.
-//
-// Answered only for a member that Namespace offers. A name neither
-// offers is left to report `unknown-name` on the base exactly as it did, which
-// is what keeps `Colour.spelledWrong` from answering with a Namespace whose
-// name no source can write.
-//
-// A value of the name WINS. The question is asked of a base that resolves
-// to nothing, so a Constant named after a Choice shadows the Choice here as it
-// shadows it everywhere else.
+// The undeclared Namespace a Lookup on a Type name reads off, as in
+// `Colour.cases()` or `T.cases()`. Only where no value has the name, and only
+// for a member it offers, so `Colour.spelledWrong` stays `unknown-name`.
 export function namespaceNamedByType(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
@@ -9451,17 +9318,9 @@ export function namespaceNamedByType(
 		: null
 }
 
-// The Case listing for a Type NAMED in a Lookup's base, or null where the
-// name is no Choice of payload-free Cases. A generic Choice's name resolves to a
-// Generic Alias and answers null: the spelling has no Type Arguments to apply,
-// and the answer's item Type is the Choice.
-//
-// A Namespace WRITING `cases` over the Choice is the answer, and the
-// derive fills in only where none does — the same order every other rail reads
-// them in. Without this, `Colour.cases()` derived while a bounded call read the
-// written Method, and which of the two a Program got turned on whether the
-// Namespace happened to be spelled `Colour`: a Namespace of that name is a
-// value in Scope and shadows this question away, one of any other name did not.
+// The Case listing for a Choice named in a Lookup's base: a Namespace's
+// written `cases`, or else the derive. Null for a generic Choice, whose name
+// carries no Type Arguments.
 function derivedEnumerableNamespaceForNamedChoice(
 	declared: common.Type,
 	scope: enricher.Scope,
@@ -9478,10 +9337,7 @@ function derivedEnumerableNamespaceForNamedChoice(
 	)
 }
 
-// The Namespace over a Choice that writes `cases`, narrowed to that one
-// Method — the base names a TYPE, so the only member this rail may answer is
-// the one the derive would have answered. Everything else the Namespace holds
-// stays reachable through its own name and nowhere else.
+// The Namespace over a Choice that writes `cases`, narrowed to that Method.
 function namespaceWritingCasesFor(
 	declared: common.Type,
 	scope: enricher.Scope,
