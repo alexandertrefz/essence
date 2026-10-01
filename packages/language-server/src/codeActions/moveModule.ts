@@ -1057,7 +1057,16 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	// Module, this file's body, or this file's export block.
 	let publish =
 		move.unpublish !== null || otherNamings.length > 0 || move.usedHere
-	let landing = landingEdits(move, target, publish, landingNamings)
+	let imports = landingImports(move, target)
+
+	if (
+		imports === null ||
+		importsEachOther(move, target, imports, landingNamings)
+	) {
+		return null
+	}
+
+	let landing = landingEdits(move, target, publish, imports, landingNamings)
 
 	if (landing === null) {
 		return null
@@ -1099,6 +1108,54 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	}
 }
 
+// Whether this Module and the destination would import each other. See
+// "Moving a Declaration" in DEVELOPMENT.md.
+function importsEachOther(
+	move: Move,
+	target: Target,
+	imports: Array<ImportEntry>,
+	landingNamings: Array<Naming>,
+): boolean {
+	let workspace = move.context.workspace
+	let source = move.context.filePath
+	let unbound = new Set<unknown>(
+		landingNamings.flatMap((naming) =>
+			naming.entries.map((named) => named.entry),
+		),
+	)
+	let dropped = new Set(
+		move.imports.filter((read) => !read.keptHere).map((read) => read.entry),
+	)
+	let backToSource = relativeSpecifier(target.filePath, source)
+	let towardsSource = [
+		...imports
+			.filter((entry) => entry.specifier === backToSource)
+			.map((entry) => entry.name),
+		...(target.program?.imports?.entries ?? [])
+			.filter(
+				(entry) =>
+					!unbound.has(entry) &&
+					workspace
+						.dependenciesOf(target.filePath)
+						.get(entry.source.path) === source,
+			)
+			.map((entry) => entry.name.content),
+	]
+	let towardsTarget = [
+		...(move.usedHere ? [move.name] : []),
+		...(move.context.program.imports?.entries ?? [])
+			.filter(
+				(entry) =>
+					!dropped.has(entry) &&
+					workspace.dependenciesOf(source).get(entry.source.path) ===
+						target.filePath,
+			)
+			.map((entry) => entry.name.content),
+	]
+
+	return towardsSource.length > 0 && towardsTarget.length > 0
+}
+
 // What lands in the destination: the Statement, its export entry where
 // needed, and the imports it reads through. The destination's own imports of
 // the name go, since it now declares it.
@@ -1106,15 +1163,11 @@ function landingEdits(
 	move: Move,
 	target: Target,
 	publish: boolean,
+	imports: Array<ImportEntry>,
 	landingNamings: Array<Naming>,
 ): Array<CodeActionEdit> | null {
 	let sourceText = target.sourceText
 	let program = target.program
-	let imports = landingImports(move, target)
-
-	if (imports === null) {
-		return null
-	}
 
 	// A new or blank file gets a whole Program.
 	if (sourceText === null || program === null || sourceText.trim() === "") {

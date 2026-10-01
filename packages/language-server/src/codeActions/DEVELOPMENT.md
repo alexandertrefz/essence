@@ -215,6 +215,10 @@ one, the destination gets a second entry, unless the name binds a Namespace, a P
 destination away, since two entries for one Namespace make its calls ambiguous. A destination the name is imported
 from needs no import, as long as it declares the name under the one the Statement writes.
 
+The move may leave this file and the destination importing each other. A cycle breaks more than its Constants, which
+do not hoist: a static Property read across one may not be declared yet either. So `importsEachOther` turns such a
+destination away. It looks at the two Modules only, not at a longer cycle through others.
+
 The edits follow from who still names the Declaration:
 
 - The landing Module publishes it whenever anything still names it: another Module, this file's own body or

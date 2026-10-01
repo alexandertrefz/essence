@@ -5366,6 +5366,66 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
+			// Each destination would import `step` from this Module, which
+			// imports `run` back, and a Constant does not hoist.
+			it("should offer nothing that would import a Constant across a cycle", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./C.es" { helper }',
+						"}",
+						"",
+						"implementation {",
+						"\tconstant step = 4",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- helper(n)::add(step)",
+						"\t}",
+						"",
+						"\tconstant kept = run(1)",
+						"}",
+						"",
+						"export {",
+						"\tkept",
+						"\tstep",
+						"}",
+						"",
+					].join("\n"),
+					"C.es": helping,
+				})
+
+				expect(moves(workspace, pathOf("A.es"), 8, "run")).toEqual([])
+			})
+
+			// Only Functions would cross here, but a cycle can also leave a
+			// static Property read before its Module declares it.
+			it("should offer nothing that would make two Modules import each other", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction base() -> Integer {",
+						"\t\t<- 1",
+						"\t}",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(base())",
+						"\t}",
+						"",
+						"\tconstant kept = run(1)",
+						"}",
+						"",
+						"export {",
+						"\tbase",
+						"\tkept",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				expect(moves(workspace, pathOf("A.es"), 6, "run")).toEqual([])
+			})
+
 			// The group that goes shares its line with the new one written
 			// before it. The Formatter closes up the space it leaves.
 			it("should swap a group in an import block written on one line", () => {
