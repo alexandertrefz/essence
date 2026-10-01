@@ -1,17 +1,10 @@
 /*
- * The grammar and the two themes, for the places on a reference page where
- * essence appears outside a Markdown fence — the signature card and a
- * parameter's type.
+ * The grammar and the two themes, for Essence outside a Markdown fence, such as
+ * the signature card. `<Code>` cannot read `markdown.shikiConfig`, so this
+ * repeats what `astro.config.ts` loads, and both change together.
  *
- * `astro:components`' <Code> builds its own highlighter and cannot read
- * `markdown.shikiConfig`, so this pairing is repeated rather than shared. It is
- * the same trio `astro.config.ts` loads; if the grammar path or the theme files
- * move, both places change.
- *
- * Imported, not `readFileSync(new URL(…, import.meta.url))`. The build
- * bundles this module into `dist/.prerender/chunks/`, where `import.meta.url`
- * is the chunk's own path and every relative read misses. An import is resolved
- * at build time and inlined, so it cannot.
+ * Imported rather than read: the build bundles this module into a chunk, where
+ * a path relative to `import.meta.url` misses.
  */
 
 import essenceGrammar from "../../../../vscode-extension/syntaxes/essence.tmLanguage.json"

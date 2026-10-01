@@ -1,5 +1,5 @@
-// Checks every internal link in a built site: the page must exist and, when the
-// link carries a #fragment, an element with that id must exist on the page.
+// Checks every internal link in a built site. The page must exist, and a
+// #fragment must name an element id on that page.
 //
 // Usage: bun scripts/checkLinks.ts <dist-dir> [--redirects <netlify.toml>]
 //        bun run check:links     (dist/ against ../../netlify.toml)
@@ -12,12 +12,9 @@
 //
 // Exit 0 when every link resolves; 1 otherwise, with one line per broken link.
 //
-// It reads the BUILT site rather than the pages' sources, because an id
-// is not something a page's source spells: a heading's comes from the slugger,
-// a library member's from the generator, a CLI flag's from a `<span>` — and
-// the link a reader follows is only broken or not once all of them have run.
-// The deploy runs it after the build, so a broken link fails the deploy rather
-// than reaching a reader.
+// It reads the built site, since ids come from the slugger, the generator and
+// hand-written spans rather than from page sources. The deploy runs it after the
+// build, so a broken link fails the deploy.
 
 import { readdirSync, readFileSync, statSync } from "node:fs"
 import * as path from "node:path"

@@ -6,9 +6,8 @@ import { defineConfig } from "astro/config"
 import { readSampleMarker } from "./src/lib/samples.ts"
 import { SITE_URL } from "./src/lib/site.ts"
 
-// Read rather than `import … with { type: "json" }` so the grammar stays
-// a plain file read — the TextMate grammar lives in another package and is the
-// editor extension's own, not something this package may re-declare.
+// Read as a file rather than imported: the TextMate grammar belongs to the
+// editor extension's package.
 function readJson(relativePath: string): any {
 	return JSON.parse(
 		readFileSync(new URL(relativePath, import.meta.url), "utf8"),
@@ -21,52 +20,40 @@ let essenceGrammar = readJson(
 let essenceLight = readJson("./src/lib/shiki/essence-light.json")
 let essenceDark = readJson("./src/lib/shiki/essence-dark.json")
 
-// The file a `§ file: Name.es` block names, carried from the hook that
-// reads the marker to the hook that draws the caption. Keyed by the hooks'
-// `meta`, the one object Shiki hands every hook of a single block — the
-// `options` beside it is copied between them.
+// The file a `§ file: Name.es` block names, carried from the hook that reads
+// the marker to the one that draws the caption. Keyed by `meta`, the one object
+// Shiki shares between a block's hooks.
 let sampleFiles = new WeakMap<object, string>()
 
 export default defineConfig({
 	site: SITE_URL,
 	output: "static",
 
-	// A port of its own, and a refusal to drift off it. Astro's default
-	// is to step to the next free port when 4321 is taken, which lands the dev
-	// server on whatever origin happens to be going — and a browser caches a
-	// 301 per origin, so a redirect left behind by another project on that port
-	// is inherited whole, before a single request reaches this server.
-	// `strictPort` turns that silent move into a loud failure.
+	// A port of its own, and no drifting off it. A browser caches redirects per
+	// origin, so a dev server on another project's port would inherit its
+	// redirects. `strictPort` fails instead of moving.
 	server: { port: 4322, strictPort: true },
 
 	integrations: [mdx()],
 	vite: {
 		build: {
-			// Load-bearing. The CSS minifier drops a `-webkit-` prefix it
-			// believes the target no longer needs, and its default target is new
-			// enough to think that of `-webkit-backdrop-filter` — which silently
-			// un-frosted the header, mobile menu, TOC bar and search overlay on
-			// every Safari before 18, where the unprefixed property first
-			// shipped. Naming the floor keeps the prefixed declarations in the
-			// bundle. Verify with:
-			//   grep -ro '\-webkit-backdrop-filter' dist | wc -l   # expect 4
+			// WARNING: the CSS minifier's default target drops
+			// `-webkit-backdrop-filter`, which Safari before 18 needs for every
+			// frosted surface. This floor keeps the prefix in the bundle.
 			cssTarget: ["chrome107", "edge107", "firefox104", "safari16"],
 		},
 	},
 	markdown: {
 		shikiConfig: {
 			langs: [{ ...essenceGrammar, name: "essence", aliases: ["es"] }],
-			// `defaultColor: false` emits both themes as CSS variables and
-			// no inline colour, so `prefers-color-scheme` picks the palette —
-			// see `src/styles/shiki.css`. It also means an unthemed token has no
-			// colour at all, which is why both themes set a bare `foreground`.
+			// Both themes become CSS variables with no inline colour, so
+			// `prefers-color-scheme` picks one in `src/styles/shiki.css`. Both
+			// themes set a bare `foreground`, since an unthemed token gets none.
 			themes: { light: essenceLight, dark: essenceDark },
 			defaultColor: false,
-			// A sample's marker line is written for the docs-examples
-			// gate, not for the reader — see `src/lib/samples.ts`, which both
-			// of them read it through. It is dropped before highlighting, and a
-			// file's name becomes the block's caption, so a page that splits a
-			// program into modules still says which block is which file.
+			// A sample's marker line is for the docs-examples gate, read through
+			// `src/lib/samples.ts`. It is dropped before highlighting, and a named
+			// file becomes the block's caption.
 			transformers: [
 				{
 					name: "essence:sample-markers",

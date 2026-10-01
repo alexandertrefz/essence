@@ -1,10 +1,7 @@
 /*
  * The library pages' manifests, for the components that draw them.
- *
- * `scripts/generateStdlibDocs.ts` writes a `src/content/docs/library/<slug>.json`
- * beside every page it generates. They are read through Vite's glob import
- * rather than the content collection: the collection only takes the pages, and
- * a component wants one page's manifest by its slug.
+ * `scripts/generateStdlibDocs.ts` writes one beside every page it generates.
+ * Vite's glob import reads them, since the content collection holds only pages.
  */
 
 import type {
