@@ -93,20 +93,13 @@ import {
 	unimportedNamespacesOf,
 } from "./scope"
 
-// Type resolution: the Types written in annotations and signatures, the
-// Types declarations resolve to, the Types a Combination, a Lookup and a Record
-// or List literal answer from their enriched children, conformance solving,
-// and the Namespaces a Scope can see. No Expression is walked here; enrichment
-// is the only Expression walker.
+// Type resolution: written Types, declarations, the Types of Combinations,
+// Lookups and Literals from their enriched children, conformance solving, and
+// the Namespaces a Scope can see. No Expression is walked here.
 
-// THE choke point where a written annotation meets the Type it resolves
-// to, which is why the annotation index is recorded here and nowhere else. The
-// switch below recurses back through this function for a Generic's Arguments, a
-// Union's members, a Record's member Types and a Function Type's Parameters and
-// return — so recording once covers every nested sub-annotation for free, and
-// the cursor on `Item` inside `List<Item>` is answered by `Item`. Deliberately
-// NOT also recorded in `resolveDeclaredType`, which is a null guard that
-// forwards here; recording there would file every annotation twice.
+// Where every written annotation meets its Type, so the annotation index is
+// recorded here alone. Nested annotations recurse through this function, so
+// `Item` inside `List<Item>` is recorded too.
 export function resolveType(
 	node: parser.TypeDeclarationNode,
 	scope: enricher.Scope,
@@ -198,20 +191,16 @@ function describeTypesForCombination(type: common.Type): string {
 			return "Records"
 		case "Case":
 			return "Cases"
-		// A refinement is combined exactly as much as its base is, which
-		// for every v1 base is not at all — so it is described as what it is,
-		// under the name the Declaration gave it.
+		// This `with` combines only Records, and no Record can be refined, so a
+		// refinement is described under its own name.
 		case "Refinement":
 			return `'${type.name}' values`
 	}
 }
 
-// A container Type nothing applied Type Arguments to — the `Dictionary` of
-// `constant d: Dictionary = ["a" = 1]`, which is accepted exactly as a bare
-// `List` is. Updating one is refused as a "Generic Type", and what is missing is
-// the very thing that would make it updatable, so the Help names it: a
-// Dictionary is combinable and this one is not, which is a difference about the
-// Arguments and about nothing else.
+// The Help for updating a container without Type Arguments, such as the
+// `Dictionary` of `constant d: Dictionary = ["a" = 1]`: the Arguments are what
+// would make it updatable.
 function unappliedGenericHelps(type: common.Type): Array<string> {
 	if (type.type === "GenericDictionary") {
 		return ["Write the Types it holds: 'Dictionary<String, Integer>'."]
@@ -224,10 +213,9 @@ function unappliedGenericHelps(type: common.Type): Array<string> {
 	return []
 }
 
-// The result Type of a Combination, computed from its operands' already
-// enriched Types. It only needs the operand Positions, to point the Diagnostics
-// at — and the RIGHT operand's Node, where the caller has one, so a refusal can
-// point at the member that caused it rather than at the whole update.
+// The result Type of a Combination, from its operands' enriched Types. The
+// right operand's Node, where there is one, lets a refusal point at the member
+// that caused it.
 export function combinationTypeOf(
 	lhsType: common.Type,
 	rhsType: common.Type,
@@ -283,23 +271,12 @@ export function combinationTypeOf(
 		return { type: "Error" }
 	}
 
-	// TODO: Resolve Applied Types and check wether they are Records
-
-	// An update WRITES the members it names, so it DECIDES the ones the
-	// original left undecided: `{ box with items = ["a"] }` over a `box` whose
-	// `items` came from an empty List Literal answers `{ items: List<String> }`,
-	// and not the `{ items: List<Unknown> }` the base still carries. Handing the
-	// blank back would make the update's own answer fit every List while the
-	// value in it holds Strings.
+	// TODO: Resolve applied Types and check whether they are Records.
 	//
-	// Decided BEFORE the Partial check, so that check reads the member Type this
-	// update just settled rather than the blank it filled — an update is what
-	// SETTLES a slot, never what has to fit into one. A member the update does
-	// not name keeps whatever the original said about it, undecided included.
-	// Asked rather than asserted. `resolveUnknownSlots` answers the Type it
-	// was given wherever it decided nothing, and both sides here are Records, so
-	// a Record is what comes back — but the answer is a `common.Type` and a cast
-	// would be this code promising something the helper's signature does not.
+	// An update decides the undecided members it writes:
+	// `{ box with items = ["a"] }` over an `items` from `[]` answers
+	// `{ items: List<String> }`. It is decided before the Partial check, which
+	// then reads the settled member.
 	let resolved = resolveUnknownSlots(lhsType, rhsType)
 	let combined = resolved.type === "Record" ? resolved : lhsType
 
@@ -307,17 +284,10 @@ export function combinationTypeOf(
 		return combined
 	}
 
-	// The update is measured against `combined`, so a member this update
-	// DECIDED is not what refused it — what can be is a member it names and
-	// leaves undecided, `items = 1` over an `items` that came from an empty List
-	// Literal. `{ items: List<Unknown> }` names no Type a reader can act on, and
-	// the two sentences that make it answerable are the ones a Variable's own
-	// assignment is refused with.
+	// A member written but left undecided, such as `items = 1` over an
+	// `items` from `[]`, is explained as a Variable's assignment would be.
 	let undecided = undecidedSlotEvidence(combined, rhsType, null)
-	// A PARTIAL, so a member the update leaves out is not missing from it
-	// — leaving members out is the whole of what an update is for. Only what it
-	// WRITES can be wrong, which is the same rule `isPartialOf` just refused it
-	// by.
+	// A Partial, so only what the update writes can be wrong.
 	let record = recordMismatchEvidence(combined, rhsType, rhs ?? null, {
 		partial: true,
 		subject: "the value it updates",
@@ -353,12 +323,9 @@ export function combinationTypeOf(
 	return lhsType
 }
 
-// Every Type name a Type declaration Node mentions, as the Identifier
-// Nodes that spell them so a Diagnostic can point at one, in written order —
-// walking Records, Lists / applications, Unions and Functions. The scan is
-// SYNTACTIC and runs before any of the Nodes is resolved, which is what the
-// recursion checks need: a Declaration that names itself can not be resolved
-// first and inspected afterwards.
+// Every Type name a Type declaration Node mentions, as the Identifiers that
+// spell them, in written order. The scan is syntactic, since the recursion
+// checks run before anything resolves.
 export function referencedTypeNames(
 	node: parser.TypeDeclarationNode,
 ): Array<parser.IdentifierNode> {
@@ -388,10 +355,8 @@ export function referencedTypeNames(
 	}
 }
 
-// The first mention of `choiceName` in a payload's Type declaration, for
-// the recursion restriction below, or null when the payload does not name the
-// Choice. Name-based on purpose: during speculative hoisting the Choice's own
-// name is not yet in scope, so a resolved-Type check could not see it.
+// The first mention of `choiceName` in a payload's Type declaration, or null.
+// By name, since the Choice is not in scope yet while it hoists.
 function typeDeclarationNamesChoice(
 	node: parser.TypeDeclarationNode,
 	choiceName: string,
@@ -403,15 +368,10 @@ function typeDeclarationNamesChoice(
 	)
 }
 
-// A generic Choice's Case payload, resolved with the Choice's Type
-// Parameters in scope so a member may mention them (`Done { value: Result }`).
-// The recursion restriction is applied member by member and syntactically: a
-// member that names the Choice being declared would, when substituted eagerly
-// at a use site, never finish substituting, so it is diagnosed and resolved to
-// Error rather than to a real Type. This owns the DIRECT self-naming of a
-// generic Choice and nothing else — every other recursive shape is caught
-// before the hoist rounds by the cycle pre-pass in `enricher/enrich.ts`, which
-// reports `recursive-type-declaration` and leaves this one shape alone.
+// A generic Choice's Case payload, resolved with the Choice's Type Parameters
+// in scope. A member naming the Choice itself would never finish substituting,
+// so it is reported and resolved to Error. See "Recursive declarations" in
+// DEVELOPMENT.md.
 function resolveGenericCaseMembers(
 	payload: parser.RecordTypeDeclarationNode | null,
 	choice: parser.ChoiceDeclarationStatementNode,
@@ -421,11 +381,8 @@ function resolveGenericCaseMembers(
 		return {}
 	}
 
-	// A Type Parameter may spell the Choice's own name
-	// (`choice Bad<Bad> { A { next: Bad } }`) — then a payload naming it names
-	// the Parameter, which is in scope and substitutes fine, and there is no
-	// recursion to report. The name-based scan can not see that on its own; the
-	// cycle pre-pass resolves the same shadowing and stays silent too.
+	// In `choice Bad<Bad> { A { next: Bad } }` the payload names the Type
+	// Parameter, so there is no recursion.
 	let shadowsOwnName = choice.generics.some(
 		(generic) => generic.name.content === choice.name.content,
 	)
@@ -467,25 +424,16 @@ function resolveGenericCaseMembers(
 	return members
 }
 
-// Each Case becomes a nominal Record Type, and a plain Choice is declared
-// as the *named* Union of them — every existing Union mechanism
-// (exhaustiveness, dispatch, `|` composition) applies to a Choice unchanged. A
-// *generic* Choice instead becomes a Generic Alias over the ANONYMOUS Union of
-// its Cases (mirroring `resolveTypeAliasStatementType`): the body stays
-// anonymous so an application heals `alias: { name, typeArguments }` onto it and
-// `printType` renders `Step<Integer, String>` for free, the Generics stay
-// GenericUses in the Cases' members until a use site binds them, and every Case
-// records the Choice's Generics so an application can substitute and stamp the
-// applied spelling.
+// Each Case becomes a nominal Record Type, and a Choice is the named Union of
+// them, so every Union mechanism applies. A generic Choice is a Generic Alias
+// over the anonymous Union, so an application spells as `Step<Integer, String>`.
+// Each Case records the Choice's Type Parameters for that substitution.
 export function resolveChoiceDeclarationStatementType(
 	node: parser.ChoiceDeclarationStatementNode,
 	scope: enricher.Scope,
 ): common.UnionType | common.GenericAliasType {
-	// Checked here as well as in `declareTypeInScope`, for the reason a
-	// Type Alias is: hoisting resolves speculatively and declares the name
-	// without ever reaching the declaration check, so `choice Self { … }`
-	// compiled while `type Self = …` was refused — and what the Note said about
-	// both was that no declaration may take the name.
+	// Checked here as well as in `declareTypeInScope`, which the hoist never
+	// reaches.
 	if (node.name.content === "Self") {
 		reportReservedTypeName(node.name.position)
 	}
@@ -494,9 +442,6 @@ export function resolveChoiceDeclarationStatementType(
 		reportError("A Choice must declare at least one Case", node.position, {
 			code: "empty-choice",
 			labels: [primary(node.position, "this Choice declares none")],
-			// A Choice IS its Cases — a Union of none is a Type no value
-			// can ever have, so there is nothing to do with the declaration but
-			// fill it in or take it out.
 			helps: [
 				`Write a Case — 'choice ${node.name.content} { First }' — or drop the declaration.`,
 			],
@@ -510,10 +455,8 @@ export function resolveChoiceDeclarationStatementType(
 	let generics = isGeneric
 		? resolveGenericDeclarations(node.generics, scope)
 		: []
-	// The Cases are identified by the Module this declaration is in, while
-	// the Union and the Generic Alias below stay named as written — their name is
-	// a key in the Type Scope and the spelling every Hover shows, and neither is
-	// an identity.
+	// The Cases are identified by their Module. The Union and the Generic
+	// Alias keep the written name, which is a Scope key and not an identity.
 	let identity = choiceIdentity(modulePathOf(scope), node.name.content)
 
 	let caseTypes: Array<common.CaseType> = []
@@ -535,10 +478,7 @@ export function resolveChoiceDeclarationStatementType(
 							"declared a second time here",
 						),
 					],
-					// The Case the Choice HAS is the first one — this
-					// declaration is skipped below — so the edit is to take
-					// this one out, and saying so is the difference between a
-					// report and a report a reader can act on.
+					// The first Case of the name is the one kept.
 					helps: [
 						`Remove this '${choiceCase.name.content}', or give it a name of its own.`,
 					],
@@ -564,13 +504,8 @@ export function resolveChoiceDeclarationStatementType(
 						notes: [
 							`'${node.name.content}' abstracts over ${countOf(node.generics.length, "Type Parameter")}, and a value written here can bind none of them — every use site decides them, and each would want a default of its own.`,
 						],
-						// The second clause used to read "declare a Choice
-						// for the Type this default is a value of", which is a
-						// Choice of what the MEMBER holds — `1` is an Integer,
-						// and a Choice of Integers defaults nothing. What
-						// actually admits the default is a Choice that abstracts
-						// over nothing, which is where the payload Types are
-						// written out and a value can be checked against them.
+						// A default needs payload Types written out to be checked
+						// against, which only a Choice without Type Parameters has.
 						helps: [
 							`Write the member at each construction, or declare a Choice that takes no Type Parameters — one whose payload Types are written out, where a default has something to be checked against.`,
 						],
@@ -606,17 +541,10 @@ export function resolveChoiceDeclarationStatementType(
 		}
 	}
 
-	// Which members a Case's `= { … }` fills in, registered on the Case Type
-	// as an object the Enricher writes the VALUES into later. Read off what the
-	// default writes — the same answer, and through the same helper, that a Record
-	// Parameter's `defaultMembers` is read off — so a payload and a Record Argument
-	// can not come to disagree about which members a caller may leave out.
-	//
-	// A default that is not a Record Literal registers nothing: what a partial fills
-	// in is what it spells, and the Enricher refuses every other spelling with
-	// `case-default-not-a-literal`. Nothing here reports, because a Choice Type is
-	// resolved wherever it is first needed and a Diagnostic reported here would be
-	// reported against whichever Module got there first.
+	// Which members a Case's `= { … }` fills in, read as a Record Parameter's
+	// `defaultMembers` is. The enricher writes the values in later and reports
+	// any other spelling; nothing here reports, since a Choice resolves in
+	// whichever Module first needs it.
 	function casePayloadDefaultOf(
 		choiceCase: parser.ChoiceCaseNode,
 		members: Record<string, common.Type>,
@@ -645,16 +573,9 @@ export function resolveChoiceDeclarationStatementType(
 		}
 	}
 
-	// Stamped once every Case is resolved, because it is the one fact
-	// about a Case that can not be read off the Case: whether its SIBLINGS carry
-	// payloads. A Case reaches the embedding boundary on its own — `constant up
-	// = #Up` is inferred as the Case rather than as the Union an annotation
-	// would have named — and that boundary has no scope to ask. So the question
-	// is answered here, where the whole declaration is in hand, and carried.
-	//
-	// A generic Choice none of whose Cases carry a payload is a unit
-	// Choice too. Its Generics are then unused by every Case, so nothing an
-	// application substitutes can give one a payload.
+	// Whether the Case's siblings carry payloads, stamped on each Case for the
+	// embedding boundary, which meets a Case alone. A generic Choice whose Cases
+	// carry no payload is a unit Choice too.
 	if (
 		caseTypes.length > 0 &&
 		caseTypes.every(
@@ -678,10 +599,9 @@ export function resolveChoiceDeclarationStatementType(
 	return { type: "UnionType", name: node.name.content, types: caseTypes }
 }
 
-// The Type of a Record Literal, computed from its members' already
-// enriched Types. A valid Record annotation wins; anything else reports and
-// falls back to the members' structural Type. `annotationPosition` is only read
-// when there is an annotation to point the Diagnostic at.
+// The Type of a Record Literal, from its members' enriched Types. A valid
+// Record annotation wins; anything else reports and falls back to the
+// members' structural Type.
 export function recordValueTypeOf(
 	resolvedAnnotation: common.Type | null,
 	memberTypes: Record<string, common.Type>,
@@ -712,17 +632,14 @@ export function recordValueTypeOf(
 		}
 	}
 
-	// Missing or invalid Type Annotations fall back to the
-	// structural Type of the Record Literal itself.
 	return {
 		type: "Record",
 		members: memberTypes,
 	}
 }
 
-// The item Type of a List Literal from its elements' already enriched
-// Types. An empty List has an Unknown item Type; otherwise the item Type is the
-// Union of the distinct element Types, in first-seen order.
+// The item Type of a List Literal: Unknown for an empty List, otherwise the
+// Union of the distinct item Types in first-seen order.
 export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
 	if (valueTypes.length === 0) {
 		return { type: "Unknown" }
@@ -743,40 +660,24 @@ export function listItemTypeOf(valueTypes: Array<common.Type>): common.Type {
 	return buildUnion(itemTypes)
 }
 
-// What a Lookup that finds no member can be told beyond "there is no such
-// member": whether a METHOD of that name answers for the base. That is the first
-// mistake anyone arriving from a language whose Methods are members makes —
-// `names.length()` for `names::length()` — and the only thing that tells it from
-// a misspelling is the Namespace walk, which is why the question is handed in as
-// a thunk: it costs what a Method lookup costs and is asked only where the
-// Program is refused already.
-//
-// Supplied by the Lookup enricher alone. A member PATH is handed none: a path
-// reads members off its Argument and calls nothing, whatever separator it wrote.
+// What the Lookup enricher hands a Lookup, so one that finds no member can
+// ask whether a Method of the name answers, as in `names.length()`. The
+// question is a function, asked only where the Lookup is refused already.
 export type MemberAccessContext = {
-	// The span between the base and the member — the `.` a fix writes
-	// `::` over. Read off the two Positions rather than off the Token, because
-	// no Node stands for a separator.
+	// The span between the base and the member, the `.` a fix replaces.
 	separator: common.Position
 	// Whether the Lookup is a call's callee: `names.length()` rather than
-	// `names.length`. The two get different Helps and different fixes — the
-	// second has to grow the parentheses the first already wrote.
+	// `names.length`. A fix for the second adds the parentheses.
 	isCalled: boolean
-	// The base as it was WRITTEN — `box`, `box.inner` — and null where it
-	// is anything a Help can not print back. A member read off a call or off a
-	// Literal has no spelling the reader would recognise, and a Help built from
-	// one would be a sentence about text nobody wrote.
+	// The base as written, such as `box.inner`, or null where a Help could
+	// not print it back.
 	spelledBase: string | null
 	methodNamed: (name: string) => common.MethodType | null
 }
 
-// The result Type of a Lookup, computed from its base's already enriched
-// Type. The member and base Positions are all it needs to point the Diagnostics.
-//
-// `scope` is handed in only where the base can BE a Namespace, which is
-// the Lookup enricher and a Pattern's member path. A record path key steps
-// through Records by its own Type, and a member path is guarded to Records and
-// Cases before it gets here, so neither can reach the branch that reads it.
+// The result Type of a Lookup, from its base's enriched Type. `scope` is
+// handed in only where the base can be a Namespace: the Lookup enricher and a
+// Pattern's member path.
 export function lookupTypeOf(
 	baseType: common.Type,
 	memberName: string,
@@ -797,20 +698,9 @@ export function lookupTypeOf(
 			scope !== null &&
 			memberDeclarationWasAbandoned(scope, memberName)
 		) {
-			// A member the Parser dropped out of a Namespace body is a
-			// member this Program declares, so reading it is the syntax error
-			// once more rather than a name the reader got wrong. The `::` side
-			// has asked this since the recovery was written; the `.` side never
-			// did, so one `static broken 20` reported twice — where it was
-			// written, and again at every `Config.broken` below it.
-			//
-			// FILE-WIDE, like every other question about a member name. A
-			// Namespace's Type carries no source span, so there is nothing to
-			// ask whether the dropped run stood inside, and a span worked back
-			// from the name would be a guess. What that costs is a genuinely
-			// misspelled member of ANOTHER Namespace that happens to share the
-			// dropped name — the same price `reportUnknownMethod` has always
-			// paid for the same reason.
+			// A member the parser dropped from a Namespace body is the syntax
+			// error again, so its reads stay silent. That holds file-wide,
+			// since a Namespace's Type carries no span.
 			return { type: "Error" }
 		} else {
 			reportUnknownMember(
@@ -851,8 +741,7 @@ export function lookupTypeOf(
 			return { type: "Error" }
 		}
 	} else if (baseType.type === "Case") {
-		// A Case *is* a Record with a nominal identity — its payload
-		// members are read exactly like a Record's.
+		// A Case's payload members are read as a Record's are.
 		if (Object.hasOwn(baseType.members, memberName)) {
 			return baseType.members[memberName]
 		} else {
@@ -893,13 +782,8 @@ export function lookupTypeOf(
 				),
 			],
 			notes: ["Only Records, Cases and Namespaces have members."],
-			// Offered for a member READ here, where `unknown-member`
-			// withholds it. That one stands on a value that HAS members, so a
-			// `.` is how one of them is reached and a Method is only a guess.
-			// This value has none at all, so whatever was written after the `.`
-			// is not a member under any reading — and a Method is the only
-			// thing it can have been. `n.toFixed` used to be answered with the
-			// rule and nothing to do about it.
+			// A value without members can only have meant a Method, so the
+			// `::` Help is offered even for a read.
 			helps: [
 				`A Method is called with '::' rather than '.' — write '::${memberName}(…)' if '${memberName}' is one.`,
 			],
@@ -909,16 +793,9 @@ export function lookupTypeOf(
 	}
 }
 
-// The one sentence a member access that found nothing is worth adding
-// where the member was CALLED and no Method answers it: a `.` there is a call
-// written the way another language writes one, and the reader is one Token away
-// from `unknown-method`, which lists what the value does answer and offers the
-// near miss. Nothing is offered as a Quick Fix — the Method is not there, so the
-// rewrite trades one refusal for another, and announcing that as a fix promises
-// a working Program.
-//
-// Silent for a member READ, where a `.` is exactly how a Record's member is
-// reached and there is no reason to suspect a Method was meant.
+// The Help for a member that was called with `.` where no Method answers
+// either: `::` would reach `unknown-method`, which lists what the value
+// answers. No Quick Fix, since the rewrite would not compile. Silent for a read.
 function methodSeparatorHelps(
 	memberName: string,
 	access: MemberAccessContext | null,
@@ -932,13 +809,9 @@ function methodSeparatorHelps(
 	]
 }
 
-// `names.length()` — the Method is there, it is simply not reached this
-// way, which is a different mistake from a misspelled member and the first one
-// anybody writes. Answers whether it reported, so each caller falls through to
-// the report it always made when no Method of the name answers.
-//
-// The Namespace branch above asks nothing: a `.` is how a Namespace's own
-// members are reached, so `Terminal.prnt(…)` is a misspelling and nothing else.
+// Reports `names.length()`, a Method reached with `.`, and answers whether it
+// reported. A Namespace's members are reached with `.`, so `Terminal.prnt(…)`
+// is never asked about.
 function reportMethodCalledWithDot(
 	baseType: common.Type,
 	memberName: string,
@@ -952,15 +825,12 @@ function reportMethodCalledWithDot(
 	}
 
 	let answersAlone = answersWithoutArguments(method)
-	// Where the `()` a READ never wrote belongs — just past the member,
-	// which is a zero-width span. Null where the reader already wrote the call.
+	// The zero-width span after the member where a read's `()` belongs, or
+	// null where the call is written.
 	let call = access.isCalled
 		? null
 		: { start: positions.member.end, end: positions.member.end }
-	// No payload at all where the member was READ and the Method takes an
-	// Argument: the `()` a fix would write answers it with none, so the edit
-	// would trade one refusal for another. What to pass is the reader's to say,
-	// and the Help says so with its ellipsis.
+	// No fix for a read whose Method needs an Argument; the Help shows `…`.
 	let fixable = access.isCalled || answersAlone
 	let spelling = access.isCalled
 		? `'::${memberName}'`
@@ -997,10 +867,8 @@ function reportMethodCalledWithDot(
 	return true
 }
 
-// Whether a call of this Method may write no Arguments at all — every
-// Parameter of it defaulted, or of ONE of its Overloads. It decides whether the
-// `()` a fix writes is a call that resolves, and nothing else: a Method that
-// needs an Argument is named in the Help with the `…` the reader has to fill in.
+// Whether a call may write no Arguments, because every Parameter of the
+// Method or of one of its Overloads is defaulted.
 function answersWithoutArguments(method: common.MethodType): boolean {
 	let overloads =
 		method.type === "OverloadedMethod" ||
@@ -1010,9 +878,7 @@ function answersWithoutArguments(method: common.MethodType): boolean {
 
 	return overloads.some((overload) =>
 		overload.parameterTypes
-			// The receiver occupies the first Parameter of every instance
-			// signature and is written left of the `::` — see
-			// `OverloadCandidate`.
+			// The receiver is the first Parameter of an instance signature.
 			.slice(
 				method.type === "SimpleMethod" ||
 					method.type === "OverloadedMethod"
@@ -1023,31 +889,18 @@ function answersWithoutArguments(method: common.MethodType): boolean {
 	)
 }
 
-// The name lookup a Parameter's default is subject to — the ordinary
-// outward walk, with the Parameter list's own barrier consulted at the Scope
-// that carries it and AHEAD of that Scope's members. Ahead, because the barred
-// names are exactly the ones that are not bound yet; at that Scope rather than
-// at the start, because a Function literal written inside a default declares its
-// own Parameters in a Scope of its own and those shadow the barrier the way they
-// shadow everything else.
-//
-// A Program with no default anywhere never sets a barrier, so this is the same
-// walk an ordinary name lookup is, one `undefined` check per Scope longer.
 type BarredName = enricher.BarredParameterName & {
 	reads: "own" | "later" | "pattern"
 }
 
-// What a default is told when it reads a name the Parameter list binds and
-// it may not see. Three shapes rather than one, because the fix differs: move
-// the Parameter, write the value out, or read what the Pattern reads.
+// Reports a default reading a name the Parameter list binds but bars. Each
+// kind gets its own fix: move the Parameter, write the value out, or read
+// what the Pattern reads.
 function reportBarredDefaultName(
 	node: parser.IdentifierNode,
 	barred: BarredName,
-	// Whether the name ALSO stands outside the Parameter list, which is
-	// the whole of what makes "rename the Parameter" an edit rather than a dead
-	// end: renaming it leaves the default reading the name it always read, and
-	// that name has to resolve to something. Without one, a reader who followed
-	// the clause was answered `'times' is not declared`.
+	// Whether the name is also bound outside the Parameter list, without
+	// which renaming the Parameter would leave the default reading nothing.
 	boundOutside: boolean,
 ): void {
 	let name = node.content
@@ -1117,11 +970,9 @@ function reportBarredDefaultName(
 	)
 }
 
-// Whether the name a barred default reads is bound somewhere OUTSIDE the
-// Parameter list as well — the `constant times` written above the Function. The
-// barrier is ignored on this walk on purpose: the question is not what the
-// default may read where it stands, it is what the default WOULD read if the
-// Parameter that shadows the name were renamed.
+// Whether a barred name is also bound outside the Parameter list, such as a
+// `constant times` above the Function. The walk ignores the barrier: it asks
+// what the default would read if the Parameter were renamed.
 function boundOutsideTheParameterList(
 	name: string,
 	scope: enricher.Scope,
@@ -1139,6 +990,10 @@ function boundOutsideTheParameterList(
 	return false
 }
 
+// The lookup a Parameter's default makes: the outward walk, consulting a
+// Parameter list's barrier ahead of its own Scope's members. A Function
+// literal inside a default declares Parameters in a Scope of its own, so
+// they shadow the barrier.
 function findVariableOrBarredName(
 	name: string,
 	scope: enricher.Scope,
@@ -1152,9 +1007,8 @@ function findVariableOrBarredName(
 		let barrier = searchScope.parameterDefaultBarrier
 		let barred = barrier?.names.get(name)
 
-		// A Parameter to the LEFT is bound and is barred by nothing — it
-		// is in `names` because the map is built once for the whole list, and
-		// the index is what tells the two apart. A Pattern binding is barred
+		// `names` holds the whole list, so the index tells a Parameter to the
+		// left, which is bound, from a barred one. A Pattern binding is barred
 		// wherever it was written.
 		if (barred !== undefined && barrier !== undefined) {
 			if (barred.kind === "pattern") {
@@ -1186,18 +1040,10 @@ function findVariableOrBarredName(
 	return null
 }
 
-// A provided Method is emitted ONCE, as a const in the band ABOVE every
-// Program that reaches it — so its body may name what that band holds, which is
-// the standard library and the builtins, and nothing the Program declares. A
-// Constant, a Function or a Namespace written beside the Protocol is in Scope
-// where the body is WRITTEN and gone where the body LANDS, and without this the
-// Program compiles clean and dies at run time on a bare `ReferenceError`.
-//
-// The prelude's names are snapshotted on the top level Scope, because the
-// Program's own land in that same table and a HOISTED declaration — every
-// Function, every Namespace — writes no `declarations` entry to be told apart
-// by. A chain with no snapshot in it is the standard library's own load, which
-// IS the prelude, and nothing is out of reach there.
+// A provided Method is emitted once, above every Program that reaches it, so
+// its body may name only the builtins, never a Program's declaration. The top
+// level's `preludeNames` tells the two apart. A chain without it is the
+// standard library's own load, where everything is in reach.
 function reportProvidedMethodOutOfReach(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -1216,9 +1062,7 @@ function reportProvidedMethodOutOfReach(
 			declaringScope === null &&
 			Object.hasOwn(searchScope.members, name)
 		) {
-			// Bound at or inside the body — a Parameter, a Constant the
-			// body declares, a Function literal's own binding — so the walk
-			// never crossed the Protocol and the name is emitted with the body.
+			// Bound at or inside the body, so emitted with it.
 			if (protocolName === null) {
 				return
 			}
@@ -1271,9 +1115,9 @@ function reportProvidedMethodOutOfReach(
 	)
 }
 
-// `provided-method-out-of-reach` for what the emitted body names and the
-// body never writes: a Method of a Namespace the Program declares, called on a
-// value or built into a witness a call in the body needs.
+// `provided-method-out-of-reach` for what the emitted body names but never
+// writes. That is a Method of a Namespace the Program declares, called on a
+// value or built into a witness.
 export function reportProvidedBodyReaches(
 	reaches: Array<NamespaceReach>,
 	protocolIdentity: string,
@@ -1371,8 +1215,8 @@ export function reportProvidedBodyReaches(
 	}
 }
 
-// The Scope that binds a Namespace name to a Namespace the Program
-// declares or imports, or null where the name is the prelude's or no Namespace.
+// The Scope binding a Namespace name to a Namespace the Program declares or
+// imports. Null where the name is the prelude's, or no Namespace.
 // The standard library's own load has no prelude snapshot, and reaches nothing.
 function programNamespaceScope(
 	name: string,
@@ -1404,14 +1248,9 @@ function programNamespaceScope(
 		: declaringScope
 }
 
-// The bare form (`#Add({ … })`) resolves the way Method lookup
-// resolves its Namespace — every Choice in Type scope is scanned for the
-// Case, and only actual ambiguity asks for the prefix. Shadowed Type names
-// are skipped, mirroring `getAllNamespacesInScope`.
-//
-// Every Case rather than only the ones spelled a given way, because the
-// near miss a failed resolution offers is drawn from the same scan — a
-// candidate set narrowed to exact matches has nothing left to suggest from.
+// Every Case of every Choice in Type scope, for a bare `#Add({ … })` to look
+// itself up in. Shadowed Type names are skipped, as `getAllNamespacesInScope`
+// skips them. A near miss is drawn from the same scan.
 export function findCaseTypesInScope(
 	scope: enricher.Scope,
 ): Array<common.CaseType> {
@@ -1427,9 +1266,8 @@ export function findCaseTypesInScope(
 
 			seenTypeNames.add(typeName)
 
-			// A generic Choice is a Generic Alias over the anonymous
-			// Union of its Cases — a bare `#Continue` scans that body Union too,
-			// finding the DECLARED Case the way it finds a plain Choice's.
+			// A generic Choice's Cases are in the Union inside its Generic
+			// Alias.
 			let members =
 				type.type === "UnionType"
 					? flattenUnionMembers(type)
@@ -1451,15 +1289,9 @@ export function findCaseTypesInScope(
 	return [...cases.values()]
 }
 
-// What a name nothing declares is answered with BEFORE `unknown-name` —
-// the habits of the languages people arrive from, and the one slip Essence's own
-// grammar invites: a Case written without its `#`. Answers whether it reported,
-// so that everything it has nothing to say about falls through to the report
-// that has always been made.
-//
-// Asked only of a name that resolved to NOTHING, which is what makes the
-// whole table safe: a Program that declares `const`, `print` or `Red` itself
-// never reaches here, and none of these words is reserved by it.
+// Reports an undeclared name as another language's habit, or as a Case
+// without its `#`, before `unknown-name`, and answers whether it reported.
+// Asked only of a name nothing declares, so a Program may declare `print`.
 function reportForeignName(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -1467,19 +1299,14 @@ function reportForeignName(
 ): boolean {
 	let name = node.content
 
-	// The table stands FIRST, and for one entry: `println!` is a name a
-	// reader wrote whole, and every rule below it would take the `!` off the end
-	// and answer about that instead — the postfix habits before the operators,
-	// and both before the words. Every other entry is a plain word that none of
-	// them would have claimed, so the order costs nothing and says one thing:
-	// what was WRITTEN is answered before what it is made of.
+	// The word table goes first, for `println!`, which the postfix rule would
+	// otherwise take apart.
 	if (reportForeignWord(node, foreignWord(name))) {
 		return true
 	}
 
-	// The rest of a String written in the other quotes. One refusal about
-	// it already stands on this line, and the names behind it are pieces of the
-	// same String — see `reportForeignString`.
+	// The rest of a String in the other quotes, already reported on this
+	// line. See `reportForeignString`.
 	if (
 		reportedOnLine(
 			"foreign-syntax",
@@ -1496,10 +1323,8 @@ function reportForeignName(
 		return true
 	}
 
-	// A `;` ends no name and no Statement, so a Statement written with one
-	// carries it into the name in front of it. What goes is the `;` alone — the
-	// name it was written against is the reader's own, and whatever is wrong with
-	// it is reported once it stands on its own again.
+	// A `;` ends no name, so it arrives inside the name before it. Only the
+	// `;` is reported; the name is the reader's own.
 	if (name.endsWith(";")) {
 		let semicolon = {
 			start: {
@@ -1524,22 +1349,12 @@ function reportForeignName(
 		return true
 	}
 
-	// `user!` and `user?` — the two postfix habits, each of which ends no
-	// name and so arrives inside one. Answered before the operator table, which
-	// would read the `!` as a negation and offer the reader the opposite of what
-	// they asked for.
-	//
-	// `user?.name` names the member it was reaching for — `map(.name)` —
-	// because the Lookup around it hands that down. `.member` is what is left
-	// where there is no member to name, which is `user?` standing on its own.
+	// `user!` and `user?` arrive as one name each. They are answered before
+	// the operator table, which would read the `!` as a negation.
 	if (name.length > 1 && (name.endsWith("!") || name.endsWith("?"))) {
 		let value = name.slice(0, -1)
-		// The `map` clause is offered only where a member was BEING
-		// reached — `user?.name` hands `name` down and the Help writes
-		// `map(.name)`. `user!` standing on its own reaches for nothing, and
-		// `map(.member)` was a path into a member called `member`: on an
-		// `Optional<Integer>` following it reached `path-step-not-a-record`,
-		// which is a report about a name nobody wrote.
+		// The `map` clause is offered only where a member is read, as in
+		// `user?.name`, whose Help writes `map(.name)`.
 		let reached = context.readMember ?? null
 
 		reportError(
@@ -1566,11 +1381,8 @@ function reportForeignName(
 	let operator = foreignOperatorIn(name)
 
 	if (operator !== null) {
-		// `count++` is one Identifier too — a `+` ends no name — so the
-		// binding being counted is in hand and the Help can write the
-		// reassignment out with it. Only the POSTFIX form arrives whole:
-		// `count += 1` is broken in two by the `=`, and the Parser answers that
-		// one with the right operand in hand as well.
+		// `count++` is one Identifier, so the Help can write the reassignment
+		// out. The parser answers `count += 1`, which the `=` splits.
 		let counted =
 			name.endsWith(operator) && name.length > operator.length
 				? compoundAssignmentHelps(
@@ -1580,11 +1392,8 @@ function reportForeignName(
 					)
 				: null
 
-		// `!ready` is one Identifier, so the operand is in hand and the
-		// Help can name it — which is the difference between being told the rule
-		// and being shown the line. Only a PREFIX operator has one to name: an
-		// infix one is refused by the Parser, where the right operand has not
-		// been read.
+		// `!ready` is one Identifier, so the Help can name the operand. The
+		// parser refuses an infix operator.
 		reportOperatorNotSupported(
 			operator,
 			node.position,
@@ -1601,23 +1410,12 @@ function reportForeignName(
 	return reportBareCaseName(node, scope, context)
 }
 
-// The one sentence a String in the other quotes is answered with, spelled
-// here so that the report and the rule that silences the rest of its line read
-// the same text rather than two copies of it.
+// Shared by the report and the rule that silences the rest of its line.
 const foreignStringMessage = "A String is written in double quotes"
 
-// `'hi'` and `` `hi` `` are one Identifier each — neither quote ends a
-// name — so the whole of what was written is in hand, and the Essence spelling
-// of it is that text in the quotes this language has.
-//
-// `` `Hello ${name}` `` is NOT one Identifier. A `{` ends a name, so the
-// holes break the run into a name, a `$`, a Record Literal and a quote standing
-// on its own, and each of the four was answered as an undeclared name of its
-// own. A name that merely OPENS with a quote is answered about the String, and
-// what the line holds behind it says nothing: there is one String here, and one
-// mistake. What a fix can write is the other half of the difference — a run
-// that closed on its own quote is one edit, and a run broken into pieces is a
-// String the reader has to write out, so only the first carries a Quick Fix.
+// `'hi'` and `` `hi` `` are one Identifier each, so the Help can respell the
+// String. A `{` ends a name, so `` `Hello ${name}` `` arrives in pieces. It is
+// reported once, at its opening quote, and only a whole String gets a fix.
 function reportForeignString(node: parser.IdentifierNode, name: string): void {
 	let quote = name[0] as string
 	let closed = name.length >= 2 && name.endsWith(quote)
@@ -1653,7 +1451,7 @@ function reportForeignString(node: parser.IdentifierNode, name: string): void {
 }
 
 // One word of another language, answered where it stands. Answers whether
-// it reported, so that the one call site reads as the question it is asking.
+// it reported.
 function reportForeignWord(
 	node: parser.IdentifierNode,
 	word: ForeignWord | null,
@@ -1681,28 +1479,11 @@ function reportForeignWord(
 	return true
 }
 
-// `constant light: Light = Red` — the Case is there, the `#` in front of
-// it is not. Reported as the undeclared name it is, because that is what it is:
-// `Red` names no value, and the Choice that declares the Case is what the Notes
-// add. EVERY Choice that declares it is named rather than one, for the reason
-// `ambiguous-case` names every one — which of them was meant is not something
-// this can decide, and the `#Red` a fix writes is what asks that question next.
-//
-// This is a GUESS about a name, and the whole of what makes a guess worth
-// making is that the edit it offers is the one the reader wanted. Three shapes
-// where it is not:
-//
-//   - The name is APPLIED and every Case of it carries no payload.
-//     `throw new Error("negative")` found `Stream#Error`, offered `'#Error'`,
-//     and wrote `throw new #Error("negative")` — a Case that takes nothing,
-//     handed a String. Nothing here is a Case, so nothing is said.
-//   - The name is NOT applied and every Case of it CARRIES a payload. `#Red`
-//     alone is `missing-payload`, so the Choices are still named — that is the
-//     half a reader can not look up — and the fix is withheld, exactly as
-//     `methodSeparatorHelps` withholds one for a Method that takes Arguments.
-//   - A `foreign-syntax` verdict already stands about the line. It has said
-//     that what is written there is another language's, and a Case is an
-//     answer to a question the reader has stopped asking.
+// `constant light: Light = Red`: a Case without its `#`, reported as an
+// undeclared name whose Notes name every Choice declaring the Case. Nothing
+// is said for an applied name whose Cases take no payload, or where a
+// `foreign-syntax` report stands on the line. The fix is withheld for an
+// unapplied name whose Cases all need a payload.
 function reportBareCaseName(
 	node: parser.IdentifierNode,
 	scope: enricher.Scope,
@@ -1737,9 +1518,8 @@ function reportBareCaseName(
 		),
 	]
 
-	// And the member spelled out where the name is a Record Literal's
-	// shorthand, for the reason the Namespace reach spells one out — `{ #Red }`
-	// is not even a Record Literal, it is `Expected 'with'`.
+	// A Record Literal's shorthand member is spelled out, since `{ #Red }` is
+	// no Record Literal.
 	let written = memberSpelling(
 		node.content,
 		`#${node.content}${payloadWanted ? "(…)" : ""}`,
@@ -1775,18 +1555,13 @@ function reportBareCaseName(
 	return true
 }
 
-// Reported from here and thrown by the Parser, because which of the two
-// meets an operator is decided by how it lexes rather than by what it is. Both
-// read `foreignOperatorAccount` for the whole of what is SAID — see
-// `helpers/foreign` — so the two can not drift into two voices; what is left
-// here is the reporting, which is the half that differs.
+// Reported here or thrown by the parser, depending on how the operator lexes.
+// Both read their words from `foreignOperatorAccount`.
 export function reportOperatorNotSupported(
 	operator: string,
 	position: common.Position,
-	// What the site knows that the table can not — the operand of a prefix
-	// operator, which only the Enricher has in hand. It replaces the table's own
-	// Help, which is the same sentence with a placeholder standing where the
-	// reader's name goes.
+	// Helps naming a prefix operator's operand, which replace the table's
+	// Help with its placeholder.
 	leadingHelps: Array<string> = [],
 ): void {
 	let account = foreignOperatorAccount(operator, leadingHelps)
@@ -1803,30 +1578,17 @@ export function reportOperatorNotSupported(
 	})
 }
 
-// What the POSITION a name stands in knows about it, which the name
-// itself can not say. None of it changes a lookup — a name resolves the same
-// way wherever it is written — and all of it is read by what a name NOTHING
-// declares is answered with, which is a guess, and a guess is only ever as good
-// as what the site around it knows.
+// What the position a name stands in knows about it. None of it changes a
+// lookup; it informs what an undeclared name is told.
 export type NameContext = {
-	// Written as a Record literal's whole member — `{ x }` — which earns
-	// one extra sentence on `unknown-name`: a reader who wrote the shorthand
-	// without knowing it was one otherwise gets told that a name they never
-	// meant to read is not declared.
+	// Written as a Record Literal's shorthand member, `{ x }`.
 	shorthandMember?: boolean
-	// Written with Arguments behind it, which is what tells `Error("x")`
-	// from `Error`. See `reportBareCaseName`.
+	// Written with Arguments, as `Error("x")` is. See `reportBareCaseName`.
 	applied?: boolean
-	// The member being read off it — the `name` of `user?.name` — so that
-	// the postfix habits offer the reader the member they were reaching for
-	// rather than the word "member".
+	// The member read off it, the `name` of `user?.name`.
 	readMember?: string | null
-	// Written as the WHOLE of a String's hole — `"use { and } carefully"`.
-	// A hole holds an Expression, so the braces a reader meant to print read as
-	// one, and the word between them reads as a name. Only a hole holding
-	// nothing but a name is marked: a hole holding a call or a path is one
-	// somebody meant to open, and the name inside it is undeclared for an
-	// ordinary reason.
+	// The whole of a String's hole, as in `"use { and } carefully"`, where the
+	// reader likely meant to print the braces.
 	inStringHole?: boolean
 }
 
@@ -1851,11 +1613,7 @@ export function resolveIdentifierType(
 	let result = resolved?.type ?? null
 
 	if (result === null) {
-		// Ahead of every reading of the name, because none of them is worth
-		// making about a Declaration the Parser dropped — see
-		// `declarationWasAbandoned`. A near miss would offer the reader another
-		// name for the one they already wrote, and a foreign-habit guess would
-		// answer a word that was never the problem.
+		// A name whose Declaration the parser dropped is not reported again.
 		if (declarationWasAbandoned(scope, name, node.position)) {
 			return { type: "Error" }
 		}
@@ -1870,30 +1628,18 @@ export function resolveIdentifierType(
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
 					],
-					// What a reader reaching for a Protocol by name
-					// wanted is a value that CONFORMS to it, which is what a
-					// bounded Parameter carries — the Note names the two
-					// positions and this names the edit in the nearer one.
+					// A value conforming to the Protocol is what a bounded Type
+					// Parameter carries.
 					helps: [
 						`Name a value instead, and bound the Type Parameter that takes it: '<infer T is ${name}>'.`,
 					],
 				},
 			)
 		} else if (!reportForeignName(node, scope, context)) {
-			// What a Namespace around the name — or one in scope — declares
-			// under it, asked BEFORE the near miss. The name is not misspelled
-			// where the Namespace it stands INSIDE has it: it is written without
-			// the thing that reaches it, and that is evidence from the site
-			// rather than a guess.
-			//
-			// A Namespace merely in SCOPE is the weaker half of that. Plain
-			// lowercase names — `head`, `write`, `get`, `send` — are statics of
-			// the prelude, and a `head` written one line under
-			// `constant heads = [1, 2]` is a misspelling of the Constant far
-			// more often than it is `Http.head` without its Namespace. So the
-			// near miss is asked there too, and it LEADS where there is one: it
-			// takes the first Help and the fix, and the reach follows it as the
-			// other thing the name could have been.
+			// A member of the enclosing Namespace, or of one in scope, written
+			// without its Namespace. For a Namespace merely in scope, a near miss
+			// leads, since `head` under `constant heads` is likelier a misspelling
+			// than `Http.head`.
 			let reached = namespaceReach(node, scope, context)
 			let suggestion =
 				reached === null || reached.inScope === true
@@ -1914,11 +1660,7 @@ export function resolveIdentifierType(
 								`A bare member name in a Record Literal is the member AND its value, so '${name}' is read here as well as written.`,
 							]
 						: []),
-					// `"use { and } carefully"` — the braces opened a
-					// HOLE, and a hole holds an Expression, so the word between
-					// them is read as a name. A reader who meant the braces to
-					// stand for themselves was told their prose was not
-					// declared and nothing else. See `inStringHole`.
+					// See `inStringHole`.
 					...(context.inStringHole === true
 						? [
 								`A '{' inside a String opens a hole, which holds an Expression — so '${name}' is read as a name rather than printed.`,
@@ -1926,12 +1668,8 @@ export function resolveIdentifierType(
 						: []),
 					...(reached?.notes ?? []),
 				],
-				// The braces come LAST where anything else was found, for
-				// the reason the near miss leads the Namespace reach: a hole
-				// holding a name one edit away from a Constant is a hole
-				// somebody meant to open and mistyped, and a hole holding a
-				// word nothing in the file resembles is prose that was never
-				// meant to be read at all.
+				// The braces' Help comes last: a name near a declared one is
+				// likelier a mistyped hole than prose.
 				helps: [
 					...(leads
 						? [
