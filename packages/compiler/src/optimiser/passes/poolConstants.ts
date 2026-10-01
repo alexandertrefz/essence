@@ -10,42 +10,17 @@ import type { OptimiserPass } from "../index"
 import type { DeclaredNamespaces } from "../namespaces"
 import { rewriteExpressions } from "../walk"
 
-// A constant written in a Program is BUILT at every site it is written
-// at, and built again on every turn of whatever loop reaches it. `1` is
-// `Integer.createInteger(1n)` — an object, a bigint and a call, per turn;
-// `"{value}"` builds `{ toString: Integer.toString }` before it renders
-// anything; a Match's Record Matcher rebuilds `{ type: "Record", members: … }`
-// to hand to the check, per test, per turn. None of them can differ from one
-// evaluation to the next, so each is built ONCE, in a band of consts, and read
-// by name ever after.
-//
-// It rests on exactly what the interning in the runtime rests on: every
-// Essence value is immutable, and the language has no operator asking whether
-// two values are the SAME value — only whether they are EQUAL. So one shared
-// value is indistinguishable from twenty equal ones, and a value built before
-// the Program's first Statement is indistinguishable from one built where it
-// was written. What is NOT indistinguishable is a value whose construction can
-// FAIL or observe something, and nothing here can: a literal, a Case with no
-// payload, a descriptor and a method map are all data.
-//
-// Booleans are deliberately absent. There are exactly two Boolean objects
-// in a running Program already — `interned-booleans`, in the runtime — so
-// pooling one would name what it already has.
+// Builds each constant once, in a band of consts, rather than at every site on
+// every evaluation. Immutable values without identity make that invisible. See
+// "pool-constants" in DEVELOPMENT.md.
 
 export const poolConstants: OptimiserPass = {
 	name: "pool-constants",
 	run: (program, namespaces) => {
-		// Which Namespaces a witness may name and still be pooled — see
-		// `poolableNamespace`. Both sets are needed, so the whole answer is
-		// handed down rather than one of them.
+		// `poolableNamespace` reads both sets.
 		let declared = namespaces
 
-		// A Parameter's `= expression` default is walked too. It is the
-		// one Expression position that is evaluated per CALL without standing in
-		// anybody's body — `at side: Side = #BothEnds` built its Case at every
-		// call of `trim` before this reached it — and pooling reaches it safely
-		// for the same reason the band can stand where it does: a default runs
-		// when the Function is called, and every call is emitted below the band.
+		// A default runs per call, and every call is emitted after the band.
 		return rewriteExpressions(program, (node) => pool(node, declared), {
 			parameterDefaults: true,
 		})
@@ -62,10 +37,7 @@ function pool(
 		return node
 	}
 
-	// The Position rides on the REFERENCE rather than on the constant.
-	// What a debugger should stop on is the place the value is read, which is
-	// where the Program says it; the band is machinery no source was written
-	// for.
+	// The reference keeps the Position, where a debugger should stop.
 	return {
 		nodeType: "Intrinsic",
 		kind: "pooled-reference",
@@ -76,14 +48,8 @@ function pool(
 	}
 }
 
-// What makes two constants ONE — a spelling of the value that is equal
-// exactly when the emitted JavaScript would be. Positions are left out on
-// purpose: `1` written on two lines is one constant, and the reference each
-// site holds keeps its own Position.
-//
-// `null` for everything else, which is the whole gate. A Node kind that
-// is not named here is not pooled, so a shape added to `typedSimple` later is
-// left alone rather than silently hoisted out of the order it was written in.
+// Equal exactly when the emitted JavaScript would be, Positions aside. Null
+// for any kind not named here, which is never pooled.
 function poolKeyOf(
 	node: common.typedSimple.ExpressionNode,
 	declaredNamespaces: DeclaredNamespaces,
@@ -94,28 +60,17 @@ function poolKeyOf(
 		case "StringValue":
 			return `string:${node.value}`
 		case "RationalValue":
-			// The parts AS WRITTEN. A Rational stores what it was given
-			// and reduces only what it answers with, so `4/2` and `2/1` are two
-			// constants — equal as values, and not the same stored parts.
+			// The parts as written, since a Rational stores what it was given: `4/2` and
+			// `2/1` are two constants.
 			return `rational:${node.numerator}/${node.denominator}`
-		// A Case with no payload is one shared instance per tag already,
-		// handed out by `createCase` from a Map — so what a pooled const saves
-		// is the call and the lookup, not the object.
+		// `createCase` already interns a unit Case, so this saves the call and lookup.
 		case "CaseValue":
 			return node.value === null ? `case:${node.tag}` : null
 		case "ConformanceValue":
 			return conformanceKeyOf(node, declaredNamespaces)
 		case "Intrinsic":
-			// A Type descriptor is DATA the runtime reads, and the same
-			// Matcher written in three Handlers of one Match is one descriptor
-			// — which is where this earns most, because that object was
-			// rebuilt at every test of every turn.
-			//
-			// Keyed by what the Rewriter will EMIT, which is the Type
-			// without a Record's display spelling on it — the same shape
-			// reached once through an Alias and once written out is one
-			// descriptor and has to be one constant, or the band declares two
-			// consts holding byte-identical objects.
+			// Keyed by the Type the rewriter emits, without a Record's display name, so
+			// one shape reached two ways is one constant.
 			return node.kind === "type-descriptor"
 				? `descriptor:${serializeKey(
 						withoutRecordNames(node.descriptor),
@@ -126,15 +81,8 @@ function poolKeyOf(
 	}
 }
 
-// `JSON.stringify`, with the one answer it lacks: a descriptor whose
-// object graph leads back into itself. The Enricher refuses a recursive Type
-// declaration, so none is expected, and the guard keeps one that did arrive from
-// recursing without end. A back-edge becomes a bare `<cycle:N>` marker naming
-// how many objects up the walk it returns to — no value can collide with it (a
-// string of that spelling keeps its quotes), and the distance keeps two graphs
-// that unfold differently from keying, and so pooling, alike. Only the objects
-// currently OPEN are held, not everything seen, so a shared sub-object still
-// serializes fully at every reach and equal descriptors keep equal keys.
+// `JSON.stringify` that marks a back edge as `<cycle:N>`, N objects up. Only
+// open objects are held, so a shared sub-object serializes fully each time.
 function serializeKey(value: unknown, visiting: Array<object> = []): string {
 	if (value === null || typeof value !== "object") {
 		return JSON.stringify(value) ?? "null"
@@ -168,25 +116,9 @@ function serializeKey(value: unknown, visiting: Array<object> = []): string {
 	}
 }
 
-// A conformance witness is a method map — `{ compare: Integer.compare }`
-// — built fresh at every site that needs one, which for an interpolated String
-// is once per hole per evaluation. It holds no Expression the Program computes:
-// each member is a reference to a Method, and a conditional conformance's
-// `boundConformance(<map>, [<witnesses>])` only curries those references onto
-// each other. So the whole of it is a constant, PROVIDED every name it reads is
-// one the band can read.
-//
-// Which is what the two refusals below are about. A `parameter`-sourced
-// condition is not a constant at all — it is the enclosing Function's own
-// conformance Argument, a different value per call — and the Simplifier leaves
-// it as an Identifier, so a witness carrying one stays where it was written.
-// The other is a Namespace whose name the band can not read, which
-// `poolableNamespace` answers.
-//
-// The key and the refusals are ONE function on purpose. They answer the
-// same question — what of this witness reaches the emitted JavaScript — and two
-// functions answering it separately is how a witness gets pooled under a key
-// that does not say which witness it is.
+// A witness is a constant when every name it reads is one the band can read.
+// The key and the refusals are one function, so a witness is never pooled
+// under a key that misdescribes it.
 function conformanceKeyOf(
 	node: common.typedSimple.ConformanceValueNode,
 	declaredNamespaces: DeclaredNamespaces,
@@ -217,9 +149,7 @@ function conformanceKeyOf(
 		witnesses.push(key)
 	}
 
-	// What of a witness reaches the emitted JavaScript: the Namespace, the
-	// maps, the witness each body is curried with, a generic Choice's equality
-	// plan, and each condition's key, which tells a `List<List<Box>>` apart.
+	// Everything of the witness that reaches the emitted JavaScript.
 	return `conformance:${serializeKey({
 		namespace: node.namespaceName,
 		methods: node.methodMap,
@@ -227,18 +157,8 @@ function conformanceKeyOf(
 		curried: node.curriedWith ?? null,
 		witnesses,
 		descriptor: node.derivedDescriptor ?? null,
-		// LOAD-BEARING for the Case listing a Choice derives, and for the
-		// members a Record routes — the same rule twice. Every Choice's witness
-		// names one Namespace and one Method — the map is `{ cases: cases }` for
-		// all of them — and what tells two of them apart is the tags the helper
-		// is curried with; every routed Record's names the builtin `Record`
-		// Namespace with the same one-entry map, and what tells two of THEM
-		// apart is the member NAMES. A key without these would declare one const
-		// for two Choices and answer the second one's `cases()` with the first
-		// one's Cases, or one const for `{ fig: Tag }` and `{ zebra: Tag }` and
-		// ask the second Record about a member it does not carry — which is not
-		// an error at run time but a silent fall-through to the structural
-		// comparison, and a crash where the name IS carried under another Type.
+		// Every derived listing and routed Record shares one Namespace and map, so
+		// only these tell two Choices, or two Records, apart.
 		cases: node.derivedCases ?? null,
 		members: node.derivedMembers ?? null,
 		conditions,
@@ -268,15 +188,9 @@ function conditionKeysOf(
 	return keys
 }
 
-// The walk is BOTTOM-UP, so a condition that CAN be pooled already IS by
-// the time the witness carrying it is offered: what stands in that position is
-// a `pooled-reference`, and its `key` is exactly the identity of the constant
-// the band will declare for it — which is what makes it the right thing to key
-// the witness above it by, and what makes the `boundConformance(…)` call
-// itself, curried onto a name the band declares above it, a constant like any
-// other. A witness refused for its Namespace is still a `ConformanceValue` and
-// is asked again here, reaching the same refusal; an Identifier is a
-// `parameter`-sourced condition, which is not a constant at all.
+// A poolable condition is already a `pooled-reference`, since the walk is
+// bottom-up, and its key names the const it will be. An Identifier is a
+// Parameter's witness, a different value per call.
 function conditionKeyOf(
 	condition: common.typedSimple.ExpressionNode,
 	declaredNamespaces: DeclaredNamespaces,
@@ -295,26 +209,8 @@ function conditionKeyOf(
 
 const runtimeNamespaces = new Set<string>(runtimeNamespaceNames)
 
-// Whether the band can read the name a witness names.
-//
-// A NESTED Namespace it can not. The class is declared inside the block that
-// wrote it, so a const at Module scope is not in that block — and two blocks
-// may each declare a Namespace of the SAME name, whose witnesses then emit
-// byte-identical text and so key alike while meaning two different classes. A
-// key that can not tell them apart would declare one const and hand it to both.
-//
-// A runtime Module it can: `import * as Integer` binds before any Statement
-// runs, and so does either fabricated Namespace a Choice's derives name — both
-// are emitted as a read off the runtime helpers, the Case listing curried with
-// the tags that tell one Choice's witness from another's in the key above. That holds even where the
-// Program IS the standard library and declares the name itself — what the
-// emitted Module reads there is still the import.
-//
-// A TOP-LEVEL Namespace the Program declares it can too, with one condition on
-// WHERE the const stands. The Enricher refuses a second declaration of the
-// name, so there is exactly one of it and it is at Module scope; but it is
-// emitted as `var X = class …`, and a class is not hoisted. So its const stands
-// below that Statement rather than in the band — see `constantPoolBand`.
+// Whether the band can read the name a witness names. See "pool-constants" in
+// DEVELOPMENT.md.
 function poolableNamespace(
 	name: string,
 	declared: DeclaredNamespaces,

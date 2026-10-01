@@ -440,3 +440,43 @@ Member literals and Guards are ANDed onto the Matcher's test, so they stay as th
 `require #Value(first) = x` is a Handler too, and is compiled the same way.
 
 The tests carry no Position, since nobody wrote them. A debugger steps over them.
+
+### pool-constants
+
+A constant written in a Program is built at every site, on every evaluation. `1` is `Integer.createInteger(1)`, an
+interpolated String builds a method map for each hole, and a Record Matcher rebuilds its descriptor for every test.
+None of them can differ between evaluations, so the pass replaces each with a `pooled-reference`. The rewriter builds
+each value once, in a band of consts, and reads it by name.
+
+This rests on what the runtime's interning rests on. Every Essence value is immutable, and the language can ask
+whether two values are equal but never whether they are the same value. So one shared value is
+indistinguishable from many equal ones, and one built before the first Statement from one built where it was
+written. Only a value whose construction could fail or observe something would differ. None pooled here can, since
+literals, payload-less Cases, descriptors and method maps are data. Booleans are not pooled, since the
+runtime already interns its two Boolean objects.
+
+`poolKeyOf` decides what is pooled and under which key. Two constants share a key exactly when the emitted
+JavaScript would be the same, and a kind it does not name is never pooled. Positions stay on the references,
+where a debugger should stop.
+
+- A Rational is keyed by its parts as written, since a Rational stores what it was given.
+- A descriptor is keyed by the Type without a Record's display name, since the rewriter emits it that way.
+  `serializeKey` marks a back edge in the graph as `<cycle:N>`, holding only the objects currently open, so equal
+  descriptors keep equal keys.
+- A conformance witness is keyed by everything of it that reaches the emitted JavaScript. That includes the
+  Case tags a derived Choice listing is curried with and the member names a routed Record is curried with. Every
+  such witness shares one Namespace and one method map, so without these a second Choice would answer the first
+  one's `cases()`.
+
+A witness is a constant only if every name it reads is one the band can read. A condition sourced from a
+Parameter is an Identifier, a different value per call, so the witness stays. The walk is bottom-up, so a
+poolable condition is already a `pooled-reference`, and its key keys the witness that holds it. `poolableNamespace`
+answers which Namespaces the band can name:
+
+- Not a nested Namespace. Its class is declared inside a block, and two blocks may declare the same name.
+- A runtime Namespace, imported before any Statement runs, and the Namespaces the enricher fabricates for a
+  Choice's derived conformances, which read off the runtime helpers.
+- A top-level Namespace of the Program. It is emitted as a class, which is not hoisted, so its const stands
+  after its declaration rather than in the band. `constantPoolBand` in the rewriter places it.
+
+Parameter defaults are pooled too. A default runs per call, and every call is emitted after the band.
