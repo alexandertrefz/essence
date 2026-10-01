@@ -258,9 +258,8 @@ describe("Folding a define", () => {
 		})
 	})
 
-	// An arm has a Position of its own and could be handed out, but
-	// folding is a brace's affair — the block, the Function around it and the
-	// implementation are the three folds this file has.
+	// An arm has a Position of its own, but only braces fold: the block, the
+	// Function around it and the implementation.
 	it("should hand out no range for an arm of its own", () => {
 		expect(foldingRangesOf(source)).toHaveLength(3)
 	})
@@ -284,9 +283,8 @@ describe("Folding a define", () => {
 	})
 })
 
-// Neither Keyword folds — both are written on the line their operand
-// starts on — but a call written under one folds like any other, which is what
-// the walk's own case for them is for.
+// Neither Keyword folds, since each is written on the line its operand starts
+// on. A call written under one folds like any other.
 describe("Folding Ranges under start and complete", () => {
 	it("should fold a call written across lines under the Keyword", () => {
 		let source = [

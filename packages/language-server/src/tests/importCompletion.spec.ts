@@ -233,9 +233,9 @@ describe("Completion in the Module sections", () => {
 			expect(entries.every((entry) => entry.kind === "module")).toBe(true)
 		})
 
-		// The Editor's word ends at every `.` and `/`, so the whole of
-		// what was typed is what the entry replaces — else `./ma` completed to
-		// `./math/Math.es` reads `./ma./math/Math.es`.
+		// The Editor's word ends at every `.` and `/`, so the entry replaces
+		// everything typed. Otherwise `./ma` completed to `./math/Math.es` reads
+		// `./ma./math/Math.es`.
 		it("replaces everything typed since the quote", () => {
 			let text = source(
 				"import {",
@@ -384,9 +384,8 @@ describe("Completion in the Module sections", () => {
 			)
 			let entries = completions(text, { line: 3, column: 2 })
 
-			// The bare `from` last is the snippet, which writes a group
-			// for the Modules a workspace could not offer one for — a file
-			// that is not there yet, and a workspace nobody indexed.
+			// The bare `from` last is the snippet. It writes a group for a Module
+			// the workspace cannot offer, such as a file that is not there yet.
 			expect(entries.map((entry) => entry.label)).toEqual([
 				'from "./Geometry.es"',
 				'from "./math/Math.es"',

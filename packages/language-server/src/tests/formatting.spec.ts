@@ -48,9 +48,8 @@ describe("Document Formatting", () => {
 		).toEqual({ edits: null, warning: null })
 	})
 
-	// Most keystrokes leave the document unparseable, and a request that
-	// lands then should do nothing rather than report — the Diagnostics already
-	// say what is wrong.
+	// Most keystrokes leave the document unparseable. A request then does
+	// nothing, since the Diagnostics already say what is wrong.
 	it("should offer no edit and no warning while the document does not parse", () => {
 		expect(
 			findFormattingEdits("implementation {\n\tconstant = = =\n}\n"),
@@ -61,10 +60,9 @@ describe("Document Formatting", () => {
 		expect(findFormattingEdits("").edits).toBeNull()
 	})
 
-	// An `unsafe` refusal means the formatter distrusted its own output — a
-	// formatter bug, which the editor must surface rather than swallow. No
-	// real source can produce one on demand (that is what the corpus sweep
-	// proves), so the formatter is stubbed through the seam.
+	// An `unsafe` refusal means the formatter distrusted its own output, a bug
+	// the editor must surface. No real source produces one on demand, so the
+	// formatter is stubbed through the seam.
 	it("should carry an unsafe refusal's message as a warning", () => {
 		let source = "implementation {\n\tconstant a = 1\n}\n"
 		let result = findFormattingEdits(source, undefined, (text) => ({
@@ -82,10 +80,8 @@ describe("Document Formatting", () => {
 		expect(result.warning).toContain("not stable")
 	})
 
-	// `declarations { … }` only parses for a standard library document,
-	// and the Language Server identifies one by the URI it was opened with — so
-	// the path has to reach the formatter for the library to be formattable at
-	// all in the editor.
+	// `declarations { … }` parses only in a standard library document, which
+	// the server knows by its URI, so the path must reach the formatter.
 	it("should format a standard library document by its file URI", () => {
 		let source = "declarations {\n  namespace A for Integer {}\n}\n"
 		let uri = "file://" + path.join(STDLIB_DIRECTORY, "Scratch.es")

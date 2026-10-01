@@ -188,9 +188,8 @@ describe("Document Symbols", () => {
 		])
 	})
 
-	// The label stays the bare name — a Type Alias's does the same, so a
-	// generic Choice's Type Parameters do not join its outline entry. What
-	// matters is that the generics clause does not break the Cases underneath.
+	// The label stays the bare name, as a Type Alias's does. The generics
+	// clause must leave the Cases in place.
 	it("should list a generic Choice with its Cases as children", () => {
 		let symbols = symbolsOf(
 			[
@@ -280,8 +279,8 @@ describe("Document Symbols", () => {
 			])
 		})
 
-		// A Match arm is not an entry of its own either — one per arm
-		// would outnumber everything the outline is actually for.
+		// A Match arm is not an entry of its own either, since one per arm would
+		// crowd out the declarations.
 		it("should list a declaration made inside a Match arm flat", () => {
 			let symbols = symbolsOf(
 				[
@@ -346,7 +345,8 @@ describe("Document Symbols", () => {
 			expect(detailOf(symbols, "label")).toBe("String")
 		})
 
-		// Nameless — the name is right beside the detail in the outline.
+		// The detail leaves the name out, since the outline shows it beside the
+		// detail.
 		it("should summarise the signature of a Function and a Method", () => {
 			let symbols = detailedSymbolsOf(source)
 
@@ -383,8 +383,8 @@ describe("Document Symbols", () => {
 			expect(detailOf(symbols, "greeting")).toBe("String")
 		})
 
-		// The Parser-only contract — an outline is still an outline while
-		// the Program does not type check, and that is when it is needed most.
+		// The outline still lists every entry while the Program does not type
+		// check.
 		it("should leave every detail null without an enriched Program", () => {
 			let symbols = flatten(symbolsOf(source))
 
@@ -392,9 +392,8 @@ describe("Document Symbols", () => {
 			expect(symbols.every((symbol) => symbol.detail === null)).toBe(true)
 		})
 
-		// A Guard is walked for entries but sits outside the Handler's
-		// body, so it is the one place a detail can go missing while every
-		// other entry in the same outline has one.
+		// A Guard sits outside its Handler's body, so a walk of bodies alone
+		// would leave its declarations without a detail.
 		it("should detail a declaration made inside a Match Guard", () => {
 			let symbols = detailedSymbolsOf(
 				[
@@ -464,10 +463,8 @@ describe("The export block", () => {
 		).toEqual(["constant"])
 	})
 
-	// The outline is built from the Parser alone, so the tests section is
-	// in it whatever the compile mode was — a writer navigating a file sees
-	// what they PROVE below what they wrote, in a build that would strip the
-	// whole block.
+	// The outline's entries come from the parsed Program, so the tests section
+	// is in it even where a build strips the block.
 	it("should list the tests below the implementation", () => {
 		let symbols = symbolsOf(
 			[
@@ -513,8 +510,8 @@ describe("The export block", () => {
 	})
 })
 
-// A `define` declares nothing itself, so what the outline has to reach
-// inside one is whatever a Function literal written as an arm's value declares.
+// A `define` declares nothing itself. The outline reaches what a Function
+// literal written as an arm's value declares.
 describe("Document Symbols inside a define", () => {
 	let source = [
 		"implementation {",
@@ -539,9 +536,8 @@ describe("Document Symbols inside a define", () => {
 	})
 })
 
-// A Function literal written under `start` is a body like any other, and
-// what it declares belongs in the outline of the Constant holding the work —
-// which a walk with no case for the two Keywords reaches nothing of.
+// What a Function literal under `start` declares belongs under the Constant
+// holding the work. A walk with no case for `start` and `complete` misses it.
 describe("Document Symbols under start and complete", () => {
 	let source = [
 		"implementation {",

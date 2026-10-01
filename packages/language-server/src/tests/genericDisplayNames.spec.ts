@@ -17,19 +17,13 @@ function hintsOf(source: string) {
 	return findInlayHints(enrichedProgram)
 }
 
-// `createFreshenedInference` alpha-renames a callee's Generics for the
-// span of one invocation — `T` is matched as `T`, a zero-width space and a
-// counter — so a caller's same-named Generic can not collide with them. A
-// Generic that never binds is left in the Types stamped onto the Argument
-// Nodes, which is what Inlay Hints and Hover read their Types back from: shown
-// verbatim the reader gets `T117`, since only the separator is invisible. The
-// counter is per process, so the digits are not even stable between sessions.
+// `createFreshenedInference` renames a callee's Generics for one invocation:
+// the name, a zero-width space and a counter. A Generic that never binds stays
+// in the Types that Inlay Hints and Hover read, where it would show as T117.
 describe("Display names of freshened Generics", () => {
-	// The lambda's Parameter and return Type come from the signature it
-	// is passed to and appear nowhere in the source, so these hints are the
-	// only place the reader sees them. `T` occurs ONLY inside the callback, so
-	// no Argument can name it: it stays unbound, and the lambda is typed in the
-	// fresh Generic itself.
+	// `T` occurs only inside the callback, so no Argument binds it and the
+	// lambda is typed in the fresh Generic. These hints are the only place a
+	// reader sees those Types.
 	const source = [
 		"implementation {",
 		"\tfunction apply <infer T>(_ f: (_: T) -> T, times n: Integer) -> {} {",
@@ -66,19 +60,16 @@ describe("Display names of freshened Generics", () => {
 		).toBe("(_ T) -> T")
 	})
 
-	// The Diagnostics-oriented sibling of `printType`. The Validator
-	// reports against the signature's own Parameter Types, which are never
-	// freshened — this keeps the renderer honest all the same, since a
-	// freshened Type reaching a Diagnostic would name a Generic the reader can
-	// not find anywhere in their source.
+	// `describeType` prints Types for Diagnostics. The Validator reports the
+	// signature's own Types, which are never freshened, but a fresh name must
+	// still read as the source's.
 	it("should describe a freshened Generic under its original name", () => {
 		expect(
 			describeType({ type: "GenericUse", name: "ItemType\u200B9" }),
 		).toBe("ItemType")
 	})
 
-	// Only the fresh suffix goes — a source Generic may well end in
-	// digits, and `T2` is a name somebody wrote.
+	// Only the fresh suffix goes, since a source Generic may end in digits.
 	it("should leave a name the source spelled alone", () => {
 		expect(displayGenericName("T")).toBe("T")
 		expect(displayGenericName("T2")).toBe("T2")

@@ -120,11 +120,9 @@ describe("Documentation Comments", () => {
 	})
 
 	it("should render a positionally matched Parameter under its label", () => {
-		// The line names the internal name, which the strict rule reports
-		// as `misnamed-documentation-parameter`. Rendering is the separate
-		// question asked here: a tag documents the Parameter at its position
-		// whatever it names, and what a Hover shows is the label a call site
-		// writes.
+		// The line names the internal name, which
+		// `misnamed-documentation-parameter` reports. A tag documents the Parameter
+		// at its position whatever it names, and a Hover shows the label.
 		let source = [
 			"implementation {",
 			"\t§§ Greets a subject.",
@@ -179,9 +177,8 @@ describe("Documentation Comments", () => {
 		let signature = findSignatureHelp(source, { line: 7, column: 8 })
 			?.signatures[0]
 
-		// The tagged sections are lifted out of the description — the
-		// Parameter's text belongs next to the Parameter, not underneath the
-		// signature where it would be said twice.
+		// The tagged sections are lifted out of the description, since a
+		// Parameter's text belongs next to the Parameter.
 		expect(signature?.documentation).toBe("Greets a subject.")
 		expect(signature?.parameters[0].documentation).toBe("who to greet")
 	})
@@ -295,9 +292,9 @@ describe("Documentation Comments", () => {
 			"Joins another String onto the end of this one.",
 		)
 
-		// The Documentation offered is the one the entry the call would
-		// REACH carries: a written `1` proves it is above zero, and
-		// `namespace PositiveInteger` declares a sum of its own.
+		// The Documentation is that of the entry the call reaches. A written `1`
+		// proves it is above zero, and `namespace PositiveInteger` declares an
+		// `add` of its own.
 		let entry = findCompletions(
 			["implementation {", "\t1::", "}"].join("\n"),
 			{ line: 2, column: 5 },
