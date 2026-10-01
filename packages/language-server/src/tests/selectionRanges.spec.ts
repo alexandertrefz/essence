@@ -23,7 +23,7 @@ describe("Selection Ranges", () => {
 
 		let ranges = selectionRangesOf(source, { line: 2, column: 22 })
 
-		// Innermost first — the Identifier, then the Statement, then the
+		// Innermost first: the Identifier, the Statement, then the
 		// implementation block.
 		expect(ranges[0].start).toEqual({ line: 2, column: 22 })
 		expect(ranges[0].end).toEqual({ line: 2, column: 27 })
@@ -96,8 +96,8 @@ describe("Selection Ranges", () => {
 			"}",
 		].join("\n")
 
-		// The Match is the next range out in both cases — a Handler has
-		// no Position of its own to widen to.
+		// The Match is the next range out in both cases, since a Handler has no
+		// Position of its own.
 		it("should start at the Guard the cursor is in", () => {
 			let ranges = selectionRangesOf(source, { line: 7, column: 30 })
 
@@ -133,9 +133,8 @@ describe("Selection Ranges", () => {
 	})
 })
 
-// A default is a span of its own inside no body, so expanding from inside
-// one has to reach it — otherwise the selection jumps straight from the name to
-// the whole Declaration.
+// A default is a span inside no body. Without a case for it, the selection
+// jumps from the name to the whole Declaration.
 describe("Selection Ranges inside a default", () => {
 	it("should widen from a name in a default out through the default", () => {
 		let source = [
@@ -157,8 +156,8 @@ describe("Selection Ranges inside a default", () => {
 	})
 })
 
-// A Case payload's default is a span inside no body either — without the
-// descent the selection jumps from the name straight to the whole Choice.
+// A Case payload's default is a span inside no body either. Without a case for
+// it, the selection jumps from the name to the whole Choice.
 describe("Selection Ranges inside a Case payload default", () => {
 	it("should widen from a name in a payload default out through the default", () => {
 		let source = [
@@ -202,9 +201,9 @@ describe("Selection Ranges inside a Case payload default", () => {
 	})
 })
 
-// An arm has a Position of its own covering `as VALUE if CONDITION`, so
-// it stands on the chain between what is written in it and the whole `define` —
-// the same answer a Dictionary entry gets, and one a Match Handler can not give.
+// An arm's Position covers its whole `as … if …`, so it stands on the chain
+// between what is written in it and the `define`. A Match Handler has no
+// Position to give.
 describe("Selection Ranges inside a define", () => {
 	let source = [
 		"implementation {",
@@ -256,11 +255,9 @@ describe("Selection Ranges inside a define", () => {
 	})
 })
 
-// The operand is a span of its own inside the Keyword's, so a selection
-// widened from inside it reaches the call, then the whole `complete …`, then
-// the Statement — one step per thing written, which is what a walk with no case
-// for the two Keywords would collapse into a jump from the call to the
-// Statement.
+// The operand is a span inside the Keyword's, so a selection widens from the
+// call to the whole `complete …`, then to the Statement. A walk with no case
+// for the Keywords would jump from the call to the Statement.
 describe("Selection Ranges around start and complete", () => {
 	let source = [
 		"implementation {",

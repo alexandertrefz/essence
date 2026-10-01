@@ -6,9 +6,9 @@ import type { parser } from "@essence-lang/interfaces"
 
 import { tagDiagnostics, tagUsages } from "../testTags"
 
-// The two questions a workspace can ask about its tags and one Module can
-// not. Everything here is over PARSER Programs, because that is what the
-// Workspace holds and because where a tag was written survives only there.
+// What a workspace can ask about its tags and one Module cannot. These specs
+// read parsed Programs, which the Workspace holds and where a tag's Position
+// survives.
 
 function programOf(source: string): parser.Program {
 	return parseDocument(source, "/Season.tests.es").program

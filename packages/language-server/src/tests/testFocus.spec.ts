@@ -6,9 +6,8 @@ import type { parser } from "@essence-lang/interfaces"
 import { findCodeActions } from "../codeActions"
 import { focusDiagnostics } from "../testFocus"
 
-// What an Editor says about a `focused` left behind. The command line
-// refuses a plain run that holds one; an Editor can refuse nothing, so it warns
-// where the word stands and offers the one edit that answers it.
+// What an Editor says about a `focused` left behind. The command line refuses a
+// run that holds one, so the Editor warns where the word stands.
 
 function programOf(source: string): parser.Program {
 	return parseDocument(source, "/Season.tests.es").program
@@ -61,8 +60,7 @@ describe("The focus warning", () => {
 		])
 	})
 
-	// A focused skip narrows nothing — the test does not run either way —
-	// and is not what has to go before this lands.
+	// A focused skip narrows nothing, since the test does not run either way.
 	it("says nothing about a focused test that is also skipped", () => {
 		expect(
 			focusDiagnostics(

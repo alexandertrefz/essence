@@ -11,10 +11,10 @@ function offsetOf(text: string, cursor: common.Cursor): number {
 	return offset + cursor.column - 1
 }
 
-// How every spec here applies an action's edits. Spans are measured
-// against the original text and written in position order, since an action's
-// own order means nothing; insertions at one point keep the order listed, ahead
-// of a replacement that starts there.
+// How the specs apply an action's edits. Spans are measured against the
+// original text and applied in position order, since an action's own order
+// means nothing. Insertions at one point keep their listed order, ahead of a
+// replacement starting there.
 export function applyEdits(
 	text: string,
 	edits: Array<{ range: common.Position; newText: string }>,

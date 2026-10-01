@@ -6,9 +6,8 @@ import { testIdentityKey } from "@essence-lang/compiler/enricher/tests"
 import { findTestLenses } from "../codeLenses"
 import { findValueHints } from "../testHints"
 
-// The two things drawn beside a test that a run does not have to have
-// happened for — the lenses, which are read off the parse — and the one thing
-// that does: the values a run recorded.
+// What is drawn beside a test: the lenses, read off the parse, and the values
+// a run recorded.
 
 function lensesOf(source: string) {
 	return findTestLenses(
@@ -96,8 +95,8 @@ describe("Test lenses", () => {
 		expect(lensesOf('tests {\n\tsuite "empty" {\n\t}\n}\n')).toEqual([])
 	})
 
-	// A row of a table test is a test in its own right and carries its
-	// row number, so the lens above the whole table names every one of them.
+	// A row of a table test is a test in its own right and carries its row
+	// number, so the table's lens names every row.
 	it("names one id per row of a table test", () => {
 		let lenses = lensesOf(
 			[
@@ -269,8 +268,8 @@ describe("Value hints", () => {
 		expect(hint?.label).toBe("4 is not 5")
 	})
 
-	// A snapshot's two sides are a recording and a run, not an equality —
-	// drawing `is` between them would claim what the failure denies.
+	// A snapshot's sides are a recording and a run, not an equality. Drawing
+	// `is` between them would claim what the failure denies.
 	it("draws a snapshot as what was recorded and what held", () => {
 		let [hint] = findValueHints(
 			[

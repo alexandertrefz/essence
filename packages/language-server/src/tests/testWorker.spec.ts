@@ -14,8 +14,8 @@ import type {
 	TestWorkerResponse,
 } from "../testProtocol"
 
-// The Worker driven over its own messages without a session, so a spec
-// can hand it more cycles than a debounced session would start in a test's time.
+// The Worker driven over its own messages without a session. A spec can hand
+// it more cycles than a debounced session would start in time.
 
 // The Worker's `BUNDLE_LIMIT`.
 const bundleLimit = 128

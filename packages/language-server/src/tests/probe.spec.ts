@@ -2,10 +2,9 @@ import { describe, expect, it } from "bun:test"
 
 import { probeSourcesFor } from "../probe"
 
-// Every reading a probe hands out is a parse and an enrichment of the
-// whole document, and they are tried in turn until one answers — so a reading
-// that can not be the one is paid for exactly at the cursors nothing explains,
-// which are the cursors a reader produces while typing a name out.
+// Each reading costs a parse and an enrichment of the whole document, and the
+// readings are tried in turn until one answers. A reading that cannot answer is
+// paid for wherever nothing answers, as while a name is typed out.
 
 describe("the define arm readings", () => {
 	let armHead = [
@@ -24,8 +23,8 @@ describe("the define arm readings", () => {
 	it("closes an arm both ways where a define stands above the cursor", () => {
 		let sources = probeSourcesFor(armHead, "::lspProbeMember()")
 
-		// A cursor in a Condition is a whole arm short of a block that
-		// closes; a cursor in a value is one word short of one.
+		// A cursor in a Condition is a whole arm short of a block that closes.
+		// A cursor in a value is one word short of one.
 		expect(
 			sources.some((source) => source.endsWith(" as {} otherwise}}}")),
 		).toBe(true)
@@ -34,9 +33,8 @@ describe("the define arm readings", () => {
 		)
 	})
 
-	// The gate is the Keyword standing anywhere above the cursor, which
-	// is cheap and can never turn away a head that needs the readings — a
-	// cursor inside an arm has `define` above it by construction.
+	// The gate is the Keyword anywhere before the cursor. It is cheap, and a
+	// cursor inside an arm always has `define` before it.
 	it("builds no arm reading where no define stands above the cursor", () => {
 		let sources = probeSourcesFor(plainHead, "::lspProbeMember()")
 
@@ -46,8 +44,8 @@ describe("the define arm readings", () => {
 		expect(sources).toHaveLength(3)
 	})
 
-	// The arm tails are aimed at the `define`'s OWN block. A brace an arm
-	// opened stands inside it, and an arm written in THAT closes nothing.
+	// The arm tails close the `define`'s own block. A brace an arm opened
+	// stands inside it, and an arm written there closes nothing.
 	it("closes the define's block and not a brace its arm opened", () => {
 		let inArmBrace = [
 			"implementation {",
