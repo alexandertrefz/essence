@@ -31,92 +31,58 @@ import {
 } from "./Terminal"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// The test runtime. It is a runtime module rather than a standard library
-// Namespace on purpose: nothing here has a spelling in Essence, and nothing a
-// Program can write reaches it. The Compiler emits calls to these exports for a
-// `tests { … }` section and for nothing else, so a Program compiled by `essence
-// build` never names this module and esbuild shakes it away whole.
-//
-// Most of what a running test touches hangs off a CONTEXT object it is
-// handed — the trace buffer, the captured output, the recorded expectations,
-// what failed. Three things that belong to the running test are module-level:
-// the coverage span (`epoch` and `touched`) and the output sink and input
-// source in `Terminal.ts`, which is why `runTests` runs one test at a time.
-// The REGISTRY is module-level too, but it is state about the Modules a bundle
-// holds rather than about a run, and is written exactly once per Module as
-// that Module is evaluated.
+// The test runtime, which the Compiler calls for a `tests { … }` section and
+// nothing else. See "The test runtime" in DEVELOPMENT.md.
 
 // #region The manifest a Module registers
 
-// The Compiler's own Position, spelled here rather than imported: this
-// module is inlined into a user's bundle and compiles under the runtime's
-// tsconfig, which knows nothing of `@essence-lang/interfaces`. Lines are
-// 1-based and columns are 1-based, which is the Essence convention everywhere.
+// The Compiler's Position, spelled here since the runtime does not depend on
+// `@essence-lang/interfaces`. Lines and columns are 1-based.
 export type Cursor = { line: number; column: number }
 export type Range = { start: Cursor; end: Cursor }
 
-// One instrumented point: where the sub-expression stands, and its source
-// text so a reader outside the Compiler — a `--json` consumer, an editor
-// showing a value beside the line — can say what was recorded without going
-// back to the file. Emitted once per Module, indexed by point id.
+// An instrumented point and its source text, so a reader can name what was
+// recorded without the file. Emitted once per Module, indexed by point id.
 export type Span = Range & { source: string }
 
-// What a test IS, independently of what it does — the half of a test the
-// runner can read without running anything. `id` is the STRUCTURAL identity
-// (module path, suite path, name template); `name` is the template rather than
-// the rendering, because an interpolated name is worked out where the test
-// stands, and `TestContext.names` is where the rendering arrives.
+// What the runner can read of a test without running it. `id` is the
+// structural identity, and `name` the template. A rendered name arrives in
+// `TestContext.names`.
 export type TestManifestEntry = {
 	id: string
 	name: string
-	// Whether the template has a hole in it. It is the whole of what says
-	// a Module has to be evaluated before anything runs — see `renderedNames` —
-	// and it is recorded by the Compiler rather than guessed from the name here,
-	// because a plain name may hold a brace of its own.
+	// Whether the name has a hole, so the Module must run to render it. The
+	// Compiler records it, since a plain name may hold a brace.
 	interpolated: boolean
-	// Which row of a table test this is, and null for the ordinary test
-	// that runs once. Everything a report groups by reads it: the rows of one
-	// table share a template, and what they are shown under is that template.
+	// The row of a table test, or null for a test that runs once.
 	row: number | null
 	suitePath: Array<string>
 	tags: Array<string>
 	focused: boolean
 	skipped: string | null
-	// Whether the item was written as a `benchmark` rather than as a
-	// `test`. It is what says whether the entry runs at all: measuring a body
-	// takes hundreds of runs of it, which is work no ordinary run asked for, so
-	// a benchmark runs where a run said `bench` and where somebody named it.
+	// A benchmark runs only under `bench` or when named, since it runs its
+	// body hundreds of times.
 	benchmark: boolean
-	// How many cases this entry's property runs where the run says
-	// nothing — a synthesized contract goal's budget, and null for every
-	// written test. An explicit `--cases` beats it: the reader who typed a
-	// number meant it for everything.
+	// A synthesized contract goal's case budget, and null for a written test.
+	// An explicit `--cases` wins.
 	cases: number | null
-	// The identity WITHOUT the Module path, a row spelled as its last
-	// step — what everything stored BESIDE the file is keyed by: a benchmark's
-	// baseline, a property test's counterexamples. The Compiler spells it, so
-	// the escaping exists once; nothing in here re-derives it.
+	// The identity without the Module path, which keys what is stored beside
+	// the file. The Compiler spells it.
 	key: string
 	position: Range
 	keywordPosition: Range
 }
 
-// Where a test is REPORTED — its suite path, and for a row of a table
-// test the template the rows share as one more step of it. So a table test
-// reads as a group of its own wherever a suite does, in the terminal's tree and
-// in an Editor's, and nothing that draws either had to learn what a row is.
+// Where a test is reported. A table test's rows group under its template, as
+// under a suite.
 export function pathOf(entry: TestManifestEntry): Array<string> {
 	return entry.row === null
 		? entry.suitePath
 		: [...entry.suitePath, entry.name]
 }
 
-// One Module's tests. `run` is the whole section as one Function: the
-// setup Statements, the suites as nested scopes, and each test as an `entry`
-// call standing where it was written. Calling it with a context whose `index`
-// names a test runs the setup that test can see and then that test — which is
-// what "a tests-section constant is indistinguishable from fresh evaluation per
-// test" MEANS, realised literally.
+// One Module's tests. `run` runs the setup a test can see and then the test
+// its context names. See "Running a test without waiting" in DEVELOPMENT.md.
 export type TestModule = {
 	module: string | null
 	spans: Array<Span>
@@ -124,26 +90,12 @@ export type TestModule = {
 	run: (context: TestContext) => Ran
 }
 
-// THE WAIT RULE, and the one shape every entry point below answers with.
-// A body that completes something is emitted as an `async` Function and the
-// call handing it over is emitted awaited, so what each of these has to do is
-// hand the promise back — one Scope at a time, up to the `run` the runner
-// awaits. A body that completes NOTHING answers `undefined`, and every one of
-// these answers `undefined` in its turn: no promise is made, nothing is
-// scheduled, and a body that throws still throws at the call rather than
-// arriving later as a rejection nobody is holding.
-//
-// So an `await` here is always guarded by "is there anything to wait for",
-// never spent on the synchronous shape. That is what keeps a run of a thousand
-// tests that wait for nothing the run it has always been.
+// A promise where a body completes something, and `undefined` otherwise. See
+// "Running a test without waiting" in DEVELOPMENT.md.
 export type Ran = void | Promise<void>
 
-// The registry is per BUNDLE, not per process: esbuild inlines this
-// module into each bundle it builds, so two bundles loaded in one process hold
-// two of these. A Module registers as it is evaluated, dependencies first, so
-// the `registry` the entry Module publishes under `$tests` — a Function rather
-// than a value, exactly so that WHEN it is asked matters as little as possible
-// — answers with every Module of the graph.
+// Per bundle, filled as each Module is evaluated. See "The test runtime" in
+// DEVELOPMENT.md.
 const registered: Array<TestModule> = []
 
 export function register(module: TestModule): TestModule {
@@ -155,33 +107,24 @@ export function register(module: TestModule): TestModule {
 export type RegisteredTest = {
 	module: TestModule
 	entry: TestManifestEntry
-	// Which `entry` call inside `module.run` this is. The context carries
-	// it to say which test to run.
+	// Which `entry` call inside `module.run` this is.
 	index: number
 }
 
 export type Registry = {
 	modules: Array<TestModule>
 	tests: Array<RegisteredTest>
-	// Keyed by structural id, which is what everything durable is keyed by
-	// — a stored snapshot, a focus the editor remembers, a timing baseline. Two
-	// tests sharing an id is a Compiler bug the Enricher already refuses as
-	// `duplicate-test-name`; the LAST one registered wins here rather than
-	// throwing, because a runner that can not build its index reports nothing at
-	// all.
+	// By structural id. The last of two tests sharing an id wins rather than
+	// throwing.
 	byId: Map<string, RegisteredTest>
 }
 
-// Everything registered so far, indexed. It is asked for AFTER a bundle
-// has been loaded — a Module registers as it is evaluated, dependencies first —
-// which is why what a bundle publishes is this Function rather than its answer.
+// Everything registered so far, asked after the bundle has loaded.
 export function registry(): Registry {
 	return registryOf(registered)
 }
 
-// The same answer over Modules a caller holds rather than over the ones
-// this instance was told about. It is what makes the indexing testable without
-// a bundle, and it is the whole of what `registry` does.
+// The same index over Modules a caller holds.
 export function registryOf(modules: Array<TestModule>): Registry {
 	let tests: Array<RegisteredTest> = []
 	let byId = new Map<string, RegisteredTest>()
@@ -202,9 +145,7 @@ export function registryOf(modules: Array<TestModule>): Registry {
 
 // #region Coverage
 
-// What one counter counts, and everything a report needs to say so. It is
-// the Compiler's `CoveragePoint`, spelled here because this module compiles
-// under the runtime's own tsconfig and is inlined into a user's bundle.
+// What one counter counts: the Compiler's `CoveragePoint`, spelled here.
 export type CoveragePoint = {
 	kind: "statement" | "branch" | "case" | "construction"
 	label: string
@@ -214,10 +155,7 @@ export type CoveragePoint = {
 	tag: string | null
 }
 
-// What a Choice DECLARES, so a report can say which of its Cases nothing
-// ever built. A construction is counted where it happens, which may be any
-// Module of the graph; what is declared is known only in the Module that
-// declares it.
+// A Choice's declared Cases, so a report can name the ones nothing built.
 export type CoverageChoice = {
 	name: string
 	cases: Array<string>
@@ -230,9 +168,7 @@ export type CoverageModule = {
 	choices: Array<CoverageChoice>
 }
 
-// What the emitted JavaScript calls. Standing alone it counts; handed a
-// value it counts and answers with that very value, so wrapping an Expression
-// in one changes nothing about what it evaluates to.
+// Counts a point, and answers the value it is handed.
 export type CoverageCounter = {
 	(point: number): void
 	<Value extends AnyType>(point: number, value: Value): Value
@@ -241,32 +177,18 @@ export type CoverageCounter = {
 type CoverageRecord = {
 	module: CoverageModule
 	counts: Array<number>
-	// What the counts were when the FIRST run began — which is what a
-	// Module's top-level Statements had already added by simply being loaded.
-	// A second run resets to this rather than to zero, because a Module is
-	// evaluated once however many times its tests are run, and zeroing what it
-	// did would report every top-level Statement as never executed.
+	// The counts loading left, which each later run resets to. See "Counting
+	// coverage" in DEVELOPMENT.md.
 	baseline: Array<number> | null
-	// The span each point last registered under — see
-	// `beginCoverageSpan`. Hits before any span began mark nothing: nothing is
-	// running that they could be attributed to.
+	// The span each point was last touched in.
 	marks: Array<number>
 }
 
-// Per BUNDLE, exactly as the test registry beside it is: a bundle inlines
-// this module, so two bundles loaded in one process count into two of these.
-// That is what makes coverage isolated per run without anybody arranging it —
-// a run loads its bundles, reads their counts and drops them.
+// Per bundle, as the test registry is.
 const covered: Array<CoverageRecord> = []
 
-// The SPAN the counters attribute to — one test, begun by the runner.
-// Every counter marks the points it touches against the current span, first
-// touch only, into one list: `touchedGround()` is an O(1) read a property
-// search asks after every generated case, and the list itself is what a run
-// that attributes per test reads whole. A span rather than a bundle-global
-// stamp, deliberately: what a case "reached" is measured from the start of
-// ITS OWN test, so the search a seed replays does not depend on which tests
-// ran before it, or on a filter having left them out.
+// The current span, one test long, and the points first touched in it. See
+// "Counting coverage" in DEVELOPMENT.md.
 let epoch = 0
 let touched: Array<{ record: CoverageRecord; point: number }> = []
 
@@ -279,15 +201,13 @@ export function touchedGround(): number {
 	return touched.length
 }
 
-// The span's touches themselves, for the runner that attributes them —
-// read whole after a test, never mutated by a reader.
+// The span's touches, which a reader never changes.
 function coverageTouches(): Array<{ record: CoverageRecord; point: number }> {
 	return touched
 }
 
-// Called once per instrumented Module, as the Module is evaluated. It
-// answers with a closure over that Module's own counts, so a counter costs one
-// call and one increment rather than a lookup by Module name.
+// Called as each instrumented Module is evaluated, answering a closure over
+// its own counts.
 export function counters(module: CoverageModule): CoverageCounter {
 	let counts = module.points.map(() => 0)
 	let marks = module.points.map(() => 0)
@@ -296,10 +216,7 @@ export function counters(module: CoverageModule): CoverageCounter {
 	covered.push(record)
 
 	return ((point: number, value?: AnyType) => {
-		// First touch per span, recorded where the count already flows —
-		// one compare and, rarely, one push. This is what per-test attribution
-		// and the guided search both read; the counting below is what the
-		// coverage report reads, and neither pays for the other.
+		// The first touch in this span.
 		if (marks[point] !== epoch) {
 			marks[point] = epoch
 			touched.push({ record, point })
@@ -311,23 +228,14 @@ export function counters(module: CoverageModule): CoverageCounter {
 	}) as CoverageCounter
 }
 
-// What a run counted, per Module — the table the Compiler emitted, with
-// the count each point reached. Asked at the end of a run, and callable at any
-// point during one: `TestContext.coverage` is this, offered to a test that
-// wants to know what it has reached so far.
+// What a run counted, per Module, at any moment of the run.
 export type CoveredPoint = CoveragePoint & { count: number }
 
 export type CoverageReport = {
 	module: string | null
 	points: Array<CoveredPoint>
 	choices: Array<CoverageChoice>
-	// The indices of the points a Module executed simply by being LOADED —
-	// a top-level Constant's initializer, code a suite's setup runs before any
-	// test. Their hits land in `counts` but in no test's span (the span opens
-	// after load), so per-test attribution cannot credit them to anyone. A
-	// consumer that maps a change back to the tests that reached it needs to know
-	// these apart: an edit to one can change a test that read the load-time
-	// result without ever re-entering the point.
+	// The points that ran while the Module loaded, which no test's span holds.
 	loaded: Array<number>
 }
 
@@ -339,10 +247,7 @@ export function coverage(): Array<CoverageReport> {
 			count: record.counts[index] ?? 0,
 		})),
 		choices: record.module.choices,
-		// `baseline` is what loading the bundle had counted before the
-		// first test span — so a point non-zero there ran at load. Null only
-		// before the first `beginCoverageRun`, which every counted run calls at
-		// its start, so by the time a report is read it is set.
+		// A point counted in the baseline ran at load.
 		loaded:
 			record.baseline === null
 				? []
@@ -352,11 +257,7 @@ export function coverage(): Array<CoverageReport> {
 	}))
 }
 
-// The line between one run and the next. The first call RECORDS what
-// loading the bundle already counted; every call after it puts the counts back
-// to exactly that. A watch session and the Language Server's session both run
-// the same loaded bundle again and again, and without this each cycle would
-// report the sum of every cycle before it.
+// The first call records the baseline, and every later call resets to it.
 export function beginCoverageRun(): void {
 	for (let record of covered) {
 		if (record.baseline === null) {
@@ -378,18 +279,15 @@ export function beginCoverageRun(): void {
 // One recorded value: the point it was recorded at, and what stood there.
 export type Trace = { point: number; value: AnyType }
 
-// What an `expect`/`require` recorded — whether it held, every
-// sub-expression value evaluated on the way, and, where the assertion compared
-// two values with `Equatable`, the two operands so the report can diff them.
+// What an `expect` or `require` recorded: whether it held, the values traced
+// on the way, and the operands of an `is` to diff.
 export type Expectation = {
 	form: "expect" | "require"
 	point: number
 	passed: boolean
 	traces: Array<Trace>
 	comparison: RecordedComparison | null
-	// What a snapshot assertion compared, as TEXT — a snapshot is two
-	// strings by the time anything compares them, so there is no value to
-	// render and no structure to walk. Null for every other assertion.
+	// A snapshot assertion's two texts, and null for any other assertion.
 	snapshot: SnapshotComparison | null
 }
 
@@ -399,11 +297,8 @@ export type SnapshotComparison = {
 	actual: string
 }
 
-// What the LOWERING says about an assertion whose top-level call is
-// `Equatable::is`/`::isNot` — the two operands, named by the points they were
-// traced at. It is written by the Compiler and read here, which is what keeps
-// the diff a consequence of the general trace mechanism rather than a second
-// capture beside it.
+// The operands of an assertion's top-level `is` or `isNot`, named by the
+// points the Compiler traced them at.
 export type Comparison = { kind: "is" | "isNot"; left: number; right: number }
 
 export type RecordedComparison = {

@@ -1131,3 +1131,51 @@ so `Equatable`'s provided body negates the routed `is`.
 `boundRecordToString` prints such a Record through the structural rendering, with a renderer for each routed member,
 as "The structural rendering" describes. Its table of renderers has no prototype. The walk reads the table by member
 name, and a member named `toString` or `constructor` would otherwise find `Object.prototype`'s Function.
+
+## The test runtime
+
+`Testing.ts` runs the `tests { … }` sections of a Program. It is a runtime module rather than a standard library
+Namespace, since nothing in it has a spelling in Essence. The Compiler emits calls to its exports for a tests section
+and for nothing else. A bundle `essence build` makes never names it, so esbuild drops it whole.
+
+Most of what a running test touches hangs off the context it is handed: the traces, the captured output, the
+recorded expectations and what failed. Three things are module-level: the coverage span in this module, and the
+output sink and input source in `Terminal.ts`. So `runTests` runs one test at a time.
+
+The registry is module-level too, but it is about the Modules a bundle holds rather than about a run. Each bundle
+inlines this module, so the registry is per bundle, and two bundles in one process hold two. A Module
+registers as it is evaluated, dependencies first. The entry Module publishes `registry` under `$tests` as a Function
+rather than its answer, so it can be asked after every Module has registered. Two tests that share an id are refused
+as `duplicate-test-name`. If one still arrives, the last registered wins, since a runner that can not build its index
+reports nothing.
+
+### Running a test without waiting
+
+A test body that completes something is emitted as an `async` Function and awaited where it is handed over. So every
+entry point hands the promise on, up to the `run` the runner awaits. A body that completes nothing answers
+`undefined`, and so does every entry point in its turn, so a body that throws throws at the call. No entry point
+awaits. Each hands back what the body answered, a promise or `undefined`, so a body that waits for nothing adds no
+promise of its own. The runner awaits each test.
+
+A Module's `run` is the whole tests section as one Function. It holds the setup Statements, the suites as nested
+scopes, and each test as an `entry` call where it was written. Called with a context whose `index` names a test, it
+runs the setup that test can see and then that test alone. So a constant in a tests section is evaluated fresh for
+every test.
+
+### Counting coverage
+
+`counters` is called once for each instrumented Module as it is evaluated. It answers a closure over that Module's
+own counts, so a counter costs one call and one increment. Handed a value, a counter answers that value, so wrapping
+an Expression in one changes nothing it evaluates to. The counts are per bundle, as the test registry is, so a run
+that loads its bundles and drops them has coverage of its own.
+
+A Module's top-level Statements count while it loads, before any test runs, and a Module loads once however often
+its tests run. So the first `beginCoverageRun` records the counts loading left as a baseline. Every later one resets
+the counts to the baseline rather than to zero. A watch session or the Language Server then reports one run at a time.
+A report lists the points that ran at load as `loaded`. They belong to no test, and an edit to one can change a test
+that read its result without running the point again.
+
+Each counter also marks the first touch of a point in the current span, which `beginCoverageSpan` opens for one
+test. `touchedGround` is the number of points touched, which the guided search asks after every case, and the
+touches are what per-test attribution reads. A span starts with its own test, so what a case reached does not depend
+on which tests ran before it. The span lives in module-level state, which is one reason tests run one at a time.
