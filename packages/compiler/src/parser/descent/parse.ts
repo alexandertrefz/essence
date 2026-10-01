@@ -5973,17 +5973,9 @@ class DescentParser {
 		return generators.integerValueNode(numerator.value, numerator.position)
 	}
 
-	// `0.75` is one Rational Literal for the reason `3/4` is — the
-	// Integer, the `.` and the digits behind it are written flush, and a `.`
-	// that stands apart from either side is the member access it has always
-	// been. So `1.foo` still reads a member off an Integer, and `1 . 5` is
-	// still two things with a broken `.` between them. Answers `null` where
-	// what follows is not a decimal at all, so the Integer stands on its own.
-	//
-	// There is no scale — `1.50` is `150/100`, which the runtime reduces
-	// on read, so `1.50 is 1.5`. A decimal is a way of WRITING a Rational and
-	// not a Type of its own, and a Rational has no memory of how it was
-	// written.
+	// `0.75` is one Rational Literal when the Integer, the `.` and the digits
+	// are flush; `1.foo` still reads a member. A decimal is only a spelling, so
+	// `1.50` is `150/100`. Null where no decimal follows.
 	protected parseDecimalTail(whole: {
 		value: string
 		position: common.Position
@@ -6003,10 +5995,8 @@ class DescentParser {
 			isAdjacent(dot.position, following.position)
 
 		if (!flush || following?.type !== TokenType.LiteralNumber) {
-			// A flush Identifier behind the point is the Lookup it was
-			// before decimals existed — `1.foo` reads a member. Everything
-			// else is half a decimal: `1.` at the end of a line, `1. 5` with
-			// the digits pushed off the point.
+			// A flush Identifier after the point is a Lookup. Anything else is
+			// half a decimal, such as `1.` or `1. 5`.
 			if (flush && isIdentifierToken(following)) {
 				return null
 			}
@@ -6050,18 +6040,13 @@ class DescentParser {
 		)
 	}
 
-	// `1.5/2` and `1/2.5` — a Rational written both ways at once. The
-	// tail is READ before it is refused, the way an `expect` Matcher is: what
-	// is dropped is then the whole Literal, rather than a tail of it left
-	// behind to be read again as a Statement of its own.
+	// `1.5/2` and `1/2.5`: a Rational written both ways at once, refused once
+	// its tail is read.
 	protected refuseMixedRational(
 		literal: common.Position,
 		symbolType: lexer.TokenType,
 		label: string,
-		// The two digit runs already read, so that the Help can say what
-		// the Literal MEANS. `'3/4' or '0.75'` was printed whatever was
-		// written, and `2.5/3` — five sixths — was answered with a Help that
-		// changed the number while the Quick Fix beside it offered `5/6`.
+		// The Literal as written, so the Help can spell the value it means.
 		written: (tail: string) => string,
 	): void {
 		let symbol = this.tokens.peek()
@@ -6079,10 +6064,7 @@ class DescentParser {
 		this.tokens.next()
 
 		let tail = this.parseDigitRun()
-		// The value the two spellings say between them, the fraction
-		// first. A value with no terminating decimal — `1.5/7` — has only the
-		// one, and the Help offers only the one: a rounded decimal would be a
-		// different number than the one that was written.
+		// The value as a fraction, then as a decimal where one terminates.
 		let spellings = mixedRationalSpellings(written(tail.value))
 
 		throw new ParseError(
@@ -6108,11 +6090,7 @@ class DescentParser {
 		)
 	}
 
-	// `.5` — the half of a decimal that is missing its whole part. It
-	// arrives here because a `.` opens a member path, and the message a path
-	// gives ("expected an Identifier") is about the wrong thing entirely: the
-	// digits are not a member name that came out wrong, they are the Literal's
-	// own fractional part.
+	// `.5`: a decimal missing its whole part, which arrives as a member path.
 	protected refusePartialDecimal(dot: Token): void {
 		let digits = this.tokens.peek()
 
@@ -6139,11 +6117,8 @@ class DescentParser {
 		)
 	}
 
-	// The name behind a `-` is offered as the thing to negate only where
-	// it is the WHOLE of what was being negated. `-price` is `price::negate()`,
-	// but `- tree::hasItems()` negates a call, and naming its receiver offers
-	// an edit that negates something else entirely. What tells the two apart is
-	// the Token behind the name: the four that carry an Expression on.
+	// Names the operand in the Help only where it is the whole of what is
+	// negated. `- tree::hasItems()` negates a call, not `tree`.
 	protected negationHelp(operand: Token): string {
 		let carriesOn = this.tokens.peek(1)?.type
 
@@ -6164,11 +6139,8 @@ class DescentParser {
 		if (this.tokens.peek()?.type === TokenType.SymbolDash) {
 			dash = this.tokens.next()
 
-			// `-price` — a `-` signs a Number Literal and negates nothing,
-			// so a name behind one is the prefix operator another language
-			// writes. Answered here because this is where the sign is read: the
-			// Expression parser reaches a `-` only as the head of a Number, and
-			// what follows it is this rule's to judge.
+			// `-price`: a `-` only signs a Number Literal, so a name after it is
+			// another language's prefix operator.
 			let operand = this.tokens.peek()
 
 			if (operand !== undefined && isIdentifierToken(operand)) {
@@ -6200,20 +6172,15 @@ class DescentParser {
 		}
 	}
 
-	// The digits of one Number, `_` groups joined. Split out of
-	// `parseInteger` because a decimal has TWO runs and only the first of them
-	// may carry a sign — `0.-5` is not a Number, and reading the fractional
-	// part with `parseInteger` is what would have made it one.
+	// The digits of one Number, `_` groups joined, without a sign, since a
+	// decimal's fraction takes none.
 	protected parseDigitRun(): { value: string; position: common.Position } {
 		let firstPart = this.tokens.expect(TokenType.LiteralNumber)
 
 		let value = firstPart.value
 		let lastPart = firstPart
 
-		// `1_000` is one Number only because its Tokens are written
-		// flush against one another. The same Tokens with anything between
-		// them are separate things — a line that begins `_ 2` is a Statement
-		// of its own (a broken one), not the tail of the Number above it.
+		// `1_000` is one Number only when its Tokens are flush.
 		while (true) {
 			let underscore = this.tokens.peek()
 			let part = this.tokens.peek(1)
@@ -6243,17 +6210,9 @@ class DescentParser {
 		}
 	}
 
-	// One pair of brackets writes three things — a List, a Dictionary and
-	// a Dictionary update — and which of them it is, is settled by ONE Token of
-	// lookahead past the first Expression rather than by speculation: an `=`
-	// after it makes the Expression a KEY, a `with` after it makes it a BASE,
-	// and a comma or a `]` leaves it the item it has always been. Nothing is
-	// ever read twice, so an error inside a long literal is reported where it
-	// stands instead of surfacing as "not a List either".
-	//
-	// The empty pair is decided before anything is read at all: `[]` is the
-	// empty List and `[=]` the empty Dictionary, and the `=` is what tells them
-	// apart because neither holds anything else to tell them apart by.
+	// A List, a Dictionary or a Dictionary update, settled by the Token after
+	// the first Expression: `=` makes it a key, `with` a base. Nothing is read
+	// twice. `[]` is the empty List and `[=]` the empty Dictionary.
 	protected parseListOrDictionaryLiteral():
 		| parser.ListValueNode
 		| parser.DictionaryValueNode
@@ -6305,10 +6264,8 @@ class DescentParser {
 			return this.parseDictionaryUpdate(leftBracket, first)
 		}
 
-		// The reading is a List from here on, and it stays one — but a
-		// separator standing where the `]` belongs says the brackets were meant
-		// to hold entries, and `["a": 1]` reported as "expected ']'" sends the
-		// reader after the bracket rather than after the colon.
+		// A List from here on, but a separator such as the `:` of `["a": 1]`
+		// says the brackets were meant to hold entries.
 		let afterFirst = this.tokens.peek()
 
 		if (
@@ -6346,10 +6303,8 @@ class DescentParser {
 		})
 	}
 
-	// `[1 = 2 = 3]` — a second `=` where the comma between two entries
-	// belongs. The entry list read exactly what was written and stopped, so
-	// what is left is a bracket that did not close, and that is what a reader
-	// would be told about. The `=` is the Token the mistake is at.
+	// `[1 = 2 = 3]`: a second `=` where a comma belongs, reported at the `=`
+	// rather than as an unclosed bracket.
 	protected refuseTrailingEntrySeparator(): void {
 		let found = this.tokens.peek()
 
@@ -6371,12 +6326,8 @@ class DescentParser {
 		)
 	}
 
-	// The rest of a Dictionary Literal, entered with the first key
-	// already read and the `=` still ahead. A trailing comma is allowed exactly
-	// where a List allows one, and for the same reason: a list of things laid
-	// out one to a line grows by a line rather than by a line and an edit above
-	// it.
-	// And the `[` these entries stand in, for the same reason.
+	// The rest of a Dictionary Literal after its first key. A trailing comma
+	// is allowed, as in a List. `opening` is the `[` the entries stand in.
 	protected parseDictionaryEntries(
 		firstKey: parser.ExpressionNode,
 		opening: Token,
@@ -6398,10 +6349,7 @@ class DescentParser {
 		return entries
 	}
 
-	// The `= value` half, read with the key already in hand — which is
-	// what lets the `=` be expected here rather than guessed at: every caller
-	// arrives having seen one, or having read a key that has to be followed by
-	// one, and the refusal below reports at the Token the reader is standing on.
+	// The `= value` half of an entry, with the key already read.
 	protected parseDictionaryEntry(
 		key: parser.ExpressionNode,
 	): parser.DictionaryEntryNode {
@@ -6420,16 +6368,9 @@ class DescentParser {
 		}
 	}
 
-	// The near misses of an entry, which are the shapes a reader who
-	// knows another language's dictionary writes: `["a": 1]`, `["a" -> 1]` and
-	// `["a" = 1, "b"]`. None of them is a reading this Parser has, so left
-	// alone every one of them is reported as the `]` or the `=` that did not
-	// come — a message about a bracket, in a line whose mistake is the
-	// separator between a key and its value.
-	//
-	// The separator is named where one was written, because that is the edit:
-	// `:` becomes `=`. Where nothing at all follows the key, the key is what is
-	// underlined, because the missing half is its value.
+	// The near misses of an entry: `["a": 1]`, `["a" -> 1]` and
+	// `["a" = 1, "b"]`. A written separator is named; otherwise the key without
+	// a value is underlined.
 	protected refuseDictionaryEntry(key: parser.ExpressionNode): never {
 		let found = this.tokens.peek()
 		let separator =
@@ -6455,19 +6396,9 @@ class DescentParser {
 		)
 	}
 
-	// `[ages with "kim" = 7]` and `[ages with other]` — the two halves of
-	// the update form, told apart by ONE Token past the Expression after the
-	// `with`, exactly as the literal itself is: an `=` makes it the first key,
-	// and anything else leaves it the whole Dictionary being merged in.
-	//
-	// There is no SHORTHAND here and there is not going to be one. A bare
-	// name after a Record's `with` is already the whole value being merged
-	// (`{ config with other }`), and the same name after a Dictionary's `with`
-	// is the same thing — so `[d with a]` merges `a` and never means
-	// `[d with a = a]`. A Dictionary's key is a VALUE rather than a name, and
-	// there is nothing for a name to be short for. See
-	// `parseKeyValuePairList`'s `allowShorthand`, which is the braced half of
-	// this rule.
+	// `[ages with "kim" = 7]` sets entries and `[ages with other]` merges a
+	// Dictionary, told apart by an `=` after the first Expression. There is no
+	// shorthand. See "Record literals and updates" in DEVELOPMENT.md.
 	protected parseDictionaryUpdate(
 		leftBracket: Token,
 		base: parser.ExpressionNode,
@@ -6475,11 +6406,7 @@ class DescentParser {
 		let withKeyword = this.tokens.expect(TokenType.KeywordWith)
 
 		if (this.tokens.peek()?.type === TokenType.SymbolRightBracket) {
-			// The label ends at the `with` and not at the `]` behind it.
-			// What the reader is being told about is the keyword and the
-			// nothing after it, and underlining the bracket too reads as a
-			// claim about the bracket — which is the one Token here that is
-			// exactly where it belongs.
+			// The label ends at the `with`, since the `]` is not at fault.
 			throw new ParseError(
 				"An update says what it changes",
 				withKeyword.position,
@@ -6501,10 +6428,7 @@ class DescentParser {
 
 		if (this.tokens.peek()?.type === TokenType.SymbolEqual) {
 			let entries = this.parseDictionaryEntries(first, leftBracket)
-			// The key list spans the keys and nothing else — the brackets
-			// belong to the Combination, which is the Node they open and close.
-			// Exactly what a braced update's key list spans; see
-			// `buildKeyValuePairList`.
+			// The key list spans only the keys, as a braced update's does.
 			let keys = generators.dictionaryValueNode(entries, {
 				start: entries[0].position.start,
 				end: entries[entries.length - 1].position.end,
