@@ -209,10 +209,6 @@ function isInlinable(value: parser.ExpressionNode): boolean {
 		return false
 	}
 
-	if (value.nodeType === "CaseValue" && value.choice === null) {
-		return false
-	}
-
 	if (
 		(value.nodeType === "ListValue" && value.values.length === 0) ||
 		(value.nodeType === "DictionaryValue" && value.entries.length === 0)
@@ -220,14 +216,19 @@ function isInlinable(value: parser.ExpressionNode): boolean {
 		return false
 	}
 
-	return !readsSelf(value)
+	return !readsPosition(value)
 }
 
-function readsSelf(value: parser.ExpressionNode): boolean {
+// Whether the value holds an `@` or a bare `#Case`, anywhere inside it. Each
+// is resolved where it is written.
+function readsPosition(value: parser.ExpressionNode): boolean {
 	let found = false
 
 	walkNode(value, (node) => {
-		if (node.nodeType === "Self") {
+		if (
+			node.nodeType === "Self" ||
+			(node.nodeType === "CaseValue" && node.choice === null)
+		) {
 			found = true
 
 			return false

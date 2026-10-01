@@ -7820,6 +7820,26 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "empty:"))).toEqual([])
 	})
 
+	// A bare Case resolves against the Choices in scope where it is written,
+	// and `Organ` would make the copy's `#Hearts` ambiguous.
+	it("offers nothing for a value holding a bare Case", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Suit { Hearts, Spades }",
+			"\tconstant hand = [#Hearts]",
+			"",
+			"\tfunction counted() -> Integer {",
+			"\t\tchoice Organ { Hearts, Lungs }",
+			"",
+			"\t\t<- hand::length()",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "hand ="))).toEqual([])
+	})
+
 	// The Lexer ends a String Literal at the next `"`, so a value with a quote
 	// cannot be written into a hole.
 	it("offers nothing for a value with a quote read inside a hole", () => {

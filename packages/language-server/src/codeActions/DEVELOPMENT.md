@@ -153,8 +153,9 @@ too, but may be assigned between the declaration and a read. So `readsVariable` 
 
 `isInlinable` admits only values that mean the same thing wherever and however often they are written:
 
-- A Function literal, a bare `#Case`, a member path, and an empty List or Dictionary take their Type from where
-  they stand. `@` means whatever the Method or Match Handler around it is about. None of these is inlined.
+- A Function literal, a member path, and an empty List or Dictionary take their Type from where they stand. A bare
+  `#Case` does too, and resolves against the Choices in scope there, so one is refused anywhere in the value. So is
+  `@`, which means whatever the Method or Match Handler around it is about. None of these is inlined.
 - A value that calls, starts or completes anything is not inlined. It runs once where the Constant stood but once
   per read after inlining, so `constant printed = Terminal.print("once")` read twice would print twice. A copy of
   `start work` would also start the work later. Nothing here can tell a call that only answers a value from one that
