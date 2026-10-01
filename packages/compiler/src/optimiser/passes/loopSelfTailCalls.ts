@@ -3,95 +3,9 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteExpressionsIn, rewriteNodes } from "../walk"
 
-// Essence has no loop Statement, so the walk the language teaches is
-// written as recursion — take the head, answer with the walk of the tail:
-//
-//   function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
-//       <- match rest::firstItem() -> Integer {
-//           case #Empty       { <- sum }
-//           case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
-//       }
-//   }
-//
-// and emitted as a genuinely self-recursive JavaScript Function. JavaScriptCore
-// eliminates the frame, so Bun runs that at a hundred thousand items; V8 does
-// not, so Node and Deno — both supported hosts, both running the very same
-// bundle — throw `RangeError: Maximum call stack size exceeded` at ten thousand.
-// A Program that is linear on one supported host and a crash on another is not
-// portable, and the language is what makes the shape idiomatic.
-//
-// So the call is not made. A call standing in TAIL POSITION — the answer
-// of the Function, with nothing left to do with what it gives back — can not
-// observe the frame it would have been given, because that frame does nothing
-// but hand the answer straight on. Rebinding the Parameters and taking the body
-// from the top says the same thing with one frame:
-//
-//   function total(rest, sum) {
-//       $tail_0: while (true) {
-//           …
-//           const $tail_0_t0 = removeFirst(rest);
-//           rest = $tail_0_t0; sum = …; continue $tail_0;
-//       }
-//   }
-//
-// TAIL POSITION is a question about the SIMPLIFIED Program, and the answer
-// is exactly: the Expression of a Return Statement that returns from THIS
-// Function. A Match lowered into Return position holds such Returns in its
-// Handlers and a Conditional inside one holds them in its branches, which is
-// what makes the walk above a tail call at all; a `define` standing there is
-// written out into the ladder of Conditionals it means, because its arms answer
-// where it stands. A Return inside a lowered Statement that writes its answer
-// somewhere ELSE does not return from the Function, and neither does one inside
-// a callback an inlined loop drives or inside a Function literal — so none of
-// those is descended into. Anything else the answer is built FROM —
-// `f(…)::add(1)`, an Argument of another call, a `complete` — is a call whose
-// answer is still worked on, and is left exactly as it was.
-//
-// What the pass must get right is that a turn is a CALL. Every Argument is
-// evaluated before any Parameter is rebound, so `<- swap(b, a)` swaps rather
-// than writing `a` over `b` and reading it back; a Parameter the call leaves out
-// takes its default AFRESH, in the turn it belongs to, reading the Parameters
-// before it as that turn bound them; and the whole body runs from the top,
-// prologue included, so a Pattern in a Parameter binds again.
-//
-// And that a JavaScript closure captures the VARIABLE. A Parameter a
-// Function literal in the body mentions may not be assigned under the closure's
-// feet, or a closure built in one turn would read the next turn's value. The
-// same is true of a Parameter whose name is SHADOWED where the tail call stands
-// — which the receiver `_self` always is inside a Match Handler, since `@` there
-// is the matched value. Both are answered the same way: that Parameter is
-// renamed to a SLOT the loop assigns, and the name the body reads becomes a
-// `const` of the turn. One binding per turn, so what a closure captured stays
-// what it captured, and an assignment can not land on a Handler's own binding.
-// Parameters needing neither are assigned where they stand, which is what keeps
-// the emission of the ordinary walk to the `while` and nothing else.
-//
-// A non-tail self call is left alone — `fib` calls itself twice and only
-// the second could ever be one — so a body holding both is looped for the one
-// and still recurses for the other. That is why the Function keeps its name, its
-// Parameters and its defaults: it is still a Function anything may call.
-//
-// What this pass does NOT do: mutual recursion, which needs a trampoline
-// and a decision about what a stack trace should then say; and a COMPLETING
-// body, which is declined outright. `complete self(…)` puts the call inside
-// `$future.complete(…)`, so it is an Argument and never a tail call — a
-// completing body has no tail self call to find — and taking a turn inside the
-// current run would give it the run's own cancellation context instead of one of
-// its own, which is a different Program.
-//
-// And a Function literal standing in a Parameter's DEFAULT, where the
-// literal reads a Parameter a turn rebinds. A default is taken again per turn
-// like every other, but it is evaluated where the turn ASSIGNS — so the closure
-// it builds captures the loop's own variable, and there is no binding of the
-// turn in front of it to capture instead. That is declined outright rather than
-// looped a second way, and it is the one shape where a Parameter being CAPTURED
-// is answered by declining rather than by a slot.
-//
-// It also declines where the answer is still an EXPRESSION holding
-// Statements, which is what a Match in Return position is until
-// `lower-matches-to-statements` has run. With that pass off there is no Return
-// of this Function to find inside the chain, so this one finds no site and
-// changes nothing — less optimisation, which is what turning a pass off means.
+// Turns a self call in tail position into a loop turn. The Parameters are
+// rebound and the body runs again from the top, so a deep recursion needs one
+// frame on every host. See "loop-self-tail-calls" in DEVELOPMENT.md.
 
 export const loopSelfTailCalls: OptimiserPass = {
 	name: "loop-self-tail-calls",
@@ -115,44 +29,27 @@ type SelfCallNode =
 	| common.typedSimple.FunctionInvocationNode
 	| MethodInvocationNode
 
-// Which Function a call has to name to be a call to ITSELF. A free
-// Function is named by the Identifier a Function Invocation holds; a Namespace
-// Method — static or not, the receiver being Parameter zero either way — by the
-// Namespace and the Method Invocation's already-Overload-mangled member, so a
-// call to a DIFFERENT Overload of the same name names a different member and is
-// not a self call.
-//
-// There is no third entry. A Function literal bound to a Constant can not
-// call itself at all — the Enricher answers `'f' is not declared` inside its own
-// initialiser — and a Protocol's PROVIDED Method reaches itself through
-// `Self__conformance`, a call a conformer may override and so not a call to this
-// body.
+// What a call must name to call itself: a Function's Identifier, or a
+// Namespace and the mangled member. Another Overload is not a self call.
 type SelfIdentity =
 	| { kind: "function"; name: string }
 	| { kind: "method"; namespace: string; member: string }
 
-// One Argument of one tail call, against the Parameter it stands for.
-// `omitted` covers both spellings of leaving one out: the `omitted-argument`
-// intrinsic that holds a position open, and an Argument list that simply stops
-// short of the Parameters with defaults at its end.
+// One Argument of a tail call. `omitted` covers the `omitted-argument`
+// intrinsic and an Argument list that stops short.
 type TailArgument =
 	| { kind: "written"; value: ExpressionNode }
 	| { kind: "omitted" }
 
-// One tail call found, with the names SHADOWED where it stands — every
-// name an enclosing block binds between the Function's body and this Statement,
-// the `_self` a lowered Match binds for its Handlers above all. What a name
-// means at a tail call is the whole of what decides how the rebinding is
-// written.
+// One tail call, with the names an enclosing block binds where it stands, such
+// as a Handler's `_self`.
 type TailSite = {
 	shadowed: ReadonlySet<string>
 	arguments: Array<TailArgument>
 }
 
 class Looping {
-	// Numbered across the whole Program, so a Function looped inside
-	// another Function's body can not declare the label that one is taking its
-	// turns through.
+	// Numbered across the Program, so nested loops never share a label.
 	private count = 0
 
 	statement(node: ImplementationNode): ImplementationNode {
@@ -189,9 +86,8 @@ class Looping {
 		return looped === undefined ? node : { ...node, methods: looped }
 	}
 
-	// One Function, and null wherever it is left exactly as it was — which
-	// is every Function with no tail call to itself, and every one a loop can not
-	// be proven to say the same thing as.
+	// One Function looped, or null where it has no tail self call or can not be
+	// shown to loop the same.
 	private looped(
 		definition: FunctionDefinitionNode,
 		identity: SelfIdentity,
@@ -203,10 +99,8 @@ class Looping {
 		let parameters = definition.parameters
 		let names = parameters.map((parameter) => parameter.internalName.name)
 
-		// A Parameter shadows the Function's own name for the whole body,
-		// so a Program whose Parameter is called like the Function it stands in
-		// — or, for a Method, like the Namespace — makes no self call anywhere
-		// in it.
+		// A Parameter named like the Function, or a Method's Namespace, shadows
+		// it, so the body makes no self call.
 		if (
 			names.includes(
 				identity.kind === "function"
@@ -217,9 +111,7 @@ class Looping {
 			return null
 		}
 
-		// EMPTY, because what this set answers is "does this name mean
-		// something OTHER than what it means at the head of the body" — and at
-		// the head of the body a Parameter means itself.
+		// Empty, since at the head of the body a Parameter means itself.
 		let outer: ReadonlySet<string> = new Set()
 		let rebuilt = rebuiltParameters(definition.body, names)
 		let sites: Array<TailSite> = []
@@ -270,55 +162,36 @@ class Looping {
 	}
 }
 
-// Unspellable in Essence, like every other name the Compiler binds for
-// itself: the Lexer reads `_` as a Symbol, so no name a Program can write holds
-// one. `$tail_3` is the label and `$tail_3_t0` an Argument held until every
-// Argument of its turn has been evaluated; a slot is the Parameter's own name
-// with `_p` after it, so that a stack frame still says which Parameter is which.
+// Unspellable in Essence, since the lexer reads `_` as a Symbol. `$tail_3` is a
+// label, `$tail_3_t0` a held Argument, and a slot is the Parameter's name with
+// `_p` appended.
 const labelPrefix = "$tail_"
 const temporaryInfix = "_t"
 const slotSuffix = "_p"
 const selfName = "_self"
 
-// What was decided about a Function's Parameters once every tail call in
-// it has been read.
+// What was decided about the Parameters after reading every tail call.
 type LoopPlan = {
-	// The Parameters as the Function DECLARES them, before any slotting —
-	// read for the one thing a turn needs of a Parameter it has no value for:
-	// the Type the hole it hands over carries. Named for that: what the Function
-	// ends up with is `plannedParameter` of each of these.
+	// The Parameters as declared, read for the Type of a hole a turn hands
+	// one.
 	declaredParameters: Array<ParameterNode>
-	// The names the BODY reads its Parameters under, which slotting never
-	// changes: a slotted Parameter's name becomes a `const` of the turn.
+	// The names the body reads. A slotted Parameter's name becomes a turn's
+	// `const`.
 	names: Array<string>
-	// Per Parameter, the slot it is rebound through, or null where it is
-	// assigned where it stands. A Parameter no turn rebinds is null too, and is
-	// never assigned at all.
+	// Per Parameter, its slot, or null where it is assigned in place or never.
 	slots: Array<string | null>
-	// The default each Parameter takes again when a turn leaves it out,
-	// read under the slot names — a default is evaluated at the head of a turn
-	// as well as at a real call, and both times it must read what the turn bound.
+	// The defaults a turn takes again, read under the slot names.
 	fallbacks: Array<ExpressionNode | null>
-	// The Parameters some turn rebinds WHERE THEY STAND — the names an
-	// Argument may therefore read the old value of, which is what decides
-	// whether a turn has to hold its Arguments before it assigns any of them.
+	// Parameters some turn assigns in place, whose old value an Argument may
+	// read.
 	directlyAssigned: ReadonlySet<string>
-	// The Parameters the BODY itself writes at its head, which today is
-	// exactly the Record-defaulted ones: a PARTIAL default is not a value the
-	// Parameter list can hold, so the Simplifier leaves the Parameter required
-	// and rebuilds it member by member in a prologue. Two things follow. A turn
-	// that leaves such a Parameter out hands it `undefined` — the very thing a
-	// call that wrote no Argument hands it — and the prologue, which the loop
-	// runs again like every other Statement of the body, rebuilds it from the
-	// default. And its per-turn copy is a `let`, because the prologue assigns it.
+	// Parameters the body's prologue rebuilds from a Record default. A turn
+	// that leaves one out hands it `undefined`, and its copy is a `let`.
 	rebuilt: ReadonlySet<number>
 }
 
-// The hole a call leaves where it wrote no Argument, which is what a turn
-// assigns to a Parameter the body rebuilds for itself. It is the one place
-// `undefined` is deliberately written into emitted code, and it never becomes a
-// value: the prologue at the head of the next turn consumes it before anything
-// reads the name.
+// The hole a call leaves for an omitted Argument. The next turn's prologue
+// consumes it before anything reads the name.
 function omittedArgument(
 	parameter: ParameterNode,
 ): common.typedSimple.OmittedArgumentNode {
@@ -329,7 +202,7 @@ function omittedArgument(
 	}
 }
 
-// The plan, or null where this Function may not be looped at all.
+// The plan, or null where this Function may not be looped.
 function planOf(
 	definition: FunctionDefinitionNode,
 	parameters: Array<ParameterNode>,
@@ -348,17 +221,14 @@ function planOf(
 
 			assigned.add(index)
 
-			// The name means something else where this call stands, so an
-			// assignment would land on that something else — a Match Handler's
-			// `_self`, a Constant of an enclosing block. The slot is the
-			// Compiler's own name and is shadowed by nothing.
+			// Shadowed where the call stands, so it goes through a slot nothing
+			// shadows.
 			if (site.shadowed.has(names[index]!)) {
 				slotted.add(index)
 			}
 
-			// And a default this turn takes again reads the Parameters
-			// before it BY NAME where the call stands. One of those that is
-			// shadowed there goes through a slot for the same reason.
+			// A default this turn takes again reads earlier Parameters by name,
+			// so a shadowed one goes through a slot too.
 			if (site.arguments[index]?.kind !== "omitted") {
 				continue
 			}
@@ -377,24 +247,9 @@ function planOf(
 		}
 	}
 
-	// A Parameter's DEFAULT is taken again at the head of every turn, but
-	// it is evaluated where the turn ASSIGNS — it IS what a turn assigns — so a
-	// Function literal standing in one closes over the variable the loop
-	// rebinds, and not over a binding of the turn. A literal in the BODY has the
-	// turn's `const` in front of it to capture; a literal in a default stands
-	// where there is no such binding to make, whichever way the Parameter it
-	// reads is rebound: assigned where it stands it is the one shared variable,
-	// and slotted it is read through the slot, which is the variable the loop
-	// assigns. So a default whose literal mentions a Parameter some turn rebinds
-	// DECLINES the whole Function. Looping it would answer with the last turn's
-	// value from every closure an earlier turn built, which is the failure the
-	// capture rule exists to prevent — and declining is the answer, rather than
-	// evaluating the default into a `const` of its own, because a turn would
-	// then bind a name the Parameter list has already bound.
-	//
-	// Asked of the names the literal MENTIONS and not of the literal,
-	// because a default that closes over nothing — `= () -> Integer { <- 7 }` —
-	// builds per turn exactly the closure a call builds per call.
+	// A default is evaluated where the turn assigns, with no turn binding to
+	// capture. So a default whose Function literal mentions a rebound Parameter
+	// declines the Function. A literal mentioning nothing is safe.
 	let rebound = new Set([...assigned].map((index) => names[index]!))
 
 	for (let parameter of parameters) {
@@ -409,16 +264,8 @@ function planOf(
 		}
 	}
 
-	// A Parameter a Function literal in the body mentions is CAPTURED, and
-	// a JavaScript closure captures the variable rather than its value — so a
-	// turn that assigned it would rewrite what a closure an earlier turn built
-	// reads. The slot holds the rebinding; the body's name becomes a `const` of
-	// the turn, which is the binding the closure captures.
-	//
-	// THE BODY, and only the body. A literal in a Parameter default is not
-	// answered by a slot at all — it is declined above — so the one capture a
-	// slot has to hold is one standing where the turn's `const` can stand in
-	// front of it.
+	// A Parameter a Function literal in the body mentions is captured, so it is
+	// slotted, and the body reads a `const` of the turn.
 	let captured = capturedNames(definition.body)
 
 	for (let index of assigned) {
@@ -441,12 +288,9 @@ function planOf(
 	})
 
 	if (renames.size > 0) {
-		// The Parameter's own name becomes a `const` at the head of the
-		// loop body, so a body declaring that name in the same block would
-		// declare it twice. Nothing in Essence can — a Constant may not shadow a
-		// Parameter in the Parameter's own Scope — and the check is here because
-		// the emission would be a `SyntaxError` rather than a wrong answer if
-		// that ever stopped being true.
+		// The name becomes a `const` at the head of the loop body, so a body
+		// binding it again would be a `SyntaxError`. Essence refuses that
+		// already.
 		for (let name of renames.keys()) {
 			if (bindsAtTopLevel(definition.body, name)) {
 				return null
@@ -465,12 +309,8 @@ function planOf(
 			continue
 		}
 
-		// A default that has to be read under the new names is renamed
-		// wholesale, which is right only while nothing inside it binds one of
-		// those names again. A Match binds `_self` for its Handlers and a
-		// Function literal binds its own Parameters, so a default holding either
-		// declines the whole Function rather than being renamed through a Scope
-		// this pass does not track.
+		// A default renamed wholesale may not bind names itself, through a
+		// Match's `_self` or a Function literal's Parameters.
 		if (mentionsAnyName(fallback, new Set(renames.keys()))) {
 			if (bindsInside(fallback)) {
 				return null
@@ -502,13 +342,8 @@ function planOf(
 	}
 }
 
-// The Parameters the body assigns at its own head. The Simplifier writes
-// one such assignment, and only one: a Parameter whose default is a RECORD keeps
-// no default in the Parameter list, because what it means is member by member —
-// `options.retries ?? 3` — so the Parameter is rebuilt from whatever arrived
-// before the first Statement the author wrote. Asked by NAME at the top level,
-// which is where the prologue stands and the only place such an assignment can
-// be: Essence has no assignable Parameter, so a `variable` never reaches one.
+// The Parameters a prologue rebuilds from a Record default, as in
+// `options.retries ?? 3`. Only the top level can hold such an assignment.
 function rebuiltParameters(
 	nodes: Array<ImplementationNode>,
 	names: Array<string>,
@@ -530,11 +365,8 @@ function rebuiltParameters(
 	return rebuilt
 }
 
-// Whether this turn CHANGES the Parameter at `index`. A written Argument
-// that is the Parameter's own name, meaning that Parameter where the call
-// stands, leaves it exactly as it was — which is what a Method walking on the
-// same receiver writes for `@` — and assigning a value to itself is work with no
-// answer.
+// Whether this turn changes the Parameter at `index`. Passing the Parameter
+// itself, as a Method walking on `@` does, changes nothing.
 function rebinds(site: TailSite, index: number, name: string): boolean {
 	let argument = site.arguments[index]
 
@@ -542,9 +374,7 @@ function rebinds(site: TailSite, index: number, name: string): boolean {
 		return false
 	}
 
-	// An omitted Argument takes the default AGAIN. It is a rebinding even
-	// where the default is a literal, because the language says a default is
-	// evaluated per call and a turn is a call.
+	// An omitted Argument takes the default again, since a turn is a call.
 	if (argument.kind === "omitted") {
 		return true
 	}
@@ -572,9 +402,8 @@ function plannedParameter(
 
 	return {
 		...parameter,
-		// No Position on the slot. The name a reader wrote is on the
-		// `const` the turn binds, which is the binding the body reads and the one
-		// a debugger should point at.
+		// No Position on the slot. The turn's `const` carries the reader's
+		// name.
 		internalName: {
 			nodeType: "Identifier",
 			name: slot,
@@ -584,9 +413,7 @@ function plannedParameter(
 	}
 }
 
-// `const rest = rest_p;` at the head of every turn — one binding per turn,
-// which is what a closure built in that turn captures, and a name an assignment
-// made inside a Handler can not reach.
+// `const rest = rest_p;` at the head of every turn, one binding per turn.
 function perTurnCopies(
 	parameters: Array<ParameterNode>,
 	plan: LoopPlan,
@@ -611,9 +438,7 @@ function perTurnCopies(
 				type: parameter.internalName.type,
 			},
 			type: parameter.internalName.type,
-			// A `let` for the one Parameter the body writes itself — the
-			// prologue that rebuilds a Record default assigns the name, and a
-			// `const` would make that a TypeError rather than a merge.
+			// A `let` where the prologue assigns the name.
 			isConstant: !plan.rebuilt.has(index),
 		})
 	}
@@ -621,8 +446,7 @@ function perTurnCopies(
 	return copies
 }
 
-// Everything one tail call has to be written from, gathered so that the
-// three shapes an answer can take pass it on rather than each declaring it.
+// Everything one tail call is written from.
 type Turn = {
 	identity: SelfIdentity
 	shadowed: ReadonlySet<string>
@@ -631,11 +455,8 @@ type Turn = {
 	temporary: () => string
 }
 
-// One Expression standing where the Function's answer goes. Three things
-// can be there: the call itself; a counter IN FRONT of the call, which `essence
-// test --coverage` writes and which is written out as the Statement it always
-// was so every turn still counts what it ran; and a `define`, whose arms answer
-// where it stands. Everything else answers null and is left alone.
+// The answer: the call, a coverage counter leading the call, or a `define`
+// whose arms answer here. Anything else gives null.
 function tailAnswer(
 	expression: ExpressionNode,
 	position: common.Position | undefined,
@@ -660,9 +481,7 @@ function tailAnswer(
 			return null
 		}
 
-		// The counter LEADS, so it already ran in front of what it counts
-		// — standing on its own in front of it says the same thing, and is the
-		// shape a counter in Statement position has anyway.
+		// A leading counter is written as the Statement before the turn.
 		return [
 			{ ...expression, value: null },
 			...rest,
@@ -674,11 +493,8 @@ function tailAnswer(
 		: null
 }
 
-// `<- define { as … if … as … otherwise }` as the Conditionals it means —
-// written out only where an arm answers with a tail call, because a `define`
-// answering with anything else is one Expression and stays one. The arms are
-// asked in order and the first that holds answers, which is what a ladder of
-// `if`/`else` does; an arm that is not a tail call keeps a Return of its own.
+// `<- define { … }` as its ladder of Conditionals, where an arm answers with a
+// tail call. Other arms keep their own Returns.
 function defineLadder(
 	node: common.typedSimple.DefineNode,
 	position: common.Position | undefined,
@@ -717,8 +533,8 @@ function defineLadder(
 	return body
 }
 
-// The turn itself: every Argument evaluated, then every Parameter the call
-// changes rebound, then the body from the top.
+// The turn: every Argument evaluated, then the changed Parameters rebound,
+// then the body from the top.
 function tailCallStatement(
 	call: SelfCallNode,
 	position: common.Position | undefined,
@@ -726,13 +542,8 @@ function tailCallStatement(
 ): common.typedSimple.TailCallStatementNode | null {
 	let { plan, shadowed } = turn
 
-	// The refusal `alignedArguments` makes on the reading walk, made again
-	// here so the two can not disagree about what a turn is: a call carrying
-	// more Arguments than the Function declares Parameters decided nothing about
-	// the plan, and a turn written from it would quietly drop the Arguments the
-	// plan has no Parameter for. No Program the Enricher accepted holds one —
-	// this is the same defence as the sibling refusal below, and neither is
-	// reachable from Essence.
+	// `alignedArguments` refuses too many Arguments. Asked again so the plan
+	// and the turn agree.
 	if (call.arguments.length > plan.names.length) {
 		return null
 	}
@@ -752,13 +563,8 @@ function tailCallStatement(
 		}
 	}
 
-	// The one question that decides whether the Arguments have to be HELD:
-	// can one of them read a Parameter that an earlier assignment has already
-	// overwritten? A slotted Parameter never can — the body reads the turn's
-	// `const` and the loop assigns the slot — so only the ones assigned where
-	// they stand are asked about. A written Argument standing after one that was
-	// left out has to be held as well: at a real call every Argument is
-	// evaluated before any default fires.
+	// Every changed Argument is held when any of them mentions a Parameter
+	// assigned in place, or a written one follows an omitted one.
 	let holds = false
 	let omitted = false
 
@@ -815,11 +621,8 @@ function tailCallStatement(
 		let fallback = plan.fallbacks[index]
 
 		if (fallback === null || fallback === undefined) {
-			// No default in the Parameter list means the body rebuilds
-			// this Parameter at its head — so the turn hands it the same hole a
-			// call that wrote no Argument hands it, and the prologue does the
-			// rest. `alignedArguments` has already refused every other way a
-			// Parameter can arrive here with nothing to bind.
+			// No default here means the prologue rebuilds the Parameter from
+			// the hole.
 			if (!plan.rebuilt.has(index)) {
 				return null
 			}
@@ -844,10 +647,7 @@ function tailCallStatement(
 	}
 }
 
-// Every self call ONE answer holds — the reading half of `tailAnswer`,
-// and written beside it so the two can not disagree about what a turn is. The
-// plan is decided from what this finds; if it found less, a turn would rebind a
-// Parameter the plan never admitted was rebound.
+// Every self call one answer holds, read the way `tailAnswer` writes it.
 function tailCallsOf(
 	expression: ExpressionNode,
 	identity: SelfIdentity,
@@ -879,11 +679,8 @@ function tailCallsOf(
 	]
 }
 
-// The Argument standing for one Parameter. An Essence call is LABELLED and
-// the Simplifier has already put the Arguments in Parameter order — the receiver
-// at zero, the hidden conformance witnesses at the end — so the position IS the
-// Parameter, and an Argument list stopping short of the Parameters with defaults
-// at its end leaves each of those out.
+// The Argument for one Parameter. The simplifier ordered them by Parameter,
+// so a short list leaves the trailing defaults out.
 function argumentAt(call: SelfCallNode, index: number): TailArgument {
 	let argument = call.arguments[index]
 
@@ -897,10 +694,8 @@ function argumentAt(call: SelfCallNode, index: number): TailArgument {
 		: { kind: "written", value: argument.value }
 }
 
-// The Arguments of one call against the Parameters, or null where they do
-// not line up — a call carrying more Arguments than the Function declares
-// Parameters, or leaving out one that has no default. Neither can happen in a
-// Program the Enricher accepted; the pass declines rather than assuming it.
+// The Arguments against the Parameters, or null where they do not line up,
+// which the enricher never lets through.
 function alignedArguments(
 	call: SelfCallNode,
 	parameters: Array<ParameterNode>,
@@ -915,9 +710,7 @@ function alignedArguments(
 	for (let index = 0; index < parameters.length; index++) {
 		let argument = argumentAt(call, index)
 
-		// A Parameter left out that has neither a default to take again
-		// nor a prologue to rebuild it is one this pass can not say what a turn
-		// would bind. No Program the Enricher accepted holds one.
+		// Neither a default nor a prologue, so a turn could bind nothing.
 		if (
 			argument.kind === "omitted" &&
 			parameters[index]!.defaultValue === null &&
@@ -932,9 +725,7 @@ function alignedArguments(
 	return args
 }
 
-// Whether this Expression is a call to the Function it stands in, asked of
-// the Node the answer is built from and of nothing below it: a self call one step
-// down is a call whose answer is still worked on.
+// Whether this Expression itself, not a part of it, calls the Function.
 function selfCallOf(
 	expression: ExpressionNode,
 	identity: SelfIdentity,
@@ -949,9 +740,7 @@ function selfCallOf(
 			: null
 	}
 
-	// `providedBy` says the Method came from a Protocol rather than from
-	// this Namespace, and `derivedDescriptor` says it is a Choice's derived
-	// Equatable — neither is the body this call stands in.
+	// A provided Method or a derived Equatable is another body.
 	return expression.nodeType === "MethodInvocation" &&
 		expression.base.name === identity.namespace &&
 		expression.member.name === identity.member &&
@@ -962,10 +751,8 @@ function selfCallOf(
 		: null
 }
 
-// Every Return Statement that returns from THIS Function, offered with the
-// names shadowed where it stands, and the body rebuilt from what the visitor
-// answers. Null leaves the Statement as it is, which is what the reading walk
-// always answers.
+// Every Return from this Function, with the names shadowed where it stands.
+// Null leaves a Statement as it is.
 function descendReturns(
 	nodes: Array<ImplementationNode>,
 	shadowed: ReadonlySet<string>,
@@ -1003,8 +790,7 @@ function descendReturn(
 	) => Array<ImplementationNode> | null,
 ): Array<ImplementationNode> | null {
 	if (node.nodeType === "ReturnStatement") {
-		// A COPY, because the set goes on growing as the block is read and
-		// the first walk keeps what it was handed to decide the plan with.
+		// A copy, since the set grows as the block is read.
 		return visit(node, new Set(shadowed))
 	}
 
@@ -1017,10 +803,8 @@ function descendReturn(
 			: [{ ...node, trueBody, falseBody }]
 	}
 
-	// A lowered Statement is descended into exactly when its answer IS the
-	// Function's answer. One that writes its answer to a name holds Returns that
-	// answer THAT question and leave the chain; one driving an inlined loop holds
-	// a callback's Returns, which answer the callback.
+	// Only a lowered Statement whose answer is the Function's holds its
+	// Returns.
 	if (
 		node.nodeType !== "IntrinsicStatement" ||
 		node.kind !== "statement-match" ||
@@ -1031,10 +815,7 @@ function descendReturn(
 
 	let inner = new Set(shadowed)
 
-	// `_self` is the name every Handler reads the matched value under, so
-	// a Handler is a Scope where the receiver of a Method means something else.
-	// Except where the value IS `_self` already — `match @ -> …` binds nothing,
-	// and the two names are the same value.
+	// A Handler binds `_self` to the matched value, except for `match @`.
 	if (node.binding.kind !== "self") {
 		inner.add(selfName)
 	}
@@ -1060,9 +841,7 @@ function descendReturn(
 	return rewritten === undefined ? null : [{ ...node, handlers: rewritten }]
 }
 
-// What a Statement binds in the block it stands in — the same four
-// Statements the Rewriter asks about when it has to know whether a name it is
-// writing to is one the Program bound.
+// What a Statement binds in its block, as the rewriter asks it.
 function bindOf(node: ImplementationNode, scope: Set<string>): void {
 	switch (node.nodeType) {
 		case "VariableDeclarationStatement":
@@ -1095,19 +874,8 @@ function bindsAtTopLevel(
 	return scope.has(name)
 }
 
-// Whether any of these names occurs anywhere in this subtree, asked
-// structurally so that a position added to `typedSimple` later is searched
-// without this having to hear about it. It over-answers — an occurrence under a
-// Scope that rebound the name is not this one, and a `Lookup`'s member or a
-// `MethodInvocation`'s base is not a name a turn can rebind at all — and
-// over-answering costs a temporary that was not needed, a slot that was not
-// needed or a Function declined, never a wrong answer.
-//
-// Which is why this and `renamed` are asked in opposite voices. This one
-// and `capturedNames` may say yes where the honest answer is no; the rename may
-// not, because a name it rewrites that meant something else is emitted as a name
-// nothing answers to. So the two questions are answered by two walks on purpose:
-// this one structural and over-answering, the rename the shared typed walk.
+// Whether any of the names occurs in the subtree. It may over-answer, at the
+// cost of a temporary, a slot or a declined Function. `renamed` may not.
 function mentionsAnyName(value: unknown, names: ReadonlySet<string>): boolean {
 	if (names.size === 0) {
 		return false
@@ -1134,10 +902,8 @@ function mentionsAnyName(value: unknown, names: ReadonlySet<string>): boolean {
 	return Object.values(node).some((entry) => mentionsAnyName(entry, names))
 }
 
-// Whether anything inside this Expression declares a name — a Match, which
-// binds `_self` for its Handlers; a Function literal, which binds its own
-// Parameters; a lowered Statement, which binds whatever it holds. A default
-// holding one of them may not be renamed wholesale.
+// Whether anything inside declares a name: a Match, a Function literal or a
+// lowered Statement.
 function bindsInside(value: unknown): boolean {
 	if (Array.isArray(value)) {
 		return value.some((entry) => bindsInside(entry))
@@ -1161,16 +927,8 @@ function bindsInside(value: unknown): boolean {
 	return Object.values(node).some((entry) => bindsInside(entry))
 }
 
-// Every name a Function literal in this subtree mentions — the Parameters
-// a closure could CAPTURE. Asked of the literal's whole subtree, the names it
-// binds itself included and a member name it reads included, because admitting
-// one Parameter too many costs a `const` per turn and missing one is a closure
-// reading the next turn's value.
-//
-// Asked of a BODY, where the answer decides which Parameters are slotted,
-// and of a Parameter's DEFAULT, where the answer decides whether the Function is
-// looped at all. The Expression it is asked of is never itself the literal: a
-// name mentioned outside one is not captured by anything.
+// Every name a Function literal in the subtree mentions, which a closure could
+// capture. Missing one would let a closure read the next turn's value.
 function capturedNames(value: unknown): ReadonlySet<string> {
 	let names = new Set<string>()
 
@@ -1211,20 +969,9 @@ function collectCaptured(
 	}
 }
 
-// One Expression with the names a slotted Parameter is read under renamed
-// — what a default that reads one needs. It is the SHARED walk rather than a
-// sweep of its own, and that is the whole of the correctness here: only the
-// walk knows which Identifier is a reference to a BINDING and which one names
-// something else. A `Lookup`'s `member` is the plain case — `opts.n` reads the
-// member `n` off a Record and has nothing to do with a Parameter called `n`,
-// and renaming it emits `opts.n_p`, which is `undefined` — and a
-// `MethodInvocation`'s `base` names the answering Namespace rather than a value.
-// Neither is a name a turn can rebind, so neither is a name to rewrite.
-//
-// The one position the walk does not offer is a Parameter default INSIDE
-// this Expression, which nothing but a Function literal can carry — and a
-// default holding one of those never reaches here, because `bindsInside`
-// declines it first.
+// Renames slotted Parameters through the shared walk, which knows `opts.n` is a
+// member read and not a Parameter. A default holding a Function literal never
+// reaches here.
 function renamed(
 	value: ExpressionNode,
 	renames: ReadonlyMap<string, string>,

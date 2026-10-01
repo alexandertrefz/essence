@@ -739,3 +739,82 @@ test. The others are written where the branches use them:
 
 A chain nested in another's branch numbers its names from zero again and shadows the outer ones. That is
 harmless, since a chain reads only its own names, and only a Function literal stands inside one.
+
+### loop-self-tail-calls
+
+Essence has no loop Statement, so the idiomatic walk is recursion: take the head, answer with the walk of the
+tail.
+
+```
+function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
+    <- match rest::firstItem() -> Integer {
+        case #Empty       { <- sum }
+        case #Value(head) { <- total(rest::removeFirst(), sum::add(head)) }
+    }
+}
+```
+
+JavaScriptCore eliminates the frame of such a tail call, but V8 does not. So Node and Deno run out of stack on a long
+List where Bun does not. A call in tail position can not observe the frame it would get. So the pass rebinds the
+Parameters and takes the body from the top instead:
+
+```
+function total(rest, sum) {
+    $tail_0: while (true) {
+        …
+        const $tail_0_t0 = removeFirst(rest);
+        rest = $tail_0_t0; sum = …; continue $tail_0;
+    }
+}
+```
+
+A self call names the Function by its Identifier, or a Method by its Namespace and its mangled member. So another
+Overload of the same name is not a self call. A Function literal bound to a Constant can not name itself, and a
+Protocol's provided Method reaches itself through a conformance a conformer may override.
+
+#### Tail position
+
+Tail position is the Expression of a Return that returns from this Function, in the simplified Program. A Match
+lowered into Return position holds such Returns in its Handlers, and a Conditional in one holds them in its branches.
+A `define` there is written out as the ladder of Conditionals it means, wherever an arm answers with a tail call. Some
+Returns answer something else, so the pass does not descend into them. They stand in a lowered Statement that writes
+its answer to a name, an inlined loop's callback or a Function literal. A call whose answer is still worked on, as in
+`f(…)::add(1)`, is not in tail position. A coverage counter that leads the call is written out in front of it, so
+every turn still counts. Until `lower-matches-to-statements` has run, a Match in Return position holds no such Return.
+So with that pass off, this one finds no tail call inside a Match.
+
+#### A turn is a call
+
+- Every Argument is evaluated before any Parameter is rebound, so `<- swap(b, a)` swaps. A turn holds every changed
+  Argument in a `$tail_N_tM` temporary when any of them mentions a Parameter assigned in place. It does the same when
+  a written Argument follows an omitted one. Otherwise it assigns them directly.
+- A Parameter the call leaves out takes its default again, since a default is evaluated per call. The default reads
+  the Parameters before it as this turn bound them.
+- The whole body runs from the top, prologue included, so a Pattern in a Parameter binds again. A Parameter with a
+  Record default has no default in the Parameter list. The simplifier rebuilds it member by member in a prologue. A
+  turn that leaves it out hands it `undefined`, as a call would, and the prologue rebuilds it.
+
+A JavaScript closure captures the variable, not its value. So a Parameter that a Function literal in the body mentions
+is slotted. The loop assigns a slot named after the Parameter with `_p` appended, and the name the body reads becomes
+a `const` of the turn. A closure built in one turn then keeps the value of that turn. A Parameter whose name is
+shadowed where the tail call stands is slotted too, so the assignment can not land on the shadowing binding. Inside a
+Match Handler that is `_self`, which names the matched value there. Every other Parameter is assigned where it stands.
+
+`mentions` and `capturedNames` may over-answer, which costs only a temporary, a slot or a declined Function. A
+rename may not over-answer, since a rewritten name that meant something else names nothing. So `renamed` uses
+the shared walk, which knows that `opts.n` reads a member and not a Parameter called `n`.
+
+#### What declines
+
+- A Function with no tail call to itself. A non-tail self call, such as the first of `fib`'s two, still
+  recurses, so the Function keeps its name, Parameters and defaults.
+- A completing body. `complete self(…)` makes the call an Argument, and a turn inside the current run would
+  share its cancellation context.
+- A default whose Function literal mentions a Parameter some turn rebinds. A default is evaluated where the turn
+  assigns, with no turn binding in front of it to capture.
+- A default that has to be renamed but binds names itself, through a Match or a Function literal.
+- A body that declares a slotted Parameter's name at its top level, and Argument lists that do not line up with
+  the Parameters. The enricher accepts neither.
+
+Mutual recursion is not looped, since it would need a trampoline. Labels are numbered across the Program, so a
+Function looped inside another never takes the outer one's label.
