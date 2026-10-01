@@ -18,24 +18,20 @@ import { map, within as startedWithin } from "../Started"
 import { createString, type StringType } from "../String"
 import { typeKeySymbol } from "../type"
 
-// The runtime half of asynchrony, asked directly rather than through a
-// compiled Program: what a start does to the context it was written in, and
-// what a run leaves behind when it is over. What the LANGUAGE does with these
-// is `packages/compiler/src/tests/asynchrony.spec.ts`.
+// The runtime half of asynchrony, asked directly: what a start does to its
+// context, and what a run leaves behind. The language half is
+// `packages/compiler/src/tests/asynchrony.spec.ts`.
 
-// Both host shapes, staged around a call. `AbortSignal.any` arrived in
-// Node 20.3, Bun 1.1, Deno 1.39 and Safari 17.4, and this runtime answers on
-// hosts older than all four — so the linking has a hand-rolled fallback, and
-// every claim below is made of BOTH paths rather than of whichever one this
-// test run happens to have.
+// Runs `run` with and without `AbortSignal.any`. A host without it takes a
+// hand-rolled fallback, so every claim must hold on both paths.
 function onEachHost(run: () => void): void {
 	run()
 
 	let host = AbortSignal.any
 
-	// Deleted rather than replaced with a thrower: the probe asks
-	// `typeof`, which is what a host without one really answers.
-	// @ts-expect-error — staging a host that does not have it
+	// Deleted rather than replaced with a thrower, since the runtime probes it
+	// with `typeof`.
+	// @ts-expect-error stages a host without it
 	delete AbortSignal.any
 
 	try {
@@ -45,9 +41,8 @@ function onEachHost(run: () => void): void {
 	}
 }
 
-// A real timer rather than a microtask, because what these tests are
-// about is a second answer arriving in a LATER turn than the first — which is
-// what a run that waits for a host does.
+// A real timer rather than a microtask: these tests need an answer in a later
+// turn, as a run waiting for a host gives.
 function pause(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
@@ -58,10 +53,9 @@ const throwing = (): never => {
 	throw new Error("bug in a native")
 }
 
-// The abort listeners a run leaves on the context it was started in,
-// counted by standing in front of the signal's own two Methods. Awaited past a
-// turn of the loop, because a run that settles releases its link in the
-// microtask its promise settles in.
+// Counts the abort listeners a run leaves on its context by wrapping the
+// signal's Methods. Awaited past a turn, since a settled run releases its link
+// in the microtask its promise settles in.
 async function listeners(
 	under: (parent: Context) => void,
 ): Promise<{ added: number; removed: number }> {
@@ -95,9 +89,8 @@ async function listeners(
 
 const one = () => createInteger(1n)
 
-// `Number`, because an Integer is hybrid — a small one holds a `number`
-// and a large one a `bigint` — and what these tests are about is which value
-// came back, not which of the two spellings it came back in.
+// `Number`, since an Integer holds a small value as a `number` and a large one
+// as a `bigint`.
 function integerOf(value: unknown): number {
 	return Number((value as IntegerType).value)
 }
@@ -205,12 +198,9 @@ describe("the context a run belongs to", () => {
 		})
 	})
 
-	// What the link is FOR, and the claim that has to hold on BOTH host
-	// shapes: stopping a context stops everything started under it, including
-	// what a run that has already answered left behind. A finished run can not
-	// be stopped itself — there is nothing left of it — but the work it started
-	// is still going, and the stop reaches that work through the finished run's
-	// own link.
+	// Stopping a context stops everything started under it, including work a
+	// finished run left behind. The stop reaches that work through the finished
+	// run's own link.
 	test("stops work a finished run left behind", async () => {
 		await onEachHostAsync(async () => {
 			let parent = root()
@@ -240,20 +230,13 @@ describe("the context a run belongs to", () => {
 		})
 	})
 
-	// And the bookkeeping that claim is paid for with, on the one path
-	// that has bookkeeping of its own. A context outlives the runs started
-	// under it — a Program's root context lives as long as the Program — so a
-	// listener left on it after everything that needed it is over is held for
-	// the whole of that life, once per start. A hundred thousand of those is
-	// tens of megabytes.
-	//
-	// Three cases, and the count is the whole of the rule: a run that settles
-	// no longer needs it, a run stopped on its own never settles and no longer
-	// needs it either, and a run still going does.
+	// On the fallback path a run takes its listener off the parent once it
+	// settles or is stopped, and keeps it while going. A root context lives as
+	// long as the Program, so a leaked listener per start adds up.
 	test("holds a listener on its parent for exactly as long as it needs one", async () => {
 		let host = AbortSignal.any
 
-		// @ts-expect-error — the path with a listener of its own to take off
+		// @ts-expect-error takes the fallback path, which has a listener to take off
 		delete AbortSignal.any
 
 		try {
@@ -322,16 +305,14 @@ describe("completing work", () => {
 
 describe("a length of time", () => {
 	// A host keeps a timer's delay in a 32-bit signed integer and fires an
-	// overflowed one at ONE millisecond. An Essence Integer is unbounded, so the
-	// generous deadline is exactly the one that would arrive at once.
+	// overflowed one after one millisecond, so a longer delay is sliced.
 	test("is spent in slices no longer than a host takes", () => {
 		let armed: Array<number> = []
 		let host = globalThis.setTimeout
 		let answered = 0
 
-		// Fired at once rather than waited for — what is under test is
-		// the slicing, and three seconds of real time is not a test.
-		// @ts-expect-error — a stand-in that answers with no handle
+		// Fired at once rather than waited for, since the slicing is under test.
+		// @ts-expect-error a stand-in that answers with no handle
 		globalThis.setTimeout = (fire: () => void, delay: number) => {
 			armed.push(delay)
 			fire()
@@ -358,9 +339,8 @@ describe("a length of time", () => {
 		expect(delayOf(createInteger(10n ** 400n))).toBe(Infinity)
 	})
 
-	// End to end, because the two halves are only worth anything
-	// together: a deadline past what a host takes has to leave the work alone
-	// rather than stop it in the next millisecond.
+	// End to end: a deadline past what a host takes must not stop the work in
+	// the next millisecond.
 	test("leaves a run alone under a deadline longer than a host takes", async () => {
 		await onEachHostAsync(async () => {
 			let answer = await complete(
@@ -381,15 +361,9 @@ describe("a length of time", () => {
 })
 
 describe("a run nobody completes", () => {
-	// A `start` in Statement position is fire-and-forget, which the
-	// Compiler reports once as an Information and allows. So a throw out of such
-	// a run has no reader — and a rejected promise with no reader is what a host
-	// raises on: Node ends the Program where it stands and Bun prints a stack
-	// and exits 1. A Program that forgets a run on purpose may not take the
-	// process with it.
-	//
-	// Three doors, because a Started is built at three of them and the two
-	// derived promises are promises of their own that nothing else marks.
+	// A `start` in Statement position is allowed, so a throw out of its run may
+	// have no reader. A host raises on such a rejection. `start`, `Started::map`
+	// and `Started::within` each build a promise that needs a mark.
 	test("does not reach the host's unhandled-rejection hook", async () => {
 		let unhandled: Array<unknown> = []
 		let seen = (reason: unknown): void => {
@@ -411,9 +385,7 @@ describe("a run nobody completes", () => {
 		expect(unhandled).toEqual([])
 	})
 
-	// And the mark takes nothing away. A handler attached to a rejected
-	// promise is what marks it read, not what consumes it, so the throw is
-	// still there for whoever completes the run later.
+	// Marking a rejected promise read does not consume it.
 	test("still throws where it is completed later", async () => {
 		let started = start(of(throwing), root())
 
@@ -425,10 +397,8 @@ describe("a run nobody completes", () => {
 })
 
 describe("the first value several runs answer with", () => {
-	// The shape that is settled twice in one turn: two runs that both
-	// answer a value before either handler runs. The second handler arrives
-	// after the winner has been chosen, and what it must not do is stop "every
-	// other run" — which by then is the winner.
+	// Both runs answer before either handler runs, so the second handler arrives
+	// after the winner is chosen and must not stop it.
 	test("leaves the run it handed out completable", async () => {
 		await onEachHostAsync(async () => {
 			let held = new Map<string, Context>()
@@ -452,10 +422,8 @@ describe("the first value several runs answer with", () => {
 		})
 	})
 
-	// And the winner's own leftover work goes on. A run that started
-	// something and answered is a run whose context must stay live, because
-	// what it started is what the Program asked for — and a later answer
-	// aborting "every other run" would reach exactly that context.
+	// A later answer must not stop the winner's context, since the work it
+	// started is what the Program asked for.
 	test("leaves the winner's own work running", async () => {
 		await onEachHostAsync(async () => {
 			let ran: Array<string> = []
@@ -489,8 +457,7 @@ describe("the first value several runs answer with", () => {
 		})
 	})
 
-	// A List whose every run fails answers empty, and the count that says
-	// so may not be reached twice by one run.
+	// The count of failed runs must not count one run twice.
 	test("answers empty where every run fails", async () => {
 		await onEachHostAsync(async () => {
 			let failing = (reason: string) =>
@@ -505,16 +472,14 @@ describe("the first value several runs answer with", () => {
 	})
 })
 
-// The asynchronous half of `onEachHost`, written out rather than folded
-// into it: a staged host has to be put back after the run it was staged for has
-// finished, and awaiting inside the synchronous form would put it back while
-// the run was still going.
+// The asynchronous `onEachHost`, which puts the staged host back only after the
+// run has finished.
 async function onEachHostAsync(run: () => Promise<void>): Promise<void> {
 	await run()
 
 	let host = AbortSignal.any
 
-	// @ts-expect-error — staging a host that does not have it
+	// @ts-expect-error stages a host without it
 	delete AbortSignal.any
 
 	try {
