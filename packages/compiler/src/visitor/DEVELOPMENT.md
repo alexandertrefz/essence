@@ -1,0 +1,133 @@
+# Developing the visitor
+
+`forEachParserChild` and `forEachTypedChild` call a function on each child of a node. Each tree's children are read
+off one table. Every walker that descends through the tables sees the same children, so a kind or a field the table
+learns reaches all of them at once.
+
+## The child tables
+
+A table has an entry per node kind. The entry names each field of the node that holds a node, and says how to reach
+the nodes in it:
+
+- `"node"`: the field is a node, or null.
+- `"nodes"`: an Array of nodes.
+- `"values"`: a Record of nodes, such as a typed Record literal's members.
+- `{ each: … }`, `{ values: … }` and `{ fields: … }`: an Array, a Record or a single plain container, such as a Match
+  Handler or a `define` arm. The container gets an entry of its own.
+- A `custom` reach, a function, for what the data forms can not say. See "Custom reaches".
+- `"skip"`: the field holds nodes, but they are not children of this node. A comment beside it says where they are
+  reached instead, or why they are not.
+
+The order of an entry's keys is the order its children are visited in, which is the order they were written in. Each
+table is compiled once into arrays of fields. A visit allocates nothing: Records are read with `for … in`, and the
+custom reaches scan rather than build lists.
+
+### What the type checker holds a table to
+
+`Table<Node>` in `table.ts` works out, for each kind, which fields hold a node. A field holds one if its value reaches
+an object with a `nodeType`, through Arrays, Records, Maps, Sets, Weak Maps and Sets, Promises, Functions and plain
+containers. The search never
+enters a `common.Type`, so a Case payload default that a Type carries is no child. An entry must name exactly those
+fields, each with a reach that fits the field's shape. So `bun run typecheck` fails:
+
+- on a new kind joined to a union the table reaches, as a missing key of the table;
+- on a new kind in no listed union, as a missing key whose expected value is the sentence "list this kind in the node
+  union";
+- on a listed kind held as a subtype with node fields of its own, as a missing key "Kind, held with more fields";
+- on a new field holding a node, on a node or on a container such as a Handler, as a missing key of that entry;
+- on a reach that does not fit the field, such as `"node"` for an Array, with the right one as a suggestion. A Record
+  keyed by number takes `"values"` as one keyed by String does. A Map, a Set, a Promise or a Function has no data
+  form, so its field is skipped or reached by a custom reach.
+
+The type checker reports errors inside entries before a missing kind, so a change may surface in rounds.
+
+What the type checker still does not see:
+
+- a node held more than six containers deep, where the search stops;
+- what a custom reach reaches, since it is a function: only its field is held to the entry;
+- a node in a field typed `unknown`, or any type that does not say it holds a node;
+- a field keyed by a Symbol, which an entry can list but `compileEntry` never reads.
+
+### Custom reaches
+
+Each custom reach names a field the entry lists, and its inside is checked by the spec alone:
+
+- `recordMemberSteps`, `internalName` and `sharedWithBody` in `parser.ts` skip a node another field already reaches.
+- `exportSectionEntries` in `parser.ts` and `sectionsBelow` in both tables put nodes from two fields into written
+  order, as `namespaceMembers` does with `visitInterleaved`.
+- `generator` and `generators` in `typed.ts` reach a nested test generator. Each kind of generator has a typed entry
+  of its own in `generatorEntries`, so a new kind or a new Expression in one fails the type check as a node's does.
+
+### Every node once
+
+The Parser AST shares some nodes between two fields, and the table reaches each such node through one of them only:
+
+- An import or export group's entries also stand flat in the section's `entries`.
+- `(name: Type)` is one Identifier that both labels the Parameter and binds it.
+- A dotted Record key's first step is the member's `name`.
+- A provided Method's body shares its signature's Parameters and return Type.
+
+The typed table skips `MethodInvocation.dispatch`, whose Arguments are per-branch copies of the call's own.
+
+`src/tests/visitor.spec.ts` checks that a walk reaches every node that a reflective read of the fields finds, and each
+of them once. It checks its own fixtures, the standard library, and every file in `packages/fixtures/files` and its
+`diagnostics` directory, whose trees are the ones the Parser recovers.
+
+### Order
+
+A parsed node's children are visited in written order, which the spec checks over the same files. A Namespace's
+properties and Methods are two Records, so `visitInterleaved` merges them back into written order by their names. An
+export block's bare names and its groups are merged by Position, so an empty or unfinished group is reached too. The
+export and tests blocks may stand in either order below the implementation, and are visited in the order written.
+
+In the typed AST, a node the enricher desugars stands where the enricher put it, with a Position borrowed from what the
+author wrote. So the typed walk is in written order only up to them. Such nodes include:
+
+- the Constants a Pattern becomes, and the Constant holding a `require`'s subject;
+- the Lookup a Guard's use of a Pattern binding lowers to, whose member keeps the Pattern's Position;
+- the suite of `@example` blocks, which takes the tests block's span.
+
+## Walking with the tables
+
+A walker is a function of a node. It does its own work and calls `forEachTypedChild(node, itself, state)` to descend:
+
+- It treats a kind specially by switching on `nodeType` before it descends.
+- It skips a subtree by not descending.
+- It carries state, such as a Scope or the enclosing declaration, in the third argument.
+
+`findTypedChild` stops at the first child whose visit answers something other than `undefined`, and answers that. It
+serves a walker that searches. `forEachTypedChild` ignores what a visit answers, so a collector written as an
+expression arrow can not stop a walk by accident.
+
+A visit receives the child, the walker's state, and where the child stands:
+
+- `field`, the name of the field holding the child, such as `trueBody`, `guard` or `defaultValue`;
+- `key`, the child's index or Record key in the outermost Array or Record on the way to it;
+- `container`, the node's own field holding the container the child sits in, such as `handlers`, `arms`,
+  `otherwise`, `cases` or `properties`, and undefined for a field of the node itself.
+
+So an `if` tells `trueBody` from `falseBody`, every field of the second Match Handler reads `handlers` and 1, and a
+Case's `name` is told apart from the Choice's own. A walker that needs a state per field or per container picks it
+from these, without walking the container itself. A test generator's Expressions all report the property's
+`generator` field, since generators nest only in it.
+
+A walker that enters at a Program's root also meets each property test's generator Expressions, through
+`TestProperty.generator`. They are Expressions of the Module, but synthesized ones with borrowed Positions. A language
+server feature enters through `typedProgramSections` and never meets them. A walker that enters at the root skips
+`TestProperty` unless it means to see them.
+
+The tables serve walkers that read. The enricher, the simplifier and the rewriter build another tree, and keep their
+own switches, which the type checker holds exhaustive. The optimiser's `rewriteNodes` walks the simplified tree, which
+has no table.
+
+## Adding a node kind
+
+1. Write the node's type in `packages/interfaces/src` and join it to its union. A kind in no union the table reaches
+   also joins `ParserNode` in `parser.ts` or `TypedNode` in `typed.ts`.
+2. Run `bun run typecheck`. It names the table entry the kind needs, and each field the entry must reach. Write the
+   fields in written order, as the neighbouring entries do.
+3. Write the kind into a fixture of `src/tests/visitor.spec.ts`. Its coverage specs fail until a fixture does.
+4. Every walker built on the tables now reaches the new kind's children. A walker that switches on `nodeType` still
+   decides whether the new kind needs anything of its own.
+
+The list of every stage the kind touches is "Adding a node kind" in [the compiler's notes](../../DEVELOPMENT.md).

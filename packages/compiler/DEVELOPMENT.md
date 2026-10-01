@@ -127,6 +127,10 @@ Kinds change at each boundary:
 `optimiser/walk.ts` holds the walk the optimiser passes share. `rewriteNodes` visits children before their
 parent and hands back an unchanged node as the same object.
 
+`visitor/` holds one child table each for the Parser and typed trees, which walkers that only read descend through.
+`forEachParserChild` and `forEachTypedChild` visit a node's children in written order. See [the visitor's
+notes](src/visitor/DEVELOPMENT.md).
+
 ## Diagnostics
 
 `common.Diagnostic` in `packages/interfaces/src/common/index.ts` has this shape:
@@ -238,31 +242,34 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 1. Interfaces, in `packages/interfaces/src`: the parser node in `parser.ts`, the typed node in
    `common/typedNodes.ts` and the simplified node in `common/typedSimpleNodes.ts`, each joined to its union.
    A new keyword needs a `TokenType` in `lexer.ts`.
-2. Lexer: a new keyword joins `keywords` and `wordTypes` in `lexer/index.ts`, and `tokenTypeLexemes` in
+2. Visitor: `bun run typecheck` names the entry the kind needs in `visitor/parser.ts` and `visitor/typed.ts`,
+   and `tests/visitor.spec.ts` needs a fixture that writes it. Walkers built on the tables then reach its
+   children with no edit. See "Adding a node kind" in [the visitor's notes](src/visitor/DEVELOPMENT.md).
+3. Lexer: a new keyword joins `keywords` and `wordTypes` in `lexer/index.ts`, and `tokenTypeLexemes` in
    `parser/descent/tokenStream.ts`.
-3. Parser: a constructor in `parser/nodeGenerators.ts` and the grammar in `parser/descent/parse.ts`. A new
+4. Parser: a constructor in `parser/nodeGenerators.ts` and the grammar in `parser/descent/parse.ts`. A new
    token joins the token sets there: a reserved keyword such as `define` joins `expressionStartTokenTypes`,
    and a contextual one such as `start` joins `identifierTokenTypes`.
-4. Enricher: `enricher/enrichers.ts`, and `helpers/providedReads.ts`, which walks parser and typed bodies
+5. Enricher: `enricher/enrichers.ts`, and `helpers/providedReads.ts`, which walks parser and typed bodies
    for the enricher.
-5. Validator: `validator/validate.ts`.
-6. Simplifier: `simplifier/simplify.ts`.
-7. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such
+6. Validator: `validator/validate.ts`.
+7. Simplifier: `simplifier/simplify.ts`.
+8. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such
    as `passes/instrumentCoverage.ts`, `passes/loopSelfTailCalls.ts` and `passes/unboxConditions.ts`, and so
    does `mutation/index.ts`.
-8. Rewriter: `rewriter/rewrite.ts`.
-9. Formatter: `packages/formatter/src/printer.ts`.
-10. Language server, in `packages/language-server/src`: `argumentContext.ts`, `callHierarchy.ts`,
+9. Rewriter: `rewriter/rewrite.ts`.
+10. Formatter: `packages/formatter/src/printer.ts`.
+11. Language server, in `packages/language-server/src`: `argumentContext.ts`, `callHierarchy.ts`,
     `completion.ts`, `documentSymbols.ts`, `foldingRanges.ts`, `hover.ts`, `inlayHints.ts`, `rename.ts`,
     `selectionRanges.ts`, `semanticTokens.ts`, `signatureHelp.ts` and `snippetContext.ts`; in
     `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts`, `payloads.ts` and
     `typedLookups.ts`.
-11. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
+12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
-12. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
+13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
     `tests/codeGeneration.spec.ts`, `packages/formatter/src/tests/formatter.spec.ts`, and a spec for the
     feature itself. Each new Diagnostic code needs a showcase in `packages/fixtures/files/diagnostics`.
-13. Docs: the language page in `packages/website/src/content/docs/language/`, and each new code on
+14. Docs: the language page in `packages/website/src/content/docs/language/`, and each new code on
     `reference/diagnostics.mdx`.
 
 ## The project file

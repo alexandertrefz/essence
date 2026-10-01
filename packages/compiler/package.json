@@ -20,6 +20,7 @@
 		"./modules": "./src/modules/index.ts",
 		"./mutation": "./src/mutation/index.ts",
 		"./validator": "./src/validator/index.ts",
+		"./visitor": "./src/visitor/index.ts",
 		"./simplifier": "./src/simplifier/index.ts",
 		"./testing": "./src/testing/index.ts",
 		"./optimiser": "./src/optimiser/index.ts",
