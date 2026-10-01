@@ -7,8 +7,6 @@
 	"packages/compiler/src/tests/codegenNaming.spec.ts": {"sentence-length": 33, "em-dash": 33, "all-caps": 13, "history": 1, "position": 3, "block-length": 2, "counts": 1},
 	"packages/compiler/src/tests/conformanceHelps.spec.ts": {"sentence-length": 15, "em-dash": 14, "all-caps": 12, "history": 4, "block-length": 3},
 	"packages/compiler/src/tests/diagnosticFactory.ts": {"sentence-length": 1, "em-dash": 2},
-	"packages/compiler/src/tests/dictionaryAdditions.spec.ts": {"sentence-length": 18, "em-dash": 4, "all-caps": 8, "position": 1, "block-length": 1},
-	"packages/compiler/src/tests/dictionaryBenchmarks.spec.ts": {"sentence-length": 1},
 	"packages/compiler/src/tests/dictionaryRefinements.spec.ts": {"sentence-length": 21, "em-dash": 14, "all-caps": 4, "block-length": 1},
 	"packages/compiler/src/tests/dispatchResolution.spec.ts": {"sentence-length": 60, "em-dash": 45, "all-caps": 25, "history": 5, "position": 4, "block-length": 8},
 	"packages/compiler/src/tests/documentationExamples.spec.ts": {"sentence-length": 2, "em-dash": 1},
