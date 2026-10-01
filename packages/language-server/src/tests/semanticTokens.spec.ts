@@ -378,6 +378,21 @@ describe("Semantic Tokens of a Case written in a require Matcher", () => {
 	})
 })
 
+describe("Semantic Tokens of a Case written in a refinement predicate", () => {
+	// A predicate admits literal Arguments only, so this one is refused. The
+	// Case is coloured off the Parser AST all the same.
+	it("should colour the Case as an enum member", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Size { Small, Large }",
+			"\ttype Sizes = List<Size> where @::contains(#Large)",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 3, 45)?.type).toBe("enumMember")
+	})
+})
+
 describe("Semantic Tokens for the standard library", () => {
 	it("should mark builtin Types and Namespaces as defaultLibrary", () => {
 		let source = [

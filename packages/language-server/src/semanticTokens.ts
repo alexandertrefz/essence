@@ -374,9 +374,15 @@ function collectCasesFromNode(
 		case "RefusedValue":
 			collectCasesFromNode(node.base, tokens)
 			return
+		// A predicate checks literals, but a refused one may still name a Case.
+		case "TypeAliasStatement":
+			if (node.predicate !== null) {
+				collectCasesFromNode(node.predicate, tokens)
+			}
+
+			return
 		// A path holds no Case; its steps colour as members through the index.
 		case "MemberPath":
-		case "TypeAliasStatement":
 		case "Identifier":
 		case "Self":
 		case "StringValue":
