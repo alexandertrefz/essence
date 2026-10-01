@@ -979,9 +979,58 @@ describe("Standard Library Loader", () => {
 		expect(() => load(...CYCLE_SOURCES)).not.toThrow()
 	})
 
-	// Every library file loads, not only those another file imports.
+	// Every library file loads, not only those another file imports. Nothing
+	// imports `Lonely.es`, so its Namespace stays out of the language. Its typed
+	// Program is still there, and a mistake in it stops the load.
 	it("loads a file that nothing imports", () => {
-		expect(Object.keys(loadStdlib().members)).toContain("Terminal")
+		let prelude: [string, string] = [
+			"Prelude.es",
+			`declarations {}
+
+			export {
+				from "./Public.es" { Public }
+			}`,
+		]
+		let reached: [string, string] = [
+			"Public.es",
+			`declarations {
+				namespace Public for String {
+					§§ The String, as it is.
+					§§ @returns — the same String.
+					same() -> String {
+						<- @
+					}
+				}
+			}
+
+			export {
+				Public
+			}`,
+		]
+		let lonely = (answer: string): [string, string] => [
+			"Lonely.es",
+			`declarations {
+				namespace Lonely for String {
+					§§ The String, as it is.
+					§§ @returns — the same String.
+					same() -> String {
+						<- ${answer}
+					}
+				}
+			}
+
+			export {
+				Lonely
+			}`,
+		]
+
+		let stdlib = load(prelude, reached, lonely("@"))
+
+		expect(Object.keys(stdlib.members)).not.toContain("Lonely")
+		expect(
+			namespaceNodeIn(stdlib.typedPrograms[2]!, "Lonely").name.content,
+		).toBe("Lonely")
+		expect(() => load(prelude, reached, lonely("1"))).toThrow(/Lonely\.es/)
 	})
 
 	// A name reaches the language only through `Prelude.es`. A Namespace
