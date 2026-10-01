@@ -34,3 +34,28 @@ the key. `writeCorpus` lays them over what was read:
   test. Only an entry the run read and could not decode is dropped.
 
 A file left empty is removed, and its directory is kept, since it may hold another Module's companion.
+
+## Coverage
+
+`coverage.ts` reads what a coverage run means out of the `coverage` events alone, which carry the compiler's point
+table and each point's count. The CLI's table, the report files and the language server's per-file payload all
+read this one answer, so they agree on what a percentage means.
+
+`collectCoverage` folds the stream into one record per Module. A run may report a Module twice, when two entries'
+graphs both hold it. The Module really was loaded twice, so the counts are added, and every ratio only asks
+whether a point was reached. Two reports whose tables differ are two compiles of the Module, as in a watch session
+mid-edit, and the later replaces the earlier whole. `sameTable` compares each point's kind and start position,
+since adding across two tables would credit one compile's counts to another's points.
+
+`mergeCoverage` lays one cycle's answer over the last, for a watch session and the language server, which re-run
+only the tests a change reached. A Module in the new answer replaces the old one whole, and any other keeps what
+it had. Which Cases were constructed is worked out again over the merged whole, since a Choice is declared in one
+Module and constructed in any.
+
+`fileCoverageOf` counts lines as lines, so two Statements on one line are one line. Branches and arms count
+towards their line, since control arrives there as at a Statement. A Case construction does not: it is an
+Expression inside a Statement already counted. So a `Foo.tests.es` file, instrumented only for the Cases its tests
+build, has no line coverage. `isReported` leaves it out of the table, and its constructions still count.
+
+`percentageOf` answers null where there is nothing to measure, which a report draws as a dash. It rounds down, so
+100% means every point: 199 of 200 is 99, and a gate reading it does not pass a missed branch.
