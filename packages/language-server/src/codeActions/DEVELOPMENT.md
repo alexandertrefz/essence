@@ -151,7 +151,7 @@ There is no hoisting hazard. A Constant is visible only after its declaration, s
 the value reads is then in scope at each read, unless shadowed, which `readsAgree` checks. A Variable is in scope
 too, but may be assigned between the declaration and a read. So `readsVariable` refuses a value that reads one.
 
-`isInlinable` admits only values that mean the same thing wherever and however often they are written:
+`isInlinable` turns away the values whose meaning depends on where or how often they are written:
 
 - A Function literal, a member path, and an empty List or Dictionary take their Type from where they stand. A bare
   `#Case` does too, and resolves against the Choices in scope there, so one is refused anywhere in the value. So is
@@ -166,6 +166,14 @@ exported Constant, one with a `§§` block, and one written over several lines a
 
 A Constant that writes its Type is not inlined either. The written Type decides the value's, as `List<Number>` does
 for `[1, 2]`, and a copy would take the Type its own text gives it.
+
+A written value can also prove more about itself than the name's Type says. The Enricher refines a written Integer,
+Rational, String, List, Dictionary or Dictionary update at a receiver, and admits one to a refinement as an Argument.
+So `n::squareRoot()` answers an Optional where `4::squareRoot()` answers an Integer. `isRefinable` names those kinds,
+and `isAdmitted` finds the reads that stand at a receiver or an Argument, or inside a written value that does. Such a
+value is not inlined where any read is admitted. An Argument of a Function with one signature and no Type Parameters
+is not admitted, since that Function answers the same whatever the Argument proves. See "Written receivers" in
+packages/compiler/src/enricher/DEVELOPMENT.md.
 
 ## Writing a table test
 

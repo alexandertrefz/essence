@@ -7737,19 +7737,109 @@ describe("Inline a Constant", () => {
 		let lines = [
 			"implementation {",
 			"\tconstant limit = 10",
-			"\tconstant doubled = limit::add(1)",
-			"\tconstant halved = limit::subtract(1)",
+			"\tconstant range = { low = 0, high = limit }",
+			"\tconstant bounds = [limit, 20]",
 			"}",
 		]
 
-		let [action] = inlines(lines, rangeOf(lines, "limit::add"))
+		let [action] = inlines(lines, rangeOf(lines, "limit }"))
+		let result = applied(lines, action)
 
-		expect(applied(lines, action)).toEqual([
+		expect(result).toEqual([
 			"implementation {",
-			"\tconstant doubled = 10::add(1)",
-			"\tconstant halved = 10::subtract(1)",
+			"\tconstant range = { low = 0, high = 10 }",
+			"\tconstant bounds = [10, 20]",
 			"}",
 		])
+
+		expectRefactored(lines, result)
+	})
+
+	// A written `4` at a receiver is a `PositiveInteger`, whose `squareRoot`
+	// answers an Integer rather than an Optional. See "Written receivers" in
+	// packages/compiler/src/enricher/DEVELOPMENT.md.
+	it("offers nothing for a written value a receiver would refine", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant n = 4",
+			"\tconstant root = n::squareRoot()",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "n ="))).toEqual([])
+	})
+
+	// A written `4` passed as `over` picks the overload that answers a
+	// Rational rather than an Optional.
+	it("offers nothing for a written value an Argument would refine", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant divisor = 4",
+			"\tconstant quarter = Rational.of(1, over divisor)",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "divisor ="))).toEqual([])
+	})
+
+	// A written List's items are admitted with it, so `[4]` picks the
+	// `List<PositiveInteger>` overload where `[n]` picks the other.
+	it("offers nothing for a written value read inside a written List passed as an Argument", () => {
+		let lines = [
+			"implementation {",
+			"\ttype Holder = { n: Integer }",
+			"",
+			"\tnamespace Pick for Holder {",
+			"\t\toverload static sign {",
+			"\t\t\t(_ items: List<PositiveInteger>) -> String {",
+			'\t\t\t\t<- "positive"',
+			"\t\t\t}",
+			"",
+			"\t\t\t(_ items: List<Integer>) -> String {",
+			'\t\t\t\t<- "any"',
+			"\t\t\t}",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant n = 4",
+			"\tconstant signed = Pick.sign([n])",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "n = 4"))).toEqual([])
+	})
+
+	// A Function with one signature and no Type Parameters answers the same
+	// for any Argument its Parameter admits.
+	it("writes a written value into an Argument of a Function with one signature", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction twice(_ n: Integer) -> Integer {",
+			"\t\t<- n::multiply(with 2)",
+			"\t}",
+			"",
+			"\tconstant limit = 10",
+			"\tconstant doubled = twice(limit)",
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "limit ="))
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\tfunction twice(_ n: Integer) -> Integer {",
+			"\t\t<- n::multiply(with 2)",
+			"\t}",
+			"",
+			"\tconstant doubled = twice(10)",
+			"}",
+		])
+
+		expectRefactored(lines, result)
 	})
 
 	// The value would move into a Scope that declares a name it reads, which

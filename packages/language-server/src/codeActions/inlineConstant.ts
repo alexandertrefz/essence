@@ -1,3 +1,4 @@
+import { memberExpression } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { isSamePosition } from "../positions"
@@ -95,6 +96,15 @@ export function inlineConstantActions(
 
 	// A read inside a Function literal runs once per call of the literal.
 	if (reads.some(isInsideLiteral(program))) {
+		return []
+	}
+
+	// A written value proves more about itself where it is admitted than the
+	// name's Type says, which can pick another Method or overload.
+	if (
+		isRefinable(statement.value) &&
+		reads.some(isAdmitted(program, index))
+	) {
 		return []
 	}
 
@@ -261,6 +271,114 @@ function acts(value: parser.ExpressionNode): boolean {
 	})
 
 	return found
+}
+
+// The written kinds the Enricher refines at a receiver and admits to a
+// refinement as an Argument. See "Written receivers" in
+// packages/compiler/src/enricher/DEVELOPMENT.md.
+function isRefinable(value: parser.ExpressionNode): boolean {
+	switch (value.nodeType) {
+		case "IntegerValue":
+		case "RationalValue":
+		case "StringValue":
+		case "ListValue":
+		case "DictionaryValue":
+			return true
+		case "Combination":
+			return value.brackets === true
+		default:
+			return false
+	}
+}
+
+// The file's receivers and Arguments, walked once. A read is admitted where it
+// stands as one, or inside a written value that does. A Function with one
+// signature and no Type Parameters answers the same whatever its Arguments
+// prove, so its Arguments are left out.
+function isAdmitted(
+	program: parser.Program,
+	index: RenameIndex,
+): (occurrence: Occurrence) => boolean {
+	let admitted: Array<common.Position> = []
+	let plain: Array<common.Position> = []
+
+	walk(program, (node) => {
+		if (
+			node.nodeType === "FunctionStatement" &&
+			node.value.generics.length === 0
+		) {
+			plain.push(node.name.position)
+		}
+	})
+
+	let isPlainCall = (callee: parser.ExpressionNode): boolean => {
+		let definition =
+			callee.nodeType === "Identifier"
+				? index.find((occurrence) =>
+						isSamePosition(occurrence.position, callee.position),
+					)?.declaration.definition
+				: null
+
+		return (
+			definition !== null &&
+			definition !== undefined &&
+			plain.some((position) => isSamePosition(position, definition))
+		)
+	}
+
+	let reach = (node: parser.ExpressionNode): void => {
+		switch (node.nodeType) {
+			case "Identifier":
+				admitted.push(node.position)
+				break
+			case "ListValue":
+				node.values.forEach(reach)
+				break
+			case "DictionaryValue":
+				for (let entry of node.entries) {
+					reach(entry.key)
+					reach(entry.value)
+				}
+
+				break
+			case "RecordValue":
+				for (let member of Object.values(node.members)) {
+					reach(memberExpression(member))
+				}
+
+				break
+			case "Combination":
+				reach(node.lhs)
+				reach(node.rhs)
+				break
+			case "CaseValue":
+				if (node.value !== null) {
+					reach(node.value)
+				}
+
+				break
+		}
+	}
+
+	walk(program, (node) => {
+		if (node.nodeType === "MethodInvocation") {
+			reach(node.base)
+		}
+
+		if (
+			node.nodeType === "MethodInvocation" ||
+			(node.nodeType === "FunctionInvocation" && !isPlainCall(node.name))
+		) {
+			for (let argument of node.arguments) {
+				reach(argument.value)
+			}
+		}
+	})
+
+	return (occurrence) =>
+		admitted.some((position) =>
+			isSamePosition(position, occurrence.position),
+		)
 }
 
 // The file's Function literals, walked once. A read inside one runs once per
