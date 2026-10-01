@@ -194,6 +194,26 @@ function symbolsOfBody(
 	return nodes.flatMap(symbolsOfNode)
 }
 
+// A Parameter's default is an Expression outside the body, written before it.
+function symbolsOfFunction(
+	definition: parser.FunctionDefinitionNode,
+): Array<DocumentSymbolEntry> {
+	return [
+		...symbolsOfDefaults(definition.parameters),
+		...symbolsOfBody(definition.body),
+	]
+}
+
+function symbolsOfDefaults(
+	parameters: Array<parser.ParameterNode>,
+): Array<DocumentSymbolEntry> {
+	return parameters.flatMap((parameter) =>
+		parameter.defaultValue === null
+			? []
+			: symbolsOfNode(parameter.defaultValue),
+	)
+}
+
 function symbolsOfNode(
 	node: parser.ImplementationNode,
 ): Array<DocumentSymbolEntry> {
@@ -234,7 +254,7 @@ function symbolsOfNode(
 		case "Define":
 			return defineExpressions(node).flatMap(symbolsOfNode)
 		case "FunctionValue":
-			return symbolsOfBody(node.value.body)
+			return symbolsOfFunction(node.value)
 		case "FunctionInvocation":
 			return [
 				...symbolsOfNode(node.name),
@@ -356,7 +376,7 @@ function symbolForStatement(
 				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				children: symbolsOfBody(node.value.body),
+				children: symbolsOfFunction(node.value),
 			}
 		case "OverloadedFunctionStatement":
 			return {
@@ -365,11 +385,10 @@ function symbolForStatement(
 				detail: null,
 				range: node.position,
 				selectionRange: node.name.position,
-				// A native signature declares nothing to outline.
 				children: node.methods.flatMap((method) =>
 					method.nodeType === "FunctionValue"
-						? symbolsOfBody(method.value.body)
-						: [],
+						? symbolsOfFunction(method.value)
+						: symbolsOfDefaults(method.parameters),
 				),
 			}
 		case "TypeAliasStatement":
@@ -392,21 +411,27 @@ function symbolForStatement(
 					name: `#${choiceCase.name.content}`,
 					kind: "case" as const,
 					detail: null,
-					range:
-						choiceCase.type === null
-							? choiceCase.name.position
-							: unionOfPositions(
-									choiceCase.name.position,
-									choiceCase.type.position,
-								),
-					selectionRange: choiceCase.name.position,
-					children: recordTypeMembers(
-						choiceCase.type ?? {
-							nodeType: "RecordTypeDeclaration",
-							members: {},
-							position: choiceCase.name.position,
-						},
+					// The range runs to the end of the payload default, which may
+					// declare an entry of its own.
+					range: unionOfPositions(
+						choiceCase.name.position,
+						choiceCase.defaultValue?.position ??
+							choiceCase.type?.position ??
+							choiceCase.name.position,
 					),
+					selectionRange: choiceCase.name.position,
+					children: [
+						...recordTypeMembers(
+							choiceCase.type ?? {
+								nodeType: "RecordTypeDeclaration",
+								members: {},
+								position: choiceCase.name.position,
+							},
+						),
+						...(choiceCase.defaultValue === null
+							? []
+							: symbolsOfNode(choiceCase.defaultValue)),
+					],
 				})),
 			}
 		case "NamespaceDefinitionStatement":
@@ -459,7 +484,7 @@ function protocolMembers(
 			)
 
 			if (signature.body !== null) {
-				children.push(...symbolsOfBody(signature.body.value.body))
+				children.push(...symbolsOfFunction(signature.body.value))
 			}
 		}
 
@@ -540,11 +565,11 @@ function namespaceMembers(
 
 		for (let method of methods) {
 			range = unionOfPositions(range, method.position)
-
-			// A native signature declares nothing to outline.
-			if (method.nodeType === "FunctionValue") {
-				children.push(...symbolsOfBody(method.value.body))
-			}
+			children.push(
+				...(method.nodeType === "FunctionValue"
+					? symbolsOfFunction(method.value)
+					: symbolsOfDefaults(method.parameters)),
+			)
 		}
 
 		members.push({
@@ -616,6 +641,42 @@ function collectDetails(
 	}
 }
 
+function collectFunctionDetails(
+	definition: common.typed.FunctionDefinitionNode,
+	details: Details,
+) {
+	collectDefaultDetails(definition.parameters, details)
+	collectDetails(definition.body, details)
+}
+
+function collectCaseDetails(
+	node: common.typed.ChoiceDeclarationStatementNode,
+	details: Details,
+) {
+	for (let choiceCase of node.cases) {
+		record(
+			details,
+			choiceCase.name.position.start,
+			printCaseWithPayload(choiceCase.type),
+		)
+
+		if (choiceCase.defaultValue !== null) {
+			collectDetail(choiceCase.defaultValue, details)
+		}
+	}
+}
+
+function collectDefaultDetails(
+	parameters: Array<common.typed.ParameterNode>,
+	details: Details,
+) {
+	for (let parameter of parameters) {
+		if (parameter.defaultValue !== null) {
+			collectDetail(parameter.defaultValue, details)
+		}
+	}
+}
+
 function collectDetail(
 	node: common.typed.ImplementationNode,
 	details: Details,
@@ -635,7 +696,7 @@ function collectDetail(
 				node.name.position.start,
 				signatureDetail(node.type),
 			)
-			collectDetails(node.value.body, details)
+			collectFunctionDetails(node.value, details)
 			return
 		case "NamespaceDefinitionStatement":
 			for (let property of Object.values(node.properties)) {
@@ -665,8 +726,13 @@ function collectDetail(
 						: [member.method]
 
 				for (let method of methods) {
-					collectDetails(method.value.body, details)
+					collectFunctionDetails(method.value, details)
 				}
+			}
+
+			// A native Method's defaults stand in the frame made for them.
+			for (let shim of node.nativeShims) {
+				collectDefaultDetails(shim.parameters, details)
 			}
 
 			return
@@ -679,20 +745,13 @@ function collectDetail(
 						: [member.method]
 
 				for (let method of methods) {
-					collectDetails(method.value.body, details)
+					collectFunctionDetails(method.value, details)
 				}
 			}
 
 			return
 		case "ChoiceDeclarationStatement":
-			for (let choiceCase of node.cases) {
-				record(
-					details,
-					choiceCase.name.position.start,
-					printCaseWithPayload(choiceCase.type),
-				)
-			}
-
+			collectCaseDetails(node, details)
 			return
 		case "IfStatement":
 			collectDetail(node.condition, details)
@@ -734,7 +793,7 @@ function collectDetail(
 
 			return
 		case "FunctionValue":
-			collectDetails(node.value.body, details)
+			collectFunctionDetails(node.value, details)
 			return
 		case "FunctionInvocation":
 			collectDetail(node.name, details)

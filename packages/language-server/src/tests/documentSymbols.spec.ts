@@ -1,7 +1,10 @@
 import { describe, expect, it } from "bun:test"
+import * as path from "node:path"
 
+import { enrichDocument, parseDocument } from "@essence-lang/compiler/documents"
 import { enrich } from "@essence-lang/compiler/enricher"
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 
 import {
 	type DocumentSymbolEntry,
@@ -680,5 +683,109 @@ describe("Document Symbols inside an assertion", () => {
 
 		expect(detailOf(symbols, "expected")).toBe("Boolean")
 		expect(detailOf(symbols, "required")).toBe("Boolean")
+	})
+})
+
+// A default stands outside the body it belongs to, written before it.
+describe("Document Symbols inside a default value", () => {
+	let source = [
+		"implementation {",
+		"\tfunction run(_ f: () -> Integer = () -> Integer {",
+		"\t\tconstant inner = 1",
+		"",
+		"\t\t<- inner",
+		"\t}) -> Integer {",
+		"\t\t<- f()",
+		"\t}",
+		"",
+		"\tnamespace Runs for Integer {",
+		"\t\ttwice(_ h: () -> Integer = () -> Integer {",
+		"\t\t\tconstant held = 3",
+		"",
+		"\t\t\t<- held",
+		"\t\t}) -> Integer {",
+		"\t\t\t<- h()",
+		"\t\t}",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("should nest what a Parameter's default declares under its Function", () => {
+		expect(flatten(symbolsOf(source)).map((symbol) => symbol.name)).toEqual(
+			["run", "inner", "Runs", "twice", "held"],
+		)
+	})
+
+	it("should put the inferred Type beside it", () => {
+		let symbols = detailedSymbolsOf(source)
+
+		expect(detailOf(symbols, "inner")).toBe("Integer")
+		expect(detailOf(symbols, "held")).toBe("Integer")
+	})
+
+	// Only the standard library declares natives, so the document is analysed
+	// as one of its files.
+	it("should nest what a native Method's default declares under it", () => {
+		let documentPath = path.join(STDLIB_DIRECTORY, "Sizes.es")
+		let { program } = parseDocument(
+			[
+				"declarations {",
+				"\tnamespace Sizes for Integer {",
+				"\t\tmeasured(to end: Integer = [1]::map((item) {",
+				"\t\t\tconstant held = item::add(1)",
+				"",
+				"\t\t\t<- held",
+				"\t\t})::length()) -> Integer",
+				"",
+				"\t\toverload scaled {",
+				"\t\t\t(by factor: Integer = [2]::map((item) {",
+				"\t\t\t\tconstant kept = item::add(2)",
+				"",
+				"\t\t\t\t<- kept",
+				"\t\t\t})::length()) -> Integer",
+				"\t\t\t(text factor: String) -> Integer",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+			documentPath,
+		)
+		let { program: enrichedProgram } = enrichDocument(program, documentPath)
+		let [namespace] = findDocumentSymbols(program, enrichedProgram)
+
+		expect(
+			namespace.children.map((member) => [
+				member.name,
+				member.children.map((child) => [child.name, child.detail]),
+			]),
+		).toEqual([
+			["measured", [["held", "Integer"]]],
+			["scaled", [["kept", "Integer"]]],
+		])
+	})
+
+	// The default is refused, but the outline shows what is written.
+	it("should nest what a Case's payload default declares under the Case", () => {
+		let [choice] = symbolsOf(
+			[
+				"implementation {",
+				"\tchoice Shape {",
+				"\t\tCircle { grow: (_ size: Integer) -> Integer } = { grow = (_ size: Integer) -> Integer {",
+				"\t\t\tconstant doubled = size",
+				"",
+				"\t\t\t<- doubled",
+				"\t\t} },",
+				"\t\tDot,",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+		let [circle] = choice.children
+
+		expect(circle.children.map((child) => child.name)).toEqual([
+			"grow",
+			"doubled",
+		])
+		expect(circle.range.end).toEqual({ line: 7, column: 6 })
 	})
 })
