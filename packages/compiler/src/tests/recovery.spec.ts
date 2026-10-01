@@ -6,12 +6,9 @@ import { analyseSource } from "../analysis"
 import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// What the Parser abandoned, and what the stages behind it do about it.
-// A Statement the Parser dropped is a Statement the reader WROTE — the file
-// declares what it declares — so every name it bound has to keep resolving, or
-// one syntax error is reported again at every line that reads one of them.
-// That cascade is what this spec is about; `parser.Recovery` is the record it
-// is answered from.
+// A Statement the Parser dropped was still written. The names it bound must
+// keep resolving, or one syntax error is reported again at every read. See
+// "Recovery" in packages/interfaces/DEVELOPMENT.md.
 
 function recoveryOf(source: string): parser.Recovery {
 	return (
@@ -23,16 +20,13 @@ function recoveryOf(source: string): parser.Recovery {
 	)
 }
 
-// The names alone, which is what most of this spec is about — WHERE each
-// one reaches is the subject of "Where a dropped Declaration's silence reaches"
-// below.
+// The names alone. Where each one reaches has a describe of its own.
 function declaredNamesOf(source: string): Array<string> {
 	return recoveryOf(source).declarations.map((declared) => declared.name)
 }
 
-// Every stage's verdict in one list, which is what the checks that STAND
-// DOWN have to be read against: what they suppress only makes sense beside what
-// the stage above them already said.
+// Every stage's codes in one list, since a check that stands down only makes
+// sense beside what an earlier stage already said.
 function analysisCodesOf(source: string): Array<string> {
 	return analyseSource(source).diagnostics.map(
 		(diagnostic: common.Diagnostic) => diagnostic.code,
@@ -83,8 +77,8 @@ describe("Parser recovery", () => {
 		).toEqual(["Point"])
 	})
 
-	// A Namespace takes its Methods down with it, and the rest of the file
-	// calls them by name — so each is recorded beside the Namespace's own.
+	// The rest of the file calls a dropped Namespace's Methods by name, so each
+	// is recorded.
 	it("should record a dropped Namespace's Methods", () => {
 		expect(
 			declaredNamesOf(`implementation {
@@ -96,9 +90,8 @@ describe("Parser recovery", () => {
 		).toEqual(["Boxes", "doubled", "origin"])
 	})
 
-	// And no deeper than the body's own level. `multiplyWith` is a name
-	// the Method CALLS, and a call says nothing about what this file declares —
-	// recording it would silence a genuine mistake anywhere else in the file.
+	// A call declares nothing, so recording `multiplyWith` would silence a real
+	// mistake elsewhere in the file.
 	it("should not record the names a dropped Namespace's bodies call", () => {
 		expect(
 			declaredNamesOf(`implementation {
@@ -109,9 +102,8 @@ describe("Parser recovery", () => {
 		).not.toContain("multiplyWith")
 	})
 
-	// A Parameter list goes down with the head it is written on, so its
-	// names are as undeclared as the Function's own — and the body reading them
-	// is exactly what survives a dropped head.
+	// The Parameters go down with the head, and the body that reads them
+	// survives it.
 	it("should record a dropped Function's Parameters", () => {
 		expect(
 			declaredNamesOf(`implementation {
@@ -122,10 +114,8 @@ describe("Parser recovery", () => {
 		).toEqual(["exclaimed", "text"])
 	})
 
-	// And nothing a Type names. A `{ x: Integer }` declares members
-	// rather than bindings, and a `type` Declaration has no Parameter list at
-	// all — recording either would silence a genuine mistake about a name
-	// spelled the same way somewhere else in the file.
+	// A Record Type's members are not bindings, so recording them would silence
+	// a real mistake about a name spelled the same way.
 	it("should not record the members a dropped Type names", () => {
 		expect(
 			declaredNamesOf(`implementation {
@@ -142,10 +132,8 @@ describe("Parser recovery", () => {
 		).toEqual(["Colour", "Green", "Red"])
 	})
 
-	// Up to where the recovery stopped, which is the `}` that closes the
-	// block the Statement was written in — a resynchronisation halts AT a
-	// closing brace rather than reading past it, so the brace's own line is the
-	// one line of the Declaration this does not claim.
+	// Recovery halts at the `}` that closes the enclosing block without reading
+	// it, so that brace's line is not recorded.
 	it("should record every line a dropped Statement was written across", () => {
 		expect(
 			recoveryOf(`implementation {
@@ -202,10 +190,7 @@ describe("Reads of a dropped Declaration", () => {
 		).toEqual([])
 	})
 
-	// The other half of the rule, and the one that decides whether this is
-	// worth having at all: a name nothing declared is still a name nothing
-	// declared. Silence is owed to what the recovery took away and to nothing
-	// else.
+	// Silence is owed only to the names the recovery took away.
 	it("should still report a name nothing declared", () => {
 		expect(
 			enricherCodesOf(`implementation {
@@ -216,13 +201,9 @@ describe("Reads of a dropped Declaration", () => {
 	})
 })
 
-// The two kinds of abandonment in ONE Program, because they are recorded
-// two different ways and were written in two different branches. A dropped
-// STATEMENT abandons text, which is what the lines are read off; a dropped
-// PATTERN BINDER abandons a name while the Matcher around it parses whole, so it
-// leaves no line at all. A `recovery()` keyed on the lines alone answered
-// `undefined` for the second, and the binder's name then reported once per read
-// as a name nobody declared.
+// A dropped Statement abandons lines, while a dropped Pattern binder abandons
+// a name inside a Matcher that parses whole and leaves no line. One Program
+// holds both, so a record keyed on lines alone would lose the binder.
 describe("A Program that abandoned a Statement and a binder", () => {
 	let source = `implementation {
 	constant limit Integer = 10
@@ -245,20 +226,14 @@ describe("A Program that abandoned a Statement and a binder", () => {
 		expect(recovery.lines).toEqual([2])
 	})
 
-	// Two mistakes, two reports — and nothing about either name, though
-	// the body below reads both of them.
+	// The handler body reads both names, and neither is reported.
 	it("should say nothing about either name it took away", () => {
 		expect(enricherCodesOf(source)).toEqual([])
 	})
 })
 
-// The other half of the rule, and the one this whole record exists to get
-// right: the silence is owed to the reads the dropped Declaration would have
-// ANSWERED, and to no others. A Constant dropped out of one Function's body was
-// never in scope in the next Function along, so a read of the same name there
-// resolved to nothing before the mistake and resolves to nothing without it —
-// reporting it is not a cascade, it is the second mistake in the file, and one
-// run that reports every mistake is the point.
+// Silence covers only the reads the dropped Declaration could have answered.
+// See "The silence of a dropped name" in packages/interfaces/DEVELOPMENT.md.
 describe("Where a dropped Declaration's silence reaches", () => {
 	it("should stay silent below the run in the block it was written in", () => {
 		expect(
@@ -299,11 +274,9 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual(["unknown-name"])
 	})
 
-	// A `type` is hoistable by KEYWORD and hoisted by nobody when it is
-	// written inside a body — `hoistDeclarations` runs over a section's own
-	// Statements and nothing deeper. So a dropped one is in scope exactly where
-	// it was written, and the Parameter annotation below reads a Type this file
-	// does not have.
+	// `hoistDeclarations` hoists only a section's own Statements, so a `type`
+	// written inside a body is in scope only there. The other Function's
+	// Parameter names a Type that is not in scope.
 	it("should report a Type dropped inside a body and named outside it", () => {
 		expect(
 			enricherCodesOf(`implementation {
@@ -319,9 +292,8 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual(["unknown-type"])
 	})
 
-	// And the hoisted case, which is why `hoistable` is recorded at all: a
-	// top-level `choice` is in scope across the whole file and ABOVE its own
-	// line, so a dropped one silences every read of its name wherever it stands.
+	// A top-level `choice` is in scope across the whole file, before its own
+	// line too, so a dropped one silences every read of its name.
 	it("should stay silent file-wide for a dropped top-level Choice", () => {
 		expect(
 			enricherCodesOf(`implementation {
@@ -336,10 +308,8 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual([])
 	})
 
-	// `ChoiceName#CaseName` reads the Choice's name through a path of its
-	// own, which had no such question to ask — so a dropped `choice` answered
-	// its every qualified Case with "Type 'Signal' is not declared", the syntax
-	// error said again about a Type the file declares.
+	// `ChoiceName#CaseName` resolves the Choice's name through a path of its
+	// own, which must also stay silent for a dropped `choice`.
 	it("should stay silent for a qualified Case of a dropped Choice", () => {
 		expect(
 			enricherCodesOf(`implementation {
@@ -354,9 +324,8 @@ describe("Where a dropped Declaration's silence reaches", () => {
 		).toEqual([])
 	})
 
-	// A Namespace's members are NOT lexical — a Method dropped out of a
-	// Namespace's body is called from outside that body, everywhere the
-	// Namespace reaches — so their silence stays file-wide. See
+	// A Namespace's members are not lexical: a Method is called from outside
+	// its Namespace's body, so a dropped one stays silent file-wide. See
 	// `memberDeclarationWasAbandoned`.
 	it("should stay silent for a dropped Method called outside its Namespace", () => {
 		expect(
@@ -373,12 +342,9 @@ describe("Where a dropped Declaration's silence reaches", () => {
 	})
 })
 
-// `top-level-return` is the one check whose stand-down can not ask about
-// its own lines: a `<-` stands outside a Function because the HEAD that would
-// have opened one is missing, and a head is dropped a line ABOVE the `<-` it
-// orphans. It used to answer that by standing down for the whole file, which
-// let a dropped Constant three lines up take away the report for a `<-` the
-// reader really did write at the top level.
+// A dropped head orphans the `<-` lines after it, so `top-level-return` asks
+// about a head above the `<-` rather than about its own line. See "Top-level
+// returns" in packages/compiler/src/validator/DEVELOPMENT.md.
 describe("A '<-' outside a Function beneath abandoned text", () => {
 	it("should stay silent under a dropped Function head", () => {
 		expect(
@@ -390,10 +356,8 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "unexpected-token"])
 	})
 
-	// One dropped head, several orphaned Returns — the `{` it was missing
-	// is ONE brace, so every Statement under it stands outside a Function for
-	// the same one reason. A Return that advanced the floor would report the
-	// second and every one after it.
+	// One missing `{` orphans every Return under it, so a Return must not raise
+	// the floor.
 	it("should stay silent for every Return one dropped head orphans", () => {
 		expect(
 			analysisCodesOf(`implementation {
@@ -405,9 +369,8 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "unexpected-token"])
 	})
 
-	// A dropped Constant takes no body down with it, so the `<-` below it
-	// is a `<-` the reader wrote at the top level and is owed its report. This
-	// is the discriminator the whole condition exists for.
+	// A dropped Constant takes no body with it, so the `<-` after it was
+	// written at the top level and is reported.
 	it("should report under a dropped Constant", () => {
 		expect(
 			analysisCodesOf(`implementation {
@@ -418,10 +381,9 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "top-level-return"])
 	})
 
-	// And the head has to be abandoned BELOW everything the Parser read
-	// whole at the top level. A Statement dropped inside a Function the Parser
-	// closed is a Statement whose body the Parser HAS — so what stands under
-	// that Function stands at the top level.
+	// The head must be dropped after the last top-level Statement read whole.
+	// Text dropped inside a Function the Parser closed leaves the `<-` after
+	// that Function at the top level.
 	it("should report below a Function the Parser read whole", () => {
 		expect(
 			analysisCodesOf(`implementation {
@@ -435,9 +397,7 @@ describe("A '<-' outside a Function beneath abandoned text", () => {
 		).toEqual(["syntax-error", "top-level-return"])
 	})
 
-	// And the head has to be abandoned ABOVE the `<-` it is supposed to
-	// have orphaned. Text dropped further down the file orphans nothing above
-	// it.
+	// Text dropped after a `<-` orphans nothing before it.
 	it("should report above the run that was abandoned", () => {
 		expect(
 			analysisCodesOf(`implementation {
