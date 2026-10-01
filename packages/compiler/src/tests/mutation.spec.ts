@@ -205,6 +205,36 @@ describe("Mutation sites", () => {
 		expect(only(sites, "case")).toEqual(["17 swap #Win for #Draw"])
 	})
 
+	it("swaps for the declared next sibling when a construction comes first", () => {
+		let source = [
+			"implementation {",
+			"	function best() -> Outcome {",
+			"		<- #Draw",
+			"	}",
+			"",
+			"	choice Outcome {",
+			"		Win,",
+			"		Draw,",
+			"		Loss,",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "case")).toEqual([
+			"3 swap #Draw for #Loss",
+		])
+		expect(
+			only(
+				enumerateMutations(
+					simplified(source, "/modules/Fixture.es"),
+					"Fixture.es",
+				),
+				"case",
+			),
+		).toEqual(["3 swap #Draw for #Loss"])
+	})
+
 	// A worker enumerates the Program for itself and compiles a mutant by
 	// id, so two enumerations must give the same list.
 	it("enumerates the same sites twice", () => {

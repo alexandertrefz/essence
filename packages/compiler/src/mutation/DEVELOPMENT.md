@@ -34,8 +34,8 @@ never changed, and `CONTEXTS` keeps one context per Program for the many walks a
 - `integer` moves an Integer literal up by one, down by one, and to zero, dropping repeats and the literal itself.
 - `case` swaps a constructed Case for the next Case of its Choice, wrapping around, that has the same member
   names. The payload is kept as written, so it has to fit. Only one sibling is offered. `readContext` orders a
-  Choice's Cases as its walk first meets them, which is declaration order when the declaration comes before
-  every construction.
+  Choice the Module declares as its declaration does, wherever a construction stands. A Choice from elsewhere
+  has only the Cases the Module constructs, in the order its walk first meets them.
 - `branch` swaps the bodies of an `if`, which inverts the condition without inventing a Node. In a `define`, it
   swaps one arm's answer with the `otherwise` answer, one candidate per arm. Those candidates stand at the
   `define`'s own Position, since the cap would drop them on an arm's line, which its Condition already fills.

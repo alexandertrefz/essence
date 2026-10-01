@@ -560,7 +560,7 @@ type KnownNamespace =
 type MutationContext = {
 	namespaces: Map<string, KnownNamespace>
 	// Each Choice's Cases with their whole Types, from the Module's own Type
-	// Aliases and from the constructions, in the order the walk meets them.
+	// Aliases in declaration order, then from the constructions as met.
 	choices: Map<string, Array<common.CaseType>>
 	// Every Node of a condition that narrows in either direction. It is
 	// gathered first, since the walk reaches a condition's Nodes before its
@@ -612,6 +612,18 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 		}
 	}
 
+	// A declaration orders its Choice's Cases, whatever the walk met first.
+	let declare = (cases: Array<common.CaseType>): void => {
+		let met = choices.get(cases[0]!.choice) ?? []
+
+		choices.set(cases[0]!.choice, [
+			...cases,
+			...met.filter(
+				(type) => !cases.some((each) => each.name === type.name),
+			),
+		])
+	}
+
 	let narrowed = new Set<common.typedSimple.ExpressionNode>()
 
 	// One walk gathers the Namespaces, the Choices and the narrowing
@@ -628,10 +640,10 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 				}
 
 				if (node.nodeType === "TypeAliasStatement") {
-					let cases = declaredCases(node.type, node.name.name) ?? []
+					let cases = declaredCases(node.type, node.name.name)
 
-					for (let type of cases) {
-						remember(type)
+					if (cases !== null) {
+						declare(cases)
 					}
 				}
 
