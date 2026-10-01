@@ -133,8 +133,8 @@ export function refinementInside(type: common.Type): boolean {
 	)
 }
 
-// A written part that did not fit, the question it left unanswered, and what
-// it is in its container, so a Diagnostic calls a key a key.
+// A written part that did not fit and the question it left unanswered. `part`
+// lets a Diagnostic call a key a key.
 type UnadmittedWrittenPart = {
 	value: common.typed.ExpressionNode
 	refinement: common.RefinementType
@@ -229,8 +229,8 @@ export function admissionOfWrittenValue(
 		)
 }
 
-// The refinement a written value is asked about where the position's own Type
-// Parameters are not decided yet, or null where the value leaves one open. See
+// The refinement a written value is asked about while the position's Type
+// Parameters are undecided, or null where the value leaves one open. See
 // "Generic refinements" in DEVELOPMENT.md.
 export function refinementDecidedBy(
 	refinement: common.RefinementType,
@@ -462,34 +462,22 @@ const RATIONAL_COMPARISONS: Record<string, PredicateEvaluator> = {
 	},
 }
 
-// Rational's alone, and the whole of it — `isWholeNumber` is the one
-// question the Namespace asks of a Rational and nothing else.
+// Rational's own question.
 const RATIONAL_QUESTIONS: Record<string, PredicateEvaluator> = {
-	// `@::denominator()::is(1)`, which is Rational's own body, and the
-	// denominator it reads is the lowest-terms one — so `4/2` is whole.
+	// Rational's body reads the lowest-terms denominator, so `4/2` is whole.
 	isWholeNumber: rationalQuestion((value) => value.denominator === 1n),
 }
 
-// The covering Namespace answers for whichever kind stands in front of
-// it, so its rung is BOTH tables: an Integer receiver keeps the Integer entry
-// it always reached, and a Rational one is read as a Rational. A conjunct
-// reaches `Number` where the two operands are of different kinds — an Integer
-// bound on a Rational finds no same-kind entry and falls to `Number`'s — and
-// where the Method is provided rather than declared, as `isBetween` is over
-// Integer bounds.
-//
-// A Rational RECEIVER is spelled as Rational's own before the key is taken, so
-// `1/2::isNot(0)` reaches `Rational::is` negated over `0/1` rather than
-// `Number`'s. What is left for this table is an INTEGER receiver whose bound is
-// a fraction, which no entry of Integer's own reads.
+// `Number` answers for whichever kind is in front of it, so it reads both
+// tables. Each entry reads one kind of value and bound, so an Integer receiver
+// with a fraction bound stays undecided.
 const NUMBER_COMPARISONS: Record<string, PredicateEvaluator> = eitherTable(
 	NUMERIC_COMPARISONS,
 	RATIONAL_COMPARISONS,
 )
 
-// The first entry that can decide the value, which is at most one of
-// them: each refuses a value of the kind it does not read, so the two tables
-// never both answer and the order between them decides nothing.
+// The entry that decides the value. Each refuses the kind it does not read, so
+// at most one answers.
 function eitherTable(
 	first: Record<string, PredicateEvaluator>,
 	second: Record<string, PredicateEvaluator>,
@@ -545,16 +533,8 @@ function rationalLiteral(value: LiteralItem): ExactValue | null {
 	return value.kind === "Rational" ? value : null
 }
 
-// A conjunct keeps a written Rational as its two runs of DIGITS with a
-// slash between them — the form `literalPredicateArgument` writes and
-// `spellScalar` prints back. A bare run of digits is read as well, and is an
-// Integer bound standing where a Rational is compared: `Rational::isLessThan`
-// declares an Overload for each, and `1/2::isLessThan(1)` is the same question
-// as `1/2::isLessThan(1/1)`.
-//
-// This is the one scalar reader that decodes a fraction. `integerScalar` still
-// refuses one, which is what keeps a Rational bound out of a comparison between
-// integers.
+// Reads a Rational bound, written as digits with a slash, or as bare digits for
+// an Integer bound read as `n/1`. `integerScalar` refuses a fraction.
 function rationalScalar(scalar: string | boolean): ExactValue | null {
 	if (typeof scalar !== "string") {
 		return null
@@ -572,10 +552,8 @@ function rationalScalar(scalar: string | boolean): ExactValue | null {
 	return denominator === 0n ? null : reducedExact(numerator, denominator)
 }
 
-// The lowest-terms form with the sign on the numerator, and zero as
-// `0/1` — the canonical form `createRational` and `reduced` give a Rational at
-// run time, taken here so that two written spellings of one number are one
-// value.
+// The lowest-terms form with the sign on the numerator, as the runtime keeps a
+// Rational, so two spellings of one number are one value.
 function reducedExact(numerator: bigint, denominator: bigint): ExactValue {
 	if (denominator < 0n) {
 		numerator = -numerator
@@ -593,8 +571,7 @@ function reducedExact(numerator: bigint, denominator: bigint): ExactValue {
 	}
 }
 
-// Euclid's, over a magnitude that may be zero and a denominator that is
-// not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
+// `gcd(0, d)` is `d`, so every zero reduces to `0/1`.
 function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	while (denominator !== 0n) {
 		;[magnitude, denominator] = [denominator, magnitude % denominator]
@@ -603,13 +580,9 @@ function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	return magnitude
 }
 
-// The spelling a conjunct KEEPS for a written Rational, which is the
-// lowest-terms one. Two refinements are compared by their conjunct sets, and
-// `@::isNot(0/1)` and `@::isNot(0/2)` are one question about one number — so
-// the number is what the key holds, rather than the characters that were typed.
-// A pair this can not read is handed back as it was written: a zero denominator
-// is refused by the Validator, and the Diagnostics in between should say what
-// stands in the source.
+// The spelling a conjunct keeps for a written Rational: its lowest terms, so
+// `@::isNot(0/1)` and `@::isNot(0/2)` are one question. An unreadable pair is
+// kept as written, for the Validator to refuse.
 export function reducedRationalSpelling(
 	numerator: string,
 	denominator: string,
@@ -623,10 +596,8 @@ export function reducedRationalSpelling(
 
 // #endregion
 
-// One flat table, keyed the way a conjunct is: the Namespace, a COLON, the
-// Method. The Lexer reads `:` as a Symbol so no name a Program can write holds
-// one — which is also what keeps every key here away from the property names an
-// Object carries of its own accord.
+// Keyed as `Namespace::method`. No written name holds a `:`, so no key meets a
+// property an Object carries of its own.
 const PREDICATES: Record<string, PredicateEvaluator> = {
 	...keyedByNamespace("Integer", NUMERIC_COMPARISONS),
 	...keyedByNamespace("Number", NUMBER_COMPARISONS),
@@ -650,10 +621,8 @@ function keyedByNamespace(
 	)
 }
 
-// The flag is applied to the ANSWER and not to the table, so a question
-// the table declines to decide stays undecided either way round: `null` is "not
-// a shape this entry can read", and the contrary of something unreadable is not
-// `true`.
+// The negation flag applies to the answer, so a question the table declines
+// stays undecided either way round.
 function evaluateConjunct(
 	conjunct: common.PredicateConjunct,
 	value: LiteralValue,
@@ -719,11 +688,7 @@ function listQuestion(
 		value.kind !== "List" || args.length !== 0 ? null : ask(value.items)
 }
 
-// These two take an ITEM rather than a value, which is the wider of the
-// two and costs a caller holding a value nothing. It is what makes an opaque
-// item refuse by the same route a Boolean does where an Integer was wanted: the
-// kind is not the one asked for, so the answer is `null` and the entry above it
-// declines to decide.
+// These take an item, so an opaque item is refused as any wrong kind is.
 function integerLiteral(value: LiteralItem): bigint | null {
 	return value.kind === "Integer" ? value.value : null
 }
@@ -732,23 +697,16 @@ function stringLiteral(value: LiteralItem): string | null {
 	return value.kind === "String" ? value.value : null
 }
 
-// A conjunct keeps a written Integer as its DIGITS, because a value is a
-// bigint at run time and JSON has no bigint — so an Argument spelled any other
-// way, a Rational's `1/2`, a quoted String or a Boolean, is refused right here.
-// That is what keeps a Rational bound out of a comparison between integers.
-// `rationalScalar` is the one reader that decodes the fraction, and it is asked
-// only where a Rational stands.
+// A conjunct keeps an Integer bound as its digits. Any other spelling, such as
+// a fraction, is refused, which keeps a Rational bound out of Integer comparisons.
 function integerScalar(scalar: string | boolean): bigint | null {
 	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
 		? BigInt(scalar)
 		: null
 }
 
-// And a written String as the JSON of its characters, quotes and all,
-// which is the half of the scalar that says it was a String and not the digits
-// it may happen to spell. Read back through `JSON.parse`, which is what wrote
-// it; anything else is an Argument of another kind and no question this entry
-// can decide.
+// A conjunct keeps a String bound as JSON, quotes included, which tells it
+// from digits. Anything else is another kind of Argument.
 function stringScalar(scalar: string | boolean): string | null {
 	if (typeof scalar !== "string" || !scalar.startsWith('"')) {
 		return null
@@ -759,9 +717,8 @@ function stringScalar(scalar: string | boolean): string | null {
 	return typeof parsed === "string" ? parsed : null
 }
 
-// One bracket list's entries, both halves read as items. The literal and
-// the update share it because they share the list — an update's key list is a
-// literal's, on the same terms and with the same opaque halves.
+// One bracket list's entries, each half read as an item, for a Literal and for
+// an update alike.
 function entriesOf(
 	value: common.typed.DictionaryValueNode,
 ): Array<LiteralEntry> {
@@ -780,10 +737,8 @@ function literalValueOf(
 
 			return integer === null ? null : { kind: "Integer", value: integer }
 		}
-		// Read as the number rather than as the two runs of digits that
-		// were typed, so `2/4` is the value `1/2` is. A zero denominator is
-		// refused here and reported by the Validator, which runs after this: it
-		// is no Rational, so it is no value to decide anything about.
+		// Read as the number, so `2/4` is `1/2`. A zero denominator is no Rational, and
+		// the Validator reports it.
 		case "RationalValue": {
 			let rational = rationalScalar(
 				`${value.numerator}/${value.denominator}`,
@@ -795,9 +750,7 @@ function literalValueOf(
 			return { kind: "String", value: value.value }
 		case "BooleanValue":
 			return { kind: "Boolean", value: value.value }
-		// Never `null`, whatever stands inside it. What the brackets say
-		// is how many items there are, and they say it whether or not the
-		// Compiler can read one.
+		// Never null: the brackets say how many items there are.
 		case "ListValue":
 			return {
 				kind: "List",
@@ -805,26 +758,16 @@ function literalValueOf(
 					(item) => literalValueOf(item) ?? OPAQUE_ITEM,
 				),
 			}
-		// Never `null` either, and for the same reason: `[=]` and
-		// `["a" = 1]` say how many entries they hold in the brackets, whatever
-		// the Compiler can make of the keys and values inside them.
+		// Never null, for the same reason.
 		case "DictionaryValue":
 			return {
 				kind: "Dictionary",
 				entries: entriesOf(value),
 				whole: true,
 			}
-		// `[ages with "kim" = 7]` — the one written shape whose brackets
-		// say something about a value they do not hold the whole of. The
-		// entries it sets are there in the source, one pair each, exactly as a
-		// literal's are, and the base stands behind them unread. So it is read
-		// as those entries and marked not whole, which is what lets a
-		// Dictionary an update wrote into be proven to hold something and
-		// leaves every question about the base unanswered.
-		//
-		// Only the form that SETS entries. `[ages with others]` merges a whole
-		// Dictionary in, and how many entries that one holds is a question
-		// about a value rather than about the brackets.
+		// `[ages with "kim" = 7]` sets entries over a base nothing reads, so it is read
+		// as those entries and marked not `whole`. `[ages with others]` merges a whole
+		// Dictionary in, which says nothing countable.
 		case "Combination":
 			return value.type.type === "Dictionary" &&
 				value.rhs.nodeType === "DictionaryValue"
