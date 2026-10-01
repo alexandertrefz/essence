@@ -332,3 +332,31 @@ Expression across a line break, so a `-` opening the next line is a negative Num
 
 Most of these reports carry `essence-spelling` data for a Quick Fix. A habit whose fix depends on a Type, such as
 which Method reads an item, offers Helps instead, because the parser knows no Types.
+
+## Define
+
+`parseDefine` reads `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms are told apart by their `as`,
+not by lines. An Expression ends at the first Token that can not continue it, and neither `if` nor `otherwise` can.
+So each arm's value reads to its end without lookahead. The arm loop decides by the Token after the value, and a
+name in value position is never that Token. That keeps `otherwise` free as a name: `as otherwise otherwise` answers
+with the value called `otherwise`. The arrow is optional, and without it the arms decide the answer Type.
+
+A `define` without an `otherwise` arm is refused with `define-without-otherwise`, since it would have nothing to
+answer with when every Condition declines. The Node has no shape for a missing arm, so every `define` downstream is
+total. The code makes the refusal survive speculation. An empty `define { }` gets the same code with its own label
+and Help.
+
+That refusal is only made when the arms were read cleanly. If the arm loop recovered, or the input ended inside the
+block, an `otherwise` arm may stand in the text that was skipped. Then the `define` still can not be built, so the
+parser throws a `ParseError` marked `reported` and drops the Statement without a second account.
+
+`parseDefineArms` has its own loop, because `parseStatementList` resynchronises to a Statement start and an `as` is
+not one. A broken arm would swallow every arm after it. `resynchroniseToArm` skips to the next `as` or the closing
+`}` at the arm's brace depth. An arm that failed on its first Token read nothing, so only that Token is dropped.
+Scanning from there could step into whatever the Token opens and skip the rest of the block. A coded refusal inside
+an arm is raised to the Statement loop, as a speculation raises one. A recovered arm's lines are recorded as
+abandoned.
+
+An arm after the `otherwise` arm can never be reached. `reportUnreachableArm` reports it once it is read, so the
+report spans the whole arm, and then drops it. Throwing would take the whole Statement and leave its Constant
+undeclared. The Node never holds the arm, so the report is the only record of its extent for the Quick Fix.

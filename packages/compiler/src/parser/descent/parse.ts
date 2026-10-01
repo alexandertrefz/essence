@@ -4337,12 +4337,8 @@ class DescentParser {
 	protected parsePrimaryExpression(): parser.ExpressionNode {
 		let token = this.peekOrFail("an Expression")
 
-		// The same question in prefix position, asked of a Token that opens
-		// no Expression — a `//` at the head of a line, a `/` left over from
-		// something written above it. Asked HERE rather than in the default arm
-		// below, because the arms in between read Tokens this would answer for:
-		// a `-` opens a negative Number and a `<` opens a generic Function
-		// literal, and both are Essence wherever they stand at the head of one.
+		// Another language's habit at the head of an Expression, such as a `//`.
+		// Asked only of Tokens that open no Expression, since `-` and `<` do.
 		if (!startsExpression(token)) {
 			let foreign = this.foreignTextAhead()
 
@@ -4351,12 +4347,8 @@ class DescentParser {
 			}
 		}
 
-		// `ChoiceName#CaseName` — recognised before the typed-Record
-		// backtrack, since a `#` can never follow the Type of a typed Record
-		// literal. The `#` must sit directly against the Identifier: a space
-		// between them (`label #Case`) marks a bare Case value passed as a
-		// labelled argument, where the Identifier is the label, not a Choice
-		// prefix — so the prefixed reading requires the two to be adjacent.
+		// `ChoiceName#CaseName`, with the `#` flush. With a space, as in
+		// `label #Case`, the name is an Argument's label before a bare Case.
 		let following = this.tokens.peek(1)
 
 		if (
@@ -4368,13 +4360,8 @@ class DescentParser {
 			return this.parseCaseValue()
 		}
 
-		// `Holder<Integer>#Full(…)` — the same construction with its Type
-		// Arguments applied. Speculative, because a `<` after an Identifier opens
-		// nothing else in expression position today and there is no adjacency rule
-		// that could tell the two apart on sight: what makes this a construction is
-		// the `#` on the far side of the Arguments, which only a parse can find.
-		// A reading that does not reach one leaves nothing behind and the
-		// Identifier is read as itself.
+		// `Holder<Integer>#Full(…)`, speculative, since only the `#` after the
+		// Type Arguments makes it a construction.
 		if (
 			isIdentifierToken(token) &&
 			following?.type === TokenType.SymbolLeftAngle
@@ -4386,11 +4373,8 @@ class DescentParser {
 			}
 		}
 
-		// `Type ~> { … }` — speculative, because a Type and an Identifier
-		// open the same way and only the `~>` behind the Type tells them apart.
-		// The stream is asked first whether a `~` stands anywhere ahead of here:
-		// the parse below can not succeed without consuming one, so a `~`-less
-		// tail turns a full Type parse and its throw into an integer compare.
+		// `Type ~> { … }`, speculative, since only the `~>` tells a Type from an
+		// Identifier. It is tried only where a `~` stands ahead.
 		if (
 			(isIdentifierToken(token) ||
 				token.type === TokenType.SymbolLeftBrace) &&
@@ -4439,10 +4423,8 @@ class DescentParser {
 			case TokenType.SymbolLeftBracket:
 				return this.parseListOrDictionaryLiteral()
 			case TokenType.SymbolLeftParen: {
-				// The only Function literal whose annotations may be
-				// omitted — in expression position there can be an expected
-				// signature to read them off. A Generic literal writes its own
-				// Generics, so it has nothing to infer them from.
+				// The one Function literal whose annotations may be omitted,
+				// since an expected signature can supply them.
 				let literal = this.parseFunctionLiteral(true, false)
 
 				this.refuseDefaultValues(
@@ -4492,27 +4474,9 @@ class DescentParser {
 		}
 	}
 
-	// `start x` and `complete x`. The operand is read by the FULL
-	// Expression reading rather than by the primary one, so the whole postfix
-	// chain behind the Keyword belongs to it: `complete headline(url)::retried
-	// (times 3)` completes the retried future, and a Method call on what was
-	// waited for is written by binding the answer first — `constant answer =
-	// complete x`, then `answer::m()`. Essence has no grouping parentheses, so
-	// `(complete x)` is a syntax error rather than the other way to say it. That
-	// is the same shape a prefix Keyword takes in every language that has one,
-	// and the only reading that makes the everyday call — a future built by a
-	// call and completed — need no parentheses at all.
-	//
-	// Which means the loop in `parseExpressionLevels` has nothing left to
-	// attach when this returns: the recursive reading consumed the chain. So a
-	// `start` reached from there behaves as a primary Expression that happens to
-	// be greedy, and `expressionStartTokenTypes` stays exactly what its NOTE
-	// says it is — the cases this switch answers.
-	//
-	// Reached only through `opensAsynchrony`, which has already found the
-	// Expression the operand is read from. A word with nothing behind it is a
-	// name — `constant held = complete` reads the value `complete`, and it is
-	// the Enricher that answers for a name nothing declared.
+	// `start x` and `complete x`. The operand takes the whole postfix chain,
+	// so `complete headline(url)::retried(times 3)` completes the retried
+	// future. A Method on the answer needs the answer bound first.
 	protected parseStartOrComplete(
 		keyword: Token,
 	): parser.StartNode | parser.CompleteNode {
@@ -4528,19 +4492,15 @@ class DescentParser {
 			return generators.start(expression, position)
 		}
 
-		// Counted for the body being parsed — `start` is not, because it
-		// never waits and so never asks anything of the body it stands in.
+		// Only `complete` makes the body around it completing; `start` never
+		// waits.
 		this.completesSeen += 1
 
 		return generators.complete(expression, position)
 	}
 
-	// `.price`, `.address.city` — the whole chain is consumed here rather
-	// than left to the postfix loop, which would otherwise read the second step
-	// as a Lookup over the path and build a Node the language has no meaning
-	// for. Nothing but a member name may follow a step's '.', so the loop needs
-	// no adjacency rule of its own: a path reads its tail exactly the way a
-	// Lookup chain reads its own.
+	// `.price` or `.address.city`, read whole here so the postfix loop does not
+	// read a later step as a Lookup over the path.
 	protected parseMemberPath(): parser.MemberPathNode {
 		let dot = this.tokens.expect(TokenType.SymbolDot)
 
@@ -4561,11 +4521,8 @@ class DescentParser {
 		})
 	}
 
-	// A path stands for a Function that READS members, so a call attached
-	// to it has nothing to attach to. Refused here rather than left to the
-	// postfix loop: the loop would build an Invocation over the path and every
-	// message from there on would be about the call rather than about the path
-	// that can not carry one.
+	// A path is a Function that reads members, so a call on it is refused here
+	// rather than built by the postfix loop.
 	protected refusePathPostfix(steps: Array<parser.IdentifierNode>): void {
 		let token = this.tokens.peek()
 
@@ -4596,13 +4553,9 @@ class DescentParser {
 				notes: [
 					"A path is the Function that reads those members off its Argument, so there is nothing here for a call to be made on.",
 				],
-				// The untyped literal only where a literal READS its
-				// Types — an Argument list, and nowhere else. Written into a
-				// Declaration or a return, `(_ item) { … }` is refused for
-				// having no Parameter Type, which is a second report rather
-				// than an answer, so there the Types are spelled as the holes
-				// they are. Exactly what `path-without-context` says about the
-				// same literal in the same positions.
+				// The untyped literal only in an Argument list, where a
+				// literal reads its Types. Elsewhere the Help spells the Types
+				// as holes.
 				helps: [
 					this.insideArgumentList
 						? `Write the Function literal instead: '${this.pathFunctionLiteral(steps, spelling)}'.`
@@ -4612,19 +4565,12 @@ class DescentParser {
 		)
 	}
 
-	// The path and the call written on it, spelled back as the Function
-	// literal that CAN carry one. Every word of it is the reader's own but
-	// `item`, which names the Parameter — and that Parameter is left UNTYPED on
-	// purpose: a literal handed to a Method reads its Parameter's Type off the
-	// Argument it is passed, so there is nothing to write there and nothing to
-	// get wrong. The `(_ item: SomeType) { <- item.price::rounded() }` this used
-	// to print named a Type nothing declares and a Method the standard library
-	// has not got, and it printed them at a reader who had written neither.
+	// The path and its call spelled back as a Function literal over a
+	// Parameter `item`, untyped where an Argument list supplies the Type.
 	protected pathFunctionLiteral(
 		steps: Array<parser.IdentifierNode>,
 		spelling: string,
-		// With the two Types written as holes, for a position that hands
-		// a literal neither of them.
+		// Writes the two Types as holes.
 		typed = false,
 	): string {
 		let path = steps.map((step) => step.content).join(".")
@@ -4643,10 +4589,8 @@ class DescentParser {
 			: `(_ item) { <- item.${path}${call} }`
 	}
 
-	// The Argument list at `at`, where it is empty or holds ONE Token a
-	// Help can print back — `()`, `(2)`, `(other)`. Everything longer is an
-	// Expression of the reader's own, and `…` says theirs goes here rather than
-	// printing half of it back at them.
+	// The Argument list at `at` spelled back where it is empty or one Token,
+	// such as `(2)`, and `(…)` otherwise.
 	protected writtenCallArguments(at: number): string {
 		if (this.tokens.peek(at)?.type !== TokenType.SymbolLeftParen) {
 			return "(…)"
@@ -4670,10 +4614,8 @@ class DescentParser {
 		return "(…)"
 	}
 
-	// The payload parens are part of the construction syntax — they are
-	// consumed here rather than left to the invocation postfix loop, because a
-	// Case is a value, not a Function. Empty parens construct a unit Case.
-	// Without a leading Identifier this parses the bare form (`#Add({ … })`).
+	// A Case value, with or without its Choice. The payload parentheses are read
+	// here rather than by the postfix loop, since a Case is not a Function.
 	protected parseCaseValue(): parser.CaseValueNode {
 		let choice: parser.IdentifierNode | null = null
 		let typeArguments: Array<parser.TypeDeclarationNode> | null = null
@@ -4684,13 +4626,8 @@ class DescentParser {
 		} else {
 			choice = this.parseIdentifier()
 
-			// `Holder<Integer>#Full(…)` — the Choice's Type Arguments
-			// applied at the value, which is the other half of how a construction
-			// is decided. The same list an annotation writes, read by the same
-			// parse, so `Holder<List<Integer>>#Full` needs nothing of its own —
-			// and held to the same one-line rule, for the same reason: a `<` that
-			// opens the NEXT line begins something of its own, and an application
-			// is always written on one line.
+			// `Holder<Integer>#Full(…)`: Type Arguments applied at the value, on
+			// the Choice's line, as an annotation writes them.
 			let leftAngleToken = this.tokens.peek()
 
 			if (
@@ -4700,13 +4637,8 @@ class DescentParser {
 				let argumentList = this.parseTypeArgumentList()
 				let hashToken = this.tokens.peek()
 
-				// And the `#` is held to the closing `>`'s line, for the
-				// reason the `<` is held to the Choice's: a construction is
-				// written on one line. Without it the applied form escaped the
-				// adjacency the bare one is held to — `Box#Full` reaches this
-				// parse only when the `#` sits directly against the name, so that
-				// a `label #Case` Argument stays readable, and an application in
-				// between must not be the way around it.
+				// The `#` must stand on the closing `>`'s line, as the bare form
+				// needs its `#` flush against the name.
 				if (
 					hashToken?.type === TokenType.SymbolHash &&
 					hashToken.position.start.line !==
@@ -4745,32 +4677,14 @@ class DescentParser {
 				value = this.parseExpression()
 			}
 
-			// A coded refusal rather than the generic one, because this
-			// reading is SPECULATIVE where the Case carries Type Arguments —
-			// only the `#` past the `>` tells `Optional<Integer>#Value(…)` from
-			// a comparison chain — and `speculate` gives a `syntax-error` back
-			// and rewinds. The rewound reading then re-read the Choice as a call
-			// receiver and refused the `#` instead, which named the wrong
-			// character on the wrong line. A code the rewind does not swallow is
-			// what keeps the refusal where the mistake is.
-			//
-			// And it is a refusal rather than an allowance because a Case
-			// payload is ONE value: every construct that takes a trailing comma
-			// is a LIST, and a separator with nothing to separate would read as
-			// though a second value could follow. Several values are carried as
-			// one Record.
+			// A Case carries one value, so a comma is refused, even a trailing
+			// one. The refusal is coded so it survives the speculation that reads
+			// `Optional<Integer>#Value(…)`.
 			let comma = this.tokens.peek()
 
 			if (comma?.type === TokenType.SymbolComma) {
-				// Two shapes arrive at this one refusal and they want
-				// different edits. A comma with the `)` behind it is a
-				// separator with nothing to separate, and dropping it is the
-				// whole fix. A comma with another value behind it is a SECOND
-				// payload, and dropping it would leave two values written flush
-				// against each other — so only that one is answered with the
-				// Record, spelled with the Case the reader wrote. Both used to
-				// be told to drop the comma AND to write `#Rectangle`, which is
-				// a Case nothing in the file declares.
+				// The Helps differ: a trailing comma is removed, and a second value
+				// is carried in one Record.
 				let trailing =
 					this.tokens.peek(1)?.type === TokenType.SymbolRightParen
 
@@ -4837,23 +4751,8 @@ class DescentParser {
 		})
 	}
 
-	// `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms
-	// are told apart by their `as` and by nothing else, not by the lines they
-	// stand on, and that is enough because an Expression ends at the first
-	// Token that can not carry it on. Neither `if` nor `otherwise` is one of
-	// the three that can, so `as 0 if x::isZero()` and `as 10 otherwise` each
-	// read to their end without a lookahead.
-	//
-	// Which is also what lets `otherwise` be a name — it is on
-	// `identifierTokenTypes` — without the two readings ever meeting. An arm's
-	// value stops at the word whatever the word is, so `as otherwise otherwise`
-	// answers with the value called `otherwise` and ends where the loop reads
-	// the terminator, and `as otherwise if flag` is that same value under a
-	// Condition. The arm loop decides by the Token it finds AFTER the value,
-	// and a name in value position is never that Token.
-	//
-	// The arrow is optional, and a `define` that writes none leaves its
-	// answer Type to its arms.
+	// `define { as VALUE if CONDITION … as VALUE otherwise }`.
+	// See "Define" in DEVELOPMENT.md.
 	protected parseDefine(): parser.DefineNode {
 		let keyword = this.tokens.expect(TokenType.KeywordDefine)
 		let returnType = this.parseOptionalReturnType(true)
@@ -4863,12 +4762,8 @@ class DescentParser {
 		try {
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 			let { arms, otherwise, recovered } = this.parseDefineArms()
-			// Read BEFORE the brace is taken, because a `define` whose
-			// block the input ended inside of is one whose arms were not read to
-			// their end either — and that is the difference between "there is no
-			// `otherwise` arm" and "this Parser never got to where one would
-			// stand". `parseClosingBrace` answers with a Position either way, so
-			// the question has to be asked of the Token.
+			// Asked of the Token, since `parseClosingBrace` answers with a
+			// Position even where the input ended inside the block.
 			let closed = this.tokens.peek()?.type === TokenType.SymbolRightBrace
 			let closingPosition = this.parseClosingBrace(leftBrace.position)
 			let position = {
@@ -4876,21 +4771,8 @@ class DescentParser {
 				end: closingPosition.end,
 			}
 
-			// A totality refusal is only worth making when the arms were
-			// read CLEANLY. An arm loop that recovered skipped text on its way to
-			// the next `as`, and an `otherwise` arm standing in what it skipped is
-			// an arm that was written — so its absence proves nothing, and saying
-			// "every value here has a condition on it" of a block that visibly
-			// ends in `otherwise` is a refusal for a mistake nobody made. The same
-			// holds for a block the input ended inside of, and for a `define`
-			// nested past the depth budget, whose `nesting-too-deep` is recovered
-			// from like any other broken arm.
-			//
-			// The `define` still can not be built — there is no arm to answer
-			// with — so the Statement it stands in is dropped, as a broken
-			// Statement always is. What went wrong has been reported already, by
-			// the loop that recovered from it, and the throw says so rather than
-			// adding a second account of one mistake.
+			// After a recovery an `otherwise` arm may stand in skipped text, so
+			// the Statement is dropped without a second report.
 			if (otherwise === null && (recovered || !closed)) {
 				throw new ParseError(
 					"This 'define' could not be read to its end",
@@ -4900,27 +4782,8 @@ class DescentParser {
 				)
 			}
 
-			// Refused here rather than represented as an absent arm: a
-			// `define` answers with a value wherever it stands, and one whose
-			// every value has a Condition on it has nothing to answer with when
-			// they all decline. The Node has no shape for that, which is what
-			// makes every `define` downstream total by construction.
-			//
-			// Coded, which is what makes the refusal SURVIVE a
-			// speculation — `refusesTheText` reads the code, and the generic
-			// `syntax-error` this used to carry is one of the two a speculation
-			// gives back. A `define` missing its `otherwise` arm is a verdict
-			// about text that was written: no other reading of those braces is
-			// going to find the arm that is not there. `{ found = define { as 1
-			// if flag } }` used to be answered with "Expected 'with' but found
-			// '='", which is the Dictionary reading behind the Record one
-			// speaking for text the Record reading had already judged.
-			//
-			// An EMPTY block is the same refusal about different text, so
-			// it is told apart in the label and in the help rather than given a
-			// code of its own. "Every value here has a condition on it" is a
-			// remark about the values that were written, and a `define { }`
-			// wrote none — it is short of every arm, not of the last one.
+			// Without an `otherwise` arm a `define` has nothing to answer with.
+			// See "Define" in DEVELOPMENT.md.
 			if (otherwise === null) {
 				let empty = arms.length === 0
 
@@ -4950,12 +4813,8 @@ class DescentParser {
 		}
 	}
 
-	// Its own loop rather than `parseStatementList`, because the
-	// resynchronisation that one does scans for a Statement start and an `as`
-	// is not one — a broken arm would swallow every arm below it, and a
-	// `define` that lost its `otherwise` that way would be refused for a
-	// mistake nobody made. So a broken arm is skipped up to the next `as` at
-	// this `define`'s own brace depth, and the arms below it are read.
+	// The arm loop, with recovery to the next `as`. See "Define" in
+	// DEVELOPMENT.md.
 	protected parseDefineArms(): {
 		arms: Array<parser.DefineArmNode>
 		otherwise: parser.DefineOtherwiseNode | null
@@ -4963,8 +4822,7 @@ class DescentParser {
 	} {
 		let arms: Array<parser.DefineArmNode> = []
 		let otherwise: parser.DefineOtherwiseNode | null = null
-		// Whether any arm was recovered from, which is what says how much
-		// the arms below it are worth as evidence — see `parseDefine`.
+		// Whether any arm was recovered from.
 		let recovered = false
 
 		while (true) {
@@ -4979,17 +4837,14 @@ class DescentParser {
 
 			let startState = this.tokens.save()
 
-			// Per arm, for the reason `parseStatementList` does it per
-			// element — an arm that was read is a group of readings resolving.
+			// Per arm, as `parseStatementList` does per element.
 			this.forgetFailuresFrom(this.speculationDepth)
 
 			try {
 				let keyword = this.tokens.expect(TokenType.KeywordAs)
 
-				// Whether this arm stands below the `otherwise` one, which
-				// is decided before it is read and answered for once it has
-				// been — see `reportUnreachableArm`. Never RECORDING it is what
-				// keeps the Node's "the `otherwise` arm is last" invariant.
+				// An arm after the `otherwise` arm is reported and never
+				// recorded, so the `otherwise` arm stays last.
 				let unreachable = otherwise !== null
 				let value = this.parseExpression()
 				let follower = this.peekOrFail("'if' or 'otherwise'")
@@ -5029,11 +4884,8 @@ class DescentParser {
 					)
 				}
 			} catch (error) {
-				// A CODED refusal is a verdict about the text and not a
-				// reading that failed — see `refusesTheText` — so it is raised
-				// to the Statement loop that reports such things, exactly as a
-				// speculation raises one, rather than being reported here and
-				// recovered from as a broken arm.
+				// A coded refusal is raised to the Statement loop, as a
+				// speculation raises one.
 				if (error instanceof ParseError && refusesTheText(error)) {
 					throw error
 				}
@@ -5046,20 +4898,8 @@ class DescentParser {
 		return { arms, otherwise, recovered }
 	}
 
-	// Reported and DROPPED rather than thrown, which is the one refusal
-	// the arm loop answers for itself. The arm reads perfectly well — what is
-	// wrong with it is where it stands — so the text below it is still text this
-	// Parser can read, and a thrown refusal would take the whole Statement the
-	// `define` stands in with it: every use of the Constant it declares then
-	// names nothing, which is a great many Diagnostics for one misplaced arm.
-	//
-	// Reported once the arm has been READ, so the span is the whole arm
-	// rather than the `as` that opens it. That is what the reader has to move or
-	// delete, and it is the only record of the arm's extent there is: an
-	// unreachable arm is never put on the Node, so nothing downstream — an
-	// Editor's Quick Fix above all — could work out where it ends. An arm that
-	// broke while being read reports what broke instead, which is the more
-	// pressing of the two things wrong with it.
+	// Reports an arm after the `otherwise` arm, which is then dropped rather
+	// than thrown. See "Define" in DEVELOPMENT.md.
 	protected reportUnreachableArm(position: common.Position): void {
 		this.reportParseError(
 			new ParseError(
@@ -5085,20 +4925,13 @@ class DescentParser {
 	): void {
 		this.reportParseError(error)
 
-		// Only an arm that READ something has leftovers to skip. One that
-		// failed on its very first Token — a `{` where an `as` belongs — read
-		// nothing, so there is nothing between here and the next arm, and
-		// scanning for one would step INTO whatever that Token opens and skip
-		// every arm below it, the `define`'s own `}`, and the block it stands
-		// in. Dropping the one Token is the whole of the recovery there, and it
-		// is what the progress guarantee below does anyway.
+		// An arm that read nothing has nothing to skip, and only its first
+		// Token is dropped.
 		if (this.tokens.save().index !== startState.index) {
 			this.resynchroniseToArm(startState.braceDepth)
 		}
 
-		// Guarantee progress, for the reason `recoverFromError` does —
-		// an arm that consumed no Token and resynchronised to where it started
-		// would be read again forever.
+		// Guarantee progress, as `recoverFromError` does.
 		if (
 			this.tokens.save().index === startState.index &&
 			!this.tokens.isAtEnd()
@@ -5106,25 +4939,18 @@ class DescentParser {
 			this.tokens.next()
 		}
 
-		// An arm is text the Parser abandoned exactly as a Statement is,
-		// and it costs the stages behind it the same thing: a `define` that lost
-		// an arm was not written without cases. It declares nothing, so the
-		// lines are the whole of what this leaves behind.
+		// A broken arm is abandoned text, like a dropped Statement.
 		this.recordAbandoned(startState.index)
 	}
 
-	// Skips to the next arm's `as`, or to the `}` that closes the
-	// `define`, at the brace depth the broken arm started on — braces the
-	// broken arm opened itself are skipped over entirely, as they are for a
-	// Statement.
+	// Skips to the next `as` or the `define`'s `}` at the broken arm's brace
+	// depth.
 	protected resynchroniseToArm(targetDepth: number): void {
 		while (true) {
 			let token = this.tokens.peek()
 
 			if (token === undefined) {
-				// Every further error would be a cascade of the one just
-				// reported, as it is for a Statement that ran into the end of
-				// the input.
+				// At the end of the input every further error is a cascade.
 				this.suppressDiagnostics = true
 
 				return
