@@ -1,33 +1,15 @@
-// The compile MODE — what a run asked to be enriched out of the sources
-// beyond the implementation every compile reads. It is one fact about a whole
-// invocation rather than about a file: `esc` opens one Session in it, links
-// every component of the graph under it, and names every bundle it emits by it.
-//
-// It lives HERE, in a leaf of its own, because everything that reads the
-// mode is downstream of it and nothing it could have shared a file with is.
-// `documents.ts` and `modules/link.ts` both hand it on, and both import the
-// Enricher — which is where the mode is finally READ — so declaring it in
-// either would have the Enricher importing back up through the seam that calls
-// it. A leaf costs nothing and can be imported from anywhere.
+// The compile mode: what a whole run asks the enricher for beyond the
+// implementation. It is a leaf module, so the enricher that reads it and the
+// callers that hand it on all import it without a cycle.
 
-// The facets, in the order a key spells them. Everything below is derived
-// from this array, which is the whole point of the file: a facet added here
-// joins the type, joins `modeOf`, joins `completeMode` and joins BOTH cache
-// keys at once. Before this existed the pair was re-declared inline at ten
-// seams and maintained by hand in two hash compositions, and a facet could
-// perfectly well join the mode without joining either.
+// The facets, in the order a key spells them. The type, `modeOf`,
+// `completeMode` and `modeKey` all derive from this array.
 const MODE_FACETS = [
-	// Whether this compile ASKED for the tests — `essence test`, `esc
-	// check` and the Editor's test session do, and nothing else. A build and a
-	// run leave every `tests { … }` block in the graph parsed and unenriched,
-	// which is the whole of what "a test costs a shipped Program nothing"
-	// means: the Program that comes out has never heard of it.
+	// Whether the run enriches `tests { … }` blocks. A build and a run parse
+	// them and drop them.
 	"tests",
-	// And whether it asked for the goals a Module's own Namespace
-	// declarations promise, synthesized as property tests and reported beside
-	// the written ones. `essence test --contracts` and the
-	// `essence.test.contracts` setting are what ask; it means nothing without
-	// `tests`, which is the mode the section it is appended to exists in at all.
+	// Whether the run also synthesizes the goals a Module's Namespace
+	// declarations promise as property tests. It means nothing without `tests`.
 	"contracts",
 ] as const
 
@@ -35,10 +17,8 @@ type CompileModeFacet = (typeof MODE_FACETS)[number]
 
 export type CompileMode = { [Facet in CompileModeFacet]?: boolean }
 
-// The mode ALONE, out of whatever is carrying it. A `CompileRequest` and
-// a `LinkOptions` ARE modes — they say `tests` and `contracts` and a great deal
-// else — so a seam handing one on to something that takes more than the mode
-// has to hand over the mode rather than itself.
+// The mode alone, out of a `CompileRequest` or `LinkOptions` that carries
+// much else.
 export function modeOf(mode: CompileMode): CompileMode {
 	let picked: CompileMode = {}
 
@@ -49,10 +29,8 @@ export function modeOf(mode: CompileMode): CompileMode {
 	return picked
 }
 
-// Every facet answered, because one seam wants no unanswered ones: a
-// worker's `begin` REQUIRES them, so that a second caller can not open a worker
-// as a build and compile every file of a test run without the section the run
-// exists to check. See `WorkerRequest`.
+// Every facet answered, as a worker's `begin` requires, so that no worker
+// compiles a test run as a build. See `WorkerRequest`.
 export function completeMode(mode: CompileMode = {}): Required<CompileMode> {
 	let complete = {} as Required<CompileMode>
 
@@ -63,16 +41,9 @@ export function completeMode(mode: CompileMode = {}): Required<CompileMode> {
 	return complete
 }
 
-// What the mode contributes to a name that means "these exact bytes". A
-// test compile enriches a section a build drops, and a contract compile
-// synthesizes a suite that is not in the file at all — out of sources that are
-// byte for byte the same, so the graph's own hash can not tell any of them
-// apart and this is what does. Without it `essence test` would be handed the
-// bundle `essence build` wrote, and a plain run the one the contract run wrote.
-//
-// Empty where nothing was asked for, and the emptiness is load-bearing:
-// every key spelled before there was a mode to name still names the same bytes,
-// so an ordinary build's cache survived the day this joined the key.
+// The mode's part of a bundle's cache key. Each mode compiles the same sources
+// to different bytes, so `essence test` never gets the bundle `essence build`
+// wrote. Empty when nothing was asked for.
 export function modeKey(mode: CompileMode): string {
 	return MODE_FACETS.filter((facet) => mode[facet] === true).join("|")
 }

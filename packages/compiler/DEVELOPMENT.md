@@ -265,6 +265,48 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 13. Docs: the language page in `packages/website/src/content/docs/language/`, and each new code on
     `reference/diagnostics.mdx`.
 
+## The project file
+
+`configuration.ts` reads `essence.json`. `findProjectFile` finds the nearest one, in a directory or its ancestors.
+The directory holding it is the project root, which a run walks. The file is JSON with comments and trailing commas,
+read with `jsonc-parser`, so the reason for a setting can be written beside it. It is read synchronously,
+because the language server's discovery walk runs inside a request.
+
+A mistake in the file is a warning with a span, never a refusal. The setting falls back to its default, and the
+Diagnostic's note, the setting's `fallback`, says what is in force meanwhile. A file that does not parse is read
+as all defaults. `jsonc-parser` recovers, but the author could not predict a setting read from half a file.
+Only the first syntax error gets a Help, since the later ones describe text the recovery has lost track of. A
+list is read item by item, so one bad item leaves the rest in force.
+
+`projectSettings` is the catalogue of every setting: its shape, its description, its fallback and one example.
+The reader walks the file against it, so every unknown key and near miss is reported in one place.
+`projectSchema` generates the JSON Schema from it, and specs compare that with the copies the VS Code extension
+and the website ship. The descriptions are what an editor shows on hover.
+
+Where a wrongly shaped value still says what was meant, `coercedSettingValue` spells it in the setting's shape
+for the Help. It reads `"false"` as a Boolean, digits in a String as an integer, and one String as a list.
+Otherwise the catalogue's example is offered as an example. The coercion stays narrow, since a Help that
+guesses changes what the file says. An unknown key's Help nests a key that spells a path flat,
+such as `"test.cases"`. It renames a near miss, and otherwise asks for the key to be removed.
+
+`settingEdits` turns those Diagnostics into the edits the language server's quick fixes offer, so the format
+has one reader. A rename or a coercion replaces one span. A moved or flat key comes out and goes back in at its
+path:
+
+- `withoutProperty` removes it by hand, since a removal through `modify` also takes the comment written over
+  the property.
+- `emptiedBy` takes the table the move empties along with it, unless the table holds a comment.
+- The edit is withheld where the destination is already written, since only one of the two values could
+  survive.
+- `replacement` reduces the rewrite to the span that changed, so nothing outside it is rewritten.
+
+An `essence` key in a `package.json` is reported as `moved-setting` on the key. Every manifest from the directory
+up to the project root is searched. Without a project file, the search goes up to the filesystem root.
+
+`readProjectConfiguration` serves a command, which reads once. `createConfigurationCache` serves the language
+server, which asks per file. It answers once per directory, and the directories under one project file share one
+configuration object. `clear` runs when a project file changes.
+
 ## Where the reasoning lives
 
 Each stage directory keeps the detailed reasoning behind its code in a DEVELOPMENT.md of its own.
