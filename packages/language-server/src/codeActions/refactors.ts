@@ -5,27 +5,12 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// The Code Actions no Diagnostic asks for. Each is offered on code the
-// Compiler has nothing to say about, on the strength of where the cursor
-// stands — which is why every one of them reads the range it was given and
-// none of them is ever preferred.
+// Refactorings no Diagnostic asks for, offered where the cursor stands. None
+// is preferred.
 
-// An Inlay Hint already IS this edit — it sits where the annotation
-// would be written and reads as the annotation would read. Offering it as a
-// refactor makes the hint applicable rather than only visible, and adds no
-// inference of its own.
-//
-// Only the hints that carry an edit. A hint whose Type can not be written down
-// shows what was inferred and offers nothing — see `typeHint` — and the ones
-// this used to offer regardless were the worst edits in the editor: `: List<
-// Unknown>` and `: NonEmptyList<Error>` added `unknown-type` on top of whatever
-// was already wrong, and a Function Type stopped the file parsing outright.
-//
-// The EDIT's own text, in the title as well as in the edit. A hint's
-// LABEL may name an Alias this position can not resolve — `: Result<Integer,
-// Problem>` in a file that imported no `Problem` — and the edit behind it
-// spells the shape instead, so a title quoting the label would promise one
-// annotation and write another.
+// Applies an Inlay Hint's edit as an annotation. Only a hint whose Type can be
+// written carries one; see `typeHint`. The title quotes the edit, not the
+// label, which may name an Alias this position cannot resolve.
 export function annotationActions(
 	enrichedProgram: common.typed.Program,
 	range: common.Position,
@@ -47,16 +32,12 @@ export function annotationActions(
 		}))
 }
 
-// The Formatter never rewrites between `{ x }` and `{ x = x }` — the
-// spelling is the author's — so the rewrite is offered here instead, in both
-// directions, on a Record LITERAL's members only.
+// Rewrites between `{ x }` and `{ x = x }` both ways, which the formatter
+// leaves to the author. Only a Record Literal's members qualify; in an update's
+// key list the spellings differ.
 //
-// An update's key list is excluded, because there the two spellings are not the
-// same thing: `{ base with x }` merges the VALUE `x`, and a shorthand there is
-// refused outright. The key list is told apart from a braced right-hand side
-// the one way it can be — a Literal's Position opens on its own `{`, and a key
-// list's opens on its first key — which is the same reading `printCombination`
-// makes.
+// A key list's Position opens on its first key, a Literal's on its `{`, as
+// `printCombination` reads them.
 export function shorthandActions(
 	program: parser.Program,
 	lines: Array<string>,
@@ -95,8 +76,7 @@ export function shorthandActions(
 		}
 
 		for (let member of Object.values(literal.members)) {
-			// A path key names no binding and a braced descend holds no
-			// value at all, so neither has a shorthand to offer or to expand.
+			// A path key or a braced descend has no shorthand.
 			if (member.value === null || member.steps !== undefined) {
 				continue
 			}

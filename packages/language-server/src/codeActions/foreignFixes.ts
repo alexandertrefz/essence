@@ -3,16 +3,12 @@ import type { common } from "@essence-lang/interfaces"
 import { sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// The fixes for text that is not Essence — a JavaScript habit written
-// where its Essence spelling belongs, and a Method reached with the separator
-// another language reaches one with. Both are answered by writing over a span
-// the Compiler measured, which is why neither starts from a Node: a refused
-// Statement is DROPPED, so the Program a fix reads holds nothing standing where
-// the habit was written.
+// Fixes for text that is not Essence, such as a JavaScript habit. Each writes
+// over a span the compiler measured, since the Parser drops a refused Statement
+// and leaves no Node.
 
-// One span, one spelling — see `essence-spelling`. The habit itself is
-// read back off the buffer for the title alone, so that the reader is offered
-// the edit in the words they wrote it in.
+// Writes the Essence spelling of an `essence-spelling` span. The title quotes
+// the habit as it was written.
 export function essenceSpellingAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -24,18 +20,15 @@ export function essenceSpellingAction(
 	let { position, spelling } = diagnostic.data
 	let written = sliceOf(lines, position).trim()
 
-	// Read back off the buffer, as every edit here is: a span holding
-	// nothing is a stale analysis pointing at text the reader has since
-	// rewritten, and a deletion of it would take whatever now stands there.
+	// An empty span is stale. See "Reading the buffer back" in
+	// DEVELOPMENT.md.
 	if (written === "") {
 		return null
 	}
 
 	return {
-		// The title names the SPELLING and the edit writes the spacing
-		// around it — `{ x: 0 }` is answered with "Write '=' instead of ':'" and
-		// rewritten as `{ x = 0 }`, since an `=` is written with a blank either
-		// side and a `:` is not.
+		// The title names the spelling; the edit also writes its spacing, so
+		// `{ x: 0 }` becomes `{ x = 0 }`.
 		title:
 			spelling === ""
 				? `Remove the '${written}'`
@@ -48,10 +41,8 @@ export function essenceSpellingAction(
 	}
 }
 
-// `names.length` — the `.` becomes `::`, and the `()` a read never wrote
-// is written behind the member. TWO edits rather than one for exactly that
-// reason: the call's own parentheses are what tells a Method that was read from
-// one that was called, and only the first of them needs growing.
+// `names.length` becomes `names::length()`. A Method that was only read gets
+// the `()` as a second edit; one already called keeps its own.
 export function methodSeparatorAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -62,9 +53,7 @@ export function methodSeparatorAction(
 
 	let { separator, call } = diagnostic.data
 
-	// The separator is everything between the base and the member, so what
-	// stands there is one `.` and whatever blanks were written around it.
-	// Anything else is a buffer that has moved on since the analysis.
+	// The separator span must still read as one `.` with any blanks.
 	if (sliceOf(lines, separator).trim() !== ".") {
 		return null
 	}
