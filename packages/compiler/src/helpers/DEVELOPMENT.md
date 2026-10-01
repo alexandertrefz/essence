@@ -54,3 +54,55 @@ Alias it was written as. A Diagnostic must not call it that. `withoutRefinements
 does the same. A Union keeps both: a Type descriptor is emitted field by field, so dropping them would change
 the emitted bytes. A Record's spelling never reaches emission, since the Rewriter takes it off with
 `withoutRecordNames`. A Case's `name` stays as well, since it says which Case a value is.
+
+## Structural conformances
+
+Some `Equatable` and `Printable` conformances are structural: the runtime's generic walk already answers what their
+Methods answer. The lists in `conformance.ts` say which, and two readers depend on them agreeing.
+
+- The Enricher asks `conformanceIsStructural` of each declared member of a Record or a Case payload. It routes a
+  member through the member's witness only where the answer is no. An unrouted member is compared by `anyIs`.
+- The Rewriter brands a witness `structural` where its Namespace is on a list. A Dictionary trusts its canonical
+  key encoding only for a branded witness, and otherwise scans its keys through the witness.
+
+`anyIs` is the comparison the key encoding stands in for, so a member left unrouted and a key encoded are the same
+claim. A composite that routes a member carries a condition whose witness is not structural, so it is not branded
+either.
+
+### Equality
+
+`structurallyEquatableNamespaces` lists the standard library Namespaces whose `is` asks only what a value is. A
+String is its characters, an Integer its number, a Rational its reduced pair, and `Number` covers the numeric kinds.
+A Record is its members compared through `anyIs`. `Choice_Equatable` is the name the Enricher gives the equality
+it derives for a Choice, which compares the tag and then the payload.
+
+A refinement such as `NonEmptyString` declares no `is` of its own, so its conformance resolves to the base
+Namespace's. A Namespace a Program writes arrives under its own name and is not branded. So under
+`namespace Loose for NonEmptyString is Equatable`, a Dictionary scans its keys through `Loose`.
+
+`conditionallyStructuralNamespaces` lists the Namespaces whose `is` is structural exactly when what they hold is.
+`List::is` compares items through the item's witness. `Optional` and `Result` write the derived equality in the
+standard library: the tag, then the payload through its Type Argument's witness. The derived equality of a
+generic Choice, or of one whose payload routes a member, is conditional too.
+
+`Dictionary` is on neither list. Its `is` is structural under the same conditions, but the runtime encoder declines
+Dictionary keys, since encoding one would make `Dictionary.ts` and `keyEncoding.ts` a cycle.
+
+A conditional brand is settled where the condition witnesses are. The runtime's `boundConformance` brands the
+witness it builds only where every condition's witness is branded. A generic Function's `List<T>` witness is
+built from a `T` witness the caller hands in, so nothing earlier can know. For the same reason a `parameter`
+source is never structural: routing is right whatever the caller hands in.
+
+### Printing
+
+`structurallyPrintableNamespaces` is a separate list. A Namespace is on it when the walk renders a value of its
+Type as its own `toString` answers. `Algebraic` and `Transcendental` are on it but not on the equality list. The
+walk calls their `toString`. Their `is` is written in Essence, over a comparison the key encoding can not stand in
+for.
+
+A String is on the list although `"x"::toString()` is `x` and the walk writes `"x"`. Inside a composite the
+quoted form is what a reader expects, as in `["a"]` and `{ name = "a" }`. A Choice is off it: its derived printing
+answers `Open` where `Terminal.inspect` writes `Door#Open`. `Optional` and `Result` are off it for the same reason.
+
+`conditionallyStructuralPrintableNamespaces` holds `List` and `Dictionary`. They render their items or entries, so
+they are structural exactly when what they hold is.

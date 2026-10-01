@@ -59,7 +59,6 @@
 	"packages/compiler/src/embed/emit.ts": {"sentence-length": 10, "em-dash": 8, "all-caps": 2, "position": 2, "counts": 1},
 	"packages/compiler/src/embed/hash.ts": {"sentence-length": 12, "em-dash": 9, "all-caps": 6, "block-length": 2},
 	"packages/compiler/src/embed/index.ts": {"sentence-length": 30, "em-dash": 28, "all-caps": 19, "history": 1, "block-length": 6, "stacked": 1},
-	"packages/compiler/src/helpers/conformance.ts": {"sentence-length": 49, "em-dash": 29, "all-caps": 35, "history": 1, "position": 9, "block-length": 13},
 	"packages/compiler/src/helpers/describe.ts": {"sentence-length": 108, "em-dash": 76, "all-caps": 60, "history": 3, "position": 3, "block-length": 24, "counts": 1},
 	"packages/compiler/src/helpers/predicateEval.ts": {"sentence-length": 81, "em-dash": 55, "all-caps": 53, "position": 5, "block-length": 16},
 	"packages/compiler/src/helpers/types.ts": {"sentence-length": 268, "em-dash": 199, "all-caps": 168, "history": 3, "position": 32, "block-length": 69, "counts": 1},

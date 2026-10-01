@@ -8,66 +8,23 @@ import {
 	resolveOverloadedMethodName,
 } from "./types"
 
-// The Namespace name the derived equality of a Choice answers to. It
-// contains a `_`, which the Lexer reads as a Symbol rather than an Identifier
-// character, so no Essence source can spell this name and it can never collide
-// with a written Namespace. The Rewriter recognises it and emits the runtime
-// helpers instead of a member read — there is no object anywhere with this name.
-//
-// The fabricated names live here rather than in the Enricher that
-// fabricates them, so that the Rewriter and the Enricher import one spelling:
-// the Rewriter's brand and the Enricher's routing have to name the same
-// Namespaces, and a name spelled twice is two places that can disagree.
-// `resolvers.ts` re-exports the three Choice ones, so every site that imported
-// them from there still does.
+// The Namespace the derived equality of a Choice answers to. The Lexer reads
+// `_` as a Symbol, so no source can spell it, and the Rewriter emits the runtime
+// helper for it. The Enricher and the Rewriter both import these names.
 export const derivedEquatableNamespaceName = "Choice_Equatable"
 
-// The Namespace name the derived printing answers to, under the same rule
-// as the one above: the `_` keeps it unspellable from Essence, and the Rewriter
-// turns the one reference to it into the runtime helper.
+// The Namespace the derived printing of a Choice answers to.
 export const derivedPrintableNamespaceName = "Choice_Printable"
 
-// The Namespace name the derived Case listing answers to, under the same
-// rule as the two above: the `_` keeps it unspellable from Essence, and the
-// Rewriter turns a reference to it into the runtime helper, curried with the
-// tags the Choice's Cases carry.
+// The Namespace the derived Case listing answers to. The Rewriter curries its
+// helper with the tags of the Choice's Cases.
 export const derivedEnumerableNamespaceName = "Choice_Enumerable"
 
-// The Protocol a composite's members are asked about, named once because
-// the routing rule reads it at several sites and a typo in any of them would
-// silently route nothing.
+// The Protocol a composite's members are asked about.
 export const equatableProtocolName = "Equatable"
 
-// The standard library's own Namespaces whose `Equatable::is` is
-// STRUCTURAL — it asks what the value IS and nothing else, which is exactly what
-// the Dictionary runtime's canonical key encoding stands in for. A String is its
-// characters, an Integer is its number, a Rational is its reduced pair, a
-// Boolean is one of two values, `Number` covers the three numeric kinds by the
-// same rule, and a Record is its members compared by that same universal rule.
-//
-// The equality the language DERIVES for a Choice is on the list under the name
-// the Enricher fabricates for it: it compares the tag and then the payload by
-// the universal rule, and no Namespace wrote it. A Namespace that writes an
-// `is` for its Choice REPLACES the derivation, so its witness arrives under the
-// Namespace's own name and is not branded — unless the Namespace is one of the
-// library's own, which is what the second list below is for. A conditional
-// witness — a generic Choice's, or a Record that routes a member — is judged by
-// that second list and never by this one.
-//
-// A refinement of one of those is not on the list and does not need to be: it
-// declares no `is` of its own, so its conformance RESOLVES to the base
-// Namespace's and arrives here under the base's name — `NonEmptyString` emits
-// `String`'s witness. What a user Namespace writes never resolves to one of
-// these, which is the whole point: `namespace Loose for NonEmptyString is
-// Equatable` arrives as `Loose`, is not branded, and the runtime scans its slots
-// through the witness instead of trusting an encoding that would call two of its
-// keys distinct.
-//
-// `Record` is on this list and not on the conditional one. The builtin
-// Namespace's `is` compares every member through `anyIs` whatever its own
-// Namespace writes, which is the structural rule; a Record that routes a member
-// arrives with that member's witness as a condition, and the member's own `is`
-// is by construction one that is not.
+// The standard library Namespaces whose `is` asks only what a value is. See
+// "Structural conformances" in DEVELOPMENT.md.
 export const structurallyEquatableNamespaces = new Set([
 	"String",
 	"Integer",
@@ -78,42 +35,7 @@ export const structurallyEquatableNamespaces = new Set([
 	derivedEquatableNamespaceName,
 ])
 
-// And the Namespaces whose `Equatable::is` is structural exactly when what
-// they HOLD is compared structurally. `List::is` is the items compared pairwise
-// through the item's own witness, so `List<ItemType> is Equatable where
-// ItemType is Equatable` is structural if and only if the witness solving that
-// `where` is — recursively, since a nested List's witness is decided by the same
-// rule. A `List<NonEmptyString>` under a `namespace Loose for NonEmptyString is
-// Equatable` is the case this has to refuse: `Loose` is not branded, so the List
-// holding it is not either, and the runtime scans.
-//
-// A GENERIC CHOICE is the same rule met on the other kind of container, and
-// there are three spellings of it here. `Optional` and `Result` WRITE their
-// `is` in the standard library rather than deriving it — and each writes the
-// derivation: the tag decides the Case, and the payload is compared through the
-// Type Argument's own witness, which is `where ItemType is Equatable` solved.
-// They are named for the same reason `String` and `Integer` are named above: the
-// library's own `is` is a Method this Compiler knows the meaning of. The third
-// is the DERIVED witness of a Choice a Program declares, which arrives under the
-// fabricated name and is conditional whenever the Choice is generic OR one of
-// its payload members routes — `boundChoiceIs` walks a descriptor that asks a
-// witness at every such member and compares the rest by the universal rule.
-//
-// A Namespace a PROGRAM writes for its own Choice is still refused, because it
-// arrives under its own name and is on neither list. So is `Dictionary`, whose
-// `is` is structural under the same conditions but whose keys the runtime
-// encoder declines outright: spelling a Dictionary would make `Dictionary.ts`
-// and `keyEncoding.ts` a real cycle, and every `removeDuplicates` Program would
-// carry the store. And so is a Record that ROUTES: it arrives as `Record` with a
-// condition, on a member whose own `is` is by construction not the structural
-// one, which is the whole reason it routes.
-//
-// The brand for such a Namespace is CONDITIONAL, and it is resolved where the
-// condition witnesses are: `boundConformance` reads it off the method map, asks
-// each of them, and only then puts it on the witness it builds. That is also
-// the one place the answer CAN be settled — a generic Function's `List<T>`
-// witness is built from a `T` witness forwarded in at the call, which the
-// Compiler has no name for here.
+// The Namespaces whose `is` is structural exactly when what they hold is.
 export const conditionallyStructuralNamespaces = new Set([
 	"List",
 	"Optional",
@@ -121,26 +43,8 @@ export const conditionallyStructuralNamespaces = new Set([
 	derivedEquatableNamespaceName,
 ])
 
-// The same question asked of PRINTING, and it is a DIFFERENT list — which
-// is the half of this that is silent when it is wrong. Structural-for-printing
-// means "the structural walk already renders a value of this Type exactly as its
-// own `toString` answers", so a member on this list can be left to the walk and
-// a member off it has to be routed through its Namespace.
-//
-// `Algebraic` and `Transcendental` are here and are NOT on the equality list
-// above: the walk calls their `toString` outright, while their `is` is written
-// in Essence over a comparison the key encoding can not stand in for. The
-// asymmetry reads like a typo and is not one.
-//
-// A STRING is on the list even though the two readings differ — `"x"::toString()`
-// is `x` and the walk writes `"x"`. Inside a composite the quoted form is what
-// every reader already gets (`[ "a" ]`, `{ name = "a" }`), so routing a String
-// member would take the quotes away rather than restore anything.
-//
-// Every written Namespace is off the list by not being on it, and so are the two
-// that read a Case: `Choice_Printable` answers `Open` where the walk writes
-// `Door#Open`, and `Optional`/`Result` answer `Value(3)` where it writes
-// `Optional#Value(3)`.
+// The Namespaces whose `toString` answers what the structural walk renders.
+// It differs from the equality list on purpose.
 export const structurallyPrintableNamespaces = new Set([
 	"String",
 	"Integer",
@@ -152,31 +56,15 @@ export const structurallyPrintableNamespaces = new Set([
 	"Record",
 ])
 
-// And printing's conditional pair. A List renders as its items rendered,
-// with the padding a Record's walk already passes (`[1, 2]`, which is what
-// `List::toString` answers); a Dictionary renders as its entries, keys quoted.
-// Either is structural exactly when what it holds is.
+// The Namespaces whose printing is structural exactly when what they hold is.
 export const conditionallyStructuralPrintableNamespaces = new Set([
 	"List",
 	"Dictionary",
 ])
 
-// Whether a SOLVED conformance is the structural one — the question the
-// Enricher asks of every declared member of a Record or a Case payload before
-// deciding to route it, and the question the Rewriter's brand is decided by.
-// One rule, read from one pair of lists, because a routed member and an encoded
-// Dictionary key are the same claim seen from two sides.
-//
-// A `parameter` source is never structural: it is the enclosing Function's own
-// witness, decided by a CALLER, and routing is the answer that is right whatever
-// that caller hands in.
-//
-// The two answers are one answer, and that is the point of one pair of
-// lists: a member left UNROUTED is compared by `anyIs`, which IS the structural
-// comparison a Dictionary's encoding stands in for, and a composite that routes
-// ANYTHING carries a condition whose witness is by construction not branded — so
-// the composite is not branded either and its keys scan through the very
-// comparison that runs. Neither side can drift while both read this.
+// Whether a solved conformance is the structural one, which the Enricher
+// asks before routing a member. A `parameter` source is never structural, since
+// a caller decides it. See "Structural conformances" in DEVELOPMENT.md.
 export function conformanceIsStructural(
 	source: common.ConformanceSource,
 	protocolName: string,
@@ -207,26 +95,14 @@ export function conformanceIsStructural(
 	)
 }
 
-// Maps each Protocol Method's *emitted* name (with `__overload$N`
-// suffixes for overloaded Protocol Methods) to the fulfilling Namespace
-// Method's emitted name. This is the single source of truth for both
-// conformance checking and conformance-value codegen — bound Method bodies
-// compile against the Protocol's names, the map translates them to whatever
-// the Namespace actually exports (a Simple requirement may well be fulfilled
-// by one overload of an Overloaded Namespace Method).
+// Each Protocol Method's emitted name, with its `__overload$N` suffix, mapped
+// to the emitted name of the Namespace Method that fulfils it. A Simple
+// requirement may be fulfilled by one Overload of a Namespace Method.
 export type ConformanceMethodMap = Record<string, string>
 
-// A deterministic key for a (Protocol, Type) pair, used to memoise and
-// cycle-guard conformance solving. The Type is serialised with object keys
-// sorted, so two structurally identical Types always produce the same key
-// regardless of the order their properties were built in. The NUL separator
-// keeps the Protocol name from colliding with the serialised Type.
-//
-// What a Record is CALLED is left out of it, because two Aliases of one
-// shape are one Type here as everywhere: conforming is a question about the
-// members, and a key that told `Standing` from the shape it stands for would
-// ask it twice and answer the same — and would leave the cycle guard unable to
-// recognise the question it is already inside.
+// The memo and cycle-guard key of a Protocol and a Type. Keys are sorted, so
+// structurally equal Types share a key. A Record's name is left out, since two
+// Aliases of one shape are one Type.
 export function conformanceKey(
 	protocolName: string,
 	type: common.Type,
@@ -234,23 +110,13 @@ export function conformanceKey(
 	return `${protocolName}\u0000${stableSerialize(type)}`
 }
 
-// The display fields a Record may carry, which nothing structural reads —
-// see `common.RecordType`. Dropped by name rather than by rebuilding the Type,
-// because the walk below is generic and a rebuild would have to enumerate every
-// shape there is.
+// The display fields a Record may carry, which nothing structural reads.
 const displayFields = new Set(["name", "alias"])
 
 function stableSerialize(value: unknown): string {
-	// The back-edge guard `resolveUnknownSlots` carries, and defence in
-	// the same way: the Enricher refuses a Type declaration that names itself.
-	// A walk that leads back to an object it is inside is answered with a bare
-	// `<cycle:N>` marker naming how many objects up the walk it returns to: no
-	// value can collide with it (a string of that spelling keeps its quotes),
-	// and the distance keeps two Types that unfold differently from sharing a
-	// memo key. Only the objects currently open are held, not everything seen:
-	// a resolved Type is a DAG, and a shared object reached twice sideways has
-	// to serialize fully both times, or two structurally identical Types built
-	// with different sharing would stop producing the same key.
+	// A back-edge to an open object becomes `<cycle:N>`, N objects up, which
+	// no quoted value can equal. Only open objects are held, so an object
+	// shared sideways serialises in full each time.
 	let visiting: Array<object> = []
 
 	let serialize = (value: unknown): string => {
@@ -271,11 +137,8 @@ function stableSerialize(value: unknown): string {
 				return `[${value.map(serialize).join(",")}]`
 			}
 
-			// A generic walker does not go through `provenConjuncts`, so it keeps
-			// the same promise by hand: a refinement whose predicate has not resolved
-			// yet must not become anybody's memo key, because the key would keep naming
-			// the empty predicate after the conjuncts were written in. The throw is the
-			// hoisting rounds' "not this round", exactly as it is at every other reader.
+			// A refinement whose predicate is still pending must not become a
+			// memo key, so this refuses it as `provenConjuncts` does.
 			if (
 				(value as Record<string, unknown>).type === "Refinement" &&
 				(value as Record<string, unknown>).conjuncts === null
@@ -283,10 +146,6 @@ function stableSerialize(value: unknown): string {
 				refusePendingPredicate(value as common.RefinementType)
 			}
 
-			// A Record's display fields are skipped here rather than at the
-			// call above, so the key costs one comparison per object instead of
-			// a second walk over the whole Type on a path conformance solving
-			// takes for every Argument of every generic call.
 			let spelled = (value as Record<string, unknown>).type === "Record"
 			let entries = Object.entries(value as Record<string, unknown>)
 				.filter(([key]) => !(spelled && displayFields.has(key)))
@@ -302,14 +161,9 @@ function stableSerialize(value: unknown): string {
 	return serialize(value)
 }
 
-// The Protocol that PROVIDED a Method a body for, or null where the name
-// is a requirement — or no Method of the Protocol at all.
-//
-// `Object.hasOwn`, never a plain index: a Method named `toString` finds
-// `Object.prototype.toString` on the record and reads as provided by a Protocol
-// called "function toString() { [native code] }". That is not a hypothetical —
-// `Printable.toString` is the standard library's, and a plain index quietly
-// stopped requiring it of every conformer.
+// The Protocol that provided a body for a Method, or null for a requirement
+// or a name the Protocol lacks. `Object.hasOwn`, since a plain index finds
+// `Object.prototype.toString`.
 export function providedMethodProtocol(
 	protocol: common.ProtocolType,
 	methodName: string,
@@ -322,8 +176,8 @@ export function providedMethodProtocol(
 }
 
 // Whether a provided body answers the requirement of its name. A body is
-// Simple, so it answers a Simple requirement alone, and only where its signature
-// fulfils the requirement's with `Self` bound to the conformer's target.
+// Simple, so it answers only a Simple requirement whose signature it fulfils
+// with `Self` bound to the conformer's target.
 export function providedBodyFulfils(
 	methodName: string,
 	requirement: common.MethodType | undefined,
@@ -349,9 +203,9 @@ export function providedBodyFulfils(
 	)
 }
 
-// Whether a Method written as a requirement declares it fulfils another
-// Protocol's entry with a body, which a Namespace writing it replaces and is held
-// to. Only a Simple entry carries a body, so any other is not asked about.
+// Whether a requirement fulfils another Protocol's entry that has a body,
+// which a Namespace writing the requirement replaces. Only a Simple entry
+// carries a body, so any other passes.
 export function writtenRequirementFulfils(
 	methodName: string,
 	requirement: common.MethodType,
@@ -380,9 +234,9 @@ export function writtenRequirementFulfils(
 	)
 }
 
-// Whether a descendant Protocol's entry for an inherited name can stand in
-// for the ancestor's, as its witness does wherever the ancestor is asked for: of
-// the same kind, so it sits under the same keys, and fulfilling each signature.
+// Whether a descendant Protocol's entry for an inherited name can stand in for
+// the ancestor's in a witness. It must be of the same kind, so it sits under the
+// same keys, and fulfil each signature.
 export function restatementAccepts(
 	methodName: string,
 	inherited: common.MethodType,
@@ -407,16 +261,9 @@ export function restatementAccepts(
 	)
 }
 
-// Every requirement of a Protocol a Namespace has not written, in the
-// order the Protocol declares them. The check below answers with the FIRST one
-// it meets, because one missing Method is enough to refuse a conformance — and
-// a Quick Fix that writes the stubs needs all of them, so it asks here rather
-// than the check growing a list it would throw away on every other path.
-//
-// A PROVIDED Method is not a requirement: the Protocol's own body answers it.
-// `providerOf` is therefore asked the question `computeConformanceMethodMap`
-// asks it, with the same default, so the two can not disagree about what a
-// Namespace owes.
+// Every requirement of a Protocol a Namespace has not written, in declared
+// order, for a Quick Fix that writes the stubs. A provided Method is not owed.
+// `providerOf` has the same default as in `computeConformanceMethodMap`.
 export function missingRequirements(
 	protocol: common.ProtocolType,
 	namespace: common.NamespaceType,
@@ -426,8 +273,7 @@ export function missingRequirements(
 	let missing: Array<string> = []
 
 	for (let methodName of Object.keys(protocol.methods)) {
-		// `Object.hasOwn`, never a plain index, for the reason spelled
-		// out above.
+		// `Object.hasOwn`, since a plain index finds `Object.prototype`.
 		if (
 			providerOf(methodName) !== null ||
 			Object.hasOwn(namespace.methods, methodName)
@@ -445,13 +291,9 @@ export type ConformanceCheckResult =
 	| {
 			kind: "conforms"
 			methodMap: ConformanceMethodMap
-			// The Protocol's PROVIDED Methods this conformer does NOT
-			// override, each under the Protocol that wrote the body. They are in
-			// the witness like everything else — a bounded call must reach the
-			// same Method a direct one does — but they are not Methods of the
-			// Namespace, so they are kept apart from the map that names its
-			// Methods and are emitted as the shared const, curried with a
-			// witness of the Protocol that wrote it.
+			// The provided Methods this conformer does not override, each
+			// under the Protocol that wrote the body. They are in the witness,
+			// emitted as the shared const curried with that Protocol's witness.
 			providedMethods: ConformanceMethodMap
 	  }
 	| { kind: "missing"; methodName: string }
@@ -462,13 +304,9 @@ export type ConformanceCheckResult =
 			// the conformer's target and not at the narrower binding.
 			provider?: string
 	  }
-	// The fulfilling Method matches the Protocol's signature, but carries
-	// a Protocol bound of its own (`<infer Item is Comparable>`) that the
-	// conformance has not been told to assume. The conformance is sound only
-	// *conditionally* — under a `where` clause supplying that bound — so it can
-	// not be granted unconditionally. This is what keeps a generic Namespace's
-	// blanket conformance honest: `List is Comparable` needs `where Item is
-	// Comparable`, and until it says so, this reports which bound is missing.
+	// The fulfilling Method matches, but carries a bound of its own, such as
+	// `<infer Item is Comparable>`, that no `where` clause supplies. So
+	// `List is Comparable` needs `where Item is Comparable`.
 	| {
 			kind: "needs-condition"
 			methodName: string
@@ -476,35 +314,23 @@ export type ConformanceCheckResult =
 			protocolName: string
 	  }
 
-// `assumptions` maps a Generic name to the Protocol the conformance is
-// allowed to assume it satisfies (from a `where` clause). A fulfilling Method
-// whose own Generic carries a bound absent from this map can not fulfill
-// unconditionally — see the `needs-condition` result.
+// `assumptions` maps a Generic name to the Protocol a `where` clause lets the
+// conformance assume. A fulfilling Method bounded beyond it answers
+// `needs-condition`.
 export function computeConformanceMethodMap(
 	protocol: common.ProtocolType,
 	namespace: common.NamespaceType,
 	target: common.Type,
 	assumptions: ReadonlyMap<string, string> = new Map(),
-	// Whether conforming to one Protocol grants conformance to another —
-	// a Protocol extension. This module knows nothing about a Scope, so the one
-	// caller that does hands the answer in; the default is the plain equality
-	// every caller without a Scope means.
+	// Whether conforming to one Protocol grants another, through Protocol
+	// extension. A caller with a Scope hands the answer in.
 	grants: (declared: string, wanted: string) => boolean = (
 		declared,
 		wanted,
 	) => declared === wanted,
-	// WHOSE body this conformer runs for a name — asked of everything the
-	// conformer conforms to, not of the Protocol this witness is being solved
-	// for. A DESCENDANT that re-provided an ancestor's Method is the one a
-	// direct call reaches, so the witness an ANCESTOR bound is handed has to
-	// name it too; asking the ancestor alone made the same expression answer
-	// differently depending on which bound it was written under. It also
-	// answers for a body a descendant wrote where the ancestor only REQUIRED
-	// one: the conformer owes nothing, because the descendant provides it.
-	//
-	// The default is the plain question a caller without a Scope means. This
-	// module can not walk the extension graph, so the callers that can hand
-	// the answer in, exactly as they hand `grants` in.
+	// Which Protocol's body the conformer runs for a name, asked of all it
+	// conforms to. A descendant's body is what a direct call reaches, so an
+	// ancestor's witness names it too. A caller with a Scope hands it in.
 	providerOf: (methodName: string) => string | null = (methodName) =>
 		providedMethodProtocol(protocol, methodName),
 ): ConformanceCheckResult {
@@ -518,24 +344,12 @@ export function computeConformanceMethodMap(
 			selfBindings,
 		) as common.MethodType
 
-		// Object.hasOwn, not a plain index — a Method named `toString`
-		// would otherwise find Object.prototype.toString on the record.
+		// `Object.hasOwn`, since a plain index finds `Object.prototype`.
 		let written = Object.hasOwn(namespace.methods, methodName)
 
-		// A PROVIDED Method is not owed — a Namespace that writes none
-		// still answers it, because the Protocol's body does — but it IS in the
-		// witness, under one of two entries.
-		//
-		// A Namespace that writes one has REPLACED it, whole, and the
-		// replacement goes in the method map exactly as a requirement's
-		// fulfiller does: the witness is what a bounded call reads, so an
-		// override that stayed out of it would make `t::isLessThan(x)` inside a
-		// `<T is Orderable>` answer differently from the same call on the
-		// Namespace's own Type. It is held to the provided signature by exactly
-		// the check a requirement gets — hence the same `mismatched` answer.
-		//
-		// A Namespace that writes none is entered as the PROVIDED const, which
-		// takes a witness of its own Protocol as its trailing Argument.
+		// A provided Method is not owed, but it is in the witness. An override
+		// goes in the method map, held to the provided signature as a requirement
+		// is, so a bounded call reaches it. Otherwise the provided const goes in.
 		let providingProtocol = providerOf(methodName)
 
 		if (providingProtocol !== null) {
@@ -545,9 +359,8 @@ export function computeConformanceMethodMap(
 				continue
 			}
 
-			// A provided signature is always Simple — a body on an
-			// `overload` entry is refused at the declaration — so the override
-			// is entered under the one entry that fulfills it.
+			// A provided signature is always Simple, so the override is entered
+			// under the one entry that fulfils it.
 			let overriding = findFulfillingMethod(
 				methodName,
 				substituted as common.BaseFunction,
@@ -559,12 +372,9 @@ export function computeConformanceMethodMap(
 				return { kind: "mismatched", methodName }
 			}
 
-			// Asked separately from the match above, and in the
-			// requirement path's order, because the two are different news: an
-			// override whose own Generic carries a bound the conformance was
-			// not told to assume MATCHES the signature, and needs a `where`
-			// clause rather than a different signature. Collapsing them told
-			// the writer the signature was wrong when it was not.
+			// Asked apart from the signature match: an override bounded beyond
+			// the assumptions matches, and needs a `where` clause, not a new
+			// signature.
 			let bound = firstUnassumedBound(
 				overriding.method,
 				assumptions,
@@ -646,8 +456,8 @@ export function computeConformanceMethodMap(
 	return { kind: "conforms", methodMap, providedMethods }
 }
 
-// The first bound the fulfilling Method carries that the conformance was
-// not told to assume — `null` when every bound is covered (or there are none).
+// The first bound of the fulfilling Method the conformance may not assume, or
+// null.
 function firstUnassumedBound(
 	method: common.BaseFunction,
 	assumptions: ReadonlyMap<string, string>,
