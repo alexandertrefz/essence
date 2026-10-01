@@ -281,3 +281,9 @@ answers with a closure wraps one on every call. The third row is the control —
 call whose Arguments and answer are all plain data touches none of this, and
 does not move. The two tables above were re-run at the same commit for the same
 reason, and did not move either.
+
+## One loop per item kind
+
+`runIn` walks a List's items through a loop picked by the item's kind. With one loop for every kind, the 8191-value
+`layout` call took 126 µs on one run and 198 µs on the next. A loop that walks leaves alone took 124 µs on every run,
+and the per-kind loops take 111 µs on every run.

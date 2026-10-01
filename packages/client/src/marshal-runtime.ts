@@ -1,3 +1,7 @@
+// The run-time half of the boundary: every conversion, refusal and call, over
+// Descriptors. Nothing here may lead to the compiler. See "The interpreter" in
+// DEVELOPMENT.md.
+
 import { bareCaseCollision } from "./bare-cases"
 import type { EssenceValue, FutureContext, RuntimeBridge } from "./bridge"
 import type {
@@ -13,10 +17,6 @@ import type {
 } from "./descriptor"
 import { EssenceCallError, EssenceMarshalError } from "./errors"
 import { EssenceRational } from "./rational"
-
-// The run-time half of the boundary: every conversion, refusal and call, over
-// Descriptors. Nothing here may lead to the compiler. See "The interpreter" in
-// DEVELOPMENT.md.
 
 // The tags of the runtime's own `Optional`, which no Module path qualifies, so
 // they are the same in every bundle. A Descriptor carries every other tag.
@@ -326,15 +326,9 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// What a call ANSWERS with, which is the one position asynchronous
-	// work crosses at — `Future<T>` and `Started<T>` come back as a `Promise` of
-	// what they answer with, and everywhere else they are refused. The rule is
-	// here rather than in `buildOut` because it is a rule about the POSITION: a
-	// Function's answer is where a Program said work would be handed over, and a
-	// Record's member is where it said a value would be.
-	//
-	// Every other shape goes to the ordinary door, memo table and all —
-	// this is one branch in front of it, not a second reading of anything.
+	// A call's answer, the one position where `Future<T>` and `Started<T>` cross,
+	// as a `Promise`. The rule is about the position, so it stands in front of
+	// `buildOut`, and every other shape goes through `compileOut`.
 	function compileAnswerOut(expected: Descriptor): Outbound {
 		if (expected.kind !== "future" && expected.kind !== "started") {
 			return compileOut(expected)
@@ -350,10 +344,8 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// The compiled way out for a Descriptor, or the value-directed walk
-	// where a position declared nothing — the one place the two doors meet, so
-	// that a piece whose shape was declared is read through its own rule and a
-	// piece whose shape was not is still read.
+	// The compiled way out, or the walk the value directs where a position
+	// declared nothing.
 	function out(expected: Descriptor | null): Outbound {
 		return expected === null ? anyOut : compileOut(expected)
 	}
@@ -362,18 +354,9 @@ export function createInterpreter(
 		return toJS(value, at, step, null)
 	}
 
-	// The members of a Record or the payload of a Case, each compiled —
-	// twice over, in the two ways a member is looked for. Memoised against the
-	// members object itself, because the general walk below reaches for it per
-	// value.
-	//
-	// The names IN THE TYPE'S ORDER beside the readers, because a value the
-	// Module built against this Type carries its members in that order — so the
-	// reader a position wants is almost always the one standing at the same
-	// position, found by comparing two names rather than by hashing one. And the
-	// map for every other value: a Record of another shape entirely, a member the
-	// Type does not name, a payload written in another order. Both spellings
-	// answer the same thing, because they are built out of the same members.
+	// A Record's or payload's member readers, kept per members object. A value the
+	// Module built carries its members in the declared order, so a reader is found
+	// by comparing names. The map serves every other value.
 	function compiledMembers(members: DescribedMembers): Members {
 		let compiled = outboundMembers.get(members)
 
@@ -393,15 +376,8 @@ export function createInterpreter(
 		return compiled
 	}
 
-	// A signature's half of a call, compiled — the half that is fixed the
-	// moment the Module declares the Function, which is everything but the
-	// Function itself and the name an Error calls it. Memoised against the
-	// FunctionDescriptor, because a Function is the one Essence value whose
-	// crossing BUILDS something: a Module Function answering with a closure
-	// wraps a new one on every call, and a host reading a constant that holds
-	// one wraps a new one on every property read, since a constant is marshalled
-	// where it is read. Without this, that crossing walks the Parameters four
-	// times over and spells every `argument N` again for each.
+	// A signature's half of a call, kept per signature. A Function is wrapped
+	// anew each time it crosses, so this work would otherwise repeat per value.
 	function compiledCall(signature: FunctionDescriptor): Call {
 		let compiled = calls.get(signature)
 
@@ -418,10 +394,8 @@ export function createInterpreter(
 				readers: parameters.map((parameter) => compileIn(parameter.of)),
 				answer: compileAnswerOut(signature.returns),
 				positional,
-				// The same Array where no labels may be written, rather
-				// than a second one holding the same strings — `readCall`
-				// answers the Arguments it was passed where it did not reorder
-				// them, and the two spellings are then told apart by identity.
+				// The same Array where no labels may be written, so `readCall`
+				// can tell the two spellings apart by identity.
 				named:
 					labels === null
 						? positional
@@ -439,40 +413,9 @@ export function createInterpreter(
 
 	// #region In
 
-	// A whole Array of one shape rather than one value of it — the items of
-	// a List, walked by the loop the ITEM's kind picks, picked once where the
-	// List is compiled and never looked at again.
-	//
-	// This is the ONE place where compiling to closures costs something
-	// interpreting did not, and so the one place a rule is written twice. A loop
-	// that calls a converter it was handed can not see what it is calling: every
-	// List in a Module reaches the SAME loop, whose one call is made against
-	// Integers here, Strings there and whole Lists one level up — so an engine
-	// that would have folded a leaf's two checks into the loop is left making an
-	// out-of-line call per item, and decided differently about it from run to
-	// run, which is worse than deciding badly. The 8191-value call `BENCH.md`
-	// measures took 126 µs on one run and 198 µs on the next through one loop for
-	// everything; 124 µs every time through a loop that walks leaves alone; and
-	// 111 µs every time through these.
-	//
-	// So a leaf's admission is spelled here as well as in the branch of
-	// `buildIn` that compiles the leaf on its own, and the two say the same
-	// thing. They are two spellings of ONE rule rather than two rules — a value
-	// met on its own and the same value met inside a List are the same value —
-	// so a difference between a loop here and its branch there is a bug and never
-	// a decision.
-	//
-	// A Rational is walked by the loop at the bottom with everything else.
-	// Its admission is three branches, a read of a double's bits and two
-	// allocations, and a call per item is a small part of that — where an
-	// Integer's is two type checks that the call itself outweighs.
-	//
-	// A hole in an Array is read as the `undefined` it holds, and admitted
-	// only where the ITEM's shape admits absence. An Array with a gap in it is
-	// not a List with a gap: `[1, , 3]` is refused where the items are Integers,
-	// and crosses with `#Empty` in the middle where they are `Optional<Integer>`
-	// — because every position of a List holds a value, and the position a hole
-	// is at holds nothing.
+	// A List's items, read by a loop picked by the item's kind. Each leaf loop
+	// repeats the leaf's branch in `buildIn`, and the two must agree. See "List
+	// loops" in DEVELOPMENT.md.
 	function runIn(
 		item: Descriptor,
 	): (source: Array<unknown>, at: Path) => Array<EssenceValue> {
@@ -482,9 +425,8 @@ export function createInterpreter(
 		if (item.kind === "integer") {
 			return (source, at) => {
 				let count = source.length
-				// The argument is the answer's LENGTH. The rule below suggests
-				// `Array.from({ length })` instead, which fills through an iterator —
-				// the very turn-by-turn work a walk written out like this avoids.
+				// The answer's length. `Array.from({ length })` would fill it
+				// through an iterator, which this walk avoids.
 				// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 				let items: Array<EssenceValue> = new Array(count)
 
@@ -547,10 +489,7 @@ export function createInterpreter(
 			}
 		}
 
-		// And everything else through its own converter, which is every
-		// shape whose items are worth more than the call that reaches them —
-		// a List of Lists, of Records, of Cases, of anything the two checks
-		// above do not settle.
+		// Every other kind through its own converter.
 		return (source, at) => {
 			let count = source.length
 			// oxlint-disable-next-line unicorn/no-new-array -- the length, as above
@@ -564,31 +503,22 @@ export function createInterpreter(
 		}
 	}
 
-	// What a JavaScript value has to become to be this shape, as one
-	// Function. Every branch is the branch the interpreter took per value, with
-	// everything it could have decided without the value decided here instead: a
-	// nested `Optional` is a refusal compiled to a throw, a Case's tag and the
-	// two spellings it answers to are strings built once, and a Record's members
-	// are an Array of readers in the order they are read.
+	// The way in for one shape. Whatever does not depend on the value is decided
+	// here, once.
 	function buildIn(expected: Descriptor): Inbound {
 		let shown = expected.shown
 
 		switch (expected.kind) {
 			case "integer":
 				return (value, at, step) => {
-					// Both kinds go in AS THEY ARE — the bridge's
-					// `createInteger` canonicalises, so a bigint that fits a
-					// double arrives as a number and a number that does not
-					// arrives as a bigint, and neither caller has to know which
-					// side of 2⁵³ its value sits.
+					// Both kinds go in as they are, since the bridge's integer
+					// constructor canonicalises either.
 					if (typeof value === "bigint") {
 						return makeInteger(value)
 					}
 
-					// A number is admitted only where it is exactly an
-					// integer a double can hold — `2 ** 53` is not one, and
-					// taking it would hand the Module a value already off by
-					// whatever the double had lost before it ever arrived.
+					// Only a safe integer, since a larger double may already
+					// have lost the value it was written as.
 					if (
 						typeof value === "number" &&
 						Number.isSafeInteger(value)
@@ -622,11 +552,8 @@ export function createInterpreter(
 						throw mismatch(value, shown, at, step)
 					}
 
-					// Normalised on the way in, because String equality in
-					// Essence is normalised — a composed `é` and a decomposed one
-					// are one value there — and letting both spellings through
-					// would put two values into the Module that it insists are
-					// the same.
+					// Normalised, because Essence compares Strings normalised,
+					// and two spellings of one String must not both get in.
 					return makeString(value.normalize("NFC"))
 				}
 			case "boolean":
@@ -645,25 +572,14 @@ export function createInterpreter(
 						throw mismatch(value, shown, at, step)
 					}
 
-					// `bridge.list` copies what it is handed, so the Array
-					// built here is copied once more before a List holds it. The
-					// alternative was to bridge the runtime's own `createList`,
-					// which takes ownership — and then this call would be safe
-					// while a host's identical-looking one, on an Array the host
-					// kept, would silently share a run with Essence.
+					// `bridge.list` copies its Array. A bridged constructor that
+					// took ownership would let a host's own call share a run with
+					// Essence.
 					return makeList(items(value, { at, step }))
 				}
 			}
-			// A `Map` and nothing else. Every key Type crosses, so what
-			// is read is the entries rather than any spelling of a key — in
-			// the order the Map holds them, which is the order a Dictionary
-			// holds its own.
-			//
-			// The entries are marshalled HERE and the Dictionary is
-			// built THERE. Which slot a key lands in, whether two keys are
-			// one, and what a key encodes to are the runtime's own and stay
-			// there: this side hands over an Array of pairs it does not keep,
-			// exactly as it hands `bridge.list` an Array of items.
+			// A `Map` only, read entry by entry in its order. The runtime builds
+			// the Dictionary and decides whether two keys are one.
 			case "dictionary": {
 				let build = makeDictionary
 
@@ -678,10 +594,8 @@ export function createInterpreter(
 
 				return (value, at, step) => {
 					if (!(value instanceof Map)) {
-						// An object is what a host reaches for first
-						// where the keys are Strings, so it is answered with
-						// the shape to write instead of with the Type it
-						// already named — see `objectSpelledDictionary`.
+						// A plain object is refused with the shape to write
+						// instead, by `objectSpelledDictionary`.
 						throw plainObject(value) === null
 							? mismatch(value, shown, at, step)
 							: objectSpelledDictionary(shown, at, step)
@@ -692,11 +606,8 @@ export function createInterpreter(
 					let entries: Array<Entry> = new Array(value.size)
 					let position = 0
 
-					// One place per ENTRY, which both halves of it are
-					// spelled below — `argument 1 → [2].value`. A Map has no
-					// accessor that names one entry, so what an Error names is
-					// the entry's position and the half of it that is wrong,
-					// which is the vocabulary the language reads an entry by.
+					// An Error names the entry's position and the wrong half,
+					// as in `argument 1 → [2].value`.
 					for (let [key, held] of value) {
 						let where: Path = { at: inside, step: position }
 
@@ -709,10 +620,8 @@ export function createInterpreter(
 
 					let built = build(entries)
 
-					// The position of an entry whose key the Dictionary
-					// already holds — two Map keys that are one key here. It
-					// is answered rather than thrown because the place is this
-					// side's to name; see `createDictionaryFrom`.
+					// A number is the position of a key the Dictionary already
+					// holds, which this side names. See `createDictionaryFrom`.
 					if (typeof built === "number") {
 						throw duplicateKey({ at: inside, step: built }, "key")
 					}
@@ -725,13 +634,9 @@ export function createInterpreter(
 				let readers = names.map((name) =>
 					compileIn(expected.members[name]!.of),
 				)
-				// The members the callee's own default fills in, which a
-				// host may therefore leave out. Absence has to reach the built
-				// Record as a MISSING KEY rather than as an `undefined` one: the
-				// callee reads `options.retries ?? 3`, and a key holding
-				// `undefined` is exactly as absent to that as no key at all —
-				// but `ownRecord` would carry it, and everything downstream
-				// reads a Record's own keys.
+				// The members the callee's default fills in, which a host may
+				// leave out. Their absence must reach the Record as a missing key,
+				// since everything downstream reads its own keys.
 				let defaulted = names.map(
 					(name) => expected.members[name]!.optional === true,
 				)
@@ -747,17 +652,8 @@ export function createInterpreter(
 
 					let fields: Record<string, EssenceValue> = {}
 					let inside: Path = { at, step }
-					// The keys the value carries against the members the
-					// Type names, IN ORDER — which answers both questions a
-					// Record asks at once, wherever the two lists agree. A host
-					// writing an object against a declaration writes the members
-					// it declares in the order it declares them, and two lists of
-					// the same length whose names match position by position name
-					// the same set: every declared member is an own key of the
-					// value, and the value carries no key the Type does not name.
-					// So the members below are read straight off, and neither the
-					// own-key check nor the search for an undeclared member has
-					// anything left to find.
+					// Keys matching the declared members in order prove at once
+					// that every member is present and no other key is.
 					let keys = Object.keys(given)
 					let asDeclared = keys.length === count
 
@@ -785,32 +681,11 @@ export function createInterpreter(
 						return ownRecord(fields)
 					}
 
-					// And every value the two lists did not settle, read
-					// the long way — a member left out, a member the Type does
-					// not name, or the very same members written in another
-					// order.
-					//
-					// An absent key IS a value here — `undefined`, which is
-					// exactly what an `Optional` member is spelled as — so what
-					// the key holds is read and the member's own shape decides.
-					// Refusing absence up front reported "expected
-					// Optional<String>, got nothing" for a Type whose whole point
-					// is that it accepts nothing, and made a Record that had been
-					// through JSON — which drops an `undefined`-valued key —
-					// impossible to hand back. A member that is not Optional
-					// still fails, with the same sentence, where the sentence is
-					// true.
-					//
-					// An OWN key, because an absent `toString` read plainly
-					// finds `Object.prototype`'s — a function where the rule above
-					// promises `undefined`.
-					//
-					// Unless the member is one the callee fills in, whose
-					// absence is not a value at all — it is the caller saying
-					// nothing, which is what the default is for. A key that IS
-					// written goes to the reader like any other, `undefined` and
-					// all: writing a member is writing it, and an Optional
-					// member written `undefined` is `#Empty` exactly as it was.
+					// Otherwise each member is read from its own key, an absent
+					// key as `undefined`, and the member's shape decides. So a
+					// Record from JSON, which drops `undefined` keys, still crosses.
+					// A defaulted member left out stays out. An own key, since a
+					// plain read of an absent `toString` finds `Object.prototype`'s.
 					for (let position = 0; position < count; position++) {
 						let name = names[position]!
 						let written = Object.hasOwn(given, name)

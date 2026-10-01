@@ -376,3 +376,17 @@ the version this box views. `backRunSeenBy` undoes the writes made since, into a
 the runtime's `caughtUp` rather than importing it, because `caughtUp` writes the replayed run back onto the box. The
 runtime repairs such a box wherever it reads one. `tests/undoReplay.spec.ts` holds this copy and the one in
 `tools/bench.ts` against the runtime's own.
+
+### List loops
+
+`runIn` picks the loop a List's items are read by from the item's kind, once, where the List is compiled. A loop that
+calls a converter it is handed can not see what it calls. Every List would reach the same loop, whose one call site
+sees Integers, Strings and whole Lists in turn. The engine then makes an out-of-line call per item, and decides
+differently from run to run. So an Integer, a String and a Boolean each have a loop of their own. Their admission is
+written there as well as in the branch of `buildIn` that compiles the leaf alone. The two spellings are one rule: a
+value inside a List is the same value met alone, so a difference between them is a bug. A Rational goes through the general loop,
+because its admission outweighs the call. `BENCH.md` has the measurement.
+
+A hole in an Array is read as the `undefined` it holds, and admitted only where the item's shape admits absence.
+`[1, , 3]` is refused where the items are Integers. It crosses with `#Empty` in the middle where they are
+`Optional<Integer>`.
