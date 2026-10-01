@@ -17,9 +17,8 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The same stages the CLI runs, minus bundling — a Match is lowered to
-// an emitted `if` chain, and both halves of what it does wrong are only
-// visible once that chain RUNS, so these go all the way through.
+// The stages the CLI runs, minus bundling. A Match is lowered to an `if`
+// chain whose mistakes show only when it runs.
 function generate(
 	source: string,
 	optimiserOptions: OptimiserOptions = defaultOptimiserOptions,
@@ -39,10 +38,8 @@ function generate(
 	)
 }
 
-// Writes the emitted Program to a throwaway module and imports it so its
-// top-level `Terminal.inspect` calls run. The emitted imports are absolute paths into
-// this repo's runtime, so the module resolves from anywhere; `console.log` is
-// captured to collect the output, then restored.
+// Imports the emitted Program from a throwaway module, which resolves because
+// its imports are absolute paths into this repository's runtime.
 async function run(source: string): Promise<Array<string>> {
 	let js = generate(source)
 	let directory = mkdtempSync(join(tmpdir(), "essence-match-"))
@@ -67,8 +64,8 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// The counterpart for a Program that is supposed to be reported on —
-// a Warning is not an error, so the Program still compiles and still runs.
+// For a Program that is reported on: a Warning is not an error, so it still
+// compiles and runs.
 function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -82,14 +79,8 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 }
 
 describe("Match Lowering", () => {
-	// Regression tests — a Record Matcher naming a Function-typed member
-	// lowered to a runtime check that could never answer true, because the
-	// Function descriptor reached `isValueOfType`'s "not implemented" branch:
-	// it printed a line of Compiler prose into the Program's own output and
-	// answered false. Every Handler of an exhaustive Match declined, the
-	// emitted chain fell off its end, and the Match answered `undefined` —
-	// which the printer then read a Type key off, so a Program that compiled
-	// green died with a `TypeError` naming the runtime's internals.
+	// A Record Matcher naming a Function-typed member must accept a value
+	// carrying a callback there.
 	describe("Record Matchers naming a Function member", () => {
 		let source = (value: string) => `implementation {
 			type Click = { x: Integer }
@@ -133,10 +124,8 @@ describe("Match Lowering", () => {
 			).toEqual(["42"])
 		})
 
-		// A Signature does not survive to runtime, so a callback member
-		// only ever answers "callable" — two Cases are told apart by the OTHER
-		// members they name, and a pair that names nothing else is reported as
-		// unreachable rather than silently taking the first branch.
+		// A Signature does not survive to runtime, so a callback member only
+		// answers "callable". Two Cases are told apart by their other members.
 		it("tells two callback-carrying Cases apart by their other members", async () => {
 			expect(
 				await run(`implementation {
@@ -156,8 +145,7 @@ describe("Match Lowering", () => {
 			).toEqual(['"string handler"'])
 		})
 
-		// A Guard is ANDed onto the Matcher's own check, so a Matcher
-		// that never answered true made the Guard unreachable too.
+		// A Guard is joined to the Matcher's own check with an and.
 		it("narrows a Guarded Case naming a callback member", async () => {
 			expect(
 				await run(`implementation {
@@ -183,13 +171,8 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// Regression tests — an Essence identifier may hold characters no
-	// JavaScript IdentifierName may, and a Matcher's Record members reached the
-	// emitted Type descriptor as bare Identifiers, so `case { ok?: Boolean }`
-	// emitted `members: { ok?: … }`. Nothing in the Compiler objected: the
-	// Program type-checked clean, the only stage that ever parsed the emitted
-	// JavaScript was the bundler, and all it could say was that bundling had
-	// failed.
+	// An Essence member name may hold characters no JavaScript identifier
+	// may, such as `ok?`, so the emitted descriptor and check must quote it.
 	describe("Member names JavaScript can not spell", () => {
 		let source = (value: string) => `implementation {
 			constant input: { ok?: Boolean } | { count: Integer } = ${value}
@@ -227,11 +210,8 @@ describe("Match Lowering", () => {
 			).toEqual(['"flag"'])
 		})
 
-		// The check and the Record literal have to spell the name the
-		// same way — whichever of the two forms the check takes reads the
-		// member back off the value by the key the literal wrote — so the
-		// quoted form is pinned here rather than left to whichever of them the
-		// emitted JavaScript happens to parse.
+		// The check reads the member back by the key the Record literal wrote,
+		// so both spell it quoted.
 		it("writes the member as a quoted key in the emitted descriptor", () => {
 			expect(
 				generate(source(`{ ok? = true }`), {
@@ -241,10 +221,8 @@ describe("Match Lowering", () => {
 			).toContain('members: { "ok?":')
 		})
 
-		// And the same invariant for the check the decision tree writes,
-		// which is what an ordinary build emits for this Match: the read has to
-		// spell the member the way the literal wrote it, and `ok?` is not
-		// something JavaScript can spell after a dot.
+		// An ordinary build emits the decision tree's check, whose read must
+		// quote `ok?` too.
 		it("writes the member as a quoted read in the compiled check", () => {
 			expect(generate(source(`{ ok? = true }`))).toContain(
 				'_self["ok?"]?.[$type.typeKeySymbol] === "Boolean"',
@@ -252,20 +230,13 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// Regression test — the emitted chain used to simply END after the
-	// last Handler. Nothing answered for a value no Matcher accepted: the
-	// wrapper returned `undefined`, which is not an Essence value at all, so
-	// the Program failed later and elsewhere, in whatever read the missing
-	// Type key next.
+	// A value no Matcher accepts must not fall off the end of the chain. See
+	// "The end of the chain" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("Exhaustiveness fallback", () => {
 		it("ends the emitted chain in an else no Handler owns", () => {
-			// Asked with `elide-final-match-test` off, because that pass
-			// is the considered decision to give this up: it proves the last
-			// Handler is what the end of the chain IS, so the fallback goes
-			// with its test. What is pinned here is what the chain ends in when
-			// no such proof has been taken — which is every Match whose last
-			// Handler is Guarded, matches a literal, or asks something no tag
-			// answers.
+			// `elide-final-match-test` drops the fallback with the last test,
+			// so it is off here. Without it, the chain ends as one whose last
+			// Handler is Guarded, matches a literal, or asks what no tag answers.
 			let generated = generate(
 				`implementation {
 					constant scrutinee: Integer | String = 5
@@ -285,10 +256,8 @@ describe("Match Lowering", () => {
 		})
 
 		it("keeps the fallback where the last Handler can decline", () => {
-			// TWO Record members, both carrying the one Record tag, so
-			// what tells them apart is their members — the elision does not
-			// apply and the chain ends where it always did, under the ordinary,
-			// fully optimised build.
+			// Both Union members carry the Record tag and differ only in their
+			// members, so the elision does not apply even in an optimised build.
 			let generated = generate(`implementation {
 				constant scrutinee: { x: Integer } | { key: String } = { key = "k" }
 
@@ -301,10 +270,8 @@ describe("Match Lowering", () => {
 			expect(generated).toContain("$type.noCaseMatched(_self)")
 		})
 
-		// A Match written for its effects promises the unit Type, `{}`,
-		// and its Handlers answer nothing useful, so the fallback has to be the
-		// innermost `else` rather than a Statement after the chain — a Handler
-		// that RAN and fell off its own end must not reach it.
+		// A Handler that ran and fell off its own end must not reach the
+		// fallback, so the fallback is the innermost `else`.
 		it("leaves a Match in Statement position alone", async () => {
 			expect(
 				await run(`implementation {
@@ -319,12 +286,9 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// Regression tests — Types erase before a Match runs, so the check
-	// emitted for a Generic Matcher is unconditionally true. A Generic Case
-	// written above a concrete one therefore swallowed every value, and neither
-	// the Enricher nor the Validator said so: `pick("missing", fallback 7)`
-	// compiled with no Diagnostic at all and answered the String, where its own
-	// Signature promised a `Value`.
+	// Types erase before a Match runs, so a Generic Matcher's check is always
+	// true. A Generic Case above a concrete one swallows every value, so it is
+	// refused.
 	describe("Generic Cases", () => {
 		let pick = (cases: string) => `implementation {
 			function pick <infer Value>(
@@ -361,12 +325,9 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// Regression tests — item Types erase before a Match runs, so a List
-	// Matcher asks about the items the value HOLDS. An empty List holds none
-	// and fits every List Matcher there is, so an empty `List<Integer>` takes
-	// the `case List<String>` written above it. The Program compiled without a
-	// single Diagnostic while doing it; it is a Warning now, and this pins the
-	// behaviour the Warning is about.
+	// Item Types erase, so a List Matcher asks about the items a value holds.
+	// An empty List fits every List Matcher and takes the first, which a
+	// Warning reports.
 	describe("Empty List Cases", () => {
 		let arms = `implementation {
 			constant empty: List<Integer> = []
@@ -404,13 +365,10 @@ describe("Match Lowering", () => {
 		})
 	})
 
-	// A Match on an Integer or a String takes the VALUE apart, and there is
-	// no Union under it — so what the Handlers are is a chain of value
-	// comparisons ending in the one Case that answers for the rest. That last Case
-	// is also evidence: reaching it proves the value is none of the values named
-	// above, which is the `isNot` a refinement is declared by. None of that runs —
-	// the evidence erases and the chain is the one someone would have written
-	// without it, which is why this goes all the way through.
+	// A Match on an Integer or a String is a chain of value comparisons, ending
+	// in the Case for the rest. That Case proves the value is none of the named
+	// ones, which a refinement's `isNot` reads. The evidence erases before the
+	// chain runs.
 	describe("Matches on values", () => {
 		let doubledOrZero = `implementation {
 			type Divisor = Integer where @::isNot(0)
@@ -438,23 +396,16 @@ describe("Match Lowering", () => {
 		it("emits a value comparison and no trace of the evidence", () => {
 			let generated = generate(doubledOrZero)
 
-			// A literal Matcher is a value comparison rather than a Type
-			// check, and the refinement is not a Type the emitted Program has ever
-			// heard of — it erases to the Integer it refines, which is the same
-			// object built by the same constructor. The scrutinee is exactly an
-			// Integer, so `compile-type-tests` writes the comparison out as the
-			// bigints both values hold rather than calling the universal
-			// structural equality to decide it.
+			// The refinement erases to the Integer it refines. The scrutinee is
+			// exactly an Integer, so `compile-type-tests` compares the bigints
+			// rather than calling the structural equality.
 			expect(generated).toContain("_self.value === $pool_1.value")
 			expect(generated).not.toContain("anyIs")
 			expect(generated).not.toContain("Divisor")
 
-			// What the product resolved to IS `NonZeroInteger` — a Namespace
-			// rather than a Type, declared for exactly this predicate, so a
-			// `Divisor` is answered by the total `multiply` written for it. Asked
-			// with the Optimiser off, because that is where a Namespace name is
-			// emitted text like every other Namespace's; the refinement above is
-			// not emitted under either setting.
+			// A `Divisor` reaches `NonZeroInteger`'s total `multiply`, declared
+			// for the same predicate. Only the unoptimised build names the
+			// Namespace.
 			let unoptimised = generate(doubledOrZero, {
 				enabled: false,
 				disabledPasses: new Set(),
@@ -463,19 +414,14 @@ describe("Match Lowering", () => {
 			expect(unoptimised).toContain("NonZeroInteger.multiply")
 			expect(unoptimised).not.toContain("Divisor")
 
-			// And with the Optimiser on there is no call at all:
-			// `lower-scalar-operations` writes the product out as the bigint
-			// multiplication it always was, exactly as it does for `Integer`'s own
-			// entry — the evidence was spent while compiling, and the two
-			// Namespaces multiply the same two values.
+			// With the Optimiser on, `lower-scalar-operations` writes the
+			// product as a bigint multiplication, as it does for `Integer`.
 			expect(generated).not.toContain("NonZeroInteger.multiply")
 			expect(generated).toContain("value: d.value * $pool_0.value")
 		})
 
-		// The last Handler of such a Match asks a tag question — every value
-		// reaching it is an Integer — so the elision applies exactly as it does to a
-		// Union's last Case, and the chain ends in the Handler rather than in the
-		// throw.
+		// Every value reaching the last Handler is an Integer, so the elision
+		// applies, and the chain ends in the Handler.
 		it("ends the emitted chain in the Case for the rest", () => {
 			expect(generate(doubledOrZero)).not.toContain(
 				"$type.noCaseMatched(_self)",
