@@ -4,14 +4,8 @@ import * as path from "node:path"
 import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 
-// Shells expand globs themselves, but not all of them, not on every
-// platform, and not when the pattern is quoted to stop them from trying. The
-// patterns that survive to here are expanded so that `esc build "src/*.es"`
-// behaves the same everywhere.
-// Exported beside `looksLikeGlob` for the one caller that needs WHERE the
-// pattern turns magic rather than whether it does — `--mutate` reads a pattern
-// down to its literal head. Two spellings of what a glob character is would be
-// two ideas of which files a run was pointed at.
+// The characters that make a glob. Globs a shell left unexpanded are expanded
+// here, and `--mutate` uses this to find a glob's literal head.
 export const GLOB_PATTERN = /[*?[\]{}]/
 
 export function looksLikeGlob(value: string): boolean {
@@ -94,9 +88,8 @@ export function defaultOutputFor(inputFileName: string): string {
 	return path.join(directory, `${base}.js`)
 }
 
-// With one input `--out` names a file; with several it can only name a
-// directory, since several sources cannot share one output path. A trailing
-// separator, or an existing directory, makes it a directory in either case.
+// With one input `--out` names a file, with several a directory. A trailing
+// separator or an existing directory makes it a directory either way.
 export async function resolveOutputFiles(
 	inputFileNames: Array<string>,
 	out: string | undefined,
@@ -137,8 +130,8 @@ export async function resolveOutputFiles(
 		}
 	}
 
-	// Compiling several sources into one directory flattens them, so two
-	// inputs with the same base name would silently overwrite each other.
+	// Several sources compile flat into one directory, so equal base names would
+	// overwrite each other.
 	let claimed = new Map<string, string>()
 
 	for (let input of inputFileNames) {

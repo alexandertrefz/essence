@@ -2,9 +2,8 @@ import { styleText } from "node:util"
 
 import { stripAnsi } from "@essence-lang/ariadne"
 
-// Colour and Unicode support are resolved once at startup and passed
-// around as a Theme, so that every renderer draws consistently and tests can
-// construct a plain Theme instead of faking a Terminal.
+// Colour and Unicode support are resolved once into a Theme, so renderers agree
+// and specs build a plain Theme without a Terminal.
 
 export type ColorChoice = "auto" | "always" | "never"
 
@@ -32,9 +31,8 @@ export type Theme = {
 		warning: string
 		info: string
 		pending: string
-		// A test's own three marks, lighter than the compilation's — a
-		// report listing forty of them beside each other is read by shape, and
-		// the heavy ✔/✖ that suit one headline per file turn a tree into noise.
+		// A test's marks are lighter than a compilation's, so a tree of many tests reads
+		// by shape.
 		pass: string
 		fail: string
 		skip: string
@@ -46,10 +44,8 @@ export type Theme = {
 	}
 }
 
-// The environment variable conventions implemented here are the ones
-// tools are expected to honour: NO_COLOR disables colour regardless of TTY
-// state, FORCE_COLOR enables it regardless — an explicit `--color` flag wins
-// over both.
+// `NO_COLOR` turns colour off and `FORCE_COLOR` on, whatever the TTY says. An
+// explicit `--color` beats both.
 export function supportsColor(
 	choice: ColorChoice,
 	stream: NodeJS.WriteStream,
@@ -78,9 +74,8 @@ export function supportsColor(
 	return stream.isTTY === true
 }
 
-// Windows consoles outside of Windows Terminal, and the handful of
-// terminals that report a non-UTF-8 locale, render the Braille and box drawing
-// characters as replacement boxes — those fall back to ASCII.
+// Older Windows consoles and terminals with a non-UTF-8 locale draw Braille and
+// box characters as boxes, so they get ASCII.
 export function supportsUnicode(
 	env: NodeJS.ProcessEnv = process.env,
 	platform: string = process.platform,
@@ -140,8 +135,7 @@ export function createTheme(color: boolean, unicode: boolean): Theme {
 
 type StyleTextFormat = Parameters<typeof styleText>[0]
 
-// `gray` is not a styleText format name — it is spelled `blackBright`
-// in the ANSI naming Node uses. Mapping it here keeps call sites readable.
+// `styleText` spells `gray` as `blackBright`.
 function resolveStyles(styles: Array<Style>): StyleTextFormat {
 	return styles.map((style) =>
 		style === "gray" ? "blackBright" : style,
@@ -162,8 +156,7 @@ export function style(
 	return styleText(resolveStyles(list), text, { validateStream: false })
 }
 
-// Semantic wrappers, so that the meaning of a colour lives in one place
-// and the palette can be retuned without touching every renderer.
+// Semantic wrappers, so a colour's meaning lives in one place.
 export function createPalette(theme: Theme) {
 	let apply =
 		(styles: Style | Array<Style>) =>
@@ -189,9 +182,7 @@ export function createPalette(theme: Theme) {
 
 export type Palette = ReturnType<typeof createPalette>
 
-// Re-exported rather than reimplemented — the Diagnostic renderer needs
-// the same operation, and two copies of an escape-sequence pattern is one copy
-// too many.
+// Re-exported from the Diagnostic renderer, which needs the same pattern.
 export { stripAnsi }
 
 export function visibleLength(text: string): number {

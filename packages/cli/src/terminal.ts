@@ -1,8 +1,7 @@
 import { visibleLength } from "./theme"
 
-// Progress is drawn to stderr so that stdout stays a clean data channel —
-// `esc build … | …` and `--json` must never have spinner frames interleaved
-// into their output.
+// Progress is drawn to stderr, so stdout carries only data, as pipes and
+// `--json` need.
 
 const MINIMUM_WIDTH = 20
 const HIDE_CURSOR = "\x1b[?25l"
@@ -20,9 +19,8 @@ export type Terminal = {
 	err: (text: string) => void
 }
 
-// CI environments are TTY-shaped often enough to fool `isTTY`, but their
-// log collectors keep every redraw frame as a separate line — a spinner there
-// produces hundreds of lines of noise, so animation is disabled.
+// CI often looks like a TTY, but its logs keep every redraw as a line, so
+// animation is off there.
 export function isInteractive(
 	stream: NodeJS.WriteStream,
 	env: NodeJS.ProcessEnv = process.env,
@@ -43,10 +41,8 @@ export function createTerminal(
 		stdout,
 		stderr,
 		isInteractive: isInteractive(stderr, env),
-		// A terminal that has no window size — a pty opened without one,
-		// a pipe, a CI log — reports zero columns rather than nothing at all,
-		// so the fallback has to treat zero as "unknown" and not as a width.
-		// Taking it literally truncates every line away to an ellipsis.
+		// A terminal without a window size reports zero columns, so zero means unknown
+		// rather than a width.
 		get width() {
 			return Math.max(
 				MINIMUM_WIDTH,
@@ -62,10 +58,8 @@ export function createTerminal(
 	}
 }
 
-// Truncation counts visible characters only, so that a line already
-// carrying colour escapes is measured by what the user sees. The escapes
-// themselves are left in place — a truncated line keeps its opening codes and
-// the trailing reset is re-appended by the caller's styling.
+// Truncation counts visible characters only, leaving colour escapes in place.
+// The caller's styling appends the closing reset.
 export function truncate(text: string, width: number): string {
 	if (width <= 1 || visibleLength(text) <= width) {
 		return text
@@ -97,9 +91,8 @@ export function truncate(text: string, width: number): string {
 	return `${result}…`
 }
 
-// A block of lines that can be redrawn in place. Every frame is written
-// as one `write` call, because a partial frame split across several writes
-// flickers visibly at spinner frame rates.
+// A block of lines redrawn in place. Each frame is one `write`, since a frame
+// split across writes flickers.
 export class LiveRegion {
 	private terminal: Terminal
 	private renderedLines = 0
@@ -136,8 +129,7 @@ export class LiveRegion {
 		this.terminal.stderr.write(frame)
 	}
 
-	// Erasing without redrawing — used before printing permanent output
-	// so that scrollback never keeps a half-finished progress frame.
+	// Erases without redrawing, so scrollback never keeps a half-drawn frame.
 	clear(): void {
 		if (!this.terminal.isInteractive || this.renderedLines === 0) {
 			this.showCursor()

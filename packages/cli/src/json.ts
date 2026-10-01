@@ -3,10 +3,8 @@ import type { common } from "@essence-lang/interfaces"
 
 import { type CompileOutcome, ownDiagnostics } from "./pipeline"
 
-// The machine-readable form of a run. Positions are flattened to plain
-// line and column numbers — a consumer should not have to know the Compiler's
-// internal Position shape — and every field is present on every entry, so a
-// reader never has to distinguish "absent" from "not applicable".
+// The machine-readable form of a run. Positions are plain line and column
+// numbers, and every field is present on every entry.
 
 type JSONDiagnostic = {
 	file: string
@@ -90,10 +88,8 @@ export function toJSONReport(
 			gzipBytes: outcome.gzipBytes,
 			durationMs: round(outcome.duration),
 			stages,
-			// Every Diagnostic under the file it was written in, which
-			// with Modules is regularly not the file that was compiled. An
-			// Editor jumping to `input` for a dependency's error would open the
-			// wrong file at a line number that means nothing there.
+			// Every Diagnostic under the file it was written in, which with Modules is often
+			// not the compiled entry.
 			diagnostics: [
 				...outcome.modules.flatMap((module) =>
 					module.diagnostics.map((diagnostic) =>

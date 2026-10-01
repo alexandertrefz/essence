@@ -153,9 +153,8 @@ export async function runWatch(
 		},
 	})
 
-	// The graphs GROW — an import written during the session brings a
-	// directory with it, and a rebuild that never watched it would be the last
-	// one.
+	// The watched set grows, since an import written during the session can bring a
+	// new directory.
 	async function watchGraph(): Promise<void> {
 		await watcher.watch(watchedFiles())
 	}
@@ -221,9 +220,8 @@ export async function runWatch(
 			process.stdin.off("data", onKey)
 		}
 
-		// Raw mode is what makes single keypresses arrive without the
-		// user pressing return. It also means Ctrl+C is delivered as data
-		// rather than as a signal, so it is handled by hand above.
+		// Raw mode delivers single keypresses without return. It also delivers Ctrl+C as
+		// data rather than as a signal, so `onKey` handles it.
 		if (process.stdin.isTTY) {
 			process.stdin.setRawMode(true)
 			process.stdin.resume()

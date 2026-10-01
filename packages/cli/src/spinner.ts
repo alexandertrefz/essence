@@ -1,10 +1,8 @@
 import { LiveRegion, type Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"
 
-// The spinner does not appear immediately. Most compilations finish in
-// well under a tenth of a second, and a spinner that flashes for two frames
-// reads as a glitch rather than as progress — so rendering only starts once a
-// run has proven to be slow enough to be worth reporting on.
+// The spinner appears only once a run proves slow, since one that flashes for two
+// frames reads as a glitch.
 const RENDER_DELAY = 90
 const FRAME_INTERVAL = 80
 const ELAPSED_THRESHOLD = 1000
@@ -64,8 +62,7 @@ export class Progress {
 			this.visible = true
 			this.draw()
 
-			// The interval is unref'd so a spinner can never be the
-			// reason the process stays alive after the work is done.
+			// Unref'd, so a spinner never keeps the process alive.
 			this.timer = setInterval(() => {
 				this.frame += 1
 				this.draw()
@@ -93,9 +90,8 @@ export class Progress {
 		this.draw()
 	}
 
-	// Called before any permanent output is printed. Progress lives in a
-	// region that is erased on the way out, so nothing it drew survives in
-	// scrollback — the report is the only record of a finished run.
+	// Called before any permanent output, so no progress frame survives in
+	// scrollback.
 	stop(): void {
 		if (this.delayTimer !== null) {
 			clearTimeout(this.delayTimer)
@@ -172,8 +168,7 @@ export class Progress {
 		return line
 	}
 
-	// Elapsed time only appears once a task has been running long enough
-	// that the user might wonder whether it is stuck.
+	// Elapsed time appears only once a task runs long enough to look stuck.
 	private elapsedFor(task: Task): string | null {
 		if (task.status !== "active" || task.startedAt === undefined) {
 			return null
