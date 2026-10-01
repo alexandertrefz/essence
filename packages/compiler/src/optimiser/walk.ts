@@ -1,91 +1,42 @@
 import type { common } from "@essence-lang/interfaces"
 
-// One walk over a simplified Program, shared by every Optimiser pass, so
-// that a pass is written as the one question it asks — "is THIS Node one I can
-// do better than?" — and not as a second copy of the tree's shape. A missed
-// position is not a crash: it is an optimisation that silently does not happen
-// where it was written to, and, once passes begin rewriting into intrinsics
-// that later passes read, a Node the walk does not reach is a Node a pass can
-// not fix up either. So every kind is handled by name: the Expression and
-// intrinsic switches are exhaustive and answer nothing by default, and the
-// Statement switch names each Statement kind before falling through to the
-// Expressions — which is what makes a Statement kind added to `typedSimple`
-// a compile error, since the fall-through narrows to `ExpressionNode` and a
-// Statement is not one.
-//
-// The walk is BOTTOM-UP: a Node's children are rewritten before the Node
-// itself is offered to the pass, so a pass reading its own output reads the
-// finished form of everything below it and never has to re-walk what it just
-// produced.
-//
-// Nothing is mutated. A pass is a pure function of its input — the
-// standard library's simplified Programs are a process-wide value the prelude
-// cache hands out again and again — so every Node whose children changed is
-// rebuilt, and every Node whose children did not is handed back AS ITSELF.
-// That identity is what keeps a pass that rewrites one Node in a Program from
-// allocating a copy of the whole Program around it.
+// The one bottom-up walk every pass shares. It never mutates, and hands back
+// an unchanged Node as itself. See "The shared walk" in DEVELOPMENT.md.
 
 type ExpressionNode = common.typedSimple.ExpressionNode
 type ImplementationNode = common.typedSimple.ImplementationNode
 type FunctionDefinitionNode = common.typedSimple.FunctionDefinitionNode
 type ArgumentNode = common.typedSimple.ArgumentNode
 
-// What a pass hands the walk: one Expression in, its replacement out. An
-// answer that IS the argument means "leave this one alone", which is how the
-// structural sharing above is kept.
+// One Expression in, its replacement out. Answering the argument leaves it
+// alone.
 type ExpressionRewrite = (node: ExpressionNode) => ExpressionNode
 
-// And the same for a Statement — one Node standing in a Statement
-// POSITION in, its replacement out. "Statement position" is the whole of what
-// this offers and is wider than `StatementNode`: an Expression written for its
-// effects stands in one, and a Match written that way is exactly what
-// `lower-matches-to-statements` is looking for. Such a Node is offered to BOTH
-// hooks, the Expression one first, because it is both things at once.
+// One Node in a Statement position, which an Expression written for its
+// effects also stands in. Such a Node is offered to both hooks.
 type StatementRewrite = (node: ImplementationNode) => ImplementationNode
 
-// And the same for a body: a Program's own nodes, a Function's body, a
-// Match Handler's, a Conditional's two, an inlined callback's and a test's. It
-// is the one hook that can answer with a different number of Statements than it
-// was given, which is what `eliminate-dead-code` needs: a Statement rewrite maps
-// one Node to one Node.
-//
-// Offered AFTER every Statement in it has been walked, like everything
-// else here, and expected to answer with the array it was GIVEN where it changes
-// nothing — the structural sharing the rest of this file keeps rests on it.
+// A whole body, after each Statement in it was walked. The one hook that may
+// change how many Statements there are. Answer the given array to change
+// nothing.
 type BodyRewrite = (
 	nodes: Array<ImplementationNode>,
 ) => Array<ImplementationNode>
 
-// The hooks a pass asks for, and it may ask for any of them. All are
-// offered by ONE walk: `elide-final-match-test` reads a Match that is still an
-// Expression and one that has been lowered to a Statement, and two walks would
-// be two chances to disagree about what was reached.
+// The hooks a pass asks for, all offered by one walk. See "Hooks" in
+// DEVELOPMENT.md.
 type NodeRewrites = {
 	expression?: ExpressionRewrite
 	statement?: StatementRewrite
 	body?: BodyRewrite
-	// Whether the walk descends into a Parameter's `= expression` default.
-	// OFF by default, and asked for by name, because a default stands in a
-	// position that has NO Statement before it: several passes answer an
-	// Expression by lifting work into Statements ahead of it —
-	// `lower-matches-to-statements` is the plain case, `inline-loops` and
-	// `build-lists-in-place` the ones that bind names — and there is nowhere in
-	// a Parameter list for any of that to go.
-	//
-	// A pass that only ever answers an Expression with another Expression has no
-	// such trouble, and three of them need to see a default: `fold-constants`
-	// and `pool-constants`, because a unit-Case default is built at every call
-	// otherwise, and `eliminate-dead-code`, whose reading of what the Program
-	// READS is not a rewrite at all — a Constant named only by a default was
-	// dropped out from under it.
+	// Whether to descend into a Parameter's default, which has no Statement
+	// before it to lift work into. A pass that rewrites in place, or only
+	// reads, asks.
 	parameterDefaults?: true
 }
 
-// BOTTOM-UP for Statements as well: a Statement's children — its
-// Expressions and the Statements of any body it holds — are rewritten before it
-// is offered. So a pass reading its own output reads the finished form of
-// everything below it, and a Match nested in a Handler's body is lowered before
-// the Match holding it is asked about.
+// Bottom-up for Statements too: a Statement's Expressions and bodies are
+// rewritten before it is offered.
 export function rewriteNodes(
 	program: common.typedSimple.Program,
 	rewrites: NodeRewrites,
@@ -104,15 +55,8 @@ export function rewriteNodes(
 	}
 }
 
-// A test compile's tests section is walked exactly as the implementation
-// is, and by the same passes. It has to be: `eliminate-dead-code` decides what
-// a Program READS, and a top-level Constant read only by a test would otherwise
-// be dropped out from under the test that reads it. Everything else follows
-// from that — a test body is Statements, and Statements the Optimiser does not
-// reach are Statements emitted as the Simplifier left them.
-//
-// Null in every compile that did not ask for the tests, which is every
-// build, so this costs a null check per pass there.
+// Walked by the same passes as the implementation, so `eliminate-dead-code`
+// sees what a test reads. Null in every compile that did not ask for tests.
 function walkTests(
 	section: common.typedSimple.TestsSectionNode | null,
 	rewrites: NodeRewrites,
@@ -126,15 +70,8 @@ function walkTests(
 	return nodes === section.nodes ? section : { ...section, nodes }
 }
 
-// A Scope's run of Nodes — the section's own, and each suite's. The two
-// Nodes that are not Statements are walked by hand; everything else is a
-// Statement and goes through `walkImplementation`, so a setup Constant is
-// optimised the way the same Constant beside the implementation would be.
-//
-// It is NOT `walkBody`: the `body` hook may answer with a different
-// number of Statements, and dropping a `TestEntry` would take a test away
-// without anything saying so. Each test's own body IS offered to that hook,
-// through `walkBody` below.
+// A Scope's run of Nodes. Not `walkBody`, so the `body` hook can never drop a
+// test. Each test's own body goes through `walkBody`.
 function walkTestsNodes(
 	nodes: Array<common.typedSimple.TestsNode>,
 	rewrites: NodeRewrites,
@@ -156,8 +93,7 @@ function walkTestsNodes(
 			let rows = mapArray(node.rows, (row) =>
 				walkExpression(row, rewrites),
 			)
-			// NOT `walkBody` — a hook answering with a different number
-			// of Statements would part the bindings from the row they read.
+			// Not `walkBody`, which could part the bindings from their row.
 			let bindings = mapArray(node.bindings, (binding) =>
 				walkImplementation(binding, rewrites),
 			)
@@ -174,9 +110,7 @@ function walkTestsNodes(
 		if (node.nodeType === "TestProperties") {
 			let name =
 				node.name === null ? null : walkExpression(node.name, rewrites)
-			// A generator's Expressions are walked too — a refinement's
-			// check and a `Generatable` call are ordinary Expressions of this
-			// Module, so a pass that improves one improves these.
+			// A generator's Expressions are ordinary Expressions of the Module.
 			let parameters = mapArray(node.parameters, (parameter) => {
 				let generator = walkGenerator(parameter.generator, rewrites)
 
@@ -292,13 +226,8 @@ export function rewriteStatements(
 	return rewriteNodes(program, { statement: rewrite })
 }
 
-// ONE Expression rather than a Program, walked by the very switch a
-// Program's Expressions are walked by. A pass that holds a single Expression —
-// a Parameter's default, an Argument it is about to move — asks its question of
-// exactly the positions named below, which is what keeps "is this Identifier a
-// reference to a BINDING?" a question answered in one place. A sweep of its own
-// over `Object.values` can not tell a Lookup's member from a name a Program
-// bound, and a rewrite made on that answer emits a name nothing answers to.
+// One Expression, walked by the switch a Program's Expressions are walked by.
+// See "Positions" in DEVELOPMENT.md.
 export function rewriteExpressionsIn(
 	node: ExpressionNode,
 	rewrite: ExpressionRewrite,
@@ -306,10 +235,8 @@ export function rewriteExpressionsIn(
 	return walkExpression(node, { expression: rewrite })
 }
 
-// One run of Statements, walked and then offered whole. Every place a body
-// can stand goes through this — which is what makes "every body, exactly once"
-// a property of this function rather than of each call site remembering to
-// agree.
+// One run of Statements, walked and then offered whole. Every body goes
+// through this, once.
 function walkBody(
 	nodes: Array<ImplementationNode>,
 	rewrites: NodeRewrites,
@@ -319,10 +246,7 @@ function walkBody(
 	return rewrites.body === undefined ? walked : rewrites.body(walked)
 }
 
-// The copy is not made until something is IN it. Every pass walks the
-// tree and each is written for one shape, so the common answer here is the
-// array that was given. Every entry is still mapped, in order, exactly once: the
-// laziness is in the allocation, not in the work.
+// Maps every entry in order, but copies only once an entry changed.
 function mapArray<Value>(
 	values: Array<Value>,
 	map: (value: Value) => Value,
@@ -347,11 +271,8 @@ function mapArray<Value>(
 	return mapped ?? values
 }
 
-// Insertion order is preserved, which is not a detail — a Record's
-// members are emitted in the order they are written, and `Object.keys` over the
-// emitted literal is what the runtime's Record equality and its printer read.
-// The copy is filled from the same key order it is abandoned in, so a Record
-// one member of which changed keeps the order the whole of it was written in.
+// Keeps the insertion order, which the runtime's Record equality and printer
+// read off the emitted literal.
 function mapRecord<Value>(
 	members: Record<string, Value>,
 	map: (value: Value) => Value,
@@ -384,10 +305,7 @@ function mapRecord<Value>(
 	return mapped ?? members
 }
 
-// Every Statement POSITION, offered once. An Expression written for its
-// effects stands in one and has already been offered to the Expression hook by
-// the time it is offered here — the walk below descends first and asks after,
-// as it does everywhere.
+// Every Statement position, offered once, after its children.
 function walkImplementation(
 	node: ImplementationNode,
 	rewrites: NodeRewrites,
@@ -414,11 +332,8 @@ function walkImplementationChildren(
 			let properties = mapRecord(node.properties, (value) =>
 				walkExpression(value, rewrites),
 			)
-			// A Method's body is walked, the Function literal holding it is
-			// not offered to the pass: the Rewriter emits it as a class member
-			// rather than as a value, so there is no position there for another
-			// kind of Expression to stand in. A Namespace's static Properties
-			// above ARE values, and are offered like any other.
+			// A Method's body is walked, but its Function literal is emitted as
+			// a class member, not a value, and is not offered.
 			let methods = mapRecord(node.methods, (entry) => {
 				let value = walkFunctionDefinition(entry.method.value, rewrites)
 
@@ -429,9 +344,7 @@ function walkImplementationChildren(
 				return { ...entry, method: { ...entry.method, value } }
 			})
 
-			// A native Method's shim is a Parameter list and nothing
-			// else — the Rewriter writes its one-call body out — so the
-			// defaults are the whole of what there is to walk here.
+			// A native Method's shim has only its Parameter defaults to walk.
 			let nativeShims = mapArray(node.nativeShims, (shim) => {
 				let parameters = walkParameterDefaults(
 					shim.parameters,
@@ -480,12 +393,8 @@ function walkImplementationChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
-		// A turn of a looped Function holds Expressions in two runs — the
-		// Arguments it evaluates and the values it then assigns — and both are
-		// walked, in that order, because that is the order they run in and each
-		// is an ordinary Expression of the Program. Nothing here is offered as a
-		// Statement of its own: a pass that lifted one out of its place would
-		// take the turn away.
+		// The Arguments a turn evaluates, then the values it assigns, in the
+		// order they run. None is offered as a Statement, which a pass could move.
 		case "TailCallStatement": {
 			let bindings = mapArray(node.bindings, (binding) => {
 				let value = walkExpression(binding.value, rewrites)
@@ -507,12 +416,8 @@ function walkImplementationChildren(
 		}
 		case "IntrinsicStatement":
 			return walkIntrinsicStatementChildren(node, rewrites)
-		// An assertion holds the Expression it asserts and, where a
-		// Matcher was written, that Matcher's test — the same two positions a
-		// Match Handler holds, walked the same way. Nothing here is offered to
-		// a pass as a Statement of its own: an assertion is not an Expression
-		// and a pass that lifted one out of its place would take away the
-		// early return a `require` is.
+		// Walked as the Handler it holds. Nothing is offered as a Statement,
+		// since moving one would lose the early return of a `require`.
 		case "TestAssertionStatement": {
 			let value = walkExpression(node.value, rewrites)
 			let matcher =
@@ -524,10 +429,7 @@ function walkImplementationChildren(
 				? node
 				: { ...node, value, matcher }
 		}
-		// A Protocol's PROVIDED Methods are bodies, walked exactly as a
-		// Namespace's are — same rule, same reason: the Rewriter emits each as a
-		// const of its own, so there is no position there for another kind of
-		// Expression to stand in, and only the body is offered to a pass.
+		// A provided Method's body is walked as a Namespace Method's is.
 		case "ProtocolDeclarationStatement": {
 			let methods = mapRecord(node.methods, (entry) => {
 				let value = walkFunctionDefinition(entry.method.value, rewrites)
@@ -541,8 +443,7 @@ function walkImplementationChildren(
 
 			return methods === node.methods ? node : { ...node, methods }
 		}
-		// A Type Alias carries nothing but a name and a Type by this
-		// point — the Rewriter emits nothing at all for it.
+		// A Type Alias holds only a name and a Type here.
 		case "TypeAliasStatement":
 			return node
 		default:
@@ -550,11 +451,8 @@ function walkImplementationChildren(
 	}
 }
 
-// A lowered Statement is walked like the Expression it was lowered from:
-// its Handlers' tests, Guards and bodies, and the values it holds under a name,
-// are the same positions in the same order. That is what lets the passes after
-// `lower-matches-to-statements` — the pool above all — reach what a Match holds
-// whether or not it was lowered.
+// The same positions, in the same order, as the Expression it was lowered
+// from.
 function walkIntrinsicStatementChildren(
 	node: common.typedSimple.IntrinsicStatementNode,
 	rewrites: NodeRewrites,
@@ -597,15 +495,8 @@ function walkIntrinsicStatementChildren(
 	}
 }
 
-// An inlined loop is walked like the call it replaced: the Expressions it
-// was given, and the Statements of each callback's body — which are Statements
-// standing in a Statement position and are offered to BOTH hooks, exactly as the
-// Function literal's body was before it was inlined. That is what keeps
-// `pool-constants` reaching a literal written inside a loop body and
-// `elide-final-match-test` reading a Match written there.
-//
-// A Parameter is a binding rather than a value and is not offered, which
-// is how every other Parameter position in this walk is treated.
+// Walked like the call it replaced. A Parameter is a binding and is not
+// offered.
 function walkInlineLoopDriver(
 	driver: common.typedSimple.InlineLoopDriver,
 	rewrites: NodeRewrites,
@@ -700,9 +591,7 @@ function walkInlineLoopCallback(
 	return body === callback.body ? callback : { ...callback, body }
 }
 
-// The body, and the Parameter defaults for the passes that asked for them
-// — see `NodeRewrites.parameterDefaults` for which passes those are and why the
-// rest are kept out.
+// The body, and the Parameter defaults when a pass asked for them.
 function walkFunctionDefinition(
 	node: FunctionDefinitionNode,
 	rewrites: NodeRewrites,
@@ -717,10 +606,8 @@ function walkFunctionDefinition(
 	return { ...node, parameters, body }
 }
 
-// The one place a `= expression` default is walked, for every kind of
-// Declaration that can carry one — a Function, a Method, and the frame the
-// Compiler synthesizes for a native's defaults, which has no body at all and is
-// therefore nothing BUT this.
+// The one place a default is walked, for a Function, a Method, and the
+// bodiless frame synthesized for a native's defaults.
 function walkParameterDefaults(
 	parameters: Array<common.typedSimple.ParameterNode>,
 	rewrites: NodeRewrites,
@@ -764,12 +651,8 @@ function walkExpression(
 		: rewrites.expression(walked)
 }
 
-// The Expression positions a Node holds — and only those. A `type` is
-// walked by nobody: it is a Type, not an Expression, and a Match's `matcher` is
-// one as well. The two Identifier positions that LOOK like Expressions are left
-// alone on purpose: a `MethodInvocation`'s `base` names the answering Namespace
-// and a `Lookup`'s `member` the member being read. Neither is a value the
-// Program computes, and neither field can hold anything but an Identifier.
+// The Expression positions a Node holds, and only those. A `base` and a
+// `member` are Identifiers but not values.
 function walkChildren(
 	node: ExpressionNode,
 	rewrites: NodeRewrites,
@@ -793,10 +676,8 @@ function walkChildren(
 		case "UnionMethodInvocation": {
 			let base = walkExpression(node.base, rewrites)
 			let args = walkArguments(node.arguments, rewrites)
-			// A dispatch case carries Arguments of its own — the hidden
-			// conformance witnesses every branch needs, and the Function
-			// literals compiled against THIS branch's Method. Both are ordinary
-			// Expressions the Program evaluates, so both are walked.
+			// A dispatch case's own Arguments, its witnesses and the Function literals
+			// compiled for its Method, are Expressions the Program evaluates.
 			let cases = mapArray(node.cases, (dispatch) => {
 				let conformanceArguments = walkArguments(
 					dispatch.conformanceArguments,
@@ -941,11 +822,8 @@ function walkChildren(
 
 			return { ...node, value, handlers }
 		}
-		// Walked in EVALUATION order — each arm's Condition, then that
-		// arm's value, and the `otherwise` value last. The source writes an arm
-		// the other way round, `as VALUE if CONDITION`, and this is the one
-		// reading where the difference is worth anything: a pass that hoists or
-		// pools work reads the order the Program runs in off this walk.
+		// In evaluation order: each arm's Condition, then its value, and the
+		// `otherwise` value last. Passes that hoist or pool read the run order here.
 		case "Define": {
 			let arms = mapArray(node.arms, (arm) => {
 				let condition = walkExpression(arm.condition, rewrites)
@@ -995,10 +873,7 @@ function walkChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
-		// The operand of either Keyword is an Expression like any other and
-		// is offered to the passes as one — what the Keyword does with it is the
-		// Rewriter's business, and a pass that folds a constant inside a
-		// `complete` has folded a constant.
+		// The operand of either keyword is an ordinary Expression.
 		case "Start":
 		case "Complete": {
 			let expression = walkExpression(node.expression, rewrites)
@@ -1009,19 +884,13 @@ function walkChildren(
 		}
 		case "Intrinsic":
 			return walkIntrinsicChildren(node, rewrites)
-		// An instrumented point wraps the Expression that stands there,
-		// so what a pass is offered is the Expression itself — a trace is
-		// transparent to every reading but the one that emits it.
+		// An instrumented point is offered as the Expression it wraps.
 		case "TestTrace": {
 			let value = walkExpression(node.value, rewrites)
 
 			return value === node.value ? node : { ...node, value }
 		}
-		// And a coverage counter the same way, where it holds anything at
-		// all: a counter standing on its own in a Statement position holds no
-		// Expression, and one that answers with a value — around a Case
-		// construction, or in front of a `define` arm's answer — is transparent
-		// to every reading but the one that emits it.
+		// A coverage counter likewise, where it wraps a value at all.
 		case "CoverageCounter": {
 			let value =
 				node.value === null
@@ -1030,8 +899,7 @@ function walkChildren(
 
 			return value === node.value ? node : { ...node, value }
 		}
-		// The leaves — a Literal holds its own value, an Identifier a
-		// name, and neither has anywhere for an Expression to hide.
+		// The leaves.
 		case "StringValue":
 		case "IntegerValue":
 		case "RationalValue":
@@ -1041,12 +909,8 @@ function walkChildren(
 	}
 }
 
-// A conformance witness a Node carries beside its Expressions, walked
-// exactly as the hidden trailing Arguments of a bounded CALL are — those ride in
-// the Argument list and are walked with it, and these would be invisible to
-// every pass without this. `pool-constants` is what most wants to see them: a
-// witness is a method map built at every site it stands at, and one const
-// answering for all of them is what that pass is for.
+// A witness a Node carries beside its Expressions, walked like a bounded
+// call's trailing Arguments. `pool-constants` shares one across its sites.
 function walkWitness(
 	witness: common.typedSimple.ExpressionNode | undefined,
 	rewrites: NodeRewrites,
@@ -1054,15 +918,9 @@ function walkWitness(
 	return witness === undefined ? undefined : walkExpression(witness, rewrites)
 }
 
-// A Match's Handlers, walked the same whether the Match is still an
-// Expression or has been lowered to a Statement — one reading, so the two forms
-// can not be reached differently.
-//
-// A residual Type test is walked like any other Expression, so a pass that
-// runs after the one which wrote it reads it — and, as with the test under an
-// `essence-boolean`, what a later pass may not do is answer it with a Node of
-// the wrong KIND: it stands where JavaScript says `if (…)`, so an Essence
-// Boolean value there would be an object, and every object is true.
+// Walked the same whether the Match is an Expression or lowered. A residual
+// Type test must stay a JavaScript condition. See "Positions" in
+// DEVELOPMENT.md.
 function walkHandlers(
 	handlers: Array<common.typedSimple.MatchHandler>,
 	rewrites: NodeRewrites,
@@ -1070,10 +928,8 @@ function walkHandlers(
 	return mapArray(handlers, (handler) => walkHandler(handler, rewrites))
 }
 
-// One Handler's own positions, taken out of the loop above because an
-// ASSERTION holds exactly one of these and nothing else — `require #Value = x`
-// is a Handler with no Guard and no body, and it is walked by the same reading
-// so that a pass can not reach the one and miss the other.
+// One Handler, which is also all an assertion such as `require #Value = x`
+// holds.
 function walkHandler(
 	handler: common.typedSimple.MatchHandler,
 	rewrites: NodeRewrites,
@@ -1092,10 +948,8 @@ function walkHandler(
 			: mapRecord(handler.memberLiterals, (member) =>
 					walkExpression(member, rewrites),
 				)
-	// `memberTypes` holds Types and is walked past; `memberTests` is
-	// what `compile-type-tests` compiled them into, and is Expressions like
-	// any other — a pass that rewrote every Expression but these would leave
-	// a Handler's requirements reading the shape the pass before it replaced.
+	// `memberTypes` holds Types, but `memberTests`, which `compile-type-tests`
+	// compiled them into, holds Expressions.
 	let memberTests =
 		handler.memberTests === null
 			? null
@@ -1128,36 +982,22 @@ function walkHandler(
 	}
 }
 
-// An intrinsic is walked like anything else. A pass that runs after the
-// one which produced it reads the shape it left — a `direct-record`'s members
-// are the Record's members, wherever the Record came from — and a pass that
-// only ever sees the Simplifier's own Nodes is a pass whose order in the
-// registry decides what it can do.
+// Walked like any other Node, so a later pass reads what an earlier one left.
 function walkIntrinsicChildren(
 	node: common.typedSimple.IntrinsicNode,
 	rewrites: NodeRewrites,
 ): ExpressionNode {
 	switch (node.kind) {
-		// A `tag-test`'s value and an `essence-boolean`'s test are
-		// ordinary positions and are offered like any other — what a later pass
-		// may not do is answer one of them with a Node of the wrong KIND. The
-		// value under a test is an Essence value, but the test itself is a raw
-		// JavaScript boolean, and a pass that rewrote it into an Essence Boolean
-		// would leave a value object where a condition belongs. Nothing does:
-		// every pass matches the shapes the Simplifier produces, and none of
-		// those is a raw one.
+		// A `tag-test`'s value and an `essence-boolean`'s test are offered like any
+		// other. A pass may not answer the raw JavaScript test with an Essence Boolean,
+		// which would leave an object where a condition belongs.
 		case "tag-test":
 		case "essence-boolean":
-		// A `raw-boolean`'s value is the Essence Boolean it reads the
-		// JavaScript one out of, and is an ordinary position like the two
-		// above — with the same rule about kinds, from the other side: what
-		// stands here is a value, and what this Node ANSWERS is raw.
+		// A `raw-boolean`'s value is an Essence Boolean, though the Node answers a raw
+		// one.
 		case "raw-boolean":
-		// A pooled reference's value is the value the const band
-		// declares, and it is walked like any other — with the one thing a
-		// pass may not do being to change it without changing the `key` that
-		// says which pooled constant it IS. Nothing does: `pool-constants` is
-		// the last pass to run, so nothing reads its output but the Rewriter.
+		// A pooled reference's value may not change without its `key`. Only the
+		// rewriter reads it, since `pool-constants` runs last.
 		case "pooled-reference": {
 			let value = walkExpression(node.value, rewrites)
 
@@ -1173,18 +1013,13 @@ function walkIntrinsicChildren(
 
 			return { ...node, value, descriptor }
 		}
-		// The leaves. A Type is not an Expression, and the descriptor is
-		// the whole of what a `type-descriptor` holds; a `direct-method` holds
-		// two names and no Expression at all; an `omitted-argument` holds
-		// nothing whatever — it is a position held open, not a value.
+		// The leaves. An `omitted-argument` is a position held open, not a value.
 		case "type-descriptor":
 		case "direct-method":
 		case "omitted-argument":
 			return node
-		// A lowered operation's operands are the Expressions the
-		// Invocation was given, in the order it was given them — so a pass
-		// running after the one that lowered it reads them, and
-		// `pool-constants` finds the literal standing in one.
+		// A lowered operation's operands are the Invocation's Arguments, in their
+		// order.
 		case "raw-boolean-op": {
 			let operand = walkExpression(node.operand, rewrites)
 			let other =
@@ -1210,10 +1045,8 @@ function walkIntrinsicChildren(
 
 			return { ...node, left, right }
 		}
-		// Both are ordinary positions — the base is the Parameter being
-		// rebuilt, and the fallback is the default's own Expression, which is
-		// where `pool-constants` finds a literal a default wrote and
-		// `fold-constants` folds one. `member` is a name, not a Node.
+		// The base is the Parameter being rebuilt and the fallback is the default's
+		// own Expression. `member` is a name, not a Node.
 		case "member-or-default": {
 			let base = walkExpression(node.base, rewrites)
 			let fallback = walkExpression(node.fallback, rewrites)
@@ -1253,10 +1086,7 @@ function walkIntrinsicChildren(
 
 			return values === node.values ? node : { ...node, values }
 		}
-		// The items a turn adds to the Array a walk builds. They are the
-		// Expressions the `append` calls were given and are offered exactly as
-		// those Arguments were, which is what keeps `pool-constants` reaching a
-		// literal written inside a build and `fold-constants` folding one.
+		// The items a turn appends, offered as the `append` Arguments were.
 		case "list-build": {
 			let additions = mapArray(node.additions, (addition) => {
 				let value = walkExpression(addition.value, rewrites)
@@ -1268,13 +1098,8 @@ function walkIntrinsicChildren(
 
 			return additions === node.additions ? node : { ...node, additions }
 		}
-		// A compiled dispatch is walked in the order it evaluates: the
-		// Expressions it holds under a name, then the reads of them, then each
-		// branch's test and the Arguments that branch alone passes. The reads
-		// are ordinary Expressions and are offered like any other — a later pass
-		// finding a name there has nothing to do with it, and one finding the
-		// Expression itself (where the chain has one branch and holds nothing)
-		// may rewrite it exactly as it would anywhere else.
+		// In evaluation order: the held Expressions, the reads of them, then each
+		// branch's test and its own Arguments.
 		case "dispatch-chain": {
 			let temporaries = mapArray(node.temporaries, (temporary) => {
 				let value = walkExpression(temporary.value, rewrites)
@@ -1359,9 +1184,8 @@ function walkIntrinsicChildren(
 
 			return { ...node, lhs, members, rhs }
 		}
-		// The same walk the Statement form gets, because it is the same
-		// loop — one written where a Statement can hold it, one wrapped in an
-		// arrow because its position can not.
+		// The same loop as the Statement form, wrapped in an arrow where no Statement
+		// can stand.
 		case "inline-loop": {
 			let driver = walkInlineLoopDriver(node.driver, rewrites)
 

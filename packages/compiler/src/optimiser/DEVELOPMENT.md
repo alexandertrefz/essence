@@ -78,3 +78,55 @@ refuses a refinement outright. Every pipeline that emits goes through `optimise`
 
 With the phase off, `optimise` skips `declaredNamespaces` and hands `instrument-coverage` an empty answer, since
 that pass does not read it.
+
+## The shared walk
+
+`rewriteNodes` in `walk.ts` is the one walk every pass uses. A pass is written as the question it asks of one Node,
+not as another copy of the tree's shape. A position the walk missed would be an optimisation that silently does not
+happen, so every kind is handled by name. The Expression and intrinsic switches are exhaustive. The Statement switch
+names each Statement kind before it falls through to the Expressions, so a new Statement kind in `typedSimple` fails
+to compile there.
+
+The walk is bottom-up. A Node's children, the Statements of its bodies included, are rewritten before the Node is
+offered. A pass therefore reads the finished form of everything under a Node. A Match nested in a Handler is lowered
+before the Match that holds it.
+
+Nothing is mutated. A Node whose children changed is rebuilt, and a Node whose children did not is handed back as
+itself. So a pass that rewrites one Node does not copy the Program around it. A hook that changes nothing answers with
+what it was given. `mapArray` and `mapRecord` copy only once something has changed. `mapRecord` keeps the members in
+their written order, which the runtime's Record equality and printer read off the emitted literal.
+
+### Hooks
+
+A pass may ask for any of the `expression`, `statement` and `body` hooks, and one walk offers them all.
+`elide-final-match-test` reads a Match both as an Expression and as a lowered Statement, and two walks could
+disagree about what they reached.
+
+- A Statement position is wider than `StatementNode`. An Expression written for its effects stands in one, and
+  it is offered to both hooks, the Expression hook first.
+- `body` receives a whole run of Statements after each was walked. It is the only hook that can change how many
+  there are, which `eliminate-dead-code` needs. Every body goes through `walkBody`.
+- `parameterDefaults` makes the walk descend into a Parameter's `= expression` default. It is off unless asked for.
+  Several passes answer an Expression by lifting work into Statements ahead of it, and a Parameter list has nowhere to
+  put them. `fold-constants`, `pool-constants` and `eliminate-dead-code` ask for it.
+
+### Positions
+
+A lowered form is walked like what it came from. A lowered Match holds the same positions in the same order as the
+Match Expression. An inlined loop is walked like the call it replaced, its callback bodies offered to both hooks. An
+assertion is walked as the Handler it is. A conformance witness a Node carries is walked like the trailing Arguments
+of a bounded call. Intrinsics are walked like any other Node, so a pass reads what an earlier pass produced.
+
+Some positions are not values and are never offered. They are a `type`, a Match's `matcher`, a `MethodInvocation`'s
+`base` and a `Lookup`'s `member`. A Parameter is a binding, not a value. `rewriteExpressionsIn` walks a single
+Expression with the same switch. A pass asks there whether an Identifier refers to a binding. A sweep over
+`Object.values` can not tell a member name from a binding.
+
+A residual Type test is walked like any Expression, but no pass may answer it with a Node of another kind. It
+stands in a JavaScript `if`, where an Essence Boolean object would always be true.
+
+### The tests section
+
+In a test compile, the tests section is walked by the same passes as the implementation, since
+`eliminate-dead-code` has to see what a test reads. Its entries are not walked through `walkBody`, so no hook can
+drop a test, or part a row's bindings from the row. Each test's own body is.
