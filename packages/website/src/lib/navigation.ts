@@ -1,10 +1,7 @@
 /*
- * The shape of the documentation: which sections exist, in what order, where a
- * page sits in the reading chain, and how it is named in a breadcrumb.
- *
- * Nothing here imports `astro:content`. Every function takes the entries it
- * works on, so the ordering rules are readable — and testable — on their own,
- * and a page never has to know how the collection is loaded.
+ * The shape of the documentation: its sections and their order, a page's place
+ * in the reading chain, and its name in a breadcrumb. Nothing
+ * here imports `astro:content`, so specs can pass entries in directly.
  */
 
 export type SectionId =
@@ -20,12 +17,9 @@ export interface Section {
 }
 
 /**
- * The one place the sidebar's order lives.
- *
- * The ids mirror the `section` enum in `src/content.config.ts`, but the
- * order is this file's alone — it is the sidebar's order and the prev/next
- * chain's. Adding a section there without adding it here is a type error at
- * every call site rather than a silently missing group.
+ * The order of the sidebar and of the prev/next chain. The ids mirror the
+ * `section` enum in `src/content.config.ts`, and a section missing here is a
+ * type error.
  */
 export const SECTIONS: readonly Section[] = [
 	{ id: "getting-started", label: "Getting started" },
@@ -38,10 +32,8 @@ export const SECTIONS: readonly Section[] = [
 export type Template = "article" | "guide" | "reference" | "type"
 
 /**
- * The templates whose pages are read in order. A `type` page and a `reference`
- * page are lookup tables — nobody reads `List` and then turns the page to
- * `Dictionary` — so the chain skips them wherever they sit: it runs through
- * the library's overview and past its type pages.
+ * The templates whose pages are read in order. `type` and `reference` pages are
+ * looked up rather than read through, so the chain skips them.
  */
 const CHAINED_TEMPLATES: ReadonlySet<Template> = new Set(["article", "guide"])
 
@@ -56,7 +48,7 @@ export interface DocEntryLike {
 		section: SectionId
 		order: number
 		template: Template
-		/** The labelled run a top-level page sits in — see `groupsIn`. */
+		/** The labelled run a top-level page sits in. See `groupsIn`. */
 		group?: string
 	}
 }
@@ -69,12 +61,8 @@ export interface DocLink {
 }
 
 /**
- * A page in the rail, with whatever is nested under it.
- *
- * The file tree is the only relation that nests: `guides/projects/settings`
- * would be a child of `guides/projects` because that is where it is written,
- * so moving a page is what moves it in the navigation and the two cannot
- * disagree. Nothing published today nests — every section is a flat list.
+ * A page in the rail, with whatever is nested under it. Only the file tree
+ * nests: `guides/projects/settings` would be a child of `guides/projects`.
  */
 export interface SidebarItem extends DocLink {
 	children: SidebarItem[]
@@ -93,14 +81,9 @@ export interface SidebarSection extends Section {
 	/** Every top-level page of the section, in order, grouped or not. */
 	items: SidebarItem[]
 	/**
-	 * The same pages split into their labelled runs, or empty for a section
-	 * whose pages name no group. Laid end to end, the groups' items are `items`.
-	 *
-	 * Beside the flat list rather than instead of it, and a label laid
-	 * over the order rather than a sort of its own. The reading chain, the
-	 * breadcrumbs, the hub and search each put a section's pages in `order`
-	 * without ever seeing a group, so a grouping that moved a page in the rail
-	 * would have the rail disagree with that page's own next link.
+	 * The same pages split into their labelled runs, or empty when no page
+	 * names a group. Laid end to end, the groups' items are `items`, so the
+	 * rail never disagrees with the reading chain.
 	 */
 	groups: SidebarGroup[]
 }
@@ -108,7 +91,7 @@ export interface SidebarSection extends Section {
 export interface Crumb {
 	label: string
 	href?: string
-	/** The last crumb — the page you are on. */
+	/** The last crumb: the page you are on. */
 	current?: boolean
 }
 
@@ -120,7 +103,7 @@ export interface TocItem {
 }
 
 /**
- * The headings a page shows in its on-this-page list: `##` and below, down to
+ * The headings a page shows in its on-this-page list: `##` and deeper, down to
  * the depth the entry asked for. `#` is the page title, which is never in it.
  */
 export function getToc(
@@ -147,16 +130,10 @@ const HEADING = /^#{1,6}\s/
 const FENCE = /^(`{3,}|~{3,})/
 
 /**
- * A guide's on-this-page list: its steps and its own headings, in the order the
- * page takes them.
- *
- * A step's title is a component's `<h2>`, not Markdown, so it is not
- * among the `headings` Astro collects — and a guide is read by its steps, so a
- * list without them would name only what comes before and after the work. The
- * steps are read off the page's source instead, and the collected headings are
- * slotted in where their Markdown stands. Where the two readings disagree about
- * how many headings the page has, the source was read wrong, and the list falls
- * back to the headings alone rather than put one where it does not stand.
+ * A guide's on-this-page list: its steps and its headings, in page order. Astro
+ * does not collect a step's `<h2>`, so steps are read off the source and the
+ * headings slotted in. If the two readings disagree about the headings, the
+ * list falls back to the headings alone.
  */
 export function getGuideToc(
 	body: string,
@@ -235,8 +212,8 @@ export function toDocLink(entry: DocEntryLike): DocLink {
 	}
 }
 
-// `order` is the author's intent; the title only settles ties so that two
-// pages sharing a number still come out in a stable order across builds.
+// `order` decides, and the title breaks ties so the order is stable across
+// builds.
 function byOrder(a: DocEntryLike, b: DocEntryLike): number {
 	return (
 		a.data.order - b.data.order || a.data.title.localeCompare(b.data.title)
@@ -260,10 +237,8 @@ export function parentId(id: string): string | null {
 }
 
 /**
- * The id of the page an entry hangs off in the sidebar, or null when it stands
- * on its own. The parent has to be a page of the same section — the sidebar is
- * built a section at a time, and a branch that crossed between them could not
- * be drawn.
+ * The id of the page an entry hangs off in the sidebar, or null. The parent
+ * must be in the same section, since the sidebar is built a section at a time.
  */
 export function parentOf(
 	entry: DocEntryLike,
@@ -274,7 +249,7 @@ export function parentOf(
 	return parent !== null && within.has(parent) ? parent : null
 }
 
-/** The pages of a section that hang off nothing — the roots of its tree. */
+/** The pages of a section that hang off nothing: the roots of its tree. */
 function topLevelIn(
 	entries: readonly DocEntryLike[],
 	section: SectionId,
@@ -286,17 +261,9 @@ function topLevelIn(
 }
 
 /*
- * A section's top-level pages as labelled runs, in the order they already
- * have: each run is the pages next to one another that name the same `group`.
- *
- * A section groups every one of its top-level pages or none of them, and
- * a label names one run. Breaking either throws rather than drawing something,
- * because what would be drawn looks deliberate: a page without a group would
- * sit under the heading of whichever run it followed, and a label that came
- * back after another run would put the same heading in the rail twice. Both
- * are what the next page a writer adds is likely to do — a new Language page
- * with no `group`, or an `order` that lands inside another run — and a build
- * that names the page is the one place that mistake would be seen.
+ * A section's top-level pages as runs of neighbours naming the same `group`.
+ * A section groups all its top-level pages or none, and a label names one run.
+ * Breaking either throws, since the rail would draw the mistake as deliberate.
  */
 function groupsIn(
 	section: Section,
@@ -338,13 +305,9 @@ function groupsIn(
 }
 
 /*
- * The sidebar tree: sections in the fixed order, empty ones omitted, each
- * section's pages carrying whatever hangs off them, to any depth, and split
- * into their labelled runs where the pages name them.
- *
- * A page whose parent does not exist is promoted to the top of its section
- * rather than dropped. It is a mistake either way, but a mistake that leaves a
- * page reachable is the better of the two.
+ * The sidebar tree: sections in order, empty ones omitted, each page carrying
+ * its children, split into labelled runs. A page whose parent is missing goes
+ * to the top of its section, so it stays reachable.
  */
 export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 	return SECTIONS.flatMap((section) => {
@@ -359,10 +322,8 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 				continue
 			}
 
-			// A page written under another is drawn under it, whatever
-			// run its parent is in, so a `group` of its own would do nothing —
-			// and frontmatter that does nothing is refused, as the schema
-			// refuses a key it does not name.
+			// A nested page is drawn under its parent, so its own `group` would
+			// do nothing, and frontmatter that does nothing is refused.
 			if (entry.data.group !== undefined) {
 				throw new Error(
 					`${entry.id} names the group "${entry.data.group}", but it is written under ${parent}, and only a section's top-level pages are grouped. Take \`group\` off it: it sits wherever ${parent} does.`,
@@ -372,8 +333,7 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 			children.set(parent, [...(children.get(parent) ?? []), entry])
 		}
 
-		// Depth is bounded by the file tree and every id is visited once as
-		// somebody's child, so this cannot run away.
+		// The file tree bounds the depth, and each id is visited once.
 		let build = (entry: DocEntryLike): SidebarItem => ({
 			...toDocLink(entry),
 			children: (children.get(entry.id) ?? []).map(build),
@@ -399,10 +359,8 @@ export function getSidebar(entries: readonly DocEntryLike[]): SidebarSection[] {
 }
 
 /*
- * Every page that is part of the guided path, flattened in reading order:
- * the sidebar's order, keeping only the templates that are read rather than
- * looked up. It runs Getting started → Language → the library's overview →
- * Guides and stops at the last guide; the reference never joins it.
+ * The guided path in reading order: the sidebar's order, keeping only pages
+ * that are read rather than looked up. It ends at the last guide.
  */
 export function getReadingChain(entries: readonly DocEntryLike[]): DocLink[] {
 	return SECTIONS.flatMap((section) =>
@@ -427,8 +385,8 @@ export function getPrevNext(
 }
 
 /**
- * `Docs / Section / Title`, with the section pointing at its first page — and
- * the page in between for one written under another, so it says where it is.
+ * `Docs / Section / Title`, the section linking its first page. A nested page
+ * also shows its parent.
  */
 export function getCrumbs(
 	entries: readonly DocEntryLike[],
