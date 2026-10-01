@@ -2261,10 +2261,8 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).toEqual(["Write it as '\\u{1B}'"])
 		})
 
-		// A lone surrogate has no character it stands for, and a code
-		// point that is simply too large is answered with a QUESTION about
-		// which base was meant — which a Quick Fix must not answer on the
-		// reader's behalf. Neither is offered a fix.
+		// A lone surrogate stands for no character, and a code point too large
+		// asks which base was meant. Neither is offered a fix.
 		it("offers nothing where no rewrite is an answer", () => {
 			for (let written of ['"\\u{D800}"', '"\\u{110000}"', '"\\u{1G}"']) {
 				let lines = [
@@ -2423,9 +2421,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// JSDoc writes `@param name - text`, and the hyphen is ITS
-		// separator. Inserting the em dash in front of it left both languages'
-		// punctuation standing in one line — `§§ @param _ — - the number`.
+		// JSDoc writes `@param name - text`, so the fix replaces that hyphen
+		// rather than adding a separator in front of it.
 		it("should replace the hyphen another language separates with", () => {
 			let lines = [
 				"implementation {",
@@ -2442,8 +2439,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// Only a run at the HEAD of the text is that separator. A hyphen
-		// inside the description is punctuation the reader wrote.
+		// Only a run at the head of the text is that separator. A hyphen inside
+		// the description is punctuation.
 		it("should leave a hyphen inside the text where it stands", () => {
 			let lines = [
 				"implementation {",
@@ -2506,9 +2503,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("shorthand-in-combination")
 		})
 
-		// A Dictionary's key is a VALUE rather than a name, so there is
-		// nothing for a bare one to have been short for — the code is shared, the
-		// answer is not.
+		// A Dictionary's key is a value rather than a name, so a bare one is
+		// short for nothing.
 		it("should stay silent for a bare name in a Dictionary update", () => {
 			let lines = [
 				"implementation {",
@@ -2655,10 +2651,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// A tab typed at the head of the line since the analysis. The span
-		// is one column short of the Literal it was reported on, so it reads as
-		// `{ a = 1 ` — a brace opened and never closed — and the deletion would
-		// take the Literal's own `}` with it and leave `Red}`.
+		// A tab typed at the head of the line since the analysis. The span now
+		// reads a brace opened and never closed, so nothing is offered.
 		it("should stay silent where the span no longer closes what it opens", () => {
 			let was = [
 				"implementation {",
@@ -2682,8 +2676,8 @@ describe("Code Actions", () => {
 			).toBeNull()
 		})
 
-		// And the same slip over a value with no brackets in it at all,
-		// where what the span cuts in half is a number.
+		// The same slip over a value with no brackets, where the span cuts a
+		// number in half.
 		it("should stay silent where the span cuts a name in half", () => {
 			let was = [
 				"implementation {",
@@ -2811,10 +2805,8 @@ describe("Code Actions", () => {
 			expect(codesOf(moved)).not.toContain("unreachable-define-arm")
 		})
 
-		// The move writes whole lines, and a `define` on one line has no
-		// line above its `otherwise` arm to write into. The deletion takes the
-		// blank in front of the arm where there is no line to take, so what is
-		// left is `otherwise }` rather than `otherwise  }`.
+		// The move writes whole lines, so a `define` on one line gets the
+		// deletion alone. It takes the blank in front of the arm.
 		it("should offer the deletion alone for a define written on one line", () => {
 			let lines = [
 				"implementation {",
@@ -2920,18 +2912,13 @@ describe("Code Actions", () => {
 				"}",
 			])
 
-			// The hole PARSES. It used to be a blank — `as  otherwise` —
-			// and the buffer that came back was a `syntax-error` that took every
-			// other stage's reports down with it, which is a worse place to
-			// leave a reader than the report they started from. `{}` is the unit
-			// value: visibly not an answer, and refused as one wherever the
-			// position names a Type (see the arm below).
+			// The hole parses. `{}` is the unit value, visibly not an answer, and
+			// refused wherever the position names a Type.
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// And the hole is not silent where the `define` has a Type to
-		// answer: the arm is refused for answering `{}`, which is the report
-		// that names what is still missing.
+		// Where the `define` has a Type to answer, the arm is refused for
+		// answering `{}`, which names what is missing.
 		it("leaves a hole the Compiler reports where the Type is known", () => {
 			let lines = [
 				"implementation {",
@@ -3069,9 +3056,8 @@ describe("Code Actions", () => {
 			expect(testCodesOf(result)).not.toContain("literal-in-require")
 		})
 
-		// A backwards search finds the LAST keyword before the cursor, so
-		// the one that matters is the one with nothing but indentation in front
-		// of it.
+		// A backwards search finds the last keyword before the cursor, and only
+		// one with nothing but indentation in front of it counts.
 		it("should stay silent where no keyword opens the line", () => {
 			let lines = ["implementation {", "\tconstant value = 3", "}"]
 
@@ -3148,10 +3134,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Module Diagnostics are reported by the graph, so their fixes are
-	// exercised over a real workspace in `workspace.spec.ts`. What is left to ask
-	// here is what each of them does with a buffer that has moved on, which
-	// needs no graph at all.
+	// `workspace.spec.ts` exercises the Module fixes over a real workspace.
+	// These ask what each does with a buffer that has moved on.
 	describe("the Module fixes measured against a stale buffer", () => {
 		it("should stay silent where no group's specifier stands at the span", () => {
 			let lines = [
@@ -3240,8 +3224,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The Diagnostic spans the whole Type Parameter, bound and all,
-		// and only the Keyword in front of it is the mistake.
+		// The Diagnostic spans the whole Type Parameter and its bound, and only
+		// the Keyword in front of it is the mistake.
 		it("should keep a bound the Parameter carries", () => {
 			let lines = [
 				"implementation {",
@@ -3299,9 +3283,8 @@ describe("Code Actions", () => {
 			let result = applied(lines, fix)
 
 			expect(fix.title).toBe("Drop 'static'")
-			// The other reading is to take the value as a Parameter,
-			// which is a change to the Signature and to every call — so an
-			// Editor must not apply this one without being asked.
+			// The other reading changes the Signature and every call, so this is
+			// not preferred.
 			expect(fix.isPreferred).toBe(false)
 			expect(result[2]).toBe("\t\tdoubled () -> Integer {")
 
@@ -3324,13 +3307,9 @@ describe("Code Actions", () => {
 			expect(applied(lines, fix)[2]).toBe("\t\toverload made {")
 		})
 
-		// The fix changes how the Method is CALLED, so a call it does
-		// not touch is a call that stops compiling — one
-		// `argument-count-mismatch` per call site, each at a line the reader
-		// was not looking at when they pressed the lightbulb. It is therefore
-		// not offered at all where this file calls the Method; the Help that
-		// says what dropping costs is there either way, for a reader who means
-		// to do it by hand.
+		// The fix changes how the Method is called, so every call it does not
+		// touch would stop compiling. It is not offered where this file calls the
+		// Method.
 		it("should stay silent where the Method is called", () => {
 			let lines = [
 				"implementation {",
@@ -3354,9 +3333,7 @@ describe("Code Actions", () => {
 			])
 		})
 
-		// A Method of the same name on ANOTHER Namespace is another
-		// Method — what makes a call a call of this one is the Namespace it is
-		// reached through.
+		// A Method of the same name on another Namespace is another Method.
 		it("should offer the fix where the call names another Namespace", () => {
 			let lines = [
 				"implementation {",
@@ -3379,10 +3356,8 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).toEqual(["Drop 'static'"])
 		})
 
-		// `keywordBefore` looks along the name's own line, so a Keyword
-		// the Parser read from the line above is one this refuses to touch —
-		// deleting a span that does not read `static ` would eat whatever does
-		// stand there.
+		// `keywordBefore` looks along the name's own line, so a Keyword read
+		// from the line before is left alone.
 		it("should stay silent where the Keyword opens a line of its own", () => {
 			let lines = [
 				"implementation {",
@@ -3419,11 +3394,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// One Diagnostic per condition, and one edit that answers all of
-		// them — a clause with one condition left is the same refusal, so there
-		// is nothing to take out but the clause. Which is also why the lightbulb
-		// is offered it ONCE: two entries with one title writing one range is a
-		// list that asks the reader to choose between a thing and itself.
+		// One Diagnostic per condition, and one edit removing the clause answers
+		// them all, so the lightbulb offers it once.
 		it("should answer every condition of the clause with one offer", () => {
 			let lines = [
 				"implementation {",
@@ -3501,8 +3473,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// An update's key list is one bracket list on the same terms, and
-		// the walk reaches it because both spellings build one Node kind.
+		// An update's key list is a bracket list on the same terms, since both
+		// spellings build one Node kind.
 		it("should reach the key list of an update", () => {
 			let lines = [
 				"implementation {",
@@ -3559,9 +3531,8 @@ describe("Code Actions", () => {
 			let result = applied(lines, fix)
 
 			expect(fix.title).toBe("Add a 'case _' for the rest of the values")
-			// The arm it writes is empty, so the `missing-return` behind
-			// it is the reader's to fill in — a hole that is visible rather
-			// than a Match that answers for nothing.
+			// The arm it writes is empty, so a `missing-return` stands until the
+			// reader fills it in.
 			expect(fix.isPreferred).toBe(false)
 
 			expect(result).toEqual([
