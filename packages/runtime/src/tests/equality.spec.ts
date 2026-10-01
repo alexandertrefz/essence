@@ -10,19 +10,16 @@ import { createRecord } from "../Record"
 import { createString } from "../String"
 import { type AnyType, createCase } from "../type"
 
-// `CaseInstanceType` is deliberately kept out of `AnyType` — see the NOTE
-// in `type.ts` — so a Case value is cast on the way in here exactly as the
-// runtime helpers cast it internally.
+// `CaseInstanceType` stays out of `AnyType`, so a Case value is cast here as the
+// runtime helpers cast it.
 const asValue = (value: unknown) => value as AnyType
 
-// A Function reaches the runtime as a bare JavaScript function carrying
-// no Type key at all, which is why comparing one needs a cell of its own.
+// A Function reaches the runtime as a bare JavaScript function with no Type key.
 const functionValue = () => asValue((value: never) => value)
 
 describe("reflexive equality", () => {
-	// The claim the fast path rests on — a value is equal to itself — and
-	// it has to hold for every kind, including the ones whose comparison is a
-	// recursive walk.
+	// `anyIs` answers identical operands first, so this must hold for every
+	// kind, including those compared by a recursive walk.
 	test("every value is equal to itself", () => {
 		let cases: Array<[string, AnyType]> = [
 			["Boolean", createBoolean(true)],
@@ -47,9 +44,8 @@ describe("reflexive equality", () => {
 		}
 	})
 
-	// A container holding a Function is the interesting one — the walk
-	// reaches identity comparison at the leaf, which answers true for the SAME
-	// Function, so the shortcut and the walk agree here too.
+	// The walk compares a Function leaf by identity, so it agrees with the
+	// identity check.
 	test("a container holding a Function is equal to itself", () => {
 		let callback = functionValue()
 
@@ -62,9 +58,6 @@ describe("reflexive equality", () => {
 		expect(anyIs(payload, payload)).toBeTrue()
 	})
 
-	// The shortcut must not have REPLACED the structural comparison —
-	// two values built separately still have to be walked, and still answer
-	// what they always did.
 	test("distinct values are still compared structurally", () => {
 		expect(
 			anyIs(
@@ -112,8 +105,6 @@ describe("reflexive equality", () => {
 		expect(anyIs(functionValue(), functionValue())).toBeFalse()
 	})
 
-	// The comparisons that cross kinds are the ones the shortcut can not
-	// answer, and they keep answering false.
 	test("values of different kinds are still unequal", () => {
 		expect(anyIs(createInteger(1n), createBoolean(true))).toBeFalse()
 		expect(anyIs(createString("1"), createInteger(1n))).toBeFalse()
@@ -124,16 +115,12 @@ describe("reflexive equality", () => {
 	})
 })
 
-// The universal comparison for a Dictionary, which is the one it can not
-// answer structurally: a box reads through a SHARED store stamped with a
-// generation, so two boxes holding the very same entries need not hold the same
-// slots, versions or generation. What `anyIs` asks instead is what the design
-// says two Dictionaries mean by equal — the same key set, and an equal value
-// under each key, in whatever order they were written.
+// Equal boxes need not share slots, versions or a generation, so `anyIs`
+// compares the key sets and the value under each key, in any order. See
+// "Dictionary equality" in packages/runtime/DEVELOPMENT.md.
 describe("comparing two Dictionaries", () => {
-	// The witness a hand-built Dictionary is keyed by here. `anyIs` uses
-	// no witness of its own — there is none to hand it — so it recurses through
-	// this same universal comparison, exactly as it does for a List's items.
+	// The key witness is the universal comparison, the one `anyIs` looks keys up
+	// by.
 	const anyEquatable = {
 		is: (a: AnyType, b: AnyType) => createBoolean(anyIs(a, b)),
 	}
@@ -212,10 +199,8 @@ describe("comparing two Dictionaries", () => {
 		).toBeFalse()
 	})
 
-	// A Dictionary held INSIDE something else is where the structural
-	// fallback used to answer wrongly — a Record carrying one compared its
-	// stores field by field, so a value stopped being equal to its own copy the
-	// moment it was wrapped.
+	// Comparing the stores field by field would make a wrapped Dictionary
+	// unequal to its own copy.
 	test("a Record holding one compares by the entries it holds", () => {
 		expect(
 			anyIs(
@@ -229,9 +214,8 @@ describe("comparing two Dictionaries", () => {
 		).toBeTrue()
 	})
 
-	// Keys and values compare through the very same universal comparison,
-	// so an Integer key and the Rational spelling of it are ONE key — which is
-	// what `Number.is` promises about them everywhere else.
+	// An Integer key and its Rational spelling are one key, as `Number.is`
+	// promises everywhere else.
 	test("keys compare by value rather than by spelling", () => {
 		expect(
 			anyIs(
