@@ -30,7 +30,6 @@
 	"packages/compiler/src/tests/snapshotFiles.spec.ts": {"sentence-length": 3, "em-dash": 2},
 	"packages/compiler/src/tests/sourceMaps.spec.ts": {"sentence-length": 16, "em-dash": 15, "all-caps": 9, "position": 2},
 	"packages/compiler/src/tests/stdlib.spec.ts": {"sentence-length": 14, "em-dash": 12, "all-caps": 5, "position": 1, "block-length": 2},
-	"packages/compiler/src/tests/stdlibCallGraph.spec.ts": {"sentence-length": 41, "em-dash": 41, "all-caps": 18, "history": 2, "position": 5, "block-length": 6},
 	"packages/compiler/src/tests/stdlibGolden.spec.ts": {"sentence-length": 32, "em-dash": 28, "all-caps": 32, "position": 9, "block-length": 6, "counts": 1},
 	"packages/compiler/src/tests/stdlibLoader.spec.ts": {"sentence-length": 84, "em-dash": 83, "all-caps": 61, "position": 10, "block-length": 11, "citation": 2},
 	"packages/compiler/src/tests/stdlibProse.spec.ts": {"sentence-length": 9, "em-dash": 6, "all-caps": 4, "position": 6, "block-length": 2, "counts": 1},
