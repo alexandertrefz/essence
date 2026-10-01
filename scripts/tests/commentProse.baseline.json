@@ -46,7 +46,6 @@
 	"packages/compiler/src/tests/optimiser.spec.ts": {"sentence-length": 289, "em-dash": 227, "all-caps": 155, "history": 4, "position": 17, "block-length": 41, "counts": 2},
 	"packages/compiler/src/tests/parser.spec.ts": {"sentence-length": 38, "em-dash": 37, "all-caps": 17, "history": 2, "position": 1, "block-length": 2},
 	"packages/compiler/src/tests/parserDiagnostics.spec.ts": {"sentence-length": 55, "em-dash": 46, "all-caps": 27, "history": 5, "position": 2, "block-length": 5},
-	"packages/compiler/src/tests/parserRecovery.spec.ts": {"sentence-length": 32, "em-dash": 23, "all-caps": 20, "history": 6, "position": 5, "block-length": 4},
 	"packages/compiler/src/tests/printType.spec.ts": {"sentence-length": 9, "em-dash": 6, "all-caps": 6, "block-length": 1},
 	"packages/compiler/src/tests/protocolProvidedMethods.spec.ts": {"sentence-length": 56, "em-dash": 40, "all-caps": 27, "history": 1, "position": 1, "block-length": 6},
 	"packages/compiler/src/tests/randomness.spec.ts": {"sentence-length": 8, "em-dash": 2, "all-caps": 3, "block-length": 1},

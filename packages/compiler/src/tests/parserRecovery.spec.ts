@@ -188,12 +188,8 @@ describe("Parser Recovery", () => {
 		})
 	})
 
-	// A String Literal may span lines, so the Lexer's reading of the file
-	// below is a String from line 2 to the quote in front of `Ada`, `Ada` as a
-	// name, and a String opened behind it that never closes — and "opened here"
-	// used to point at that last quote, which is one the author wrote on
-	// purpose. One '"' is missing under either reading; the one that spans lines
-	// is the one nobody writes on purpose, and is named as the culprit.
+	// The String that spans lines is named as the culprit. See "Which quote is
+	// missing" in packages/compiler/src/lexer/DEVELOPMENT.md.
 	it("should name the String that swallowed the lines below it", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -229,23 +225,16 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].helps[0]).toBe(
 			`Add the missing '"' at the end of line 2.`,
 		)
-		// And that is the WHOLE of what is offered. The other reading was
-		// a second Help — "add it at the end of the input instead" — and
-		// following it reached no Program: the quote written there closes a
-		// String holding every line below, and the quotes standing in those
-		// lines close it early all over again, so a reader who took it was
-		// answered `unclosed-string` a second time about the same two lines.
-		// The reading is true and is said as a Note.
+		// One Help only. A quote at the end of the input reaches no Program,
+		// so that reading is a Note.
 		expect(diagnostics[0].helps).toHaveLength(1)
 		expect(diagnostics[0].notes[1]).toContain(
 			"at the end of line 2 the lines below are Statements, and at the end of the input they are text",
 		)
 	})
 
-	// `"{\"a\": 1}"` — JSON written with the quotes escaped and the braces
-	// left alone. The `{` opens a hole, and the quote this used to ask for is
-	// not what is missing: writing one leaves the same refusal standing, which
-	// is how the Quick Fix behind it wrote a second quote, and a third.
+	// `"{\"a\": 1}"` is JSON with the quotes escaped and the braces not. The
+	// `{` opens a hole, so a missing quote is not the problem.
 	it("should answer the hole a String's '{' opened", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -264,8 +253,8 @@ describe("Parser Recovery", () => {
 		])
 	})
 
-	// A hole holding a NAME is a hole somebody meant to open, and the
-	// String really is one quote short. Nothing changes for it.
+	// A hole holding a name was meant, so the String really is one quote
+	// short.
 	it("should keep the missing quote where the hole holds a name", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -279,10 +268,8 @@ describe("Parser Recovery", () => {
 		expect(diagnostics[0].helps).toEqual(["Add the missing '\"'."])
 	})
 
-	// An EVEN number of forgotten quotes leaves nothing unterminated at
-	// all — the Lexer runs out of nothing, and what is left of each swallowed
-	// line is the name that stood behind the quote that closed the String above
-	// it. `'two' is not declared` was the whole of what this file said.
+	// An even number of forgotten quotes leaves nothing unterminated, only the
+	// name behind the quote that closed the String above it.
 	it("should name the String that swallowed a line where nothing is left open", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -312,10 +299,9 @@ describe("Parser Recovery", () => {
 		])
 	})
 
-	// The other half of that rule — a String written to span lines, which
-	// is Essence and stays silent. What tells the two apart is the name standing
-	// behind the closing quote on its line: two Expressions never stand side by
-	// side, so there is nothing else that name could be.
+	// A String written to span lines stays silent. A name behind the closing
+	// quote on its line tells the two apart, since two Expressions never stand
+	// side by side.
 	it("should leave a String that really does span lines alone", () => {
 		let sources = [
 			`implementation {
@@ -344,11 +330,8 @@ are red"
 		}
 	})
 
-	// The claim is about the String that closed DIRECTLY in front of the
-	// unclosed one and on its line. A one-line String written between the two
-	// clears it, and so does a line break: neither file below is the shape the
-	// swap is for, and each is reported about the String that really was left
-	// open.
+	// The claim needs the String that closed directly before the unclosed one,
+	// on its line. A one-line String between them, or a line break, clears it.
 	it("should keep the plain report where the evidence is not there", () => {
 		let sources = [
 			`implementation {
@@ -376,9 +359,8 @@ are red"::append("x")
 		}
 	})
 
-	// The Lexer stops one line PAST the last one when the file ends in a
-	// newline — a label there has no text to point at and renders dangling, so
-	// the position is clamped to just after the last visible character.
+	// The Lexer stops one line past the last when the file ends in a newline.
+	// The position is clamped to just after the last visible character.
 	it("should keep an unterminated String Literal's label on the last line of content", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			'implementation {\nconstant x = "abc\n}\n',
@@ -393,10 +375,8 @@ are red"::append("x")
 	})
 
 	it("should keep reporting after a speculative parse ran to the end of the input", () => {
-		// The speculative reading of `f(g(match …` runs to the end of
-		// the input during its own recovery and latches the suppression that
-		// keeps cascades quiet — `backtrack` has to unlatch it along with
-		// everything else, or the whole broken file parses in silence.
+		// The speculative reading of `f(g(match …` runs to the end of the input
+		// and latches the cascade suppression. `backtrack` must unlatch it.
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
 	variable u: Integer | String = 1
@@ -432,12 +412,8 @@ are red"::append("x")
 		expect(diagnostics).toEqual([])
 	})
 
-	// The budget is shared across Expressions, Types and blocks because
-	// the three recur into each other on the one call stack — so it has to be
-	// wide enough that a machine-generated file (a serialized tree nests one
-	// level per node) does not spend it on a single construct, and that blocks
-	// and Expressions merely SUMMING past a few hundred levels stay a program
-	// rather than an error.
+	// Expressions, Types and blocks share one nesting budget. It is wide enough
+	// for a machine-generated tree and for depths that sum past a few hundred.
 	it("should parse machine-generated nesting several hundred levels deep", () => {
 		let source = `implementation { constant x = ${"[".repeat(600)}1${"]".repeat(600)} }`
 
@@ -454,20 +430,13 @@ are red"::append("x")
 		expect(diagnostics).toEqual([])
 	})
 
-	// The one coded refusal a speculation still gives back. Every other
-	// one is a verdict about text that was written, and travels out to the
-	// Statement loop; `nesting-too-deep` is about the READING instead — a
-	// speculation recurs a level deeper than the reading it stands in for, so
-	// at the deepest nesting the Parser accepts, the attempt runs out of
-	// budget where the reading that is kept fits inside it. The attempt here
-	// is the typed Record Literal, read for every Identifier with a `~`
-	// somewhere ahead of it: re-raised, its refusal would turn a Program into
-	// an error over a `~` written on another line.
+	// `nesting-too-deep` is about the reading, not the text, so a speculation
+	// gives it back. A speculation recurs one level deeper than the reading it
+	// stands in for. See "Speculation" in
+	// packages/compiler/src/parser/DEVELOPMENT.md.
 	it("should give the depth guard back to the reading that fits", () => {
-		// The innermost value is a NAME, because that is what the typed
-		// Record Literal is speculated on — a Number Literal begins nothing
-		// the speculation could read, and the `~` would then make no
-		// difference at all.
+		// The innermost value is a name, which the typed Record Literal is
+		// speculated on when a `~` stands ahead.
 		let nest = (depth: number, tilde: boolean) =>
 			parseWithDiagnostics(
 				`implementation {
@@ -476,9 +445,8 @@ are red"::append("x")
 				}`,
 			).diagnostics
 
-		// The deepest nesting the Parser accepts, found rather than
-		// written down, so this says what it means whatever the budget is set
-		// to. One nesting deeper is where the guard fires.
+		// The deepest nesting the Parser accepts, found by search so the spec
+		// holds whatever the budget is.
 		let deepest = 1
 		let tooDeep = 4096
 
@@ -497,13 +465,9 @@ are red"::append("x")
 		expect(nest(tooDeep, true)[0]?.code).toBe("nesting-too-deep")
 	})
 
-	// A coded refusal raised out of a speculation lands in the Statement
-	// loop like any other ParseError: the Statement holding it is dropped, the
-	// Statement below it is read as written, and the one below that reports
-	// its own failure. What the abandoned reading consumed stays consumed —
-	// a refusal site reads what it is refusing before it throws — so
-	// resynchronisation resumes past the Literal rather than walking into it
-	// again.
+	// A coded refusal raised out of a speculation drops its Statement like any
+	// other ParseError. What the abandoned reading consumed stays consumed, so
+	// resynchronisation resumes past the Literal.
 	it("should keep parsing after a refusal raised inside a speculation", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -616,10 +580,8 @@ are red"::append("x")
 		expect(diagnostics[0].labels[0]?.message).toBe("expected 'is' here")
 	})
 
-	// A `define` arm is recovered from by its own loop rather than by the
-	// Statement resynchronisation — an `as` is no Statement start, so the shared
-	// one would skip every arm below the broken one and the `define` would then
-	// be refused for an `otherwise` arm that WAS written.
+	// A `define` arm is recovered from by its own loop, since an `as` is no
+	// Statement start. See "Define" in packages/compiler/src/parser/DEVELOPMENT.md.
 	it("should keep reading arms after a broken define arm", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -652,9 +614,8 @@ are red"::append("x")
 		}
 	})
 
-	// A broken arm that opened braces of its own is skipped over whole,
-	// exactly as a broken Statement is — the arm below it is read, not the
-	// leftovers of the one above.
+	// A broken arm that opened braces of its own is skipped whole, as a broken
+	// Statement is.
 	it("should skip a broken define arm's own braces", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -682,11 +643,8 @@ are red"::append("x")
 	})
 
 	// `otherwise` is a valid Identifier, so `as otherwise` is an arm whose
-	// VALUE is a name and whose follower never came — the same reading `as 1`
-	// gets, and the same message. What is missing is the word that says which
-	// arm it is, and that is what the Diagnostic is about: blaming the value
-	// would send the reader after the wrong edit. The arm below it still reads,
-	// so the `define` keeps the `otherwise` arm that WAS written.
+	// value is a name and whose follower is missing. The report asks for the
+	// follower, and the next arm still reads.
 	it("should ask for a follower where an arm's value is a name spelled otherwise", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -748,9 +706,8 @@ are red"::append("x")
 		}
 	})
 
-	// The same refusal about different text. "Every value here has a
-	// condition on it" is a remark about the values that were WRITTEN, and an
-	// empty block wrote none — it is short of every arm, not of the last one.
+	// An empty block wrote no values, so it is short of every arm, not of the
+	// last one.
 	it("should refuse an empty define in its own words", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -768,9 +725,8 @@ are red"::append("x")
 		])
 	})
 
-	// Reported and DROPPED rather than thrown, which is what keeps the
-	// `define` and the Statement it stands in: the arm reads perfectly well, and
-	// what is wrong with it is where it stands.
+	// Reported and dropped rather than thrown, so the `define` and its
+	// Statement stay.
 	it("should refuse an arm written below the otherwise arm", () => {
 		let { program, diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -802,19 +758,14 @@ are red"::append("x")
 			nodes[0].nodeType === "ConstantDeclarationStatement" &&
 			nodes[0].value.nodeType === "Define"
 		) {
-			// The unreachable arm is never recorded, which is what keeps
-			// "the `otherwise` arm is last" true of every Node that can be
-			// built rather than of the ones the Parser happened to like.
+			// The unreachable arm is never recorded, so the `otherwise` arm is
+			// last in every Node.
 			expect(nodes[0].value.arms).toHaveLength(1)
 		}
 	})
 
-	// A `define` missing its `otherwise` arm inside a SPECULATION. The
-	// refusal used to carry the generic `syntax-error`, which `rewoundCodes`
-	// hands back — so the Record reading rewound, the Dictionary reading behind
-	// it answered for the same text, and what a reader was told about a `define`
-	// with no `otherwise` arm was "Expected 'with' but found '='". With a code of
-	// its own `refusesTheText` raises it instead, and the verdict survives.
+	// The refusal has a code of its own, so it survives the speculation
+	// rather than being rewound.
 	it("should raise a define refusal out of a speculation", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -828,9 +779,8 @@ are red"::append("x")
 		expect(diagnostics[0].code).toBe("define-without-otherwise")
 	})
 
-	// A coded refusal is a verdict about the text, so it is raised out of
-	// the arm loop to the Statement loop that reports such things — reporting it
-	// here and reading on would answer the same text twice.
+	// A coded refusal is raised out of the arm loop to the Statement loop, so
+	// the text is answered once.
 	it("should let a coded refusal out of a define arm", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			`implementation {
@@ -845,19 +795,13 @@ are red"::append("x")
 		expect(diagnostics[0].code).toBe("partial-decimal-literal")
 	})
 
-	// A totality refusal is a claim about text that was READ, so the arm
-	// loop's own recovery is what decides whether it may be made at all. Every
-	// source below visibly ends in an `otherwise` arm, or never got as far as
-	// where one would stand — and used to be told that every value in it has a
-	// condition on it.
+	// The missing-`otherwise` refusal is made only when the arms were read
+	// cleanly. Each source here writes an `otherwise` arm, or ends before one
+	// would stand.
 	describe("a define whose arms were not read cleanly", () => {
-		// The arm opens a `{` it never closes, so the `}` the author wrote
-		// for the `define` closes the Record instead and resynchronisation
-		// carries on past the arm below it. What is left of the file is one
-		// brace short whichever way it is read, so the Statement goes — but the
-		// one Diagnostic about it is the one that is true, and it is about the
-		// brace: the Literal reading of `{ a = 1` runs out at the `if`, which is
-		// further than the update reading behind it ever got.
+		// The arm opens a `{` it never closes, so the Statement goes. The one
+		// Diagnostic is about the brace, where the Literal reading of `{ a = 1`
+		// runs out at the `if`.
 		it("should not refuse an otherwise arm its own recovery skipped", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
@@ -875,12 +819,8 @@ are red"::append("x")
 			expect(diagnostics[0].message).toBe("Expected '}' but found 'if'.")
 		})
 
-		// A Token where an `as` belongs read NOTHING, so there are no
-		// leftovers between it and the next arm — and scanning for one stepped
-		// into the brace it opens, skipped the `define`'s own `}`, ate the
-		// `implementation` block's, and then reported that block as never
-		// closed. Everything below the `define` is still text this Parser can
-		// read.
+		// A Token where an `as` belongs read nothing, so only that Token is
+		// dropped. Scanning on would step into the brace it opens.
 		it("should keep the block a stray brace below the arms stands in", () => {
 			let { program, diagnostics } = parseWithDiagnostics(
 				`implementation {
@@ -906,10 +846,8 @@ are red"::append("x")
 			])
 		})
 
-		// `nesting-too-deep` is about the READING rather than about the
-		// text — a speculation hands it back by name — so the arm loop recovers
-		// from it like any other broken arm, and the arms it skipped on the way
-		// out are no evidence about what was written either.
+		// `nesting-too-deep` is about the reading, so the arm loop recovers from
+		// it like any broken arm, and the skipped arms prove nothing.
 		it("should not refuse a define its own depth budget broke", () => {
 			let nested = "1"
 
@@ -937,12 +875,8 @@ are red"::append("x")
 			).toBe(true)
 		})
 
-		// The arm loop is a RECOVERY loop and not a candidate reading, so
-		// what it reports is a verdict about text that was written — and a
-		// speculation the refusal escapes must not rewind it. The same `define`
-		// in and out of a Record literal used to be answered differently: inside
-		// one, the broken arm's Diagnostic was rewound and only the refusal
-		// behind it survived.
+		// The arm loop is a recovery loop, not a candidate reading, so a
+		// speculation the refusal escapes must not rewind its report.
 		it("should report a broken arm the same inside a speculation", () => {
 			const ARMS = `define {
 						as ] if flag
@@ -969,10 +903,7 @@ are red"::append("x")
 			).toEqual(bare.diagnostics.map((diagnostic) => diagnostic.message))
 		})
 
-		// The refusal used to be thrown from BEHIND `parseClosingBrace`,
-		// which is the one place a coded refusal peeks no Token — so it spoke
-		// for an input that had ENDED, and the accurate `unclosed-block` the
-		// brace had just reported was rewound by the speculation it escaped.
+		// The `unclosed-block` the brace reports survives the speculation.
 		it("should keep the unclosed block a define ran to the end of", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				`implementation {
