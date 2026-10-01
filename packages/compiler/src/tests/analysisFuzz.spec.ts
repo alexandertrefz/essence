@@ -420,10 +420,9 @@ const DECLARING_TOKEN_TYPES = new Set([
 	TokenType.KeywordCase,
 ])
 
-// Whether the Identifier at `index` reads a name rather than binding one. A
-// binding is a name after a `DECLARING_TOKEN_TYPES` keyword, a name followed
-// by `:` or `=`, or a Function literal's Parameter. That last is the one
-// parenthesised run whose `)` is followed by a `{`.
+// Whether the Identifier at `index` reads a name in scope. A name after a
+// `DECLARING_TOKEN_TYPES` keyword or before `:` or `=` binds one, as each shape
+// in the list does. A label, a member key or an export reads nothing.
 function readsAName(tokens: Array<Token>, index: number): boolean {
 	let previous = tokens[index - 1]
 	let next = tokens[index + 1]
@@ -439,9 +438,221 @@ function readsAName(tokens: Array<Token>, index: number): boolean {
 		return false
 	}
 
-	return !insideFunctionLiteralParameters(tokens, index)
+	return ![
+		insideFunctionLiteralParameters,
+		labelsAnArgument,
+		declaresACase,
+		declaresAMethod,
+		declaresATypeParameter,
+		startsAMemberPath,
+		listsAnExport,
+	].some((shape) => shape(tokens, index))
 }
 
+// A name in `export { … }`, which the Module linker checks. `analyseSource`
+// reads one file and links nothing.
+function listsAnExport(tokens: Array<Token>, index: number): boolean {
+	let opener = enclosingOpener(tokens, index)
+
+	return (
+		opener !== null && tokens[opener - 1]?.type === TokenType.KeywordExport
+	)
+}
+
+// Tokens that end an operand, so a name before one is the operand itself. A
+// `.` after a space opens a member path, as in `on .value`.
+const OPERAND_ENDS = new Set([
+	TokenType.SymbolComma,
+	TokenType.SymbolRightParen,
+	TokenType.SymbolRightBrace,
+	TokenType.SymbolRightBracket,
+	TokenType.SymbolColon,
+	TokenType.SymbolEqual,
+])
+
+// A label opens an Argument or a Parameter, and its value or internal name
+// follows after a space, as in `to 2`, `where (n) { … }` or `against other:`.
+function labelsAnArgument(tokens: Array<Token>, index: number): boolean {
+	let previous = tokens[index - 1]?.type
+	let next = tokens[index + 1]
+
+	return (
+		(previous === TokenType.SymbolLeftParen ||
+			previous === TokenType.SymbolComma) &&
+		next !== undefined &&
+		next.start > tokens[index]!.end &&
+		!OPERAND_ENDS.has(next.type)
+	)
+}
+
+// A Case a `choice` declares, as `Red` in `choice Light { Red, Green }`.
+function declaresACase(tokens: Array<Token>, index: number): boolean {
+	let opener = enclosingOpener(tokens, index)
+
+	if (
+		opener === null ||
+		tokens[opener]!.type !== TokenType.SymbolLeftBrace ||
+		(tokens[index - 1]!.type !== TokenType.SymbolLeftBrace &&
+			tokens[index - 1]!.type !== TokenType.SymbolComma)
+	) {
+		return false
+	}
+
+	let before = opener - 1
+
+	// Past the Type Parameters of `choice Progress<State, Result> {`.
+	if (tokens[before]?.type === TokenType.SymbolRightAngle) {
+		while (
+			before > 0 &&
+			tokens[before]!.type !== TokenType.SymbolLeftAngle
+		) {
+			before--
+		}
+
+		before--
+	}
+
+	return tokens[before - 1]?.type === TokenType.KeywordChoice
+}
+
+// A Method a Namespace or a Protocol declares, written `name(…) -> Type` or
+// `name<infer T>(…) -> Type`. A call written so stands after a receiver or
+// after `match` instead.
+function declaresAMethod(tokens: Array<Token>, index: number): boolean {
+	let previous = tokens[index - 1]?.type
+	let opener = index + 1
+
+	if (tokens[opener]?.type === TokenType.SymbolLeftAngle) {
+		while (
+			opener < tokens.length &&
+			tokens[opener]!.type !== TokenType.SymbolRightAngle
+		) {
+			opener++
+		}
+
+		opener++
+	}
+
+	if (
+		tokens[opener]?.type !== TokenType.SymbolLeftParen ||
+		previous === TokenType.SymbolColon ||
+		previous === TokenType.SymbolDot ||
+		previous === TokenType.KeywordMatch
+	) {
+		return false
+	}
+
+	let closer = matchingParen(tokens, opener)
+
+	return (
+		closer !== null &&
+		tokens[closer + 1]?.type === TokenType.SymbolDash &&
+		tokens[closer + 2]?.type === TokenType.SymbolRightAngle
+	)
+}
+
+// A Type Parameter a declaration introduces, as `Value` in `choice Box<Value>`.
+function declaresATypeParameter(tokens: Array<Token>, index: number): boolean {
+	let step = index - 1
+
+	while (tokens[step]?.type === TokenType.SymbolComma) {
+		step -= 2
+	}
+
+	return (
+		tokens[step]?.type === TokenType.SymbolLeftAngle &&
+		tokens[step - 1]?.type === TokenType.Identifier &&
+		tokens[step - 2] !== undefined &&
+		DECLARING_TOKEN_TYPES.has(tokens[step - 2]!.type)
+	)
+}
+
+// A member path key in a Record Literal, as `server` in `server.port = 1` or
+// `server.{ … }`. It names a member of the Type, not a name in scope.
+function startsAMemberPath(tokens: Array<Token>, index: number): boolean {
+	let previous = tokens[index - 1]?.type
+
+	if (
+		previous !== TokenType.SymbolLeftBrace &&
+		previous !== TokenType.SymbolComma
+	) {
+		return false
+	}
+
+	let step = index + 1
+
+	while (
+		tokens[step]?.type === TokenType.SymbolDot &&
+		tokens[step + 1]?.type === TokenType.Identifier
+	) {
+		step += 2
+	}
+
+	let end = tokens[step]?.type
+
+	return (
+		(step > index + 1 && end === TokenType.SymbolEqual) ||
+		(end === TokenType.SymbolDot &&
+			tokens[step + 1]?.type === TokenType.SymbolLeftBrace)
+	)
+}
+
+// A `(` written against the name before it, as a call's is.
+function opensACall(tokens: Array<Token>, opener: number | null): boolean {
+	let callee = opener === null ? undefined : tokens[opener - 1]
+
+	return (
+		callee?.type === TokenType.Identifier &&
+		callee.end === tokens[opener!]!.start
+	)
+}
+
+// The `)` that closes the `(` at `index`.
+function matchingParen(tokens: Array<Token>, index: number): number | null {
+	let depth = 0
+
+	for (let step = index; step < tokens.length; step++) {
+		let type = tokens[step]!.type
+
+		if (type === TokenType.SymbolLeftParen) {
+			depth++
+		} else if (type === TokenType.SymbolRightParen && --depth === 0) {
+			return step
+		}
+	}
+
+	return null
+}
+
+const OPENERS = new Set([
+	TokenType.SymbolLeftParen,
+	TokenType.SymbolLeftBrace,
+	TokenType.SymbolLeftBracket,
+])
+
+// The nearest bracket opened before `index` and not yet closed.
+function enclosingOpener(tokens: Array<Token>, index: number): number | null {
+	let depth = 0
+
+	for (let step = index - 1; step >= 0; step--) {
+		let type = tokens[step]!.type
+
+		if (CLOSERS.has(type)) {
+			depth++
+		} else if (OPENERS.has(type)) {
+			if (depth === 0) {
+				return step
+			}
+
+			depth--
+		}
+	}
+
+	return null
+}
+
+// A Function literal's Parameter, inside the one parenthesised run whose `)`
+// is followed by `{`, or by `->` where the `(` opens no call.
 function insideFunctionLiteralParameters(
 	tokens: Array<Token>,
 	index: number,
@@ -455,7 +666,12 @@ function insideFunctionLiteralParameters(
 			depth++
 		} else if (token.type === TokenType.SymbolRightParen) {
 			if (depth === 0) {
-				return tokens[step + 1]?.type === TokenType.SymbolLeftBrace
+				return (
+					tokens[step + 1]?.type === TokenType.SymbolLeftBrace ||
+					(tokens[step + 1]?.type === TokenType.SymbolDash &&
+						tokens[step + 2]?.type === TokenType.SymbolRightAngle &&
+						!opensACall(tokens, enclosingOpener(tokens, index)))
+				)
 			}
 
 			depth--
@@ -471,8 +687,9 @@ function insideFunctionLiteralParameters(
 }
 
 // A real mistake is never silenced by a stand-down. Replacing a read name with
-// an undeclared one owes a report. Only a mutation that breaks the parse is
-// excused, since reporting it again would be the cascade the recovery removes.
+// an undeclared one owes a report at that name. Only a mutation that breaks the
+// parse is excused, since reporting it again would be the cascade the recovery
+// removes.
 describe("a name nothing declares, in a Program that parsed", () => {
 	const NAME_CODES = new Set([
 		"unknown-name",
@@ -480,10 +697,14 @@ describe("a name nothing declares, in a Program that parsed", () => {
 		"unknown-method",
 		"unknown-case",
 		"unknown-member",
-		"unknown-namespace",
+		"unknown-protocol",
+		"unknown-where-generic",
+		"method-not-on-protocol",
 	])
 
 	it("is reported where it is written", () => {
+		let misses: Array<string> = []
+
 		for (let file of files) {
 			let tokens = tokensOf(file.text)
 			// The implementation only. A `tests { … }` block is not enriched
@@ -533,14 +754,19 @@ describe("a name nothing declares, in a Program that parsed", () => {
 							token.position.start.column,
 				)
 
-				// `here` is a subset of `errors`, so this asserts only that some
-				// error is reported, not that it stands at the mutation site.
-				expect([name, errors.length > 0 || here.length > 0]).toEqual([
-					name,
-					true,
-				])
+				if (here.length === 0) {
+					let reported = errors.map(
+						(error) => `${error.code}@${positionKey(error)}`,
+					)
+
+					misses.push(
+						`${name} '${token.value}' -> ${reported.join(" ")}`,
+					)
+				}
 			}
 		}
+
+		expect(misses).toEqual([])
 	}, 60_000)
 })
 
