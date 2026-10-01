@@ -107,7 +107,6 @@
 	"packages/compiler/src/tests/validator.spec.ts": {"sentence-length": 101, "em-dash": 84, "all-caps": 39, "history": 1, "position": 4, "block-length": 5},
 	"packages/language-server/src/codeActions/fixes.ts": {"sentence-length": 141, "em-dash": 79, "all-caps": 62, "history": 1, "position": 9, "block-length": 33},
 	"packages/language-server/src/codeActions/geometry.ts": {"sentence-length": 40, "em-dash": 30, "all-caps": 27, "position": 2, "block-length": 8},
-	"packages/language-server/src/codeActions/index.ts": {"sentence-length": 37, "em-dash": 25, "all-caps": 11, "history": 3, "position": 3, "block-length": 6},
 	"packages/language-server/src/codeActions/lookups.ts": {"sentence-length": 44, "em-dash": 29, "all-caps": 27, "position": 1, "block-length": 9},
 	"packages/language-server/src/tests/affected.spec.ts": {"sentence-length": 5, "em-dash": 6, "all-caps": 3},
 	"packages/language-server/src/tests/analysisCache.spec.ts": {"sentence-length": 111, "em-dash": 71, "all-caps": 48, "history": 7, "position": 1, "block-length": 11, "counts": 1},

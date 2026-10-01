@@ -3,6 +3,28 @@
 The Code Actions are the Quick Fixes and refactorings the Language Server offers. `findCodeActions` in `index.ts`
 gathers them. This file explains the rules they share.
 
+## Answering a request
+
+`findCodeActions` computes every edit from the document text it is handed and that text's analysis. It never
+uses a Diagnostic the client echoes back. Published Diagnostics are debounced, so the client's Positions may
+belong to an older buffer than the one an edit applies to. The client's Diagnostics serve only to attach an action
+to the Diagnostic it answers.
+
+The editor asks on every cursor move, so the analysis is handed in. The Workspace holds one per file and version,
+the same one that published the Diagnostics. A caller without a Workspace, such as a spec, gets the pipeline run
+on the spot. The rename index is built at most once per request, and only when an action needs it. The
+Workspace's cached index is used where there is one.
+
+A request may name the kinds it wants in `context.only`. `isRequestedKind` reads them as a dotted hierarchy, so
+`refactor` includes `refactor.extract` but not the other way round. An empty list asks for everything. Each kind
+is computed only when asked for, rather than computed and dropped. A save that runs `source.organizeImports` thus
+computes no refactorings.
+
+Quick Fixes are looked up by Diagnostic code in `fixesByCode`. A new fix is a function in one of the `*Fixes`
+modules plus one line in that table. A code with several answers concatenates them in the order they are offered.
+Several Diagnostics can have one answer, such as the conditions of one `where` clause. So `alreadyOffered` drops an
+action identical to one already in the list.
+
 ## Reading the buffer back
 
 A Code Action's edits replace spans of the document's text. The spans come from the last analysis, which may be
