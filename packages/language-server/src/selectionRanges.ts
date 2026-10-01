@@ -218,6 +218,9 @@ function collectFromNode(
 			}
 
 			return
+		case "TypeAliasStatement":
+			descend(node.predicate, cursor, chain)
+			return
 		case "ChoiceDeclarationStatement":
 			// A Case payload's default is a span inside no body, like a Parameter's.
 			for (let defaultValue of caseDefaults(node.cases)) {
@@ -348,10 +351,7 @@ function collectFromNode(
 			descend(node.base, cursor, chain)
 			return
 		case "CaseValue":
-			if (node.value !== null) {
-				descend(node.value, cursor, chain)
-			}
-
+			descend(node.value, cursor, chain)
 			return
 		// The step the cursor stands on, so `city` widens to `.address.city`.
 		case "MemberPath":
@@ -374,12 +374,13 @@ function collectFromNode(
 	}
 }
 
+// A missing node, such as an absent predicate, holds nothing.
 function descend(
-	node: parser.ImplementationNode,
+	node: parser.ImplementationNode | null,
 	cursor: common.Cursor,
 	chain: Array<common.Position>,
 ) {
-	if (!contains(node.position, cursor)) {
+	if (node === null || !contains(node.position, cursor)) {
 		return
 	}
 

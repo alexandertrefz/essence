@@ -345,3 +345,20 @@ describe("Selection Ranges inside a refused value", () => {
 		])
 	})
 })
+
+describe("Selection Ranges inside a refinement predicate", () => {
+	it("should widen from an Argument out through the predicate's call", () => {
+		let source = [
+			"implementation {",
+			"\ttype Positive = Integer where @::isGreaterThan(0)",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 2, column: 49 })).toEqual([
+			{ start: { line: 2, column: 49 }, end: { line: 2, column: 50 } },
+			{ start: { line: 2, column: 32 }, end: { line: 2, column: 51 } },
+			{ start: { line: 2, column: 2 }, end: { line: 2, column: 51 } },
+			{ start: { line: 1, column: 1 }, end: { line: 3, column: 2 } },
+		])
+	})
+})
