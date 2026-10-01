@@ -1300,49 +1300,20 @@ export function createInterpreter(
 								spell(at, step),
 							)
 						: toJS(value, at, step, expected)
-			// Work met somewhere other than a call's answer, which is the
-			// one position it crosses at — see `compileAnswerOut`, which is the
-			// door, and `asynchronyInsideValue`, which is the sentence. A fact
-			// about the SHAPE rather than about any value of it, so it compiles
-			// to the refusal itself.
+			// Work anywhere but a call's answer compiles to a refusal.
 			case "future":
 			case "started":
 				return (_value, at, step) => {
 					throw asynchronyInsideValue(expected.shown, at, step)
 				}
-			// A Type the way IN has no mapping for is still a value on the
-			// way out, and its tag says what it is — `Optional<Algebraic>` hands
-			// back an Algebraic's own refusal rather than the Type Parameter's.
+			// A Type the way in can not build still comes out by its tag.
 			case "refused":
 				return (value, at, step) => toJS(value, at, step, expected)
 		}
 	}
 
-	// A call's answer that has not run — the whole of the asynchrony door,
-	// and the only place this boundary starts anything.
-	//
-	// A FUTURE is started here, once per call: what a Function answers with is a
-	// description, and a host holding a `Promise` is holding a run. Each call
-	// starts its own, which is what a Future means — two calls are two runs —
-	// and the run belongs to a ROOT context made for it, with the host's own
-	// signal above that root where the binding was given one.
-	//
-	// A STARTED is already in flight, and nothing here starts it again: what
-	// crosses is the promise it holds. The host's signal is deliberately NOT
-	// linked to one — `Started::within` states the same rule from inside the
-	// language: a run belongs to whoever started it and may be waited for from
-	// anywhere, so a deadline or a stop written by one holder may not stop the
-	// work the others are waiting for.
-	//
-	// The value inside is marshalled when it ARRIVES, so a refusal of it
-	// comes back as a rejected promise rather than as a throw at the call. There
-	// is nowhere else for it to go: the value does not exist yet when the call
-	// answers, which is the whole reason the position is a promise.
-	//
-	// The promise gains no segment of its own in the path. It is
-	// transparent on this side exactly as an `Optional` is — a host awaiting a
-	// call's answer reads the value, not a box around it — so a refusal inside
-	// one is spelled from where the answer was.
+	// A call's answer that is work, as a `Promise`. A Future is started here,
+	// once per call. See "Work crossing out" in DEVELOPMENT.md.
 	function buildAnswerOut(
 		expected: Extract<Descriptor, { kind: "future" | "started" }>,
 	): Outbound {
@@ -1364,22 +1335,14 @@ export function createInterpreter(
 				return toJS(value, at, step, expected)
 			}
 
-			// A host that has already pulled its stop is a host that wants
-			// nothing started. A Future has not run yet — the call above only
-			// BUILT it — so there is nothing here to stop: it is simply not
-			// started, and what the host holds is the promise a stopped run
-			// answers with, which is none at all.
-			//
-			// A Started is not declined, for the reason it is not linked either:
-			// the run was put in flight before this boundary saw it, and it
-			// belongs to whoever started it.
+			// An aborted host starts no Future, and gets a promise that never
+			// settles. A Started belongs to whoever started it.
 			if (!started && hostSignal?.aborted === true) {
 				return new Promise(() => {})
 			}
 
-			// A Started is waited for under a context of its own that
-			// nothing reads — the runtime answers one with the promise it
-			// already holds — so there is nothing to unlink afterwards either.
+			// The runtime answers a Started with the promise it holds, so its
+			// context is never read and nothing needs unlinking.
 			let root = started
 				? { context: makeContext(), release: nothing }
 				: rootContext(makeContext)
@@ -1400,17 +1363,8 @@ export function createInterpreter(
 		}
 	}
 
-	// The context a run the boundary started belongs to: a root of its
-	// own, with the host's signal linked above it where the binding was given
-	// one. Per CALL, because two calls are two runs and one may not stop the
-	// other — which is exactly what the Rewriter emits at a Program's top level,
-	// a fresh root per site.
-	//
-	// `release` is what takes the link off again once the run is over, and
-	// it is why the link is not simply left in place: a host signal lives as
-	// long as the host does, and a listener per call on it would be a listener
-	// per call that outlives the call. It is the same bookkeeping `childOf`
-	// keeps in the runtime, kept here for the one link this side makes.
+	// A root context for one run, linked to the host's signal until `release`.
+	// See "Work crossing out" in DEVELOPMENT.md.
 	function rootContext(makeContext: () => FutureContext): {
 		context: FutureContext
 		release: () => void
@@ -1421,19 +1375,8 @@ export function createInterpreter(
 			return { context, release: nothing }
 		}
 
-		// A signal that is aborted ALREADY aborts this context before
-		// anything is run under it. The run is declined outright one level up,
-		// where the answer is built — see `buildAnswerOut` — and this is what
-		// makes a run that somehow reaches here read a signal that is already
-		// pulled.
-		//
-		// What a MID-RUN abort does is cooperative, and the word for it is
-		// signalled rather than stopped. Work suspended in a native that reads
-		// the signal — `Async.sleep`, `Http.send`, and `::within` and `::race`
-		// over either — stops there and answers nothing at all. Work already
-		// running to its end runs to its end and answers: there is no point in
-		// it at which anything could be taken away, because nothing between two
-		// Statements reads a signal.
+		// A signal aborted already aborts the context before anything runs. A
+		// later abort is cooperative.
 		if (hostSignal.aborted) {
 			context.controller.abort(hostSignal.reason)
 
@@ -1451,16 +1394,9 @@ export function createInterpreter(
 		}
 	}
 
-	// Every Case a Union offers, under the tag its values carry — nested
-	// Unions walked in the order `caseFor` reads them and the first one under a
-	// tag winning, so the compiled dispatch answers with the arm the general
-	// walk would have found.
-	//
-	// `Optional`'s own two Cases are left out. They are spelled by ABSENCE
-	// on this side rather than by a `$case`, which is a rule of the general walk
-	// and not of the Case that carries the tag — dispatching to one would hand
-	// back `{ $case: 'Optional#Value' }` where the boundary promises the value
-	// itself.
+	// Every Case a Union offers, by tag, in the order `caseFor` reads them, so
+	// the first under a tag is the arm `toJS` would find. `Optional`'s Cases are
+	// left to `toJS`, which spells them by absence.
 	function collectCases(
 		descriptor: Descriptor,
 		found: Map<string, Outbound>,
@@ -1483,23 +1419,17 @@ export function createInterpreter(
 		}
 	}
 
-	// The walk a value directs — what is left when a position declared
-	// nothing, and what every compiled reader falls back to when the tag it met
-	// is not the tag it expected. It is the same switch it always was, and it is
-	// the whole of the door `marshaller.toJS(value)` opens.
+	// The walk a value directs, for a position that declared nothing and for a
+	// compiled reader that met an unexpected tag.
 	function toJS(
 		value: unknown,
 		at: Path | null,
 		step: Step,
 		expected: Descriptor | null,
 	): unknown {
-		// The one untagged Essence value — a Function is emitted as a bare
-		// JavaScript function, and a Namespace as a class, which is one too. So
-		// only what its position declared can say what a call to one means: where
-		// that names exactly one signature the Function is wrapped, so a caller
-		// calls it as the declaration reads, and where it names none — a direct
-		// `toJS` with nothing declared, a Namespace — the value passes through as
-		// it is.
+		// A Function, or a Namespace emitted as a class, carries no tag. It is
+		// wrapped where its position declares one signature, and passes through
+		// where it declares none.
 		if (typeof value === "function") {
 			let signatures = callableSignatures(expected)
 
@@ -1511,9 +1441,7 @@ export function createInterpreter(
 				)
 			}
 
-			// A Union of two signatures says two things a call could mean,
-			// and an untagged value can not say which — refused rather than
-			// wrapped as whichever was written first and misdispatched.
+			// Two signatures, and no tag to choose between them.
 			if (signatures.length > 1) {
 				throw undecidableSignature(expected!.shown, at, step)
 			}
@@ -1581,11 +1509,7 @@ export function createInterpreter(
 			}
 			case OPTIONAL_EMPTY:
 				return undefined
-			// Work met where nothing declared any — a Record member the
-			// boundary never named, a `toJS` with no Type over it. It is refused
-			// in the words a declared position is refused in, because it is the
-			// same refusal: work crosses as a call's answer and nowhere else,
-			// and a walk that reached one here reached it inside a value.
+			// Work inside a value, refused as at a declared position.
 			case "Future":
 			case "Started":
 				throw asynchronyInsideValue(tag, at, step)

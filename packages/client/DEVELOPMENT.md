@@ -459,3 +459,29 @@ Every other arm goes through the general walk. A Union the way in refuses for co
 too. A host is never handed a value it could not hand back.
 
 A Function is the one untagged value, so only the Descriptor of its position says what a call to it means.
+
+### Work crossing out
+
+`buildAnswerOut` is the only place the boundary starts anything. A call's answer that is a Future is started there,
+once per call, since a Future describes work and two calls are two runs. Each run belongs to a root context of its own,
+with the host's signal linked above it where the binding has one. The Rewriter likewise emits a fresh root per site at
+a Program's top level.
+
+A Started is already in flight and is not started again: what crosses is the promise it holds. The host's signal is
+not linked to it, and an aborted host signal does not decline it. A run belongs to whoever started it and may be
+awaited from anywhere, so one holder's stop must not stop the work others wait for. `Started::within` states the same
+rule inside the language.
+
+A Future answered after the host's signal was aborted is not started at all. The host receives a promise that never
+settles, as a stopped run answers nothing.
+
+The value inside is marshalled when it arrives, so its refusal is a rejected promise rather than a throw at the call.
+The promise adds no path segment, as an `Optional` adds none.
+
+`rootContext` takes its listener off the host's signal when the run is over. The signal lives as long as the host, and
+a listener per call would outlive each call. The runtime's `childOf` keeps the same bookkeeping. A signal that is
+already aborted aborts the context before anything runs under it.
+
+A mid-run abort is cooperative. Work suspended in a native that reads the signal stops there and answers nothing. Such
+natives are `Async.sleep` and `Http.send`, and `::within` and `::race` over either. Work already running continues to
+its end and answers, since nothing between two Statements reads a signal.
