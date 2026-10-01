@@ -15,27 +15,19 @@ import { UsageError } from "./args"
 import { type CommandSpec, DEFAULT_PROGRAM_NAME } from "./commands"
 import { looksLikeGlob } from "./inputs"
 
-// `esc build` is pointed at the files it compiles; `essence test` is
-// pointed at a project, and walks it with the Compiler's `essenceFilesUnder`,
-// the walk the Formatter shares.
+// `esc build` compiles the files it is given. `essence test` walks a project with
+// the Compiler's `essenceFilesUnder`, the walk the Formatter shares.
 
-// The `.tests.es` convention: a file that is nothing but imports and a
-// `tests { … }` block, named after the Module it tests. It is discovered by
-// its NAME as well as by its content, so a `Season.tests.es` that does not
-// parse is still compiled and still reports its Diagnostic — a file that can
-// not be read can not be shown to hold no tests.
+// A `.tests.es` file holds imports and a `tests` block for the Module it is
+// named after. It is kept by name, so one that does not parse still reports.
 const TESTS_SUFFIX = ".tests.es"
 
-// The one thing a file with no `tests { … }` block may still write that
-// makes it a file with tests. Like the substring check on `tests`, it can only
-// rule a file OUT — an `@example` may perfectly well be prose — so what follows
-// it is a parse.
+// A file without a `tests` block holds tests if a `§§` block has an `@example`.
+// Finding the text only rules a file in for parsing.
 const EXAMPLE_TAG = "@example"
 
-// And the word a file has to write before a contract run can find
-// anything to test in it. Like the two above it can only rule a file OUT — the
-// word may be written in a Comment, or be a Constant's name — so what follows
-// it is a parse.
+// A contract run finds goals only in a file that writes this word. Under
+// `--contracts` finding it keeps the file without a parse.
 const NAMESPACE_KEYWORD = "namespace"
 
 export function namesTests(filePath: string): boolean {
@@ -53,14 +45,10 @@ async function isDirectory(target: string): Promise<boolean> {
 async function collectEssenceFiles(
 	directory: string,
 	found: Set<string>,
-	// Whether a standard library source counts. A walk of a PROJECT must
-	// never pick one up, wherever the checkout puts it — it declares the
-	// builtins and is nobody's test. A walk that STARTED inside the standard
-	// library is a different question: the library's own `@example` blocks are
-	// tests, and `essence test` run in it is how they are run.
+	// Whether a standard library source counts. A project walk never keeps one, but a
+	// walk started inside the library keeps its `@example` tests.
 	allowStdlib: boolean,
-	// What the project said not to walk into. Empty for every caller that
-	// read no configuration, which is every caller but the two commands.
+	// The project's `exclude`. Empty for a caller that read no project file.
 	exclude: Array<string> = [],
 ): Promise<void> {
 	for (let filePath of await essenceFilesUnder(directory, exclude)) {
@@ -70,19 +58,13 @@ async function collectEssenceFiles(
 	}
 }
 
-// Two rules, because the two ways a file arrives here mean different
-// things. A file the caller NAMED is one they want an answer about, so an
-// unreadable or unparsable one is kept and the compile reports why. A file a
-// WALK turned up is one nobody mentioned, so it is kept only when it plainly
-// holds tests — an unrelated broken source under the working directory is not
-// what `essence test` was asked about.
+// A named file is kept even when it cannot be read or parsed, so the compile
+// says why. A walked file is kept only when it plainly holds tests.
 async function keepsFile(
 	filePath: string,
 	named: boolean,
-	// Whether the run reads a Namespace declaration as tests too — see
-	// `--contracts`. It widens what a WALK keeps, because a file whose goals a
-	// run is about to synthesize is a file with tests whether or not anybody
-	// wrote a `tests { … }` block in it. A project's ordinary run is untouched.
+	// Whether the run tests Namespace declarations too. It widens what a walk keeps,
+	// since a file with goals has tests without a `tests` block.
 	contracts: boolean,
 ): Promise<boolean> {
 	if (namesTests(filePath)) {
@@ -97,25 +79,16 @@ async function keepsFile(
 		return named
 	}
 
-	// A file that never writes the word can not open the section, so a
-	// walk that turned it up is answered without parsing it — which is what
-	// keeps `essence test` in a project from parsing every source in it twice,
-	// once here and once in the compile. The reverse does NOT hold: `tests` is a
-	// contextual keyword, so a file that writes it may only be naming a
-	// Constant, and that is why what follows is a parse rather than a second
-	// guess.
-	//
-	// Under `--contracts` the text scan is the WHOLE answer: a Namespace
-	// declaration promises goals, a declaration can not be written without the
-	// word, and nearly every implementation file writes one — so a parse here
-	// would be a parse of most of the project, serially, before the compile
-	// parses it all again in parallel. A file the word turns up in that
-	// declares nothing simply synthesizes zero goals; over-keeping is the
-	// compile's cost once, under-parsing here was every run's.
+	// Under `--contracts` the text scan decides: nearly every implementation file
+	// declares a Namespace, and parsing them all here would precede the compile's
+	// own parse. A file that declares nothing yields no goals.
 	if (contracts && sourceText.includes(NAMESPACE_KEYWORD)) {
 		return true
 	}
 
+	// Without the word `tests` a file cannot open the section, so a walked file is
+	// answered without a parse. With it, `tests` may be a Constant's name, so it
+	// is parsed.
 	if (
 		!named &&
 		!sourceText.includes("tests") &&
@@ -128,50 +101,33 @@ async function keepsFile(
 
 	return (
 		parsed.program.tests !== null ||
-		// A file that writes no section may still promise something: an
-		// `@example` in a `§§` block is a test of the file it was written in,
-		// and a project's documentation is the last place a drifting example
-		// should be allowed to sit unrun.
+		// An `@example` in a `§§` block is a test of the file it is written in.
 		hasDocumentationExamples(parsed.program) ||
 		(named && containsErrors(parsed.diagnostics))
 	)
 }
 
-// Every file `essence test` will compile, from what was typed. Nothing
-// typed means the project — see `root` — a directory means every Essence source
-// under it; anything else is a file or a glob, and is a file the caller named.
+// Every file `essence test` will compile. Nothing typed means the project, a
+// directory means every source under it, and anything else is a named file or glob.
 export async function discoverTestFiles(
 	patterns: Array<string>,
 	command: CommandSpec,
 	programName: string = DEFAULT_PROGRAM_NAME,
 	workingDirectory: string = process.cwd(),
-	// Where a walk that was given nothing starts: the directory the
-	// project file sits in, which is what `essence test` typed with no argument
-	// is about. Null where no project file governs the run, and then the
-	// working directory answers as it always did. Handed over rather than read
-	// here, because this is the walk and not the place a project is worked out
-	// — the commands read the file once, at the head of a run, and hand what it
-	// said to everything that needs it.
-	//
-	// It moves the WALK and nothing else. A pattern that WAS typed — a
-	// file, a glob, a directory — is still read against the working directory,
-	// because a path typed into a shell means what that shell's directory says
-	// it means.
+	// Where a walk with nothing typed starts: the project file's directory, or the
+	// working directory without one. It moves only the walk, since a typed path means
+	// what the shell's directory says.
 	root: string | null = null,
-	// The project's own `exclude`. It narrows the WALK and nothing else:
-	// a file named on the command line was asked about by name, and answering
-	// "there is a setting" to a direct question would be the worse reading of
-	// both.
+	// The project's `exclude`. It narrows only the walk: a file named on the command
+	// line was asked about by name.
 	exclude: Array<string> = [],
-	// Whether this run reads a declaration as a test — see `keepsFile`.
+	// Whether this run tests declarations. See `keepsFile`.
 	contracts: boolean = false,
 ): Promise<Array<string>> {
 	let walked = new Set<string>()
 	let named = new Set<string>()
-	// Everything typed is read against the working directory rather than
-	// against `process.cwd()`, so that a caller driving this from somewhere
-	// else — a spec, a run started in a nested directory — says once where the
-	// globs and the named files are read from.
+	// Typed patterns are read against `workingDirectory` rather than
+	// `process.cwd()`, so specs and nested runs can say where.
 	let against = (target: string): string =>
 		path.resolve(workingDirectory, target)
 
@@ -220,10 +176,8 @@ export async function discoverTestFiles(
 	}
 
 	let candidates = [...new Set([...named, ...walked])].sort()
-	// Fanned out — each answer is one independent read (and sometimes a
-	// parse), and a project of hundreds of files pays this walk at the head of
-	// every run and every watch cycle. The order of the answers is the sorted
-	// candidates', whatever order the disk answered in.
+	// Every candidate is checked at once, since each is an independent read. The
+	// answers keep the sorted candidates' order.
 	let answers = await Promise.all(
 		candidates.map((candidate) =>
 			keepsFile(candidate, named.has(candidate), contracts),

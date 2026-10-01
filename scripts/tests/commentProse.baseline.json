@@ -18,7 +18,6 @@
 	"packages/cli/src/commands.ts": {"sentence-length": 15, "em-dash": 6, "all-caps": 3, "block-length": 2},
 	"packages/cli/src/compile.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 3},
 	"packages/cli/src/context.ts": {"sentence-length": 2, "em-dash": 2, "all-caps": 1, "block-length": 1, "stacked": 1},
-	"packages/cli/src/discovery.ts": {"sentence-length": 17, "em-dash": 14, "all-caps": 13, "block-length": 2},
 	"packages/cli/src/execute.ts": {"sentence-length": 5, "em-dash": 5},
 	"packages/cli/src/help.ts": {"sentence-length": 4, "em-dash": 4},
 	"packages/cli/src/index.ts": {"sentence-length": 11, "em-dash": 9, "all-caps": 5, "block-length": 2},
