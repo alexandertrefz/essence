@@ -1032,3 +1032,24 @@ A bounded call, such as `Terminal.print(r)`, reaches the routing through `solveC
 `r::is(other)`, resolves its Method off the standard library's `Record` Namespace, which has no `where` clause to
 solve. `routedRecordCall` asks for it there, and the answer becomes the call's conformance Arguments. `isNot` is
 provided by `Equatable` over the Record's own witness, so the direct rail leaves it alone.
+
+## Provided Methods at a call
+
+A Protocol's provided Method is emitted once, as `$es_<Protocol>__<member>`, and called with the witness of the
+conformance that reached it. At a `::` call, each source of the receiver's conformance offers it as a candidate
+(`providedMethodNamespaces`). A source is a Namespace targeting the receiver that declares the conformance, or,
+where none does, a derive. Each candidate is ranked by its source's target Type, beside the written Methods. So the
+covering `Number`'s provided `isLessThan` answers what `Integer`'s refused, as `Number::compare` answers what
+`Integer::compare` refuses.
+
+`Self` is pinned to the source's target rather than inferred from the receiver (`providedMethodNamespaceFor`). The
+pin is a Type Parameter that is not `infer`, with the target as its default, and `resolveConformances` solves the
+witness from it. A Namespace that writes the name replaces the provided Method for its own source only. Where two
+Protocols provide one name through one source, the more derived one answers, and two unrelated ones are
+`ambiguous-namespace`.
+
+The standard library's `Record` Namespace conforms for the top Record, conditionally on the receiver's members. So
+its witness is solved for the receiver itself (`witnessType`). A derive's `Self` is the whole Choice, so a sibling
+Case still fits the Parameter. `providedNamespaceMember` answers the `Number.isLessThan(a, b)` spelling the same
+way. A generic Namespace named there has no receiver, so its Type Parameters stay open for the first Argument to
+decide.
