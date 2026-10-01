@@ -323,3 +323,46 @@ describe("Folding Ranges inside a refused value", () => {
 		})
 	})
 })
+
+describe("Folding Ranges inside a Method's default", () => {
+	it("should fold a Record literal written as a Namespace Method's default", () => {
+		let source = [
+			"implementation {",
+			"\ttype Options = { size: Integer, label: String }",
+			"",
+			"\tnamespace Box for Integer {",
+			"\t\tdescribe(options: Options = {",
+			"\t\t\tsize = 1,",
+			'\t\t\tlabel = "box",',
+			"\t\t}) -> String {",
+			"\t\t\t<- options.label",
+			"\t\t}",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 5,
+			endLine: 7,
+		})
+	})
+
+	it("should fold a Record literal written as a native signature's default", () => {
+		let source = [
+			"declarations {",
+			"\ttype Options = { size: Integer, label: String }",
+			"",
+			"\tnamespace Box for Integer {",
+			"\t\tdescribe(options: Options = {",
+			"\t\t\tsize = 1,",
+			'\t\t\tlabel = "box",',
+			"\t\t}) -> String",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let ranges = foldingRangesOf(source, { allowDeclarationsHeader: true })
+
+		expect(ranges).toContainEqual({ startLine: 5, endLine: 7 })
+	})
+})

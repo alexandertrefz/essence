@@ -7,6 +7,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { assertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
+import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { programSections } from "./sections"
 
 // Folding from the Parser AST, so it survives Type errors. Only constructs
@@ -97,6 +98,23 @@ function collectFromDefaults(
 	}
 }
 
+// An `overload` block, which only the standard library writes, may mix bodied
+// Functions with native signatures. A bodied one folds like a Function literal.
+// A signature has no block, but a default written across lines folds. A
+// Namespace's Methods are read the same way.
+function collectFromOverloads(
+	methods: Array<parser.FunctionValueNode | parser.NativeMethodSignatureNode>,
+	ranges: Array<FoldingRange>,
+) {
+	for (let method of methods) {
+		if (method.nodeType === "FunctionValue") {
+			collectFromNode(method, ranges)
+		} else {
+			collectFromDefaults(method.parameters, ranges)
+		}
+	}
+}
+
 function collectFromNode(
 	node: parser.ImplementationNode,
 	ranges: Array<FoldingRange>,
@@ -110,15 +128,7 @@ function collectFromNode(
 		case "OverloadedFunctionStatement":
 			addRange(ranges, node.position)
 
-			// An `overload function` block may mix bodied Functions with native
-			// signatures; only the bodied ones fold.
-			for (let method of node.methods) {
-				if (method.nodeType === "FunctionValue") {
-					addRange(ranges, method.position)
-					collectFromBody(method.value.body, ranges)
-				}
-			}
-
+			collectFromOverloads(node.methods, ranges)
 			return
 		case "NamespaceDefinitionStatement": {
 			addRange(ranges, node.position)
@@ -131,33 +141,8 @@ function collectFromNode(
 			}
 
 			for (let member of Object.values(node.methods)) {
-				// Only bodied Methods fold; native signatures have no block.
-				let methods: Array<parser.FunctionValueNode> = []
-
-				if (
-					member.nodeType === "SimpleMethod" ||
-					member.nodeType === "StaticMethod"
-				) {
-					methods = [member.method]
-				} else if (
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-				) {
-					methods = member.methods
-				} else if (
-					member.nodeType === "OverloadedMethodSignatures" ||
-					member.nodeType === "OverloadedStaticMethodSignatures"
-				) {
-					methods = member.methods.filter(
-						(entry): entry is parser.FunctionValueNode =>
-							entry.nodeType === "FunctionValue",
-					)
-				}
-
-				for (let method of methods) {
-					addRange(ranges, method.position)
-					collectFromBody(method.value.body, ranges)
-				}
+				collectFromOverloads(methodsOf(member), ranges)
+				collectFromOverloads(nativeSignaturesOf(member), ranges)
 			}
 
 			return
