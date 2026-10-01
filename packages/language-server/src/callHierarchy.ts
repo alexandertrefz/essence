@@ -1,16 +1,11 @@
 import {
-	caseDefaults,
-	memberExpression,
-	parameterDefaults,
-} from "@essence-lang/compiler/helpers"
+	forEachParserChild,
+	forEachTypedChild,
+	type ParserNode,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import {
-	assertionExpressions,
-	typedAssertionExpressions,
-} from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 import {
 	buildRenameIndex,
@@ -150,7 +145,9 @@ function buildContext(
 	let items = new Map<string, CallHierarchyItem>()
 
 	for (let body of programBodies(program)) {
-		collectItems(body, null, items)
+		for (let node of body) {
+			collectItems(node, items)
+		}
 	}
 
 	return {
@@ -264,15 +261,32 @@ function group(
 /*********/
 
 // Item geometry comes off the Parser AST, which survives Type errors, so an
-// Item is the same for a prepare and an expansion.
-function collectItems(
-	nodes: Array<parser.ImplementationNode>,
-	container: string | null,
-	items: Map<string, CallHierarchyItem>,
-) {
-	for (let node of nodes) {
-		collectItemsFromNode(node, container, items)
+// Item is the same for a prepare and an expansion. A Function declared in a
+// body is a free Function, so only a member has a container.
+function collectItems(node: ParserNode, items: Map<string, CallHierarchyItem>) {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+			addItem(
+				{
+					name: node.name.content,
+					kind: "function",
+					container: null,
+					range: node.position,
+					selectionRange: node.name.position,
+				},
+				items,
+			)
+			break
+		case "NamespaceDefinitionStatement":
+			addNamespaceItems(node, items)
+			break
+		case "ProtocolDeclarationStatement":
+			addProtocolItems(node, items)
+			break
 	}
+
+	forEachParserChild(node, collectItems, items)
 }
 
 function addItem(
@@ -288,208 +302,7 @@ function addItem(
 	}
 }
 
-function collectItemsFromNode(
-	node: parser.ImplementationNode,
-	container: string | null,
-	items: Map<string, CallHierarchyItem>,
-) {
-	switch (node.nodeType) {
-		case "FunctionStatement":
-			addItem(
-				{
-					name: node.name.content,
-					kind: "function",
-					container,
-					range: node.position,
-					selectionRange: node.name.position,
-				},
-				items,
-			)
-
-			// A Function declared in a body is a free Function, so the container does not
-			// travel into bodies.
-			collectItemsFromDefinition(node.value, items)
-			return
-		case "OverloadedFunctionStatement":
-			addItem(
-				{
-					name: node.name.content,
-					kind: "function",
-					container,
-					range: node.position,
-					selectionRange: node.name.position,
-				},
-				items,
-			)
-
-			for (let method of node.methods) {
-				collectItemsFromSignature(method, items)
-			}
-
-			return
-		case "NamespaceDefinitionStatement":
-			collectNamespaceItems(node, items)
-			return
-		case "ProtocolDeclarationStatement":
-			collectProtocolItems(node, items)
-			return
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			collectItemsFromNode(node.value, container, items)
-			return
-		case "IfStatement":
-			collectItemsFromNode(node.condition, container, items)
-			collectItems(node.body, container, items)
-			return
-		case "IfElseStatement":
-			collectItemsFromNode(node.condition, container, items)
-			collectItems(node.trueBody, container, items)
-			collectItems(node.falseBody, container, items)
-			return
-		case "ReturnStatement":
-			collectItemsFromNode(node.expression, container, items)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of assertionExpressions(node)) {
-				collectItemsFromNode(expression, container, items)
-			}
-
-			return
-		case "FunctionValue":
-			collectItems(node.value.body, container, items)
-			return
-		case "FunctionInvocation":
-			collectItemsFromNode(node.name, container, items)
-			collectItemsFromArguments(node.arguments, container, items)
-			return
-		case "MethodInvocation":
-			collectItemsFromNode(node.base, container, items)
-			collectItemsFromArguments(node.arguments, container, items)
-			return
-		case "Lookup":
-			collectItemsFromNode(node.base, container, items)
-			return
-		case "Start":
-		case "Complete":
-			collectItemsFromNode(node.expression, container, items)
-			return
-		case "RefusedValue":
-			collectItemsFromNode(node.base, container, items)
-			return
-		case "Combination":
-			collectItemsFromNode(node.lhs, container, items)
-			collectItemsFromNode(node.rhs, container, items)
-			return
-		case "Match":
-			collectItemsFromNode(node.value, container, items)
-
-			for (let handler of node.handlers) {
-				if (handler.guard !== null) {
-					collectItemsFromNode(handler.guard, container, items)
-				}
-
-				collectItems(handler.body, container, items)
-			}
-
-			return
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				collectItemsFromNode(expression, container, items)
-			}
-
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				collectItemsFromNode(memberExpression(member), container, items)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				collectItemsFromNode(value, container, items)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				collectItemsFromNode(entry.key, container, items)
-				collectItemsFromNode(entry.value, container, items)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					collectItemsFromNode(segment.expression, container, items)
-				}
-			}
-
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				collectItemsFromNode(node.value, container, items)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			// A Case payload's default may call something, which is an incoming edge.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				collectItemsFromNode(defaultValue, container, items)
-			}
-
-			return
-		// A path only reads members (`path-is-members-only`), so it calls nothing.
-		case "MemberPath":
-		case "TypeAliasStatement":
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
-	}
-}
-
-// A Function literal written as a default may declare Functions of its own.
-function collectItemsFromDefinition(
-	definition: parser.FunctionDefinitionNode,
-	items: Map<string, CallHierarchyItem>,
-) {
-	for (let defaultValue of parameterDefaults(definition.parameters)) {
-		collectItemsFromNode(defaultValue, null, items)
-	}
-
-	collectItems(definition.body, null, items)
-}
-
-function collectItemsFromSignature(
-	method: parser.FunctionValueNode | parser.NativeMethodSignatureNode,
-	items: Map<string, CallHierarchyItem>,
-) {
-	if (method.nodeType === "FunctionValue") {
-		collectItemsFromDefinition(method.value, items)
-		return
-	}
-
-	for (let defaultValue of parameterDefaults(method.parameters)) {
-		collectItemsFromNode(defaultValue, null, items)
-	}
-}
-
-function collectItemsFromArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-	container: string | null,
-	items: Map<string, CallHierarchyItem>,
-) {
-	for (let argument of nodeArguments) {
-		collectItemsFromNode(argument.value, container, items)
-	}
-}
-
-function collectNamespaceItems(
+function addNamespaceItems(
 	node: parser.NamespaceDefinitionStatementNode,
 	items: Map<string, CallHierarchyItem>,
 ) {
@@ -510,10 +323,6 @@ function collectNamespaceItems(
 			},
 			items,
 		)
-
-		if (property.value !== null) {
-			collectItemsFromNode(property.value, null, items)
-		}
 	}
 
 	for (let member of Object.values(node.methods)) {
@@ -552,15 +361,11 @@ function collectNamespaceItems(
 			},
 			items,
 		)
-
-		for (let method of methods) {
-			collectItemsFromSignature(method, items)
-		}
 	}
 }
 
 // Only a provided Method is an Item: no call binds to a requirement.
-function collectProtocolItems(
+function addProtocolItems(
 	node: parser.ProtocolDeclarationStatementNode,
 	items: Map<string, CallHierarchyItem>,
 ) {
@@ -600,12 +405,6 @@ function collectProtocolItems(
 			},
 			items,
 		)
-
-		for (let { body } of signatures) {
-			if (body !== null) {
-				collectItemsFromDefinition(body.value, items)
-			}
-		}
 	}
 }
 
@@ -620,8 +419,14 @@ function spanning(a: common.Position, b: common.Position): common.Position {
 /* Call sites */
 /**************/
 
-// One walk of the typed AST, threading the enclosing named caller down. A
-// Function value pushes nothing, so its calls go to the nearest named caller;
+// The walk of the typed AST, with the named caller a call is credited to.
+type SiteWalk = {
+	caller: CallHierarchyItem
+	context: Context
+	sites: Array<CallSite>
+}
+
+// A Function value names no caller, so its calls go to the nearest named one;
 // top level Statements go to the implementation caller.
 function collectSites(context: Context): Array<CallSite> {
 	let sites: Array<CallSite> = []
@@ -631,26 +436,107 @@ function collectSites(context: Context): Array<CallSite> {
 	}
 
 	for (let section of typedProgramSections(context.enrichedProgram)) {
-		let caller =
-			section.kind === "implementation"
-				? context.topLevel
-				: (context.testsLevel ?? context.topLevel)
+		let walk: SiteWalk = {
+			caller:
+				section.kind === "implementation"
+					? context.topLevel
+					: (context.testsLevel ?? context.topLevel),
+			context,
+			sites,
+		}
 
-		visitBody([...section.head, ...section.nodes], caller, context, sites)
+		for (let node of [...section.head, ...section.nodes]) {
+			visitSites(node, walk)
+		}
 	}
 
 	return sites
 }
 
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
-	for (let node of nodes) {
-		visitNode(node, caller, context, sites)
+// The walk inside a declaration, crediting its calls to the declaration's
+// Item where it has one.
+function within(position: common.Position, walk: SiteWalk): SiteWalk {
+	return {
+		...walk,
+		caller: callerFor(position, walk.caller, walk.context),
 	}
+}
+
+function visitSites(node: TypedNode, walk: SiteWalk): void {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+			forEachTypedChild(
+				node,
+				visitSites,
+				within(node.name.position, walk),
+			)
+			return
+		// Every Overload body attributes to the one Item the set shares, as renaming
+		// does. `overloadedMethodIndex` would allow splitting them.
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			forEachTypedChild(
+				node,
+				visitSites,
+				within(node.name.position, walk),
+			)
+			return
+		case "NamespaceDefinitionStatement":
+			visitNamespaceSites(node, walk)
+			return
+		case "FunctionInvocation":
+			if (node.name.nodeType === "Identifier") {
+				recordCall(node.name.position, walk)
+			} else if (
+				node.name.nodeType === "Lookup" &&
+				node.name.base.type.type === "Namespace"
+			) {
+				// `Namespace.staticMethod(…)`, a Lookup the rename index binds
+				// to the static Method.
+				recordCall(node.name.member.position, walk)
+			}
+
+			break
+		case "MethodInvocation":
+			// The receiver first, so a chain reports its calls in written order.
+			visitSites(node.base, walk)
+
+			// A call on a Union receiver dispatches per member Type, and its `namespace`
+			// is a placeholder, so it is skipped. So is a receiver not yet resolved,
+			// whose `namespace.name` is empty.
+			if (node.dispatch === null) {
+				recordCall(node.member.position, walk)
+			}
+
+			forEachTypedChild(node, (child) => {
+				if (child !== node.base) {
+					visitSites(child, walk)
+				}
+			})
+
+			return
+	}
+
+	forEachTypedChild(node, visitSites, walk)
+}
+
+// A property's initialiser calls on the property's behalf, so the Namespace
+// walks its own members.
+function visitNamespaceSites(
+	node: common.typed.NamespaceDefinitionStatementNode,
+	walk: SiteWalk,
+) {
+	for (let property of Object.values(node.properties)) {
+		visitSites(property.value, within(property.name.position, walk))
+	}
+
+	for (let member of Object.values(node.methods)) {
+		visitSites(member, walk)
+	}
+
+	visitNativeShims(node, walk)
 }
 
 function callerFor(
@@ -661,34 +547,18 @@ function callerFor(
 	return context.items.get(positionKey(position)) ?? fallback
 }
 
-// A refinement's predicate calls Methods on `@`, which may be the Program's
-// own.
-function visitPredicate(
-	node: common.typed.TypeAliasStatementNode,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
-	if (node.predicate !== null) {
-		visitNode(node.predicate, caller, context, sites)
-	}
-}
-
 // A native Method's calls live in the frame the Compiler synthesizes for its
 // defaults: `to end: Integer = @::length()` calls `length`.
 function visitNativeShims(
 	node: common.typed.NamespaceDefinitionStatementNode,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
+	walk: SiteWalk,
 ) {
 	for (let shim of node.nativeShims) {
-		visitDefaults(
-			shim.parameters,
-			memberItem(node.name.content, shim.memberName, context) ?? caller,
-			context,
-			sites,
-		)
+		let caller =
+			memberItem(node.name.content, shim.memberName, walk.context) ??
+			walk.caller
+
+		visitSites(shim, { ...walk, caller })
 	}
 }
 
@@ -709,12 +579,8 @@ function memberItem(
 
 // `position` is where the callee's name is written. A name the index does not
 // bind is one this document does not declare.
-function recordCall(
-	position: common.Position,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
+function recordCall(position: common.Position, walk: SiteWalk) {
+	let { caller, context, sites } = walk
 	let declaration = context.declarationAt.get(positionKey(position))
 
 	if (
@@ -732,249 +598,4 @@ function recordCall(
 	}
 
 	sites.push({ caller, callee, range: position })
-}
-
-// `= @::length()` is an outgoing call of the Function the default is on.
-function visitDefaults(
-	parameters: Array<common.typed.ParameterNode>,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		visitNode(defaultValue, caller, context, sites)
-	}
-}
-
-function visitNode(
-	node: common.typed.ImplementationNode,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			visitNode(node.value, caller, context, sites)
-			return
-		case "FunctionStatement": {
-			let functionCaller = callerFor(node.name.position, caller, context)
-
-			visitDefaults(node.value.parameters, functionCaller, context, sites)
-			visitBody(node.value.body, functionCaller, context, sites)
-
-			return
-		}
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				visitNode(
-					property.value,
-					callerFor(property.name.position, caller, context),
-					context,
-					sites,
-				)
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				// Every Overload body attributes to the one Item the set shares, as renaming
-				// does. `overloadedMethodIndex` would allow splitting them.
-				for (let method of methods) {
-					let methodCaller = callerFor(
-						member.name.position,
-						caller,
-						context,
-					)
-
-					visitDefaults(
-						method.value.parameters,
-						methodCaller,
-						context,
-						sites,
-					)
-					visitBody(method.value.body, methodCaller, context, sites)
-				}
-			}
-
-			visitNativeShims(node, caller, context, sites)
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-				let methodCaller = callerFor(
-					member.name.position,
-					caller,
-					context,
-				)
-
-				for (let method of methods) {
-					visitDefaults(
-						method.value.parameters,
-						methodCaller,
-						context,
-						sites,
-					)
-					visitBody(method.value.body, methodCaller, context, sites)
-				}
-			}
-
-			return
-		case "IfStatement":
-			visitNode(node.condition, caller, context, sites)
-			visitBody(node.body, caller, context, sites)
-			return
-		case "IfElseStatement":
-			visitNode(node.condition, caller, context, sites)
-			visitBody(node.trueBody, caller, context, sites)
-			visitBody(node.falseBody, caller, context, sites)
-			return
-		case "ReturnStatement":
-			visitNode(node.expression, caller, context, sites)
-			return
-		// A call in an assertion counts, so tests reach the Functions they exercise.
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, caller, context, sites)
-			}
-
-			return
-		case "FunctionInvocation":
-			if (node.name.nodeType === "Identifier") {
-				recordCall(node.name.position, caller, context, sites)
-			} else if (
-				node.name.nodeType === "Lookup" &&
-				node.name.base.type.type === "Namespace"
-			) {
-				// `Namespace.staticMethod(…)`, a Lookup the rename index binds
-				// to the static Method.
-				recordCall(node.name.member.position, caller, context, sites)
-			}
-
-			visitNode(node.name, caller, context, sites)
-			visitArguments(node.arguments, caller, context, sites)
-			return
-		case "MethodInvocation":
-			// The receiver first, so a chain reports its calls in written order.
-			visitNode(node.base, caller, context, sites)
-
-			// A call on a Union receiver dispatches per member Type, and its `namespace`
-			// is a placeholder, so it is skipped. So is a receiver not yet resolved,
-			// whose `namespace.name` is empty.
-			if (node.dispatch === null) {
-				recordCall(node.member.position, caller, context, sites)
-			}
-
-			visitArguments(node.arguments, caller, context, sites)
-			return
-		case "Lookup":
-			visitNode(node.base, caller, context, sites)
-			return
-		// Calls under `start` and `complete` count too.
-		case "Start":
-		case "Complete":
-			visitNode(node.expression, caller, context, sites)
-			return
-		case "RefusedValue":
-			visitNode(node.base, caller, context, sites)
-			return
-		case "Combination":
-			visitNode(node.lhs, caller, context, sites)
-			visitNode(node.rhs, caller, context, sites)
-			return
-		case "Match":
-			visitNode(node.value, caller, context, sites)
-
-			for (let handler of node.handlers) {
-				// A Handler's literal and Guard hold calls outside its body.
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, caller, context, sites)
-				}
-
-				visitBody(handler.body, caller, context, sites)
-			}
-
-			return
-		// A `define` is Expressions only, Conditions included.
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				visitNode(expression, caller, context, sites)
-			}
-
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				visitNode(member, caller, context, sites)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				visitNode(value, caller, context, sites)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				visitNode(entry.key, caller, context, sites)
-				visitNode(entry.value, caller, context, sites)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, caller, context, sites)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			visitBody(node.value.body, caller, context, sites)
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				visitNode(node.value, caller, context, sites)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			for (let defaultValue of caseDefaults(node.cases)) {
-				visitNode(defaultValue, caller, context, sites)
-			}
-
-			return
-		case "TypeAliasStatement":
-			visitPredicate(node, caller, context, sites)
-			return
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
-	}
-}
-
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	caller: CallHierarchyItem,
-	context: Context,
-	sites: Array<CallSite>,
-) {
-	for (let argument of nodeArguments) {
-		visitNode(argument.value, caller, context, sites)
-	}
 }
