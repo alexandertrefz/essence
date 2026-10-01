@@ -80,7 +80,10 @@ export function inlineConstantActions(
 
 	let value = sliceOf(lines, statement.value.position)
 
-	if (!readsAgree(index, scopes, statement.value.position, reads)) {
+	if (
+		readsVariable(index, statement.value.position) ||
+		!readsAgree(index, scopes, statement.value.position, reads)
+	) {
 		return []
 	}
 
@@ -309,6 +312,21 @@ function readsOf(
 	}
 
 	return reads
+}
+
+// A Variable may be assigned between the declaration and a read, and a copy
+// would read the new value.
+function readsVariable(index: RenameIndex, value: common.Position): boolean {
+	for (let occurrence of index) {
+		if (
+			occurrence.declaration.kind === "variable" &&
+			containsRange(value, occurrence.position)
+		) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Whether every name the value reads resolves the same at every read, since

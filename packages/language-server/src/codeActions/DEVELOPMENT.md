@@ -148,7 +148,8 @@ whole operand after them, so `complete work` pasted before `::add(1)` would read
 brackets group an Expression, so the copy cannot be guarded, and neither is inlined.
 
 There is no hoisting hazard. A Constant is visible only after its declaration, so every read follows it. Every name
-the value reads is then in scope at each read, unless shadowed, which `readsAgree` checks.
+the value reads is then in scope at each read, unless shadowed, which `readsAgree` checks. A Variable is in scope
+too, but may be assigned between the declaration and a read. So `readsVariable` refuses a value that reads one.
 
 `isInlinable` admits only values that mean the same thing wherever and however often they are written:
 

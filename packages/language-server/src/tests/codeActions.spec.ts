@@ -7923,6 +7923,26 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "mixed:"))).toEqual([])
 	})
 
+	// A copy reads the Variable where the Constant is read, after the
+	// assignment.
+	it("offers nothing for a value that reads a Variable", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction run() -> Integer {",
+			"\t\tvariable count = 1",
+			"\t\tconstant first = { count }",
+			"",
+			"\t\tcount = 2",
+			"",
+			"\t\t<- first.count",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(inlines(lines, rangeOf(lines, "first ="))).toEqual([])
+	})
+
 	// A read inside a Function literal runs once per call of that literal.
 	it("offers nothing for a read inside a Function literal", () => {
 		let lines = [
