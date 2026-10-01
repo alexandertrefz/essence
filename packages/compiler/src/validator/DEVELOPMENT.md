@@ -181,3 +181,25 @@ which is the `isNot` a refinement is declared by, and the enricher reads that.
 Only Integer and String qualify, because their literal Matcher asks what their `is` asks. The runtime's `anyIs`
 compares Integers as bigints and Strings normalised, as `Integer.is` and `String.is` do. Every other scrutinee,
 and an Integer or String Match naming no value, is `match-on-non-union`.
+
+## Re-matching a committed call
+
+`checkCommittedOverload` and the plain call checks match a call's Arguments again against the Signature the
+enricher committed to, through `matchCommittedArguments`. The Arguments are asked what the enricher asked them,
+literal admission and `refinementDecidedBy` included. A committed Overload that fails the re-match is an internal
+error, so a weaker question would fail a well-typed Program.
+
+An Argument carrying an undecided slot, such as the `List<Unknown>` an empty `[]` leaves, binds no Type
+Parameter. It is matched after every Argument that can decide one, as the enricher does. Binding `T` to the blank
+would turn every later Argument into a write into a blank: `pair(empty, ["a"], "two")` would refuse the `["a"]`
+that decides `T`.
+
+Some decisions can not be re-derived from the Arguments one at a time. The enricher can fill a Type Parameter bound to an undecided slot from the call's expected Type or from a Function
+literal's body. A name at an Argument position keeps the undecided Type its Declaration wrote. Matching from the Nodes alone binds the Parameter
+to the blank again, and every Argument that followed the decision fits nothing. The enricher substituted its
+decision into the call's recorded Type, so `matchCommittedArguments` reads the bindings back off that Type and
+matches a second time. That second match only runs for a generic call carrying an undecided slot whose first
+match failed.
+
+The second match only checks a commitment. Seeding from the recorded Type is unification and can fail halfway. But a seed is never a verdict. A wrong or
+missing seed makes the second match fail, and then the first match's answer is reported.

@@ -3435,16 +3435,9 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		mergedValue: () => argumentNode.value,
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
-		// An Argument carrying a slot nobody decided binds no Type
-		// Parameter, so it is matched after every Argument that can decide one —
-		// the holding-back a prefixed Case construction gets, for the same reason
-		// and one Argument kind over. A blank is bottom to READ and nothing to
-		// bind: binding `T` to the `List<Unknown>` an empty `[]` left turned
-		// every Argument after it into a write into a blank, and `pair(empty,
-		// ["a"], "two")` was refused for the `["a"]` that DECIDES `T` beside the
-		// `"two"` that is genuinely wrong. Deferred, the `["a"]` binds `T` and
-		// the blank is read against it, which is what the Enricher made of the
-		// same call.
+		// An Argument with an undecided slot binds nothing and is matched after
+		// the Arguments that decide a Type Parameter. See "Re-matching a
+		// committed call" in DEVELOPMENT.md.
 		bindsNothing: typeContainsUnknown(argumentNode.type),
 		getType: (expectedType) =>
 			admittedTypeOf(expectedType, argumentNode.value) ??
@@ -3452,45 +3445,9 @@ function matchableArgumentsFromTypedNodes(
 	}))
 }
 
-// The Arguments matched against the Signature the Enricher committed to —
-// and, where that fails while an Argument still carries an undecided slot,
-// matched a SECOND time with the Type Parameters the Enricher decided read back
-// off the Type it recorded for the call.
-//
-// A decision made from the Arguments TOGETHER can not be re-derived from them
-// one at a time. `invocationWithDecidedSeeds` fills a Type Parameter bound to an
-// undecided slot from the call's expected Type, from the Arguments that were
-// only checked against it, or from what a Function literal's body answers — and
-// a NAME standing at an Argument position keeps the undecided Type its own
-// Declaration wrote, deliberately, because what an empty `[]` bound to a name
-// decides is that Declaration's business. Re-deriving the bindings from those
-// Nodes alone binds the Parameter to the blank all over again, and every
-// Argument that reacted to the decision then fits nothing: the combiner of a
-// `loop(startingWith seed, …)` is resolved against `List<Integer>`, and the seed
-// it is re-matched beside says `List<Unknown>`.
-//
-// What the Enricher decided is written down, though — it is substituted into the
-// Type of the call itself — so reading the bindings back off that Type asks the
-// re-match with the answer the Enricher had. Which is what the re-match is for:
-// it CHECKS a commitment, it does not make one again.
-//
-// Only a GENERIC call carrying an undecided slot pays for the second attempt,
-// and only the first attempt's answer is ever reported: nothing a seeded match
-// says can hide a mismatch the plain one found. A signature with no Type
-// Parameter has nothing to seed, so the blank an Argument carries is measured
-// against a written Type and the two attempts would be the same one.
-//
-// Seeding from the call's own Type is unification, and unification can fail
-// halfway — leaving some Parameters seeded and others not. Safe, because a seed
-// is never a verdict: a wrong or missing one makes the second attempt FAIL, and
-// a failed second attempt is the first attempt's answer.
-//
-// It is the deferral above that keeps this rare. An Argument carrying a blank
-// binds nothing, so the Arguments that decide a Type Parameter bind it first and
-// the blank is read against what they decided — which is every call whose blank
-// stands beside an Argument of the same Parameter. What is left for the rescue is
-// a call whose decision came from somewhere the Arguments can not be asked
-// again: a callback's body, or the position the whole call stands in.
+// Matches the Arguments against the committed Signature, and once more with
+// the bindings read off the call's recorded Type where an undecided slot
+// failed the first match. See "Re-matching a committed call" in DEVELOPMENT.md.
 function matchCommittedArguments(
 	signature: common.BaseFunction,
 	argumentNodes: Array<common.typed.ArgumentNode>,
@@ -3535,11 +3492,8 @@ function matchCommittedArguments(
 	return seeded.type === "Match" ? seeded : matched
 }
 
-// Whether an Argument the Enricher could not type stands where it moves
-// the ones around it — which is every POSITIONAL one. A labelled Argument is
-// matched by its label before its Type is looked at, so a hole under a label
-// leaves every other Argument exactly where it was and the call can still be
-// judged on them.
+// Whether a positional Argument is a hole, which shifts the Arguments after
+// it. A labelled hole shifts nothing.
 function holesShiftTheCall(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): boolean {
@@ -3564,15 +3518,8 @@ function reportArityMismatch(
 	})
 }
 
-// A LABEL is what an Argument is matched by before its Type is looked at
-// — a free Function's Arguments carry them exactly as a Method's do, `loop(
-// startingWith 1, …)` as much as `things::sort(by …)` — so a label that does
-// not agree leaves `matchArguments` with the same mismatching index a wrong
-// Type does. Reported as a Type mismatch it said "this is an Integer" under
-// "Parameter 'around' is Integer", which names nothing the call did wrong; the
-// label is what it did. An overloaded callee is told the same thing by
-// `no-matching-overload`'s per-candidate notes, so the signature is the note
-// here too.
+// A wrong label gives `matchArguments` the same mismatching index a wrong
+// Type does, so the report names the label rather than the Type.
 function reportArgumentLabelMismatch(
 	parameterTypes: Array<common.Parameter>,
 	parameter: common.Parameter,
@@ -3598,12 +3545,8 @@ function reportArgumentLabelMismatch(
 					? "Pass the value with no label."
 					: `Write '${parameter.name}' before the value.`,
 			],
-			// Both halves, because which of the three edits the mismatch
-			// asks for is decided by the PAIR — a label written where none is
-			// declared is dropped, one written where another is declared is
-			// changed, and one that was never written is inserted. The Help
-			// leads with the second half of that and the Quick Fix needs the
-			// first as well.
+			// Both labels, since the pair decides whether the Quick Fix drops,
+			// changes or inserts one.
 			data: {
 				kind: "expected-label",
 				label: parameter.name,
@@ -3613,18 +3556,9 @@ function reportArgumentLabelMismatch(
 	)
 }
 
-// A Record Argument written against a Parameter whose default fills some
-// of its members in, missing members the default does NOT fill in — and missing
-// nothing else. Null where the Argument failed for any other reason: a member
-// with the wrong Type, a member the Parameter does not declare, a Parameter
-// that is not a Record, or no default at all. Each of those is
-// `argument-type-mismatch`, which names the whole Type, and this one names the
-// members instead.
-//
-// And null for an Argument that is not WRITTEN as a Record literal, which
-// may not be a partial at all: naming the members it is missing would be advice
-// it can not take, since writing them means writing a literal. That refusal is
-// `argument-type-mismatch` with `partialSpellingEvidence`'s note.
+// The members a written Record literal Argument lacks that the Parameter's
+// default does not fill in, where nothing else is wrong. Otherwise null, and
+// the call is an `argument-type-mismatch`.
 function missingMembersOf(
 	parameter: common.Parameter,
 	argumentNode: common.typed.ArgumentNode,
@@ -3650,10 +3584,8 @@ function missingMembersOf(
 	return missing.length === 0 ? null : missing
 }
 
-// What the Argument comes to once the default has filled it in — a member
-// a path key wrote stands for the whole member the merge rebuilds. The
-// Argument's own Type wherever no path key was written, which is every Argument
-// but one.
+// The Argument's Type once the default fills in what a path key reaches, or
+// its own Type where it wrote no path key.
 function argumentRecordType(
 	parameter: common.Parameter,
 	argumentNode: common.typed.ArgumentNode,
