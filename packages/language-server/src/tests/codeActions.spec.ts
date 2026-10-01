@@ -6007,6 +6007,33 @@ describe("Code Actions", () => {
 			expect(matchActions(lines, spanOf(lines, 17, "inner"))).toEqual([])
 		})
 
+		// A name carries its value's Type, but a `match` written before it
+		// would break the declaration. A member's name scaffolds the whole read.
+		it("should offer nothing on a name and match the read a member ends", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant maybe: Optional<Integer> = #Value(1)",
+				"\tfunction unwrap (given: Optional<Integer>) -> Optional<Integer> {",
+				"\t\t<- given",
+				"\t}",
+				"\tvariable current: Optional<Integer> = #Empty",
+				"\tcurrent = maybe",
+				"\tconstant holder = { held = maybe }",
+				"\tconstant read = holder.held",
+				"\tchoice Shape { Circle { radius: Integer }, Square }",
+				"\tconstant made = Shape#Circle(1)",
+				"}",
+			]
+
+			expect(matchActions(lines, spanOf(lines, 2, "maybe"))).toEqual([])
+			expect(matchActions(lines, spanOf(lines, 3, "given"))).toEqual([])
+			expect(matchActions(lines, spanOf(lines, 7, "current"))).toEqual([])
+			expect(matchActions(lines, spanOf(lines, 11, "Shape"))).toEqual([])
+			expect(
+				titles(matchActions(lines, spanOf(lines, 9, "held"))),
+			).toEqual(["Match on 'holder.held'"])
+		})
+
 		// The request must sit inside the Expression. A selection of the whole
 		// file is about no Expression in particular.
 		it("should offer nothing for a request no Expression contains", () => {
