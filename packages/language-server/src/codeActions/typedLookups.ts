@@ -7,11 +7,9 @@ import { typedHandlerExpressions } from "../matchHandlerChildren"
 import { isSamePosition } from "../positions"
 import { typedProgramBodies } from "../sections"
 
-// What the TYPED Program says about a span the source wrote. Every lookup
-// beside this one reads the Parser AST, because an edit is written into text
-// and the typed tree erases and rewrites what the text says — but a refactoring
-// that has to SPELL a Type has nowhere else to ask, and the Positions are the
-// source's own either way.
+// What the typed Program says about a span of the source. Other lookups read
+// the Parser AST, which matches the text, but spelling a Type needs the typed
+// tree. Both keep the source's Positions.
 
 export function typedExpressionAt(
 	program: common.typed.Program,
@@ -21,11 +19,8 @@ export function typedExpressionAt(
 
 	for (let body of typedProgramBodies(program)) {
 		visitBody(body, (node) => {
-			// The FIRST match wins, which is the outermost of the Nodes
-			// sharing a span — a Method Invocation and its base Identifier
-			// stand at the same Position when the call has no receiver written
-			// in front of it, and what a caller asking about a span means is
-			// the whole of what stands there.
+			// The first match is the outermost Node of a span. A call without
+			// a written receiver shares its Position with its base Identifier.
 			if (found === null && isSamePosition(node.position, position)) {
 				found = node
 			}
@@ -44,9 +39,8 @@ function visitBody(
 	}
 }
 
-// The same walk `findInlayHints` makes, which is the one that reaches
-// every Expression of a typed Program — a form missing from it is a form this
-// answers nothing about.
+// The walk `findInlayHints` makes, which reaches every Expression of a typed
+// Program.
 function visitNode(
 	node: common.typed.ImplementationNode,
 	visit: (node: common.typed.ExpressionNode) => void,

@@ -1,10 +1,8 @@
 import type { Scope } from "../rename"
 
-// The name an extraction gives what it lifted out, with a number after it
-// where the Scope already has one. The whole chain is walked rather than the one
-// Scope: a name that shadows one read further down the same body would rebind it
-// silently, and an extraction that renames somebody's code by accident is worse
-// than one that writes `total2`.
+// The name an extraction gives what it lifted out, numbered when taken. The
+// whole Scope chain is checked, since shadowing an outer name would silently
+// rebind its later reads.
 export function availableName(name: string, scope: Scope): string {
 	if (!isTaken(name, scope)) {
 		return name

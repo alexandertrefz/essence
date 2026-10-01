@@ -5,22 +5,15 @@ import { sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// The two shorthands an update's key list does not have. A Record
-// Literal's member list takes `{ port }` for `{ port = port }`; a key list does
-// not, because a bare name after `with` is already the whole value being merged
-// in. Both fixes write the value the shorthand would have stood for, which is
-// the Help each Diagnostic gives — and both are preferred, since a key list
-// spells its values and there is nothing else a bare key could become.
+// Shorthands an update's key list does not take, unlike a Record Literal's
+// `{ port }`. Each fix writes the value the shorthand would stand for, as its
+// Diagnostic's Help says, and is preferred.
 
 const namePattern = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-// Found through the AST rather than off the buffer alone, which is the
-// one thing that tells the two shapes carrying this code apart. A RECORD update
-// recovers its key list and keeps it — `{ base with port }` is a Combination
-// whose right side is a member list — while a DICTIONARY update (`[d with a,
-// b]`) is refused outright and leaves no Node behind. The expansion belongs to
-// the first only: a Dictionary's key is a VALUE, so `a = a` there says something
-// else entirely rather than saying what was meant the long way round.
+// Only a Record update gets the fix, which the AST tells apart: it keeps its
+// key list, while a refused Dictionary update leaves no Node. A Dictionary key
+// is a value, so `a = a` would mean something else.
 export function expandShorthandKeyAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -79,12 +72,9 @@ function isRecordKey(
 	return found
 }
 
-// A path key never had a reading to recover — there is no `a.b = a.b` for
-// a bare path to have been short for — so the value it sets is named by the
-// LAST step, which is the binding a reader writing `{ config with server.port }`
-// meant. Read off the buffer rather than off the Node, as every edit here is:
-// the steps are what the Diagnostic underlines, and the last of them is the one
-// that names anything.
+// A path key's value is named by its last step, the binding a reader writing
+// `{ config with server.port }` meant. It is read off the buffer, where the
+// Diagnostic underlines the steps.
 const pathPattern = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$/
 
 export function expandShorthandPathAction(

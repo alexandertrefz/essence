@@ -6,20 +6,12 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// The mirror of the `constant-reassignment` fix, offered where there is
-// no Diagnostic to answer: a `variable` nothing ever assigns is a Constant that
-// says it might change. The Compiler has nothing to say about that — both
-// Programs are correct — so this is a rewrite rather than a fix, and it is
-// never preferred: applying it to a name that IS assigned would stop the file
-// compiling, and the title says which of the two keywords the reader is asking
-// for rather than promising a tidy-up.
+// Declares a `variable` that nothing assigns as a Constant. Both Programs are
+// correct, so this is a rewrite, never preferred, rather than a fix.
 //
-// What makes it safe is the rename index, which records every site that BINDS a
-// value to the name — the declaration and every assignment, wherever it is
-// written, a Function literal that captures the name included. One write means
-// the declaration and nothing else. The index covers this document alone and
-// that is enough: a Variable can not be exported at all (`export-of-variable`),
-// so nothing outside the file it is declared in can ever reach it.
+// The rename index records every write to the name, captures included, so one
+// write means only the declaration. A Variable cannot be exported, so this
+// document's index is enough.
 
 const variableKeyword = "variable"
 
@@ -34,9 +26,7 @@ export function constantActions(
 	walk(program, (node) => {
 		if (
 			node.nodeType !== "VariableDeclarationStatement" ||
-			// A Pattern binds several names at once and each of them is a
-			// Declaration of its own, so `variable` there is a keyword over a
-			// list rather than over one name — a question this does not ask.
+			// A Pattern's `variable` covers several names, so it is skipped.
 			node.name.nodeType !== "Identifier" ||
 			!overlaps(node.position, range)
 		) {
@@ -51,10 +41,8 @@ export function constantActions(
 			},
 		}
 
-		// The Statement's Position starts at its keyword, but a `§§`
-		// block or a Declaration this Parser recovered from could move it —
-		// replacing a span that does not read `variable` would corrupt the
-		// line silently. The same reading `constantToVariableAction` makes.
+		// A `§§` block or a recovered Declaration could move the keyword, so
+		// the span must read `variable`, as in `constantToVariableAction`.
 		if (sliceOf(lines, keyword) !== variableKeyword) {
 			return
 		}
