@@ -147,3 +147,83 @@ an entry.
 problems went away. An open project file is judged from its buffer, on every keystroke. Everything the server does
 with the settings, such as the exclusions a walk obeys and the tags a run skips, comes from the saved file. The buffer
 decides what is reported, the file decides what is done, and saving makes them agree.
+
+## Renaming
+
+`indexProgram` in `src/rename.ts` builds the rename index of one file: every occurrence of a name, each tied to the
+Declaration it resolves to. Rename, references, Document Highlight, go-to-definition, Semantic Tokens and Completion
+all read it. `joinComponent` in `src/workspace.ts` joins the indexes of a component's files into workspace symbols.
+
+### Scopes
+
+Most names resolve on the Parser AST through a lexical Scope model that mirrors the Enricher's binding rules. A
+Scope's `values` correspond to the Enricher's members, and its `types` to the Enricher's Types. Protocols share the
+`types` space, since only Type positions name them.
+
+- The top level Scope starts from the Enricher's builtin tables. Builtins take part in resolution, so shadowing works,
+  but no rename targets them.
+- Functions, Namespaces, Type Aliases, Choices and Protocols are hoisted, so their `visibleFrom` is null. Constants
+  and Variables become visible after their declaring Statement.
+- An import entry binds its local name in both spaces through one Declaration of kind `import`. A Type and a Namespace
+  of one name travel under one entry. Its kind at the other end is for the workspace join to answer.
+- An argument label of a call whose callee is a plain Identifier links to the Parameter that declares it. Labels are
+  collected during the walk and resolved after it, so a hoisted Function sees its labels whatever the order.
+
+### Names the typed Program resolves
+
+A Method, a property or a Record member resolves through Types, not Scopes. When an enriched Program is at hand,
+`walkTypedBody` binds these in a second pass over the typed tree:
+
+- The typed tree names the Namespace that answered each Method Invocation, and `namespaceMembers` binds the call to
+  that Namespace's Declaration. A Namespace this file does not declare goes to `externalMembers` for the workspace
+  join.
+- A call that a Protocol answers binds to the Protocol's member through `protocolMembers`, looking through the
+  Protocols it extends.
+- A Method that answers a Protocol requirement is one name with the requirement. `shareConformanceSites` gives them
+  one occurrence list. A Method answering a standard library Protocol is marked `answersBuiltin`, since nothing
+  reaches the requirement.
+- Record Types are structural. `resolveRecordMembers` groups a member's occurrences across the file's Record shapes
+  that share it and are related by subset. One such shape could flow into the other.
+
+### Shorthand edits
+
+Renaming an ordinary occurrence writes the new name over its Identifier. Two shorthands write `{ width }` and mean
+two names by it, so renaming either end spells the other one out beside it:
+
+- A Pattern's binder names the Record's member and the local it binds. Renaming the local writes `{ width as w }`;
+  renaming the member writes `{ w as width }`. An annotated member takes its binder after the Type, as in
+  `{ width: Integer as w }`.
+- A Record Literal's member names the member it writes and the value it reads. Renaming the value writes
+  `{ width = w }`; renaming the member writes `{ w = width }`.
+
+A `RenameSite` carries these as `edits`, and null everywhere else. An edit has a Position of its own, and an empty one
+inserts. The site's `position` stays the Identifier, since it is also the hit test and the highlight and token span.
+`renameEdits` fills in the new name, and every caller that applies a rename goes through it.
+
+Linked editing writes one text to every range, so it declines a symbol with a shorthand site.
+
+### Names a rename may write
+
+`isValidIdentifierName` accepts a word with no character that ends an Identifier Token, no leading digit, and no entry
+in `reservedWords`. Keywords the Parser reads as Identifiers, such as `start` and `from`, pass it. `reservedWords`
+holds `as`, which separates a member from its binder inside a Pattern.
+
+A label follows the grammar's Identifier rule, which reads some Keywords as Identifiers. The standard library writes
+labels with them, as in `slice(from 1, to 3)`, so `isValidLabelName` accepts `keywordIdentifiers` too. It refuses
+`start` and `complete`: a label stands where `start x` opens, so `compute(start 1)` would parse as a `start` of `1`.
+`opensAsynchrony` in the Parser holds that rule. A Parameter whose name is its label must pass both checks
+(`isValidBindingLabelName`).
+
+### No renaming inside the standard library
+
+`findRenameableOccurrence` refuses inside a standard library source, and Prepare Rename and Linked Editing refuse with
+it. A rename there would be silently destructive:
+
+- The edit reaches that document only. Calls of a standard library Method are in other files, and the Workspace holds
+  nothing for a standard library source.
+- A signature without a body is bound to the runtime export of its name, so renaming it breaks the binding at run
+  time.
+- The standard library loader throws on any Diagnostic in its sources, so a rename that breaks a conformance there
+  stops every Program from compiling.
+
+A declaration outside every workspace folder is refused for the same reason: its other uses are not indexed.

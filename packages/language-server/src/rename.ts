@@ -24,22 +24,8 @@ import {
 	typedProgramSections,
 } from "./sections"
 
-// Renaming is resolved on the Parser AST with a lexical Scope model
-// that mirrors the Enricher's binding rules — `values` corresponds to the
-// Enricher's `members`, `types` to its `types`.
-//
-// Names that resolve through Types instead of Scopes are covered by two
-// additional mechanisms:
-//
-// - Argument labels: for invocations whose callee is a plain Identifier,
-//   the callee's Function Definitions are known lexically, so labels are
-//   linked to the Parameters declaring them and rename together with them.
-// - Method, property and Record member names: the enriched AST knows which
-//   Namespace resolved each Method Invocation and the Record Type of every
-//   Lookup base, so those references are bound in a second pass over the
-//   typed Program. Record Types are structural — member occurrences are
-//   grouped across all Record shapes in the file that share the member and
-//   are subset-related (one shape could flow into the other).
+// One file's rename index: every occurrence of a name, tied to its
+// Declaration. See "Renaming" in DEVELOPMENT.md.
 
 export type SymbolSpace = "values" | "types"
 
@@ -57,58 +43,30 @@ export type DeclarationKind =
 	| "property"
 	| "member"
 	| "label"
-	// What an `import { … }` entry binds. One entry carries its name
-	// across every table it is bound in, so the kind the OTHER Module declared
-	// it as is not something one file can answer — the workspace index joins the
-	// entry to that Module's own Declaration, and everything reading a single
-	// file's index sees the entry for what it is here: a name from elsewhere.
+	// What an import entry binds. The kind the other Module declared it as is
+	// for the workspace join to answer.
 	| "import"
 
-// The text ONE edit of a rename writes, in parts: a String stands as it
-// is written, and `null` is where the new name goes. Renaming an ordinary
-// occurrence writes `[null]` over the Identifier it was found at, which is why
-// nothing but a shorthand — a Pattern's binder and a Record Literal's member —
-// carries any of this.
+// The text one edit writes, in parts: a String as written, and `null` where
+// the new name goes.
 type RenameText = Array<string | null>
 
 export type RenameEdit = {
-	// The span the edit replaces. An EMPTY span INSERTS, which is what
-	// expanding a shorthand binder does — the name it writes was not there to
-	// begin with.
+	// An empty span inserts.
 	position: common.Position
 	text: RenameText
 }
 
-// Where one occurrence is written, and what renaming THROUGH it writes.
-//
-// `edits` is what the two shorthands need and nothing else does. Both write
-// `{ width }` and both mean two names by it, so renaming either end has to
-// spell the other one out beside it.
-//
-// A PATTERN's binder names the Record's member and the local it binds. Renaming
-// the local gives `{ width as w }`, renaming the member `{ w as width }`, and an
-// annotated member takes its binder after the Type (`{ width: Integer as w }`),
-// which is why an edit carries a Position of its own instead of reusing this
-// one.
-//
-// A Record LITERAL's member names the member it writes and the value it reads.
-// Renaming the value gives `{ width = w }`, renaming the member `{ w = width }`
-// — the same two directions, expanded to the spelling the author could have
-// written by hand.
-//
-// Null — every other site in the index — means the new name over `position`.
-//
-// `position` is deliberately NOT widened to cover the expansion: it is the
-// cursor hit test, the Document Highlight span and the Semantic Token span as
-// well, and all three mean the Identifier itself.
+// Where one occurrence is written. `edits` is null except at a shorthand,
+// whose rename spells out the other name. See "Shorthand edits" in
+// DEVELOPMENT.md.
 export type RenameSite = {
 	position: common.Position
 	edits: Array<RenameEdit> | null
 }
 
-// What a rename writes for one site, with the new name filled in.
-// Everything that applies a rename asks here — the Server, the workspace join
-// and the tests — so that an expansion can not be forgotten at one of them.
+// What a rename writes for one site, with the new name filled in. Every
+// caller that applies a rename asks here, so no caller forgets an expansion.
 export function renameEdits(
 	site: { position: common.Position; edits: Array<RenameEdit> | null },
 	newName: string,
@@ -124,18 +82,13 @@ export function renameEdits(
 export type Declaration = {
 	builtin: boolean
 	kind: DeclarationKind
-	// A Parameter whose name DOUBLES as its call site label —
-	// `function compute(value: Integer)`, where the Parser reuses one Identifier
-	// for the binding and the label. Its kind is `parameter`, so nothing about
-	// the kind says a rename of it rewrites call sites too, and the two words a
-	// label may not be spelled would have gone in unrefused.
+	// A Parameter whose name is also its call site label, as in
+	// `function compute(value: Integer)`. A new name must be valid as both.
 	labelled?: boolean
 	definition: common.Position | null
-	// Where the name starts being resolvable. `null` means "anywhere in
-	// its Scope" — builtins, and the declaration kinds the Enricher hoists
-	// (Functions, Namespaces, Type Aliases), which may be used before their
-	// declaration site. Constants and Variables are deliberately not hoisted,
-	// so they only become visible after their declaring Statement.
+	// Where the name becomes resolvable. Null means anywhere in its Scope:
+	// builtins and the kinds the Enricher hoists. Constants and Variables are
+	// visible after their declaring Statement.
 	visibleFrom: common.Cursor | null
 	// Shared with every Declaration this one renames with, as a Method
 	// does with the requirement it answers (`shareConformanceSites`).
@@ -153,22 +106,20 @@ export type Scope = {
 }
 
 export type ScopeRange = {
-	// `null` covers the whole document — only the top level Scope.
+	// Null covers the whole document, for the top level Scope only.
 	range: common.Position | null
 	scope: Scope
 }
 
-// `write` marks the occurrences that bind a value to the name — its
-// declaration and any assignment to it. Everything else reads it. Only
-// Document Highlight distinguishes the two; renaming touches both alike.
+// `write` marks a declaration or an assignment; everything else reads. Rename
+// treats both alike; Document Highlight and the refactorings do not.
 export type OccurrenceAccess = "read" | "write"
 
 export type Occurrence = {
 	name: string
 	position: common.Position
 	access: OccurrenceAccess
-	// The same field `RenameSite` carries, for the same reason — an
-	// Occurrence is one site with its Declaration attached.
+	// As on `RenameSite`: an Occurrence is a site with its Declaration.
 	edits: Array<RenameEdit> | null
 	declaration: Declaration
 }
@@ -177,12 +128,9 @@ export type RenameIndex = Array<Occurrence>
 
 type RecordMemberSite = {
 	names: Array<string>
-	// Whether the members are WRITTEN here. A Record literal and a Record
-	// Type declaration write them, so one of those is where the member is
-	// defined; a Pattern only NAMES members that are declared by the Type of
-	// whatever it takes apart, so it must not claim to define them — the local
-	// it binds is written at that very Position, and two Declarations sharing a
-	// definition Position are one symbol to the workspace join.
+	// Whether the members are written here, as in a Record literal or Type.
+	// A Pattern only names them, and its binder holds the same Position, which
+	// the workspace join would merge.
 	declares: boolean
 	members: Array<{
 		name: string
@@ -199,17 +147,14 @@ type RecordMemberLookup = {
 
 type WalkContext = {
 	index: RenameIndex
-	// The Function Definitions each value Declaration is known to
-	// hold — fed by Function Statements and by Function Values bound through
-	// declarations and assignments.
+	// The Function Definitions each value Declaration is known to hold, from
+	// Function Statements and Function Values bound by declaration or assignment.
 	functionDefinitions: Map<Declaration, Array<parser.FunctionDefinitionNode>>
-	// Call site label → Declaration, per Function Definition. For a
-	// Parameter without an explicit external name the label Declaration is
-	// the Parameter's own — renaming one renames both.
+	// Call site label to Declaration, per Function Definition. A Parameter
+	// written without an explicit label is its own label Declaration.
 	labels: Map<parser.FunctionDefinitionNode, Map<string, Declaration>>
-	// Labelled arguments are collected during the walk and resolved
-	// afterwards, so that invocations of hoisted (or later-assigned)
-	// Functions see their labels regardless of statement order.
+	// Labelled arguments, resolved after the walk so a hoisted or later
+	// assigned Function sees its labels.
 	pendingLabelReferences: Array<{
 		identifier: parser.IdentifierNode
 		callee: Declaration
@@ -231,10 +176,9 @@ type WalkContext = {
 		memberName: string
 		position: common.Position
 	}>
-	// The same, per Protocol, apart because a Protocol and a Namespace
-	// may be spelled alike. Calls a Protocol answers bind here: a provided
-	// Method, and any Method called on a bounded Type. Keyed as
-	// `siteKeyOf` keys a Protocol, since two may share a name.
+	// The same per Protocol, kept apart since a Protocol and a Namespace may
+	// share a name. A provided Method or a call on a bounded Type binds here.
+	// Keyed as `siteKeyOf` keys a Protocol.
 	protocolMembers: Map<string, Map<string, Declaration>>
 	// The Protocols each Protocol declared here extends, as its `is` list
 	// names them. A requirement is looked for through them as well.
@@ -250,26 +194,21 @@ type WalkContext = {
 		position: common.Position
 	}>
 	conformances: Array<ConformanceLink>
-	// Every Method and Property reference whose Namespace this file does
-	// not declare, by the name the reference resolved through. A Namespace an
-	// `import { … }` entry brought in has its Methods declared in another file
-	// entirely, so nothing here can bind them — the workspace index joins them
-	// through that entry, and a single file's index simply carries the
-	// references it could not answer for.
+	// Method and property references whose Namespace or Protocol this file
+	// does not declare, by the name they resolved through. The workspace join
+	// binds those another Module declares; a builtin's stay unbound.
 	externalMembers: Array<ExternalMemberReference>
 	// Record member declaration sites (literals and Record Type
 	// declarations) and member Lookups, grouped structurally after the walk.
 	recordSites: Array<RecordMemberSite>
 	recordLookups: Array<RecordMemberLookup>
-	// Every Scope with the Position it spans — lets completion find
-	// the names visible at a cursor.
+	// Every Scope with the Position it spans, for `scopeAt`.
 	scopes: Array<ScopeRange>
 }
 
 type ExternalMemberReference = {
-	// The name the Namespace is reachable under HERE — an aliased import
-	// binds a copy of the Namespace Type carrying its local name, which is what
-	// the resolved Invocation names.
+	// The name the Namespace is reachable under in this file. An aliased
+	// import binds a copy of the Namespace Type under its local name.
 	namespaceName: string
 	memberName: string
 	position: common.Position
@@ -279,24 +218,18 @@ type ExternalMemberReference = {
 	protocol?: true
 }
 
-// A Method written by a Namespace that conforms to a Protocol, or by a
-// Protocol that extends one, under a name that Protocol's surface may hold. If
-// it does, the two are one name: renaming either alone breaks the conformance.
+// A Method of a Namespace conforming to a Protocol, or of a Protocol extending
+// one. If the Protocol holds a member of that name, the two rename together.
 export type ConformanceLink = {
 	declaration: Declaration
-	// The Protocol the `is` clause names, keyed by `siteKeyOf`: as
-	// the clause writes it, which may be an import's local name, or with its
-	// Position for one this file declares in a body.
+	// The Protocol the `is` clause names, keyed by `siteKeyOf`. The key may be
+	// an import's local name.
 	protocolName: string
 	memberName: string
 }
 
-// These ARE the top level Scope the Enricher starts from — derived
-// from its builtin tables, never listed by hand. Builtins participate in
-// resolution — so that shadowing works — but are rejected as rename targets.
-// Read on use rather than at import. Half of what the tables answer with
-// is enriched from Essence source, once per process and cached — building the
-// index is where that belongs, not module evaluation order.
+// The top level Scope the Enricher starts from, read from its builtin tables
+// on use. Part of them is enriched from Essence source on first read.
 const builtinValues = () => Object.entries(builtinMembers())
 
 const builtinTypes = () => Object.keys(builtinTypeTable())
@@ -336,30 +269,16 @@ const reservedWords = new Set([
 	"choice",
 	"true",
 	"false",
-	// Structurally significant inside a Pattern, where it separates a
-	// member from the name it binds under — renaming a binder to `as` writes
-	// `{ width as as }`, or `{ as }` where the shorthand is expanded, and
-	// neither says what it reads as. It only ever restricts rename TARGETS, so
-	// the `import`/`export` grammar, which spells its own `as`, is untouched:
-	// a member may still BE called `as` and be bound under that name.
+	// Separates a member from its binder inside a Pattern, so a binder named
+	// `as` would read `{ width as as }`. Only rename targets are restricted.
 	"as",
 ])
 
-// Anything the Lexer would not produce as a single Identifier Token —
-// whitespace, Symbols, String- and Comment-Literals, a leading digit — is
-// rejected, as are reserved words.
+// Characters that end an Identifier Token in the Lexer.
 const forbiddenIdentifierCharacters = /[\s"§(){}[\]<>|/@,.:=\-~_#]/
 
-// The same character class in its positive form: one whole Identifier.
-// Linked editing hands it to the editor so that typing a character a name
-// cannot contain ends the linked edit rather than propagating something
-// unparseable. Kept as a string because the editor wants a pattern, not a
-// RegExp.
-//
-// Number literals are deliberately not covered: `_` separates digit groups
-// and a leading `-` belongs to the literal, so they need a second alternative
-// — the extension's language configuration spells that out for word
-// selection, but renaming only ever targets Identifiers.
+// One whole Identifier, as a pattern String for linked editing. Number
+// literals are not covered, since rename only targets Identifiers.
 export const identifierPattern = '[^\\s"§(){}\\[\\]<>|/@,.:=~_#-]+'
 
 export function isValidIdentifierName(name: string): boolean {
@@ -371,12 +290,9 @@ export function isValidIdentifierName(name: string): boolean {
 	)
 }
 
-// Keywords the grammar's Identifier rule reads as ordinary Identifiers,
-// drawn from the Parser's `identifierTokenTypes`. The standard library already
-// writes labels with them (`slice(from 1, to 3)`, `normalize(as
-// #ComposedCanonical)`), so a LABEL may be renamed to any of these even where
-// an ordinary binding must not be: a binding named `with` would collide with
-// the `{ … with … }` Combination the moment it is read in one.
+// Keywords the Parser's `identifierTokenTypes` admits as Identifiers. A label
+// may take them, as in `slice(from 1, to 3)`, though a binding named `with`
+// would collide with a Combination.
 const keywordIdentifiers = new Set([
 	"with",
 	"static",
@@ -389,14 +305,8 @@ const keywordIdentifiers = new Set([
 	"as",
 ])
 
-// The mirror of the Set above, and the only place the two asynchrony
-// Keywords are refused. Both are ordinary Identifiers — a Constant, a Record
-// member, a Parameter and a Method may each be called `start` — but a LABEL is
-// the one position where the Parser reads them as their prefix form instead: a
-// label stands directly in front of the Argument's value, which is exactly
-// where `start x` opens, so a label renamed to one would turn `compute(start
-// 1)` into a `start` of `1`. The rule lives in the Parser's `opensAsynchrony`;
-// this is what keeps a rename from writing through it.
+// Valid names everywhere but in a label, where `compute(start 1)` parses as a
+// `start` of `1` (`opensAsynchrony`).
 const prefixKeywords = new Set(["start", "complete"])
 
 export function isValidLabelName(name: string): boolean {
@@ -407,39 +317,15 @@ export function isValidLabelName(name: string): boolean {
 	return isValidIdentifierName(name) || keywordIdentifiers.has(name)
 }
 
-// And the name a Parameter whose name doubles as its label may take: one
-// that is valid as BOTH. `isValidLabelName` admits `with`, `from` and `as`,
-// none of which can bind a name, and `isValidIdentifierName` admits `start` and
-// `complete`, neither of which can be a label. What is left is the intersection.
+// A name valid both as a binding and as a label, for a Parameter whose name
+// is its label.
 export function isValidBindingLabelName(name: string): boolean {
 	return isValidIdentifierName(name) && !prefixKeywords.has(name)
 }
 
-// REFUSED outright inside a standard library source — and with it
-// Prepare Rename and Linked Editing, which both resolve through here. Not out
-// of caution; a rename there is silently destructive:
-//
-//   • the edit reaches this document only. Every call site of a standard
-//     library Method is in a file a single-document rename never sees, and the
-//     workspace index holds nothing for a standard library source.
-//   • the name IS the runtime binding. A body-less signature is bound to the
-//     export of the same name in `@essence-lang/runtime`, so renaming
-//     `isPrime` to `prime` passes `essence check`, draws only a bundler
-//     warning from `essence build`, and calls `undefined` at run time.
-//   • renaming a Method a `is …` clause depends on breaks the conformance, and
-//     the standard library loader then throws for EVERY Program compiled
-//     afterwards — the Editor would have bricked the compiler.
-//
-// The Namespace's own NAME was already protected, since it resolves to a
-// builtin; its Methods, Parameters and local Type names were not.
-//
-// The native contract and the Compiler's specs catch a mis-bound native.
-// `src/tests/natives.spec.ts` fails while the runtime's `natives.generated.ts`
-// lags the standard library, and once that file is regenerated tsc fails
-// unless each runtime module has the shape generated for it, such as
-// `IntegerNatives`. `src/tests/builtins.spec.ts` drives `nativeBindings`
-// against the real runtime modules in both directions, for the Namespaces its
-// `runtimeModules` table names. Renaming `isPrime` to `prime` trips each.
+// Refuses inside a standard library source, and so do Prepare Rename and
+// Linked Editing. See "No renaming inside the standard library" in
+// DEVELOPMENT.md.
 export function findRenameableOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,
@@ -463,8 +349,7 @@ export function findRenameableOccurrence(
 	return occurrence
 }
 
-// Unlike renaming, finding references and highlighting are read-only —
-// they work on builtins too, so this does not reject them.
+// Accepts builtins, since references and highlighting only read.
 export function findOccurrence(
 	program: parser.Program,
 	cursor: common.Cursor,
@@ -473,9 +358,8 @@ export function findOccurrence(
 	return occurrenceAt(buildRenameIndex(program, enrichedProgram), cursor)
 }
 
-// Every index entry resolving to the same Declaration as the one under
-// the cursor. Document Highlight needs the entries rather than the
-// Declaration's flat Position list, because only they carry the access.
+// Every index entry of the Declaration under the cursor. Only the entries
+// carry the access Document Highlight shows.
 export function findOccurrences(
 	program: parser.Program,
 	cursor: common.Cursor,
@@ -514,20 +398,17 @@ export function buildRenameIndex(
 export type ProgramIndex = {
 	index: RenameIndex
 	scopes: Array<ScopeRange>
-	// Handed out so the workspace index can reach the Method and Property
-	// Declarations of a Namespace an importer only ever names through an entry.
-	// A top level Namespace, the only kind an entry names, is keyed by its own
-	// name, which is unique there — two sharing a name is a duplicate the
-	// Enricher rejects, and an import may not shadow a declaration either.
+	// Lets the workspace join reach the members of a Namespace an importer
+	// names. A top level Namespace, the only kind an entry names, is keyed by
+	// its own name, which is unique there.
 	namespaceMembers: Map<string, Map<string, Declaration>>
 	// The same, for the Methods a Protocol declares, reached through the
 	// entry that imports the Protocol or by its identity.
 	protocolMembers: Map<string, Map<string, Declaration>>
 	protocolExtensions: Map<string, Array<string>>
 	externalMembers: Array<ExternalMemberReference>
-	// Every link, including the ones this file resolves itself. The
-	// workspace index resolves them all again, so a Protocol in another Module
-	// joins the group the same way a local one does.
+	// Every link, including those this file resolves. The workspace join
+	// resolves them all again, so another Module's Protocol joins the same way.
 	conformances: Array<ConformanceLink>
 }
 
@@ -559,10 +440,6 @@ export function indexProgram(
 
 	context.scopes.push({ range: null, scope: topLevelScope })
 
-	// The KIND is read off the member's own Type rather than off its name.
-	// It used to be read off a hard-coded list of the one builtin that was not a
-	// Namespace, which left `loop` mis-kinded as a Namespace on the strength of
-	// not being on it.
 	for (let [name, member] of builtinValues()) {
 		topLevelScope.values.set(name, {
 			builtin: true,
@@ -583,9 +460,7 @@ export function indexProgram(
 		})
 	}
 
-	// Protocols share the `types` symbol space here — they are only
-	// nameable in Type-like positions (bounds, conformance clauses), and the
-	// Enricher keeps them apart where it matters.
+	// Protocols share the `types` space, since only Type positions name them.
 	for (let name of builtinProtocols()) {
 		topLevelScope.types.set(name, {
 			builtin: true,
@@ -596,9 +471,8 @@ export function indexProgram(
 		})
 	}
 
-	// The two Module sections frame the body here as they do in the source:
-	// an entry is in Scope before the first Statement, and an export entry reads
-	// a Scope the whole implementation has been walked into.
+	// Imports are in Scope before the first Statement, and exports read the
+	// Scope after the whole implementation.
 	declareImports(program, topLevelScope, context)
 
 	walkSections(program, topLevelScope, context)
@@ -649,10 +523,7 @@ export function indexProgram(
 	}
 }
 
-// The innermost Scope a Cursor stands in. Beside the index that hands
-// the ranges out rather than inside the one feature that used to ask for it:
-// reading a `ScopeRange` list at a Position is what the list is FOR, and
-// Completion was only the first to need it.
+// The innermost Scope a Cursor stands in.
 export function scopeAt(
 	scopes: Array<ScopeRange>,
 	cursor: common.Cursor,
@@ -676,11 +547,8 @@ export function scopeAt(
 	return (best ?? scopes[0]).scope
 }
 
-// An entry binds its local name across BOTH symbol spaces through one
-// Declaration — a `type Foo` and a Namespace `Foo` travel together under one
-// entry, so a use of either has to reach the same Declaration and rename with
-// it. Hoisted, because an entry is in scope everywhere in the file it is
-// written in, whatever the kind at the other end turns out to be.
+// An entry binds its local name in both spaces through one hoisted
+// Declaration, since a Type and a Namespace of one name travel together.
 function declareImports(
 	program: parser.Program,
 	scope: Scope,
@@ -698,11 +566,9 @@ function declareImports(
 			occurrences: [],
 		}
 
-		// An entry whose name this Module also declares is REFUSED by the
-		// Compiler, and the declaration keeps the name — so it must not reach
-		// the Scope, or a use of the name would rename with the entry instead of
-		// with what it actually resolves to. The Identifier is still indexed:
-		// the entry is a mistake, and a mistake is a thing a reader edits.
+		// The Compiler refuses an entry whose name this Module declares, and
+		// uses resolve to the declaration. The entry's Identifier is still
+		// indexed, so the mistake can be renamed.
 		if (!declared.has(local.content)) {
 			scope.values.set(local.content, declaration)
 			scope.types.set(local.content, declaration)
@@ -718,21 +584,13 @@ function declareImports(
 	}
 }
 
-// What the implementation declares at its top level, off the Parser AST —
-// asked before anything is walked, which is the only moment an import entry can
-// be told from a declaration of the same name.
-//
-// The tests section is deliberately absent. It is a CHILD Scope, so a
-// name it declares beside an entry of the same name SHADOWS it rather than
-// colliding with it — and a use inside the section resolves to the shadow,
-// which is what the walk binds it to.
+// What the implementation declares at its top level, asked before the walk.
+// The tests section is a child Scope, whose names shadow an entry.
 function topLevelNames(program: parser.Program): Set<string> {
 	let names = new Set<string>()
 
 	for (let node of program.implementation.nodes) {
 		switch (node.nodeType) {
-			// A Pattern declares as many names as it binds, and every one
-			// of them is a name an import could collide with.
 			case "ConstantDeclarationStatement":
 			case "VariableDeclarationStatement":
 				if (node.name.nodeType === "Pattern") {
@@ -757,12 +615,8 @@ function topLevelNames(program: parser.Program): Set<string> {
 	return names
 }
 
-// Only the side of an entry that names something THIS file holds. The
-// public name an entry publishes under — the `alias` of `area as measure`, and
-// a re-export's name, which is the dependency's — is a workspace-wide symbol
-// rather than a local one, so it is joined by the workspace index and left
-// unbound here. An unaliased entry's single Identifier is both at once, and it
-// is recorded here as the local occurrence it also is.
+// Binds the local side of each export entry. A re-export's name, and a public
+// name such as the alias of `area as measure`, are for the workspace join.
 function referenceExports(
 	program: parser.Program,
 	scope: Scope,
@@ -783,9 +637,8 @@ export function occurrenceAt(
 	index: RenameIndex,
 	cursor: common.Cursor,
 ): Occurrence | null {
-	// Identifiers never span lines, and `end.column` is exclusive —
-	// it is still included here so that renaming works with the cursor
-	// directly behind the Identifier.
+	// `end.column` is exclusive, but a cursor directly behind the Identifier
+	// still counts. Identifiers never span lines.
 	for (let occurrence of index) {
 		if (
 			occurrence.position.start.line === cursor.line &&
@@ -833,20 +686,12 @@ function record(
 	position: common.Position,
 	index: RenameIndex,
 	access: OccurrenceAccess = "read",
-	// See `RenameSite.edits` — null is "write the new name here", which
-	// is what every site but a Pattern's shorthand binder means.
+	// See `RenameSite.edits`.
 	edits: Array<RenameEdit> | null = null,
 ) {
-	// One Position is one occurrence OF ONE DECLARATION. A Pattern's
-	// shorthand binder is reached twice for the member it names — once from the
-	// Pattern itself, and once through the Lookup the Enricher desugared it
-	// into, whose member Identifier carries that very span — and two entries
-	// would write their edits twice, the second over text the first had already
-	// rewritten. The entry that knows how to rewrite itself wins.
-	//
-	// Two DECLARATIONS at one Position stay two, which is the whole point of
-	// the shorthand: the member and the local it binds are different symbols
-	// written with one Identifier.
+	// One Position is one occurrence of one Declaration, or a rename would
+	// write it twice. A shorthand binder is reached twice for its member, from
+	// the Pattern and from its desugared Lookup; the entry with edits wins.
 	let existing = declaration.occurrences.find(
 		(site) =>
 			site.position.start.line === position.start.line &&
@@ -878,17 +723,12 @@ function declareInScope(
 	identifier: parser.IdentifierNode,
 	kind: DeclarationKind,
 	context: WalkContext,
-	// `null` for the kinds that hoist — see `Declaration.visibleFrom`.
-	// Only set when the Declaration is created: a re-declaration is an error
-	// the Enricher reports, and the first one is what use sites bound to.
+	// Null for the kinds that hoist. Set only when the Declaration is created.
 	visibleFrom: common.Cursor | null = null,
-	// How the declaring occurrence is REWRITTEN — see `RenameSite.edits`.
-	// A Pattern's shorthand binder is the one declaration whose name can not
-	// simply be overwritten.
+	// See `RenameSite.edits`.
 	edits: Array<RenameEdit> | null = null,
 ): Declaration {
-	// Re-declarations share the first Declaration — the Enricher
-	// reports the duplicate; grouping the occurrences is harmless here.
+	// A re-declaration shares the first Declaration; the Enricher reports it.
 	let declaration = scope[space].get(identifier.content)
 
 	if (declaration === undefined) {
@@ -922,13 +762,12 @@ function reference(
 	identifier: parser.IdentifierNode,
 	context: WalkContext,
 	access: OccurrenceAccess = "read",
-	// See `RenameSite.edits` — null is "write the new name here", which
-	// is what every reference but a Record Literal's shorthand member means.
+	// See `RenameSite.edits`.
 	edits: Array<RenameEdit> | null = null,
 ): Declaration | null {
 	let declaration = lookup(scope, space, identifier.content)
 
-	// Undeclared names are not recorded — the Enricher reports them.
+	// The Enricher reports an undeclared name.
 	if (declaration !== null) {
 		record(
 			declaration,
@@ -958,9 +797,8 @@ function linkFunctionDefinition(
 	definitions.push(definition)
 }
 
-// Mirrors the Enricher's `hoistDeclarations`, minus the speculative
-// resolution — for renaming, binding a use site to an un-hoistable
-// declaration is what the user means anyway.
+// Mirrors the Enricher's `hoistDeclarations` without its speculative
+// resolution: binding a use to the declaration is what a rename means anyway.
 function hoistDeclarations(
 	nodes: Array<parser.ImplementationNode>,
 	scope: Scope,
@@ -1010,9 +848,7 @@ function hoistDeclarations(
 	}
 }
 
-// Approximates the Position a Body of Statements spans, for scoping
-// completion — Bodies carry no Position of their own, only their contained
-// nodes do.
+// The span of a Body's Statements, since a Body has no Position of its own.
 function rangeOfBody(
 	nodes: Array<parser.ImplementationNode>,
 	fallback: common.Position,
@@ -1031,15 +867,9 @@ function rangeOfBody(
 /* Walkers */
 /***********/
 
-// Every body a Program holds, each in the Scope it opens — see
-// `sections.ts`. The Sections arrive outermost first, so the Scope a Section is
-// nested in has always been made by the time it is reached, and one Map is the
-// whole of the nesting.
-//
-// A test's body does NOT hoist and every other Section does, which is exactly
-// what the Enricher says: the tests section and a suite hoist the ordinary
-// Statements standing in them, while a test's body binds in order like any
-// other block.
+// Every body a Program holds, each in its own Scope. Sections arrive
+// outermost first, so a parent's Scope always exists. As in the Enricher, a
+// test's body binds in order and every other Section hoists.
 function walkSections(
 	program: parser.Program,
 	topLevelScope: Scope,
@@ -1059,8 +889,8 @@ function walkSections(
 
 		scopes.set(section, scope)
 
-		// Read in the Scope AROUND the Section — a table's rows are
-		// written outside the body and can not name the row they are bound to.
+		// The head reads the enclosing Scope: a table's rows are written
+		// outside the body.
 		for (let node of section.head) {
 			walkNode(node, parentScope, context)
 		}
@@ -1073,12 +903,9 @@ function walkSections(
 	}
 }
 
-// The two binders only a test has: the row Parameter of
-// `across [ … ] (row: Row)` and the Parameters `for any (a: T, b: U)`
-// generates a value of. Both are written as a closure's Parameter list, so both
-// are read like one — except for the call site label, which a test has no use
-// for: nothing calls a test, and the Enricher refuses a label written on a
-// generated Parameter outright.
+// The row Parameter of `across [ … ] (row: Row)` and the generated
+// Parameters of `for any (a: T, b: U)`. Read like a closure's Parameters,
+// without labels, since nothing calls a test.
 function declareTestParameters(
 	parameters: Array<parser.ParameterNode>,
 	scope: Scope,
@@ -1101,9 +928,8 @@ function declareTestParameters(
 			continue
 		}
 
-		// Visible throughout the Section, which is what `null` means —
-		// a table test's NAME reads the row, and the name is written above the
-		// body rather than in it.
+		// Visible throughout the Section: a table test's name, written before
+		// the body, reads the row.
 		declareInScope(
 			scope,
 			"values",
@@ -1120,8 +946,7 @@ function walkBody(
 	context: WalkContext,
 	{ hoist }: { hoist: boolean },
 ) {
-	// Only a Section other than a test's body hoists (see
-	// `walkSections`); nested bodies bind in order, exactly like the Enricher.
+	// Nested bodies bind in order, as in the Enricher.
 	if (hoist) {
 		hoistDeclarations(nodes, scope)
 	}
@@ -1150,18 +975,16 @@ function walkNode(
 					? ("constant" as const)
 					: ("variable" as const)
 
-			// A Pattern declares every name it binds, and none of them is
-			// the Declaration's — so there is no one Declaration for a Function
-			// value to be linked to either.
+			// A Pattern declares each name it binds, so no single Declaration
+			// links to a Function value.
 			if (node.name.nodeType === "Pattern") {
 				declarePattern(
 					node.name,
 					scope,
 					context,
 					kind,
-					// Visible only after the whole Statement — the value
-					// is resolved in the Scope as it was before the
-					// declaration, so no name it binds can refer to itself.
+					// Visible after the whole Statement, so the value cannot read
+					// a name it binds.
 					node.position.end,
 				)
 
@@ -1174,9 +997,8 @@ function walkNode(
 				node.name,
 				kind,
 				context,
-				// Visible only after the whole Statement — the value is
-				// resolved in the Scope as it was before the declaration, so
-				// the name cannot refer to itself.
+				// Visible after the whole Statement, so the value cannot read
+				// the name.
 				node.position.end,
 			)
 
@@ -1228,10 +1050,8 @@ function walkNode(
 				context,
 			)
 
-			// An `overload function` block mixes bodied Function literals
-			// with body-less native signatures, exactly as an `overload` Method
-			// block in declarations mode does — only the bodied entries hold a
-			// definition to link and walk.
+			// An `overload function` block may mix bodied Functions with native
+			// signatures; only a bodied one has a definition to link.
 			for (let method of node.methods) {
 				if (method.nodeType === "FunctionValue") {
 					linkFunctionDefinition(declaration, method.value, context)
@@ -1258,26 +1078,19 @@ function walkNode(
 			declareInScope(scope, "types", node.name, "type", context)
 
 			// A generic Choice's Type Parameters bind across every Case's
-			// payload the way a Type Alias's do — `State` in `#Continue { state:
-			// State }` resolves to the header's declaration, so renaming either
-			// end moves both, and `scopeWithGenerics` records the header
-			// occurrences (and any bound or default) for Semantic Tokens too.
+			// payload, as a Type Alias's do.
 			let choiceScope = scopeWithGenerics(node.generics, scope, context)
 
-			// Case names resolve through their Choice, never through a
-			// Scope — only the member Types inside the payload declarations
-			// hold renameable references.
+			// A Case name resolves through its Choice; only the payload's Types
+			// hold references.
 			for (let choiceCase of node.cases) {
 				if (choiceCase.type !== null) {
 					walkTypeDeclaration(choiceCase.type, choiceScope, context)
 				}
 			}
 
-			// A payload default names values, not Types, and it names
-			// them in the Module's own Scope — a Choice declaration opens no
-			// frame, so the Type Parameters a generic Choice binds are not
-			// what a value in there could mean. Missing this is silent: a
-			// rename would leave the occurrence inside the `= …` behind.
+			// A payload default names values in the enclosing Scope, since a
+			// Choice opens no frame for values.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				walkNode(defaultValue, scope, context)
 			}
@@ -1325,14 +1138,8 @@ function walkNode(
 		case "ReturnStatement":
 			walkNode(node.expression, scope, context)
 			return
-		// `expect EXPR` and `require EXPR` read a value and bind nothing.
-		// `require MATCHER = EXPR` is the ONE form that introduces names, and it
-		// introduces them into the block it stands in rather than into a Scope
-		// of its own: a `require` ends the test where it stands, so everything
-		// BELOW it may read what its Matcher took apart. That is what
-		// `node.position.end` says — the same thing an ordinary Declaration
-		// says, and what stops Completion from offering the name above the line
-		// that binds it.
+		// `require MATCHER = EXPR` binds into the enclosing block, visible
+		// after the Statement, since a failed `require` ends the test.
 		case "ExpectStatement":
 		case "RequireStatement": {
 			walkNode(node.value, scope, context)
@@ -1341,9 +1148,8 @@ function walkNode(
 				return
 			}
 
-			// The Matcher's own reading is the Match Handler's, field for
-			// field — a bare Case resolves through the asserted value's Union,
-			// so only a prefixed Choice name is a Type reference of its own.
+			// Read as a Match Handler's Matcher: only a prefixed Choice name is
+			// a Type reference.
 			if (node.matcher.nodeType === "Pattern") {
 				declarePattern(
 					node.matcher,
@@ -1419,26 +1225,20 @@ function walkNode(
 			return
 		}
 		case "Lookup":
-			// The member resolves through the base's Type — skipped.
+			// The member resolves through the base's Type, in the typed pass.
 			walkNode(node.base, scope, context)
 			return
 		case "Start":
 		case "Complete":
 			walkNode(node.expression, scope, context)
 			return
-		// And into what was written in front of a refusal. Of every walk
-		// in this Server this is the one where missing a Node writes a WRONG
-		// answer rather than none: the name inside `primes[0]` is an occurrence
-		// a reader can see, and a rename that skipped it would leave the file
-		// naming two things where it named one. The index is also what colours
-		// the document — see `findSemanticTokens`.
+		// The name inside `primes[0]` is an occurrence a rename must reach.
 		case "RefusedValue":
 			walkNode(node.base, scope, context)
 			return
 		case "CaseValue":
-			// The Case's name resolves through the Choice — only the
-			// (optional) Choice prefix is a Type reference of its own, along with
-			// the Type Arguments a value-position application writes.
+			// The Case name resolves through the Choice. The Choice prefix and
+			// any Type Arguments are Type references.
 			if (node.choice !== null) {
 				reference(scope, "types", node.choice, context)
 			}
@@ -1461,18 +1261,11 @@ function walkNode(
 			walkTypeDeclaration(node.returnType, scope, context)
 
 			for (let handler of node.handlers) {
-				// Neither a wildcard nor a literal Matcher names a Type,
-				// so neither holds a reference that a rename could have to
-				// touch. A Pattern is walked below instead, inside the Scope it
-				// binds into — its members are names as well as Types.
 				if (handler.matcher.nodeType === "Pattern") {
-					// Nothing here: the Pattern's Types and its bindings
-					// both belong to the Handler's own Scope, which does not
-					// exist yet.
+					// Declared in the Handler's Scope, which does not exist yet.
 				} else if (handler.matcher.nodeType === "CaseMatcher") {
-					// The Case's name resolves through the matched
-					// value's Type — only a prefixed Choice name is an
-					// ordinary Type reference.
+					// The Case resolves through the matched value's Type; only a
+					// prefixed Choice name is a Type reference.
 					if (handler.matcher.choice !== null) {
 						reference(
 							scope,
@@ -1488,12 +1281,8 @@ function walkNode(
 					walkTypeDeclaration(handler.matcher, scope, context)
 				}
 
-				// The Handler's Scope spans its Matcher onwards rather
-				// than only its body, because a payload binding is written in
-				// the Matcher and read in the Guard as well as in the body. ONE
-				// Scope holds it for all three: two Declarations of the same
-				// name at the same Position would be two Declarations, and a
-				// rename would only reach the half it was started from.
+				// One Scope from the Matcher on, since a binding written in the
+				// Matcher is read in the Guard and the body alike.
 				let handlerScope = childScope(
 					scope,
 					{
@@ -1503,9 +1292,7 @@ function walkNode(
 					context,
 				)
 
-				// Declared BEFORE the Guard and the body are walked, so
-				// a use in either binds to it — which is the whole reason the
-				// Handler's Scope starts at its Matcher.
+				// Declared before the Guard and the body are walked.
 				if (handler.matcher.nodeType === "Pattern") {
 					declarePattern(
 						handler.matcher,
@@ -1545,10 +1332,8 @@ function walkNode(
 			}
 
 			return
-		// No child Scope, unlike the Match above: a `define` declares
-		// nothing and binds nothing, so every arm is read in the very Scope the
-		// Keyword stands in. The only name a rename could have to touch outside
-		// the arms is the one an explicit `define -> Type` wrote.
+		// No child Scope: a `define` binds nothing, so its arms read the
+		// Scope it stands in.
 		case "Define":
 			walkTypeDeclaration(node.returnType, scope, context)
 
@@ -1565,12 +1350,8 @@ function walkNode(
 			registerRecordSite(Object.values(node.members), context)
 
 			for (let member of Object.values(node.members)) {
-				// A shorthand member's value is an Identifier the Parser
-				// wrote at the member's own Position, so it can not simply be
-				// overwritten — renaming it has to spell the member out beside
-				// the new name. It is referenced here rather than walked so
-				// that it carries those edits; `walkNode` would record it as
-				// the ordinary Identifier it looks like.
+				// A shorthand member's value shares the member's Identifier, so
+				// it is referenced with edits that spell the member out.
 				if (
 					member.shorthand === true &&
 					member.steps === undefined &&
@@ -1616,11 +1397,8 @@ function walkNode(
 		case "FunctionValue":
 			walkFunctionDefinition(node.value, scope, context, node.position)
 			return
-		// A path's steps are MEMBER occurrences, and a member is indexed
-		// off the Type it is read from — which this lexical walk does not know.
-		// They are recorded by the typed pass instead, off the Lookups the
-		// Enricher synthesizes for them, each standing at the span of the step
-		// that spelled it.
+		// A path's steps are member occurrences, which the typed pass records
+		// off the Lookups the Enricher synthesizes for them.
 		case "MemberPath":
 		case "Self":
 		case "StringValue":
@@ -1636,8 +1414,7 @@ function walkArguments(
 	scope: Scope,
 	context: WalkContext,
 ) {
-	// Labels of Method and native invocations resolve through Types —
-	// only their values are walked.
+	// The labels of a Method call resolve through Types.
 	for (let argument of nodeArguments) {
 		walkNode(argument.value, scope, context)
 	}
@@ -1659,18 +1436,15 @@ function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
 	scope: Scope,
 	context: WalkContext,
-	// The Type Parameters the ENCLOSING Namespace declares. An entry of a
-	// Method's `<…>` naming one of them declares nothing — it bounds the
-	// Namespace's Parameter for that Method — so the name is a USE and must be
-	// recorded as one, or renaming the Namespace's declaration would leave the
-	// bound behind and the Method reading a name nothing declares.
+	// The enclosing Namespace's Type Parameters. A Method's `<…>` entry naming
+	// one bounds it for that Method, so it is a use, not a declaration.
 	enclosing: Set<string> = new Set(),
 ): Scope {
 	let genericScope = createScope(scope)
 
 	for (let generic of generics) {
-		// Default Types and Protocol bounds resolve in the outer Scope,
-		// exactly like the Enricher's `resolveGenericDeclarations`.
+		// Defaults and bounds resolve in the outer Scope, as in the Enricher's
+		// `resolveGenericDeclarations`.
 		if (generic.defaultType !== null) {
 			walkTypeDeclaration(generic.defaultType, scope, context)
 		}
@@ -1702,13 +1476,10 @@ function walkFunctionDefinition(
 	definition: parser.FunctionDefinitionNode,
 	scope: Scope,
 	context: WalkContext,
-	// The wrapping FunctionStatement or FunctionValue's Position — it
-	// spans the whole Definition including the body's braces, unlike the
-	// body's own Statements, which can be empty or dropped by error recovery
-	// while the cursor sits inside an incomplete Statement.
+	// The wrapping node's Position, which spans the braces. The body's
+	// Statements may be empty, or dropped by error recovery mid-edit.
 	range: common.Position,
-	// A Namespace Method's enclosing Type Parameters — see
-	// `scopeWithGenerics`. Empty for every Function, which encloses none.
+	// A Namespace Method's enclosing Type Parameters; see `scopeWithGenerics`.
 	enclosing: Set<string> = new Set(),
 ) {
 	let functionScope = scopeWithGenerics(
@@ -1730,26 +1501,19 @@ function walkFunctionDefinition(
 	for (let parameter of definition.parameters) {
 		walkTypeDeclaration(parameter.type, functionScope, context)
 
-		// A default is walked BEFORE its own Parameter is declared, which
-		// reproduces the Enricher's scoping rule exactly: it sees `@`, the
-		// Parameters to its left and everything the Declaration is written
-		// inside, and nothing to its right. Without this, renaming a module
-		// Constant a default reads silently produces broken code — the
-		// occurrence inside the `= …` is simply never found.
+		// Walked before its Parameter is declared, as the Enricher scopes it: a
+		// default sees `@`, the Parameters to its left and the enclosing Scope.
 		if (parameter.defaultValue !== null) {
 			walkNode(parameter.defaultValue, functionScope, context)
 		}
 
-		// `_: Type` declares neither a Parameter name nor a call site
-		// label, so it holds no symbol a rename could reach.
+		// `_: Type` declares neither a name nor a label.
 		if (parameter.internalName === null) {
 			continue
 		}
 
-		// A Pattern where the internal name goes brings in as many names
-		// as it binds and none of them is the Parameter's own, so there is no
-		// symbol for a label to share. An explicit label is still its own, and
-		// is recorded below exactly as it would be beside a written name.
+		// A Pattern binds names, none of them the Parameter's, so a label has
+		// no symbol to share. An explicit label is still recorded.
 		if (parameter.internalName.nodeType === "Pattern") {
 			declarePattern(
 				parameter.internalName,
@@ -1781,7 +1545,7 @@ function walkFunctionDefinition(
 		}
 
 		if (parameter.externalName === null) {
-			// `_` — explicitly label-less.
+			// `_`, explicitly without a label.
 			declareInScope(
 				functionScope,
 				"values",
@@ -1791,9 +1555,8 @@ function walkFunctionDefinition(
 				parameter.internalName.position.end,
 			)
 		} else if (parameter.externalName === parameter.internalName) {
-			// The Parser reuses the same Identifier node when the
-			// internal name doubles as the call site label — one symbol, so
-			// call site labels rename together with the Parameter.
+			// The Parser reuses one Identifier node for a name that is also its
+			// label, so the labels rename with the Parameter.
 			let declaration = declareInScope(
 				functionScope,
 				"values",
@@ -1806,8 +1569,7 @@ function walkFunctionDefinition(
 			declaration.labelled = true
 			labels.set(parameter.internalName.content, declaration)
 		} else {
-			// An explicit external name is its own symbol — renaming
-			// it never touches the internal Parameter name, and vice versa.
+			// An explicit label is a symbol of its own, apart from the name.
 			let labelDeclaration: Declaration = {
 				builtin: false,
 				kind: "label",
@@ -1852,8 +1614,7 @@ function walkProtocolDeclaration(
 		context,
 	)
 
-	// An extension names a Protocol declared elsewhere, so renaming that
-	// Protocol has to move this spelling of it too.
+	// Each extended Protocol is a reference, which its rename moves.
 	let extended = node.conformsTo.map((clause) =>
 		protocolReference(clause.protocol, scope, context),
 	)
@@ -1866,8 +1627,8 @@ function walkProtocolDeclaration(
 
 	extensions.push(...extended)
 
-	// `Self` is visible inside the signatures — builtin, so it colours
-	// like a Type Parameter but can not be renamed.
+	// `Self` is visible inside the signatures, coloured as a Type Parameter
+	// and builtin, so never renamed.
 	let selfScope = createScope(scope)
 
 	selfScope.types.set("Self", {
@@ -1878,10 +1639,8 @@ function walkProtocolDeclaration(
 		occurrences: [],
 	})
 
-	// Declared under the Protocol's name, in the table that answers a
-	// call a Protocol resolved: a provided Method, or any Method called on a
-	// bounded Type. A call on a conformer binds to the conformer's own Method,
-	// which joins this one through `conformances`.
+	// The table a call the Protocol resolved binds to. A call on a conformer
+	// binds to its own Method, which joins this one through `conformances`.
 	let memberDeclarations = context.protocolMembers.get(key)
 
 	if (memberDeclarations === undefined) {
@@ -1924,12 +1683,8 @@ function walkProtocolDeclaration(
 				: [member.signature]
 
 		for (let signature of signatures) {
-			// A PROVIDED Method is a Function Definition over the very
-			// Parameters this signature holds, so it is walked as one — its
-			// Parameters declare, its body's names resolve, and every rename
-			// inside it reaches what it should. The requirement branch below
-			// walks the annotations alone, because a requirement has nothing
-			// else to walk.
+			// A provided Method is walked as a Function Definition. A
+			// requirement has only its annotations to walk.
 			if (signature.body !== null) {
 				walkFunctionDefinition(
 					signature.body.value,
@@ -1967,18 +1722,14 @@ function walkNamespaceDefinition(
 		context.namespaceKeys.set(node.name.content, [...keys, key])
 	}
 
-	// The Namespace's own Type Parameters are in scope for the `where`
-	// conditions (and for the target Type and Methods below), so the Generic
-	// scope is built first — a `where Item is Comparable` condition then binds
-	// `Item` to the Generic's declaration, and renaming either end moves both.
+	// Built first, so `Item` in `where Item is Comparable` binds to the
+	// Namespace's Type Parameter.
 	let genericScope = scopeWithGenerics(node.generics, scope, context)
-	// The names a Method's `<…>` may not re-declare — see
-	// `scopeWithGenerics`.
+	// The names a Method's `<…>` may not re-declare; see `scopeWithGenerics`.
 	let declared = new Set(node.generics.map((generic) => generic.name.content))
 
-	// A clause's Protocol resolves in the outer Scope, its `where`
-	// conditions' LHS Generic through the Namespace's own Type Parameters, and
-	// each condition's RHS Protocol in the outer Scope again.
+	// A clause's Protocols resolve in the outer Scope, and a condition's
+	// Generic through the Namespace's Type Parameters.
 	let conformed: Array<string> = []
 
 	for (let clause of node.conformsTo) {
@@ -1990,10 +1741,8 @@ function walkNamespaceDefinition(
 		}
 	}
 
-	// Property and Method names are declared as Namespace member
-	// symbols — the typed pass binds their use sites, which resolve through
-	// the Namespace's Type. Same-named Namespaces of one Scope share one
-	// member map.
+	// The typed pass binds uses of these members, which resolve through the
+	// Namespace's Type. Same-named Namespaces of one Scope share the map.
 	let memberDeclarations = context.namespaceMembers.get(key)
 
 	if (memberDeclarations === undefined) {
@@ -2057,8 +1806,8 @@ function walkNamespaceDefinition(
 		walkTypeDeclaration(node.targetType, genericScope, context)
 	}
 
-	// Properties resolve in the outer Scope — Namespace Generics are
-	// only visible to the target Type and the Methods, like in the Enricher.
+	// Properties resolve in the outer Scope: as in the Enricher, the
+	// Namespace's Type Parameters reach only the target Type and the Methods.
 	for (let property of Object.values(node.properties)) {
 		if (property.type !== null) {
 			walkTypeDeclaration(property.type, scope, context)
@@ -2071,23 +1820,12 @@ function walkNamespaceDefinition(
 	}
 
 	for (let member of Object.values(node.methods)) {
-		// A body-less native signature has no Function definition to
-		// walk, but it still WRITES Type names (`Boolean`, `List<Item>`,
-		// `Ordering`) and Parameter names. Skipping it left every one of them
-		// outside the index — uncoloured by Semantic Tokens, invisible to
-		// Document Highlight and to `go to definition` — which went unnoticed
-		// while no document containing one could be opened at all. The
-		// standard library is nothing but these signatures.
-		//
-		// Their names are indexed, NOT made renameable in practice:
-		// `renameableOccurrenceAt` refuses outright inside a standard library
-		// source (see `server.ts`), which is the only place a native signature
-		// can appear. Indexing is what colours and highlights them.
+		// A native signature writes Type and Parameter names, indexed for
+		// Semantic Tokens, highlighting and go-to-definition.
 		for (let signature of nativeSignaturesOf(member)) {
 			walkNativeSignature(signature, genericScope, context, declared)
 		}
 
-		// Only bodied Methods have a Function definition to walk.
 		for (let method of methodsOf(member)) {
 			walkFunctionDefinition(
 				method.value,
@@ -2120,13 +1858,8 @@ function walkNativeSignature(
 			walkNode(parameter.defaultValue, signatureScope, context)
 		}
 
-		// A Parameter of a body-less signature binds nothing —
-		// there is no body to read it — so it is recorded as a
-		// standalone Declaration rather than declared in a Scope,
-		// exactly as a Protocol signature's would be.
-		// The Parser reuses ONE Identifier Node when the internal
-		// name doubles as the call site label, so the pair is deduped
-		// by identity rather than by name.
+		// Without a body nothing reads the Parameter, so it is a standalone
+		// Declaration. A name that is also its label is one Identifier node.
 		let identifiers = new Set(
 			[parameter.externalName, parameterInternalName(parameter)].filter(
 				(identifier) => identifier !== null,
@@ -2153,8 +1886,7 @@ function walkNativeSignature(
 	walkTypeDeclaration(signature.returnType, signatureScope, context)
 }
 
-// Null for an annotation a contextually typed Function literal omitted —
-// there is no Type written down, so there is no name in it to rename.
+// Null where a contextually typed Function literal omitted an annotation.
 function walkTypeDeclaration(
 	node: parser.TypeDeclarationNode | null,
 	scope: Scope,
@@ -2223,20 +1955,10 @@ function registerRecordSite(
 	})
 }
 
-// The keys of an update the Enricher wrote out of a dotted key. A path
-// key's LAST step is a key of a list that exists nowhere in the written AST —
-// `{ c with server.port = 1 }` is enriched as
-// `{ c with server = { c.server with port = 1 } }`, and `port` is a key of the
-// inner list — so the lexical walk, which reads what was written, never reaches
-// it. Every step before the last is a synthesized Lookup and is carried by the
-// Lookup arm already.
-//
-// The shape is the WHOLE Record being updated, which is what the level's own
-// Type does not say: an update writes some of the members, and the union-find
-// resolves a site by the set of names it holds. A key list somebody wrote is
-// registered here a second time, at the very Position the lexical walk already
-// gave it — `record` keeps one occurrence per Position, and the site that knows
-// how to rewrite itself is the one already there.
+// The keys of an update the Enricher wrote out of a path key. In
+// `{ c with server.port = 1 }`, `port` keys an inner Record the written AST
+// lacks, so only `memberPositions` records it. The site's shape is the whole
+// Record updated.
 function registerPathKeySite(
 	node: common.typed.CombinationNode,
 	context: WalkContext,
@@ -2267,21 +1989,9 @@ function registerPathKeySite(
 	})
 }
 
-// The keys of a Literal that is MERGED into a default and wrote a path
-// key — an Argument or a Case payload. The same fact `registerPathKeySite`
-// carries for an update, for the same reason: a path's later steps are keys of
-// lists that exist nowhere in the written AST, so the lexical walk never reaches
-// them and `memberPositions` is the only record of where they were spelled.
-//
-// The shape is the level's OWN keys rather than the whole Record, which is what
-// a Literal merged into a default can say for itself: what the merge fills in is
-// decided by the Parameter the Argument was committed to, and the union-find
-// unions a subset with the shape that holds it — the very reading a partial
-// Argument's own key list is already resolved by.
-//
-// Asked of every typed Record, so it is answered by the one field it takes to
-// know: a level a path key built carries `merged`, and the Literal that holds
-// one carries the level.
+// The path keys of a Literal merged into a default, an Argument or a Case
+// payload, as `registerPathKeySite` records an update's. The shape is the
+// level's own keys, which the grouping relates to the full Record by subset.
 function registerMergedKeySite(
 	node: common.typed.RecordValueNode,
 	context: WalkContext,
@@ -2313,12 +2023,8 @@ function registerMergedKeySite(
 	})
 }
 
-// What renaming the MEMBER writes at a Record Literal's member — the
-// mirror of a Pattern's `memberRenameEdits`, and needed for the same reason:
-// `{ width }` is `{ width = width }`, so the one Identifier is the member AND
-// the value, and renaming the member has to leave the value behind. A member
-// that spelled its value needs nothing; a Record TYPE's member never can, since
-// there is no value in it to leave.
+// Renaming the member at a shorthand Record Literal member keeps the value:
+// `{ width }` becomes `{ newName = width }`.
 function shorthandMemberEdits(
 	member: parser.RecordValueMemberNode | parser.RecordTypeMemberNode,
 ): Array<RenameEdit> | null {
@@ -2326,9 +2032,8 @@ function shorthandMemberEdits(
 		return null
 	}
 
-	// A PATH key marked shorthand is one the Parser recovered from
-	// `{ c with server.port }` after refusing it — it names no binding, which
-	// is exactly what it was refused for, so there is nothing to leave behind.
+	// A shorthand path key, recovered from the refused `{ c with server.port }`,
+	// names no binding to keep.
 	if ("steps" in member && member.steps !== undefined) {
 		return null
 	}
@@ -2341,11 +2046,8 @@ function shorthandMemberEdits(
 	]
 }
 
-// What renaming the VALUE writes at a Record Literal's member. The other
-// half of the same fact: `{ width }` becomes `{ width = newName }`, so the
-// member the Record declares keeps the name every reader of the Record knows it
-// by. The span is the member's name — the value has no span of its own, which
-// is exactly what the shorthand is.
+// Renaming the value at a shorthand Record Literal member keeps the member:
+// `{ width }` becomes `{ width = newName }`.
 function shorthandValueEdits(
 	member: parser.RecordValueMemberNode,
 ): Array<RenameEdit> | null {
@@ -2361,17 +2063,8 @@ function shorthandValueEdits(
 	]
 }
 
-// A Pattern NAMES members that something else declares — the Type of
-// whatever it takes apart — so it joins the member group without claiming to
-// define anything. That distinction is load-bearing rather than tidy: a bare
-// `{ width }` writes the member and the local it binds at ONE Position, and the
-// workspace keys a Declaration by its definition Position, so a Pattern
-// claiming to define the member would collapse the two into one symbol and
-// rename both at once, across every file.
-//
-// Each member also carries how renaming THROUGH it is written: a shorthand
-// binder has to spell the other end out beside the new name, because one
-// Identifier is standing for both.
+// A Pattern joins the member groups without declaring. `{ width }` writes the
+// member and its local at one Position, which keys a workspace Declaration.
 function registerPatternSite(
 	pattern: parser.PatternNode,
 	context: WalkContext,
@@ -2397,11 +2090,8 @@ function registerPatternSite(
 	}
 }
 
-// What renaming the MEMBER writes at a Pattern member. Only a shorthand
-// binder needs anything: `{ width }` becomes `{ newName as width }`, so that
-// the body reading `width` still reads the member it was bound from. Every
-// other spelling already writes the two names apart, and the member's own span
-// is simply overwritten.
+// Renaming the member at a shorthand Pattern member keeps the local:
+// `{ width }` becomes `{ newName as width }`.
 function memberRenameEdits(
 	member: parser.PatternMemberNode,
 ): Array<RenameEdit> | null {
@@ -2409,10 +2099,7 @@ function memberRenameEdits(
 		return null
 	}
 
-	// The binder goes AFTER the Type, because the grammar is
-	// `Identifier ":" Type "as" Binder`. Writing it straight after the name
-	// instead produced `{ breadth as width: Integer }`, which is not a Pattern
-	// at all — a plain rename turned a clean file into a syntax error.
+	// The binder goes after the Type: `Identifier ":" Type "as" Binder`.
 	if (member.type !== null) {
 		return [
 			{ position: member.name.position, text: [null] },
@@ -2434,11 +2121,8 @@ function memberRenameEdits(
 	]
 }
 
-// What renaming the LOCAL writes at a Pattern member — the mirror of
-// `memberRenameEdits`. `{ width }` becomes `{ width as newName }`; an annotated
-// `{ width: Integer }` takes its binder AFTER the Type, so the edit inserts at
-// an empty span there rather than overwriting the member's name. A member that
-// already writes its binder needs nothing: that binder IS the local.
+// Renaming the local at a shorthand Pattern member keeps the member:
+// `{ width }` becomes `{ width as newName }`, the binder after any Type.
 function binderRenameEdits(
 	member: Extract<parser.PatternMemberNode, { kind: "Type" }>,
 ): Array<RenameEdit> | null {
@@ -2466,20 +2150,15 @@ function binderRenameEdits(
 	]
 }
 
-// Every name a Pattern brings into scope, declared where the author wrote
-// it, plus the Type references its annotated members make. `patternBindings`
-// decides WHICH names, so the Enricher and this index can never disagree about
-// what a Pattern binds.
+// Every name a Pattern binds and every Type it names. `patternBindings`
+// decides the names, for the Enricher too.
 function declarePattern(
 	pattern: parser.PatternNode,
 	scope: Scope,
 	context: WalkContext,
 	kind: DeclarationKind,
-	// Where the names start being resolvable, exactly as an ordinary
-	// Declaration passes it — a Pattern's bindings are Constants and Variables
-	// and do not hoist, so a Declaration hands the end of its own Statement and
-	// Completion stops offering them above it. A Matcher's and a Parameter's are
-	// visible throughout the Scope they were made for, which is what null means.
+	// The end of a declaring Statement. Null for a Matcher's or a Parameter's
+	// bindings, visible throughout their Scope.
 	visibleFrom: common.Cursor | null = null,
 ) {
 	registerPatternSite(pattern, context)
@@ -2498,10 +2177,7 @@ function declarePattern(
 	}
 }
 
-// Every Type a Pattern names, at every depth. Written as its own walk
-// because a nested Pattern's annotation is a Type reference like any other: one
-// left out of the index is one a rename leaves behind, turning a clean file into
-// `unknown-type` — and it would get no definition and no Semantic Token either.
+// Every Type a Pattern names, nested Patterns included.
 function walkPatternTypes(
 	pattern: parser.PatternNode,
 	scope: Scope,
@@ -2522,9 +2198,8 @@ function walkPatternTypes(
 	}
 }
 
-// The rewrite a binding's own declaration site needs, found by the
-// Identifier the binding was read under — a shorthand member is the only one
-// that needs any, and it is the only one whose `name` node IS the member's.
+// The edits at a binding's declaring site, which only a shorthand member
+// needs. Its binding's Identifier is the member's own `name` node.
 function editsForBinding(
 	pattern: parser.PatternNode,
 	name: parser.IdentifierNode,
@@ -2550,12 +2225,9 @@ function editsForBinding(
 	return null
 }
 
-// Record Types are structural — there is no single declaration a
-// member belongs to. Member occurrences are grouped across all Record
-// shapes that are subset-related (one could flow into the other), so a
-// rename touches every site that could observe the member. Two unrelated
-// but identically shaped Records rename together — with structural typing
-// they are the same Type.
+// Groups member occurrences across the Record shapes related by subset, so
+// a rename reaches every site that could observe the member. Identically
+// shaped Records are one structural Type and rename together.
 function resolveRecordMembers(context: WalkContext) {
 	let shapes = [
 		...context.recordSites.map((site) => new Set(site.names)),
@@ -2618,10 +2290,8 @@ function resolveRecordMembers(context: WalkContext) {
 		return declaration
 	}
 
-	// Declaration sites first, so `definition` points at one of them
-	// instead of at a Lookup. A Pattern's site is not one of them — it names
-	// members something else declares, and taking a definition Position from it
-	// would be taking the one its own local binding already occupies.
+	// Declaring sites first, so `definition` is one of them rather than a
+	// Lookup. A Pattern's site does not declare; see `registerPatternSite`.
 	context.recordSites.forEach((site, siteIndex) => {
 		for (let member of site.members) {
 			let declaration = declarationFor(siteIndex, member.name)
@@ -2681,10 +2351,8 @@ function protocolReference(
 	)
 }
 
-// A Protocol or a Namespace declared at the top level is keyed by its
-// name, which is how another file and the builtins name it too. One declared
-// anywhere else carries the Position of its name as well, as a Protocol's
-// identity does, because it may share that name with another.
+// A top level Protocol or Namespace is keyed by its name, as other files
+// name it. One declared in a body adds its Position, since names may repeat.
 function siteKeyOf(
 	name: string,
 	declaration: Declaration | null,
@@ -2925,10 +2593,8 @@ function bindKeyedMember(
 		return
 	}
 
-	// An imported Namespace lands here too, and unlike a builtin it DOES
-	// have a source declaration — in the Module that wrote it. Kept so the
-	// workspace index can bind it there; a single file's index has no way to
-	// tell the two apart and does not have to.
+	// Possibly an imported Namespace's member, which the workspace join binds
+	// in the Module that declares it.
 	context.externalMembers.push({ namespaceName, memberName, position })
 }
 
@@ -2960,9 +2626,8 @@ function bindProtocolMembers(context: WalkContext) {
 	}
 }
 
-// The key `siteKeyOf` gives a Protocol, read off its identity: what
-// follows the Module path, which is the name and, for one declared in a body,
-// the Position of its name.
+// The key `siteKeyOf` gives a Protocol, read off the part of its identity
+// after the Module path.
 export function protocolIdentityKey(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
@@ -2989,10 +2654,7 @@ function walkTypedArguments(
 	}
 }
 
-// A default is an Expression like any other, and the typed pass is what
-// finds a Method or a Namespace member NAMED inside one — the parser pass above
-// finds the plain names. Missing this is silent: a rename simply leaves the
-// occurrence inside the `= …` behind.
+// A default may name a Method or member, which only the typed pass binds.
 function walkTypedCaseDefaults(
 	cases: common.typed.ChoiceDeclarationStatementNode["cases"],
 	context: WalkContext,
@@ -3055,10 +2717,8 @@ function walkTypedNode(
 
 			walkTypedMethods(node.methods, context)
 
-			// A native Method has no typed body, and the frame the
-			// Compiler synthesizes for its defaults is where its Expressions
-			// live — so a Method or member renamed inside `= @::length()` on a
-			// native is found here and nowhere else.
+			// A native Method's defaults live in the frame the Compiler
+			// synthesizes for them, such as `= @::length()`.
 			for (let shim of node.nativeShims) {
 				walkTypedParameterDefaults(shim.parameters, context)
 			}
@@ -3084,11 +2744,8 @@ function walkTypedNode(
 		case "ReturnStatement":
 			walkTypedNode(node.expression, context)
 			return
-		// What a `require MATCHER = EXPR` bound is not here — the
-		// Enricher desugared each name into a Constant of its own, standing in
-		// the very body this walks, so the Declarations above answer for them.
-		// What is left is the asserted value, which on the Matcher form is the
-		// Constant holding it rather than the Expression.
+		// The Enricher desugars a `require` Matcher's bindings into Constants
+		// of this body, so only the asserted value is left to walk.
 		case "ExpectStatement":
 		case "RequireStatement":
 			walkTypedNode(node.value, context)
@@ -3100,10 +2757,9 @@ function walkTypedNode(
 				node.member.name,
 				node.member.position,
 				context,
-				// As in the Hover — a bounded receiver resolves through
-				// the witness, whose members are provided and required alike, so
-				// which Protocol wrote the body is a per member answer there. A
-				// required one is declared by the bound or a Protocol it extends.
+				// As in the Hover, a bounded receiver resolves per member
+				// through the witness. A requirement belongs to the bound or a
+				// Protocol it extends.
 				node.namespace.type.providedBy ??
 					node.namespace.type.providedMembers?.[node.member.name] ??
 					boundProtocol(node.namespace.type.targetType),
@@ -3127,13 +2783,8 @@ function walkTypedNode(
 					node.member.content,
 					node.member.position,
 					context,
-					// As in the MethodInvocation — `Number.isLessThan` is
-					// written on the Namespace whose conformance put the Method
-					// in reach, and the declaration a rename has to reach is the
-					// Protocol's. Without this the site is indexed under a
-					// Namespace that declares no such member, so renaming the
-					// declaration left this spelling behind and broke the
-					// Program it was renamed in.
+					// As for a MethodInvocation: `Number.isLessThan` names the
+					// conforming Namespace, but the declaration is the Protocol's.
 					node.providedBy,
 				)
 			} else if (baseType.type === "GenericUse") {
@@ -3170,7 +2821,7 @@ function walkTypedNode(
 		case "Complete":
 			walkTypedNode(node.expression, context)
 			return
-		// The typed half of the same, for the reason above.
+		// The name inside `primes[0]` may be a member a rename must reach.
 		case "RefusedValue":
 			walkTypedNode(node.base, context)
 			return
