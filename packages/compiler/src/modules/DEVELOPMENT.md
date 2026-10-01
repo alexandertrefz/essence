@@ -77,6 +77,9 @@ the Namespace a call resolved to, for its `providedBy`. A refinement's predicate
 Type, as a conjunct or as a Method's predicate alias. That is no use either. A call the Module writes to that
 Namespace counts on its own.
 
+Both trees are walked with the visitor, and the typed tree's Conformances and dispatch branches with
+`forEachHeldRecord`. See "What a node holds" in [the helpers' notes](../helpers/DEVELOPMENT.md).
+
 The warning stays off for a Module whose parser recovery abandoned lines, since a dropped line may be the one
 that read the import. It asks for `recovery.lines` rather than for the record, because a dropped Pattern
 binder writes a record without losing any text.

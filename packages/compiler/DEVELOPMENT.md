@@ -253,14 +253,16 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    and a contextual one such as `start` joins `identifierTokenTypes`.
 5. Enricher: `enricher/enrichers.ts`, and `helpers/providedReads.ts`, which walks parser and typed bodies
    for the enricher. `refuseSnapshots` in `enricher/enrich.ts` descends through the visitor.
-6. Validator: `validator/validate.ts`.
-7. Simplifier: `simplifier/simplify.ts`.
-8. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such
+6. Linker: `isAssignedIn` and `usedNames` in `modules/link.ts` descend through the visitor. `usedNames` needs
+   an edit only for a kind that names an import outside a node, in a field it does not read yet.
+7. Validator: `validator/validate.ts`.
+8. Simplifier: `simplifier/simplify.ts`.
+9. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such
    as `passes/instrumentCoverage.ts`, `passes/loopSelfTailCalls.ts` and `passes/unboxConditions.ts`, and so
    does `mutation/index.ts`.
-9. Rewriter: `rewriter/rewrite.ts`.
-10. Formatter: `packages/formatter/src/printer.ts`.
-11. Language server, in `packages/language-server/src`: `completion.ts`, `hover.ts`, `rename.ts` and
+10. Rewriter: `rewriter/rewrite.ts`.
+11. Formatter: `packages/formatter/src/printer.ts`.
+12. Language server, in `packages/language-server/src`: `completion.ts`, `hover.ts`, `rename.ts` and
     `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`. `argumentContext.ts`, `callHierarchy.ts`,
     `documentSymbols.ts`, `foldingRanges.ts`, `inlayHints.ts`, `selectionRanges.ts`, `semanticTokens.ts`,
     `signatureHelp.ts`, `codeActions/lookups.ts`, `codeActions/matchOnValue.ts`, `codeActions/payloads.ts` and
@@ -274,12 +276,12 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
     Match can take apart joins its scaffolded cases. A kind that asks a Type of a value it holds hands it on in
     `visitNode`, and a new name field joins `names`. A subtree where no Match may stand is skipped, as
     `TypeAliasStatement`'s predicate is.
-12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
+13. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
-13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
+14. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
     `tests/codeGeneration.spec.ts`, `packages/formatter/src/tests/formatter.spec.ts`, and a spec for the
     feature itself. Each new Diagnostic code needs a showcase in `packages/fixtures/files/diagnostics`.
-14. Docs: the language page in `packages/website/src/content/docs/language/`, and each new code on
+15. Docs: the language page in `packages/website/src/content/docs/language/`, and each new code on
     `reference/diagnostics.mdx`.
 
 ## The project file

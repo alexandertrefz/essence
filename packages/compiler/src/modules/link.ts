@@ -17,9 +17,17 @@ import {
 import { countTypeDeclaration } from "../enricher/scope"
 import { derivedPrintableNamespaceName } from "../helpers/conformance"
 import { specifierTo } from "../helpers/describe"
+import { forEachHeldRecord } from "../helpers/nodes"
 import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
 import { flattenUnionMembers } from "../helpers/types"
+import {
+	findParserChild,
+	forEachParserChild,
+	forEachTypedChild,
+	type ParserNode,
+	type TypedNode,
+} from "../visitor/index"
 import type { Module, ModuleGraph } from "./graph"
 
 // What a top-level declaration was written as. A Variable can not be
@@ -1115,42 +1123,17 @@ function reportCyclicConstantImport(entry: parser.ImportNode): void {
 // Whether anything in the Module, Function bodies and tests included, assigns
 // to `name`.
 function isAssignedIn(module: Module, name: string): boolean {
-	let found = false
+	let assigns = (node: ParserNode): true | undefined =>
+		node.nodeType === "VariableAssignmentStatement" &&
+		node.name.content === name
+			? true
+			: findParserChild(node, assigns)
 
-	let visit = (node: unknown): void => {
-		if (found || node === null || typeof node !== "object") {
-			return
-		}
-
-		if (Array.isArray(node)) {
-			for (let entry of node) {
-				visit(entry)
-			}
-
-			return
-		}
-
-		let record = node as Record<string, unknown>
-
-		if (record["nodeType"] === "VariableAssignmentStatement") {
-			let target = record["name"] as Record<string, unknown> | undefined
-
-			if (target?.["content"] === name) {
-				found = true
-
-				return
-			}
-		}
-
-		for (let value of Object.values(record)) {
-			visit(value)
-		}
-	}
-
-	visit(module.program.implementation)
-	visit(module.program.tests)
-
-	return found
+	return (
+		assigns(module.program.implementation) === true ||
+		(module.program.tests !== null &&
+			assigns(module.program.tests) === true)
+	)
 }
 
 // An entry naming nothing this Module declares, and an exported Variable. A
@@ -1272,74 +1255,40 @@ function usedNames(
 	// The Choices a call printed through the derive.
 	let printedChoices = new Set<string>()
 
-	let visit = (node: unknown): void => {
-		if (Array.isArray(node)) {
-			for (let entry of node) {
-				visit(entry)
-			}
+	// A bare Case with no Choice expected resolves through the Choices in
+	// Scope. One the position resolved counts too, which only quiets the
+	// warning.
+	let noteBareCase = (
+		caseName: string,
+		type: common.Type | undefined,
+	): void => {
+		if (type?.type === "Case") {
+			bareCases.add(`${type.choice}#${type.name}`)
+		} else if (byName || type !== undefined) {
+			bareCaseNames.add(caseName)
+		}
+	}
 
-			return
+	let visitParsed = (node: ParserNode): void => {
+		if (node.nodeType === "Identifier") {
+			names.add(node.content)
+		} else if (node.nodeType === "CaseValue" && node.choice === null) {
+			noteBareCase(node.caseName.content, undefined)
 		}
 
-		if (node === null || typeof node !== "object") {
-			return
-		}
+		forEachParserChild(node, visitParsed)
+	}
 
-		let record = node as Record<string, unknown>
+	// A Union receiver's branch or a conformance witness names a Namespace. A
+	// provided Method needs its Protocol in Scope, though the call names only
+	// the conforming Namespace.
+	let noteRecord = (value: object): boolean => {
+		let record = value as Record<string, unknown>
 
-		// A resolved Type is no use, or an import whose Type only flows through
-		// would never be reported. So is the Namespace a refinement's predicate
-		// names in it: a call the Module writes to it counts on its own.
-		if (
-			typeof record["type"] === "string" &&
-			record["nodeType"] === undefined
-		) {
-			return
-		}
-
-		if (
-			record["nodeType"] === "Identifier" &&
-			typeof record["content"] === "string"
-		) {
-			names.add(record["content"])
-		}
-
-		if (record["nodeType"] === "MethodInvocation") {
-			let namespace = record["namespace"] as
-				| Record<string, unknown>
-				| undefined
-
-			if (typeof namespace?.["name"] === "string") {
-				names.add(namespace["name"])
-			}
-
-			// The one Type read, for the Protocol a provided Method needs.
-			let resolved = namespace?.["type"] as
-				| common.NamespaceType
-				| undefined
-
-			if (resolved?.providedBy !== undefined) {
-				identities.add(resolved.providedBy)
-			}
-
-			// The derive answers only where a Namespace declared the Choice
-			// `is Printable`, and the call names neither.
-			if (namespace?.["name"] === derivedPrintableNamespaceName) {
-				let base = record["base"] as { type: common.Type }
-
-				for (let member of casesOf(base.type)) {
-					printedChoices.add(member.choice)
-				}
-			}
-		}
-
-		// A Union receiver's branch, or a conformance witness.
 		if (typeof record["namespaceName"] === "string") {
 			names.add(record["namespaceName"])
 		}
 
-		// A provided Method needs its Protocol in Scope, though the call
-		// names only the conforming Namespace.
 		if (typeof record["providedBy"] === "string") {
 			identities.add(record["providedBy"])
 		}
@@ -1351,39 +1300,61 @@ function usedNames(
 			names.add(record["name"])
 		}
 
-		// A bare Case with no Choice expected resolves through the Choices
-		// in Scope. One the position resolved counts too, which only quiets
-		// the warning.
-		if (record["nodeType"] === "CaseValue" && record["choice"] === null) {
-			let type = record["type"] as common.Type | undefined
-
-			if (type?.type === "Case") {
-				bareCases.add(`${type.choice}#${type.name}`)
-			} else if (byName || type !== undefined) {
-				let caseName = record["caseName"] as parser.IdentifierNode
-
-				bareCaseNames.add(caseName.content)
-			}
-		}
-
-		for (let value of Object.values(record)) {
-			visit(value)
-		}
+		return true
 	}
 
-	visit(module.program.implementation)
-	visit(program)
+	// A resolved Type's name is not a use, or an import whose Type only flows
+	// through would never be reported. So the walk reads no Type but the
+	// Namespace a call resolved to.
+	let visitTyped = (node: TypedNode): void => {
+		if (node.nodeType === "Identifier") {
+			names.add(node.content)
+		} else if (node.nodeType === "MethodInvocation") {
+			names.add(node.namespace.name)
+
+			if (node.namespace.type.providedBy !== undefined) {
+				identities.add(node.namespace.type.providedBy)
+			}
+
+			// The derive answers only where a Namespace declared the Choice
+			// `is Printable`, and the call names neither.
+			if (node.namespace.name === derivedPrintableNamespaceName) {
+				for (let member of casesOf(node.base.type)) {
+					printedChoices.add(member.choice)
+				}
+			}
+
+			// A branch types its Function literal Arguments anew.
+			for (let branch of node.dispatch ?? []) {
+				for (let contextual of branch.contextualArguments) {
+					visitTyped(contextual.argument)
+				}
+			}
+		} else if (node.nodeType === "CaseValue" && node.choice === null) {
+			noteBareCase(node.caseName.content, node.type)
+		}
+
+		noteRecord(node)
+		forEachHeldRecord(node, noteRecord)
+		forEachTypedChild(node, visitTyped)
+	}
+
+	visitParsed(module.program.implementation)
+	visitTyped(program)
 	// The parser's tests section and `@example` blocks, which only a test
 	// compile types. Parsed here, so an import an example needs counts.
 	byName = program.tests === null
-	visit(module.program.tests)
+
+	if (module.program.tests !== null) {
+		visitParsed(module.program.tests)
+	}
 
 	if (byName) {
-		visit(
-			collectDiagnostics(() =>
-				exampleTestsOf(module.program, module.sourceText),
-			).result,
-		)
+		for (let example of collectDiagnostics(() =>
+			exampleTestsOf(module.program, module.sourceText),
+		).result) {
+			visitParsed(example)
+		}
 	}
 
 	for (let [name, protocol] of Object.entries(scope.protocols)) {

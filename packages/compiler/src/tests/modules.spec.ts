@@ -2334,6 +2334,146 @@ export {
 		)
 	})
 
+	// Each branch of `shape::area()` runs off its own Namespace, which only the
+	// dispatch names.
+	it("counts each Namespace a Union receiver dispatches through as a use", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shapes.es" {
+		Circle
+		Square
+		CircleArea
+		SquareArea
+	}
+}
+
+implementation {
+	function areaOf(_ shape: Circle | Square) -> Integer {
+		<- shape::area()
+	}
+
+	constant square: Square = { side = 3 }
+
+	Terminal.print(areaOf(square))
+}
+`,
+				"Shapes.es": `implementation {
+	type Circle = { radius: Integer }
+
+	type Square = { side: Integer }
+
+	namespace CircleArea for Circle {
+		area() -> Integer {
+			<- @.radius::multiply(with @.radius)::multiply(with 3)
+		}
+	}
+
+	namespace SquareArea for Square {
+		area() -> Integer {
+			<- @.side::multiply(with @.side)
+		}
+	}
+}
+
+export {
+	Circle
+	Square
+	CircleArea
+	SquareArea
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// Each branch types the Function literal anew, so `each::area()` runs off
+	// `CircleArea` only in the copy the `Circle` branch holds.
+	it("counts a Namespace only a dispatch branch's Function literal calls as a use", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shapes.es" {
+		Circle
+		Square
+		CircleArea
+		SquareArea
+		CircleTools
+		SquareTools
+	}
+}
+
+implementation {
+	function areaOf(_ shape: Circle | Square) -> Integer {
+		<- shape::measured(by (each) { <- each::area() })
+	}
+
+	constant square: Square = { side = 3 }
+
+	Terminal.print(areaOf(square))
+}
+`,
+				"Shapes.es": `implementation {
+	type Circle = { radius: Integer }
+
+	type Square = { side: Integer }
+
+	namespace CircleArea for Circle {
+		area() -> Integer {
+			<- @.radius::multiply(with @.radius)::multiply(with 3)
+		}
+	}
+
+	namespace SquareArea for Square {
+		area() -> Integer {
+			<- @.side::multiply(with @.side)
+		}
+	}
+
+	namespace CircleTools for Circle {
+		measured(by measure: (_ circle: Circle) -> Integer) -> Integer {
+			<- measure(@)
+		}
+	}
+
+	namespace SquareTools for Square {
+		measured(by measure: (_ square: Square) -> Integer) -> Integer {
+			<- measure(@)
+		}
+	}
+}
+
+export {
+	Circle
+	Square
+	CircleArea
+	SquareArea
+	CircleTools
+	SquareTools
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
 	// A Type whose values only flow through the file is no use. Nothing derives a
 	// conformance off `Standing`, so removing the entry compiles.
 	it("warns about a Type import whose values only flow through", () => {

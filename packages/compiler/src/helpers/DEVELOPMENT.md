@@ -268,6 +268,19 @@ Arguments a Type was spelled with, and they already stand wherever they were sub
 find a refinement, an `Error` or a Type Parameter that the Type's members do not hold. `type Box<Held> = { value:
 Integer }` applied as `Box<NonZeroInteger>` holds a refinement in its spelling and none in its members.
 
+## What a node holds
+
+The visitor reaches a node's children. Some walkers also read what a typed node holds besides nodes, such as a
+call's Conformances or the branches of a Union dispatch. `forEachHeldRecord` hands them each such object, with
+the field and the object holding it. It reads every field reflectively, so it covers fields added later.
+
+It stops at a node, which the visitor reaches, and at a Type. A Type shares objects, so followed reference by
+reference the walk multiplies with nesting. A walker that needs something inside a Type reads it by name. The
+unused-import walk reads the `providedBy` of the Namespace a call resolved to.
+
+A dispatch branch holds a typed copy of each Function literal Argument it types anew, in `contextualArguments`.
+The visitor skips the branches, so a walker that reads what those bodies call walks the copies itself.
+
 ## Freshened Type Parameters
 
 Generic identity is by name across the compiler, and a caller may declare a Generic under the same name as its
