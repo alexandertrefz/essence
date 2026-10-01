@@ -200,6 +200,5 @@
 	"packages/runtime/src/tests/writing.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 2},
 	"packages/vscode-extension/tests/grammar.spec.ts": {"sentence-length": 25, "em-dash": 17, "all-caps": 12, "position": 4, "block-length": 1},
 	"packages/vscode-extension/tests/testModel.spec.ts": {"sentence-length": 11, "em-dash": 8, "all-caps": 5, "position": 1},
-	"packages/vscode-extension/tests/testView.spec.ts": {"sentence-length": 12, "em-dash": 11, "all-caps": 5, "block-length": 1},
-	"packages/vscode-extension/tests/vscodeStub.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 5, "citation": 1}
+	"packages/vscode-extension/tests/testView.spec.ts": {"sentence-length": 12, "em-dash": 11, "all-caps": 5, "block-length": 1}
 }
