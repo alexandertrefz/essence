@@ -13,11 +13,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// `Result` is `Optional` with a reason attached — `#Value(item)` or
-// `#Failure(reason)` — and what the second Case buys is not visible in a Type
-// error: it is visible when a Program RUNS. So every claim here compiles AND
-// executes, exactly as `optional.spec.ts` does for the carrier this one
-// mirrors.
+// `Result` is `Optional` with a reason attached: `#Value(item)` or
+// `#Failure(reason)`. What the reason buys shows when a Program runs, so every
+// claim here compiles and runs, as `optional.spec.ts` does.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -71,9 +69,8 @@ function diagnosticsOf(source: string): Array<common.Diagnostic> {
 	return validate(enriched.program)
 }
 
-// Both Cases carry a payload, so a receiver is declared rather than
-// written bare: a `#Value(3)` on its own decides the value Type and says
-// nothing about the failure Type.
+// A bare `#Value(3)` says nothing about the failure Type, so each receiver
+// is declared.
 const CARRIERS = `constant fine: Result<Integer, String>  = #Value(3)
 					constant wrong: Result<Integer, String> = #Failure("gone")`
 
@@ -114,9 +111,8 @@ describe("Result", () => {
 			).toEqual(["true", "false", "false", "true", "false", "true"])
 		})
 
-		// The second entry of `is`, and the reason it takes the VALUE
-		// rather than the reason: one Expression then tests an answer. A failed
-		// Result is never a bare value, whatever the value is.
+		// The second entry of `is` takes a value rather than a reason, so one
+		// Expression tests an answer. A failure is never a bare value.
 		it("compares against a bare value, which a failure never is", async () => {
 			expect(
 				await run(`implementation {
@@ -134,9 +130,8 @@ describe("Result", () => {
 			).toEqual(["true", "false", "false", "true", "true", "false"])
 		})
 
-		// The outer-question caveat `Optional::is` carries, one Type
-		// along: the whole-Result entry is declared first, so an Argument that
-		// fits both readings asks about the RECEIVER.
+		// As with `Optional::is`, the whole-Result entry is declared first, so
+		// an Argument that fits both readings asks about the receiver.
 		it("reads a Result of Results at the outer level first", async () => {
 			expect(
 				await run(`implementation {
@@ -180,9 +175,8 @@ describe("Result", () => {
 			).toEqual(["true", "false", "false", "true"])
 		})
 
-		// The quantified entry, which answers `false` on a failure
-		// without running the check — the same rule `Optional::hasValue(where:)`
-		// keeps for the Case that holds nothing.
+		// A failure answers `false` without running the check, as
+		// `Optional::hasValue(where:)` does for an empty Optional.
 		it("asks a question of the value, and answers false without one", async () => {
 			expect(
 				await run(`implementation {
@@ -235,9 +229,8 @@ describe("Result", () => {
 			).toEqual(["Result#Value(30)", `Result#Failure("gone")`])
 		})
 
-		// The other direction, and the reason the Method is
-		// `mapFailure` rather than `mapError`: the Case is `#Failure`, and this
-		// language has no errors to name.
+		// The Method is `mapFailure` rather than `mapError`, since the Case is
+		// `#Failure` and the language has no errors.
 		it("maps the reason and carries the value through", async () => {
 			expect(
 				await run(`implementation {
@@ -249,11 +242,9 @@ describe("Result", () => {
 			).toEqual(["Result#Failure(4)", "Result#Value(3)"])
 		})
 
-		// The step is written INLINE at each call rather than bound to a
-		// Constant above them. A Method Generic that appears only in the
-		// callback's return Type is solved from a Function literal and not
-		// from a Function value, on `Optional::andThen` exactly as here, so a
-		// named step reads as `no-matching-overload`.
+		// The step is written inline at each call. A Method Generic that appears
+		// only in the callback's return Type is solved from a Function literal,
+		// not a Function value, as on `Optional::andThen`.
 		it("chains with andThen without nesting the answer", async () => {
 			const step = `(item) -> Result<Integer, String> {
 							if item::isOdd() {
@@ -278,9 +269,8 @@ describe("Result", () => {
 			])
 		})
 
-		// `recover` is the one Method here that answers a BARE value off
-		// a failure, which is what a caller holding a reason it can repair
-		// wants. The value Case never runs the transform.
+		// `recover` answers a bare value off a failure, for a caller that can
+		// repair the reason. The value Case never runs the transform.
 		it("recovers a bare value out of the reason", async () => {
 			expect(
 				await run(`implementation {
@@ -292,8 +282,8 @@ describe("Result", () => {
 			).toEqual(["4", "3"])
 		})
 
-		// The `keep` an Optional has, with the second Argument a Result
-		// needs: refusing a value here has to say why.
+		// An Optional's `keep` with a second Argument, since a Result refusing
+		// a value has to say why.
 		it("keeps a value that passes, and fails with the given reason", async () => {
 			expect(
 				await run(`implementation {
@@ -358,18 +348,10 @@ describe("Result", () => {
 			])
 		})
 
-		// `NestedResult` targets one failure Type at both levels, and a
-		// receiver that fails with two different ones still reaches it: the
-		// dispatch matches each Case of the receiver on its own, so `#Value`
-		// binds the inner pair and `#Failure` binds the outer reason. The
-		// answer is the two joined, which is sound — the reason a `flatten`
-		// answers really is a `String` or an `Integer` there.
-		//
-		// The `#Failure` branch binds nothing for the value Type, so its half
-		// of that answer carries the Compiler's poison Type. What is pinned
-		// here is that the poison is not PRINTED: `Error` is not a Type this
-		// Program declares, and a Diagnostic naming one would send a reader
-		// looking for it.
+		// `NestedResult` names one failure Type at both levels, but each Case of
+		// the receiver is matched on its own, so the failure Types are joined.
+		// The `#Failure` half binds no value Type and carries the poison Type,
+		// which a Diagnostic must not print as `Error`.
 		it("joins two failure Types, and names neither of them Error", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant mismatched: Result<Result<Integer, String>, Integer> = #Value(#Value(1))
@@ -385,10 +367,9 @@ describe("Result", () => {
 		})
 	})
 
-	// The bridge each way. `Optional::toResult` supplies the reason an
-	// Optional never had, and `Result::value()` drops it again — which is the
-	// pair of signatures that makes `Optional.es` and `Result.es` name each
-	// other, and the second cycle the standard library's graph allows.
+	// `Optional::toResult` supplies a reason and `Result::value()` drops it,
+	// so `Optional.es` and `Result.es` name each other. See "The shape of the
+	// graph is frozen" in packages/standard-library/DEVELOPMENT.md.
 	describe("Crossing from an Optional", () => {
 		it("supplies the reason an Optional never had", async () => {
 			expect(
@@ -415,10 +396,8 @@ describe("Result", () => {
 		})
 	})
 
-	// The laws, checked over every combination of a small domain rather
-	// than over sampled ones — two values and two reasons is the whole of what
-	// a `Result<Integer, String>` can be up to the payloads, so an exhaustive
-	// answer is available and is stronger than a sampled one.
+	// The laws, checked over every combination of two values and two reasons,
+	// which covers every shape a `Result<Integer, String>` can take.
 	describe("Laws", () => {
 		const domain = `constant candidates: List<Result<Integer, String>> = [
 						#Value(1),
@@ -439,9 +418,8 @@ describe("Result", () => {
 			).toEqual(["true"])
 		})
 
-		// The composition law, which is what says `map` is about the
-		// value alone: mapping twice is mapping once with the two transforms
-		// composed, on both Cases.
+		// Mapping twice is mapping once with the transforms composed, on both
+		// Cases.
 		it("composes two maps into one", async () => {
 			expect(
 				await run(`implementation {
@@ -469,10 +447,9 @@ describe("Result", () => {
 			).toEqual(["true"])
 		})
 
-		// The two steps are free Functions, and each call writes the
-		// literal that forwards to one — a Method Generic appearing only in
-		// the callback's return Type is solved from a Function literal and not
-		// from a Function value.
+		// Each call wraps its free Function in a literal, since a Method
+		// Generic appearing only in the callback's return Type is solved from a
+		// literal.
 		const steps = `function first(_ item: Integer) -> Result<Integer, String> {
 						<- #Value(item::add(1))
 					}
@@ -568,9 +545,7 @@ describe("Result", () => {
 			).toEqual(["true"])
 		})
 
-		// The round trip. `toList` and the List's own `firstItem` are
-		// each other's inverse on the value, which is what makes `toList` a
-		// bridge rather than a lossy rendering.
+		// `toList` and the List's `firstItem` are inverses on the value.
 		it("crosses to a List and back with toList", async () => {
 			expect(
 				await run(`implementation {
@@ -584,9 +559,8 @@ describe("Result", () => {
 		})
 	})
 
-	// The Namespace a List of Results reaches, which is the half the
-	// corpus actually needed: the quote-server checks a List of lines and
-	// wants every reason, not the first one.
+	// The Namespace a List of Results reaches, for a caller that wants every
+	// reason rather than the first.
 	describe("A List of Results", () => {
 		const lists = [
 			`constant rows: List<Result<Integer, String>> = [#Value(1), #Failure("a"), #Value(3), #Failure("b")]`,
@@ -613,9 +587,8 @@ describe("Result", () => {
 			])
 		})
 
-		// THE decision this Namespace exists for. A single failure
-		// decides the answer, and every reason is kept — applicative
-		// validation, not a short circuit.
+		// A single failure decides the answer, and every reason is kept:
+		// applicative validation, not a short circuit.
 		it("accumulates every reason with allValues", async () => {
 			expect(
 				await run(`implementation {
@@ -632,9 +605,8 @@ describe("Result", () => {
 			])
 		})
 
-		// The empty List has no failed Result in it, so every value it
-		// holds is present and the answer is a value: the empty List, wrapped.
-		// A failure there would name a reason nothing gave.
+		// The empty List holds no failure, so it answers the empty List as a
+		// value.
 		it("answers the empty List wrapped, for the empty List", async () => {
 			expect(
 				await run(`implementation {
@@ -647,10 +619,8 @@ describe("Result", () => {
 			).toEqual(["Result#Value([])", "[]", "[]"])
 		})
 
-		// The `NonEmptyList` the answer promises is spent at the use
-		// site: the reasons come back with the proof, so `firstItem()` answers
-		// an item rather than an Optional. This is the spelling the `§§` block
-		// on `allValues` names for a caller that wants only the first.
+		// The reasons come back as a `NonEmptyList`, so `firstItem()` answers
+		// an item, as the `allValues` docs suggest for a caller wanting one.
 		it("answers the reasons with the proof that there is one", async () => {
 			expect(
 				await run(`implementation {
@@ -666,11 +636,9 @@ describe("Result", () => {
 			).toEqual([`Optional#Value("a")`, "Optional#Empty"])
 		})
 
-		// Both laws are checked over every arrangement of up to three
-		// items, which is where a failure can stand first, last, alone or not
-		// at all. They are written on `values` and `reasons` rather than on
-		// the body's own question, so a body rewritten another way is still
-		// held to them.
+		// Every arrangement of up to three items puts a failure first, last,
+		// alone or nowhere. The laws use `values` and `reasons` rather than the
+		// body's own question, so a rewritten body is still held to them.
 		const arrangements = `constant arrangements: List<List<Result<Integer, String>>> = [
 						[],
 						[#Failure("a")],
@@ -721,8 +689,7 @@ describe("Result", () => {
 			).toEqual(["true"])
 		})
 
-		// The two halves cover the receiver exactly once, which is what
-		// separates `partition` from two unrelated walks.
+		// The halves cover the receiver exactly once.
 		it("splits every item into exactly one half", async () => {
 			expect(
 				await run(`implementation {
@@ -768,13 +735,9 @@ describe("Result", () => {
 			).toContain("missing-case")
 		})
 
-		// `#Value` is declared by two builtin Choices now, so a position
-		// that decides neither is `ambiguous-case` rather than a silent choice
-		// of whichever the Compiler met first. Both Choices are named in the
-		// Diagnostic's helps, which is what makes it actionable — and both are
-		// generic, so each Help asks for the Type Arguments as well as the
-		// Choice: the bare `Result#Value` it would otherwise offer resolves the
-		// ambiguity and then meets `undecided-type-arguments`.
+		// Two builtin Choices declare `#Value`, so a position that decides
+		// neither is `ambiguous-case`. Each Help names a Choice with its Type
+		// Arguments, or the fix would meet `undecided-type-arguments`.
 		it("refuses a bare #Value that nothing decides", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant carried = #Value(3)
@@ -788,9 +751,6 @@ describe("Result", () => {
 			)
 		})
 
-		// The other half of that rule: a position that DOES decide is
-		// decided, and a bare `#Value` there resolves against the Choice the
-		// position asked for.
 		it("takes the Choice the position names", async () => {
 			expect(
 				await run(`implementation {

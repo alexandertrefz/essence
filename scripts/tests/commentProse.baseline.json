@@ -28,7 +28,6 @@
 	"packages/compiler/src/tests/rationals.spec.ts": {"sentence-length": 30, "em-dash": 16, "all-caps": 13, "position": 4, "block-length": 3},
 	"packages/compiler/src/tests/recordConformanceModel.spec.ts": {"sentence-length": 7, "em-dash": 6, "all-caps": 6, "position": 2},
 	"packages/compiler/src/tests/recovery.spec.ts": {"sentence-length": 22, "em-dash": 14, "all-caps": 19, "history": 1, "position": 3, "block-length": 2},
-	"packages/compiler/src/tests/result.spec.ts": {"sentence-length": 17, "em-dash": 8, "all-caps": 9, "block-length": 2},
 	"packages/compiler/src/tests/snapshotCache.spec.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 2},
 	"packages/compiler/src/tests/snapshotFiles.spec.ts": {"sentence-length": 3, "em-dash": 2},
 	"packages/compiler/src/tests/sourceMaps.spec.ts": {"sentence-length": 16, "em-dash": 15, "all-caps": 9, "position": 2},
