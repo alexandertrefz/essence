@@ -27,21 +27,11 @@ import {
 } from "../String"
 import { typeKeySymbol } from "../type"
 
-// A String is a WINDOW when its characters live in an Array it shares
-// with the String it was cut from — `slice` hands one back wherever the cut is
-// at least half of what it cuts, so that consuming a String from the front does
-// not copy the rest of it every turn. Nothing in the language can ask whether a
-// String is a window, and this file is the proof of that: every observable
-// answer is compared with a MODEL that holds the characters as a plain Array
-// and knows nothing of sharing.
-//
-// The model is "an Array of clusters", because that is what a String IS
-// here — and deliberately NOT "segment the text afresh". A String assembled
-// from a known view keeps that view (see `createSegmentedString`), since
-// grapheme boundaries are decided by neighbours and three regional indicators
-// re-pair however they happen to stand. So the model carries the clusters the
-// way the makers do: a RAW String segments its NFC form, and an ASSEMBLED one
-// is handed its characters and joins them for its text.
+// Every observable answer of a String window is compared with a model holding
+// its characters as a plain Array of clusters. A raw model segments its NFC
+// form, and an assembled one keeps the clusters it was given, since regional
+// indicators re-pair however they stand. See "String windows" in
+// packages/runtime/DEVELOPMENT.md.
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" })
 
@@ -65,9 +55,9 @@ function assembled(clusters: Array<string>): Model {
 	return { clusters, value: clusters.join("") }
 }
 
-// The position rules written out a second time, in the model's own terms
-// — half-open, a negative position counting back from the end, each end THEN
-// clamped. Spelled here rather than imported so that the two are genuinely two.
+// The position rules again, in the model's terms: half-open, a negative
+// position counts back, and each end is then clamped. Spelled here rather than
+// imported, so the two are independent.
 function resolve(index: number, count: number): number {
 	let position = index < 0 ? index + count : index
 
@@ -184,38 +174,17 @@ function characterAt(value: StringType, index: number): string | null {
 	return answer[typeKeySymbol] === "Optional#Empty" ? null : answer.item.value
 }
 
-// Every observable answer, taken off the String and off the model and
-// compared. `value` is first because everything else is a question about the
-// same text; a window whose text was cut wrongly fails here before anything
-// subtler gets a chance to.
-//
-// THE ORDER IS PART OF THE TEST, and it is the one thing about this file
-// that must not be tidied. A reader that walks the whole receiver —
-// `characters`, `reverse`, `split` — MATERIALISES a window: `graphemesIn`
-// copies the window's clusters out, writes a start of zero and gives up the
-// borrowed text and table. Everything asked after one of those is a question
-// about a COPY, and no copy can be read past an end it no longer has. So the
-// readers that read a window WHERE IT STANDS go first — `length`,
-// `character(at:)`, the two proven ends, the cuts, the searches and the prefix
-// and suffix tests — and the three that materialise go last, in that order.
-//
-// It is written down because the file has already been wrong this way
-// twice. `characters` stood third, and with it there a window that read PAST
-// ITS OWN END (`characterIn` without its upper bound) passed this file and the
-// whole 10,172-test suite; the cuts stood after the `split` inside the parts
-// loop, so every cut they compared was a cut of a copy. It is the same disease
-// as the ASCII guard further down, which asked the window before anything used
-// it — a guard that asks at the wrong moment is not a guard.
+// WARNING: the order is part of the test. `characters`, `reverse` and `split`
+// materialise a window through `graphemesIn`, so anything asked after them
+// asks a copy. The readers that read a window in place go first.
 function compareWithModel(value: StringType, model: Model, note: string) {
 	expect(`${note} value ${value.value}`).toBe(`${note} value ${model.value}`)
 	expect(`${note} length ${Number(length(value).value)}`).toBe(
 		`${note} length ${model.clusters.length}`,
 	)
 
-	// The last two positions are the window's OWN end and one past it,
-	// wherever that falls — the gap between where a window stops and where the
-	// Array it borrows stops is exactly what a fixed list of positions can
-	// miss, and it is where a window reading its parent's characters shows.
+	// The last two positions are the window's own end and one past it, where a
+	// window reading its parent's characters would show.
 	for (let index of [
 		0,
 		1,
@@ -245,11 +214,7 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 		)
 	}
 
-	// The cuts stand HERE, before anything walks the receiver, because
-	// cutting a window is the whole of what this change does: the cut resolves
-	// its positions against the window's own count and reads the borrowed Array
-	// from the window's own offset. Asked after a walk they were nine cuts of a
-	// copy, which is the cut that worked before there were windows at all.
+	// The cuts come before any walk, so they cut the window rather than a copy.
 	for (let [from, to] of CUTS) {
 		let cut = slice(value, createInteger(from), createInteger(to))
 		let expected = sliceModel(model, from, to)
@@ -309,19 +274,13 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 		)
 	}
 
-	// The KEY a Dictionary would file this String under, which is its NFC
-	// form — the one answer that ties a window to `is` and `compare`, since
-	// those are decided over the same form. A window whose text is not the text
-	// its characters spell is caught here even where its own `value` reads
-	// right.
+	// The Dictionary key is the NFC form `is` and `compare` decide over, so a
+	// window whose text differs from its characters fails here.
 	expect(
 		`${note} key ${String(encodeKey(value, { structural: true } as never))}`,
 	).toBe(`${note} key ${model.value.normalize("NFC")}`)
 
-	// From here down every reader walks the whole receiver, so the value
-	// under test is a copy of its own characters from the first of them on. See
-	// the ordering NOTE above: these three go last for that reason and for no
-	// other.
+	// These readers walk the whole receiver and materialise it, so they go last.
 	expect(`${note} reverse ${reverse(value).value}`).toBe(
 		`${note} reverse ${[...model.clusters].reverse().join("")}`,
 	)
@@ -341,15 +300,14 @@ function compareWithModel(value: StringType, model: Model, note: string) {
 	).toBe(`${note} characters ${JSON.stringify(model.clusters)}`)
 }
 
-// A read is clamped nowhere — a position outside the String answers
-// nothing at all, where a CUT clamps to the nearer end.
+// A read is never clamped: a position outside the String answers nothing,
+// where a cut clamps to the nearer end.
 function resolveRead(index: number, count: number): number {
 	return index < 0 ? index + count : index
 }
 
-// What `String.ts` remembered on a value under one of its private Symbol
-// keys, found by the key's description — the same reader, for the same reason,
-// that `asciiFastPath.spec.ts` has.
+// Reads what `String.ts` remembered under a private Symbol key, found by its
+// description, as `asciiFastPath.spec.ts` does.
 function remembered(value: StringType, description: string): unknown {
 	let key = Object.getOwnPropertySymbols(value).find(
 		(symbol) => symbol.description === description,
@@ -386,9 +344,7 @@ const BASES = [
 	"́abćabc",
 ]
 
-// A seeded generator, so the sequences are the same on every machine and
-// on every run, and a failure is a seed anyone can replay. Its shape is the
-// xorshift `randomness.spec.ts` uses for the same reason.
+// A seeded xorshift generator, so a failing seed replays anywhere.
 function generator(seed: number) {
 	let state = seed >>> 0 || 1
 
@@ -403,10 +359,8 @@ function generator(seed: number) {
 }
 
 describe("a window answers what a copy answered", () => {
-	// The sequence builds Strings out of Strings — cuts of cuts of cuts,
-	// joins of two windows, a piece of a split, a reversal — and every one of
-	// them is compared with the model as it is made. A window of a window is
-	// what the base offset is for, so the sequences are deliberately deep.
+	// Builds Strings out of Strings, deep enough for windows of windows, and
+	// compares each with the model as it is made.
 	test.each(BASES)("random sequences over %j", (base) => {
 		for (let seed = 1; seed <= 6; seed++) {
 			let random = generator(seed * 2_654_435_761)
@@ -468,9 +422,8 @@ describe("a window answers what a copy answered", () => {
 						let pieces = split(values[first]!, createString(part))
 						let modelled = splitModel(models[first]!, raw(part))
 
-						// The empty separator over the empty String is
-						// the one split that answers no pieces at all, and
-						// there is nothing to carry forward from it.
+						// The empty separator over the empty String answers no
+						// pieces.
 						if (modelled.length === 0) {
 							continue
 						}
@@ -503,12 +456,8 @@ describe("a window answers what a copy answered", () => {
 				)
 			}
 
-			// PERSISTENT use. Every String the sequence made is read
-			// AGAIN, after everything derived from it exists — a parent that has
-			// since been cut, walked and materialised, and a window whose parent
-			// has. Nothing a later String did may change what an earlier one
-			// answers, and the remembering under the Symbol keys is the whole
-			// reason that has to be asserted rather than assumed.
+			// Every String is read again after everything derived from it exists,
+			// since values remember answers under Symbol keys.
 			for (let index = values.length - 1; index >= 0; index--) {
 				compareWithModel(
 					values[index]!,
@@ -520,24 +469,9 @@ describe("a window answers what a copy answered", () => {
 	})
 })
 
-// The claims about WORK, which no clock decides. A drain over a String
-// segments it ONCE and copies a bounded number of clusters in all; the ASCII
-// drain beside it builds no character view whatever. `viewOf` is what makes the
-// copying askable: the Array a String's characters live in is its identity
-// here, and a copy is a second Array.
-//
-// The SEGMENTING is counted where it happens, by wrapping
-// `Intl.Segmenter.prototype.segment` for the length of the drain — the whole of
-// what `clustersOf` calls to build a view. `String.ts` used to remember a flag
-// saying the Segmenter had run for an Array, and only this file ever read it: a
-// property write inside a reached Function can not be shaken out of a bundle,
-// so the claim cost 94 bytes in the floor every Program pays. Counting the call
-// costs a Program nothing, and it is the stronger claim of the two — the flag
-// said an Array HAD been segmented, where this says how many times the
-// Segmenter ran at all.
-//
-// Restored in a `finally`, because a prototype left wrapped would follow
-// this file into every other spec the runner shares a process with.
+// Counts segmenting by wrapping `Intl.Segmenter.prototype.segment`, which
+// `clustersOf` calls to build a view. The wrapper is restored in a `finally`,
+// since a wrapped prototype would leak into every spec sharing the process.
 function whileCountingSegmentations<Answer>(body: () => Answer): {
 	answer: Answer
 	runs: number
@@ -564,11 +498,8 @@ function whileCountingSegmentations<Answer>(body: () => Answer): {
 describe("what a drain costs", () => {
 	const CHARACTERS = 20_000
 
-	// Every drain here is bounded by the turns it is KNOWN to take, and
-	// the bound is asserted afterwards rather than trusted. A drain runs until
-	// the String is empty, so a change that stops a cut shortening its receiver
-	// would not fail this file — it would hang it, and a suite that hangs says
-	// nothing at all. The turn count is the assertion, the cap is the seatbelt.
+	// A cut that stopped shortening its receiver would hang a drain, so the cap
+	// stops it and the turn count is asserted.
 	const TURN_CAP = CHARACTERS + 10
 
 	function drainWork(text: StringType) {
@@ -600,10 +531,7 @@ describe("what a drain costs", () => {
 		expect(work.turns).toBe(CHARACTERS)
 		expect(runs).toBe(1)
 
-		// One Array per halving, and the clusters they hold add up to
-		// 2n — the half rule's whole claim. Copying at every turn would be
-		// 20,000 Arrays and 200,000,000 clusters; never copying would be one
-		// Array, which is the other test below.
+		// One Array per halving, holding about twice the characters in all.
 		expect(work.arrays).toBeLessThanOrEqual(20)
 		expect(work.clustersHeld).toBeLessThan(3 * CHARACTERS)
 	})
@@ -621,9 +549,8 @@ describe("what a drain costs", () => {
 		expect(turns).toBe(CHARACTERS)
 	})
 
-	// The other side of the half rule, and the reason it exists: a short
-	// token cut out of a long String does NOT share, so holding the token for
-	// the life of a Program does not hold the String it came from.
+	// A short token cut from a long String does not share, so holding the token
+	// does not hold the String.
 	test("a short cut keeps its own characters", () => {
 		let text = createString("café ".repeat(CHARACTERS / 5))
 		let token = slice(text, createInteger(3), createInteger(9))
@@ -633,21 +560,9 @@ describe("what a drain costs", () => {
 		expect(viewOf(token).clusters).not.toBe(viewOf(text).clusters)
 	})
 
-	// The half rule is asked about the ROOT's Array and not about the
-	// window doing the cutting, and THAT is what bounds retention: a cut that is
-	// most of a window is still a small part of the Array the window borrows, and
-	// sharing it would pin the whole root for as long as the cut is held. The
-	// test above cuts from a root, where asking either question answers the same
-	// — so it is this one that holds the rule. Six thousand characters are at
-	// least half of the ten-thousand-character window and well under half of the
-	// twenty-thousand-character Array underneath it.
-	//
-	// And then the same thing over SKEWED clusters, because on a text
-	// whose characters are all one unit wide the unit half of the rule happens
-	// to answer the root question too — the two are proportional there. Where
-	// the window holds the WIDE clusters it is not: 1,500 of the window's 2,000
-	// characters are 72% of the whole text's units and pass that question, and
-	// only the root's Array length refuses them.
+	// The half rule is asked of the root's Array, so a cut that is most of a
+	// window but under half of the root copies. Over skewed clusters the unit
+	// question alone would let it share.
 	test("a cut of a window is measured against the root's Array", () => {
 		let text = createString("café ".repeat(CHARACTERS / 5))
 		let half = slice(text, createInteger(0), createInteger(CHARACTERS / 2))
@@ -669,20 +584,10 @@ describe("what a drain costs", () => {
 		expect(viewOf(inside).count).toBe(1_500)
 	})
 
-	// THE HALF RULE IS ASKED IN BOTH UNITS, and this is the shape that
-	// tells the two apart: 2,000 clusters of 21 code units each followed by
-	// 2,000 of one. A window over the narrow half is exactly half the
-	// CHARACTERS and a twenty-second of the TEXT, so the character rule alone
-	// let it share — and what it shared was the whole 44,000-unit text, held
-	// for as long as the window was. Measured over this very drain, the worst
-	// text a window pinned was 21 times its own; it is 2 now, and the price is
-	// three more Arrays over a drain of four thousand turns.
-	//
-	// Both claims are asserted every turn rather than at the end, because
-	// a window that pins too much pins it from the moment it is made, and the
-	// text it borrowed is gone by the time the drain is over. The borrowed text
-	// is read by the Symbol key's description, as the ASCII mark is — what a
-	// window HOLDS is not observable any other way.
+	// The half rule is asked in characters and in code units. A window over the
+	// narrow half is half the characters but a twenty-second of the units, so it
+	// must not share. Both bounds are asserted every turn, since a window pins
+	// its text from the moment it is made.
 	test("a drain over skewed clusters pins no more text than it holds", () => {
 		let wide = `e${String.fromCodePoint(769).repeat(20)}`
 		let skewed = createString(wide.repeat(2_000) + "a".repeat(2_000))
@@ -715,9 +620,7 @@ describe("what a drain costs", () => {
 		expect(clustersHeld).toBeLessThan(5 * 4_000)
 	})
 
-	// A window of a window shares the ROOT's Array rather than standing
-	// on a chain of windows, so reading a character is one Array read however
-	// many cuts deep the String is.
+	// A character read is one Array read however many cuts deep the String is.
 	test("a window of a window shares the root's Array", () => {
 		let text = createString("café ".repeat(CHARACTERS / 5))
 		let once = slice(text, createInteger(1), createInteger(1_000_000))
@@ -729,10 +632,8 @@ describe("what a drain costs", () => {
 		expect(viewOf(thrice).count).toBe(CHARACTERS - 3)
 	})
 
-	// Materialising a window — which is what a whole-Array reader like
-	// `split` does to one — gives it characters of its own and lets its parent's
-	// Array go. It is asserted here because it is what keeps a drain that
-	// splits from pinning the String it drains.
+	// Releasing the parent's Array keeps a drain that splits from pinning the
+	// String it drains.
 	test("a walk over a window gives it characters of its own", () => {
 		let text = createString("café ".repeat(CHARACTERS / 5))
 		let window = slice(text, createInteger(1), createInteger(1_000_000))
@@ -746,19 +647,9 @@ describe("what a drain costs", () => {
 		expect(viewOf(window).count).toBe(CHARACTERS - 1)
 	})
 
-	// The ASCII scan is O(n) and every turn of a drain is a NEW String,
-	// so asking it per turn is the same n² the copying was. A String that has a
-	// character view answers the question off the view instead and is never
-	// scanned — which shows as the scan's remembered answer never appearing on
-	// a window. The Symbol key is found by its description, as
-	// `asciiFastPath.spec.ts` finds the same two, because whether a scan
-	// HAPPENED is not observable any other way than by timing.
-	//
-	// Asked of the window AFTER everything a turn asks OF it, and that
-	// ordering is the test. The scan remembers its answer on the receiver, so a
-	// window asked before it is used carries nothing whatever the Methods do —
-	// which is what an earlier draft of this guard asserted, and a mutant that
-	// scanned every window walked straight through it.
+	// Every turn is a new String, so a scan per turn would be quadratic. A String
+	// with a view answers off the view. The scan remembers its answer on the
+	// receiver, so the window is checked after the turn's questions.
 	test("a drain never scans a window for ASCII-ness", () => {
 		let rest = slice(
 			createString("café ".repeat(CHARACTERS / 5)),
@@ -786,19 +677,9 @@ describe("what a drain costs", () => {
 		expect(turns).toBe(CHARACTERS - 1)
 	})
 
-	// And neither does the drain that ASKS ITS REST WHAT IT IS — which is
-	// the tokenizer comparing the text it has left with a keyword every turn.
-	// `is`, `compare` and every Dictionary key are decided over the NFC form,
-	// `normalisedFormOf` is where that form is taken, and it used to scan for
-	// the ASCII mark before deciding whether there was anything to normalise:
-	// O(window) a turn, on a String whose one non-ASCII character can stand at
-	// the very end where no scan can stop early. It asks the view-aware question
-	// now, and the window it declines to scan is the window it was already going
-	// to normalise.
-	//
-	// The NORMAL FORM is allowed to be remembered here, where the ASCII
-	// mark is not: the form is the answer the call was asked for, and the mark
-	// would be the trace of a scan nothing needed.
+	// A tokenizer compares its rest with a keyword every turn. `normalisedFormOf`
+	// asks the view-aware question, and may remember the normal form, which is
+	// the answer asked for.
 	test("a drain comparing its rest never scans a window", () => {
 		let rest = slice(
 			createString("café ".repeat(CHARACTERS / 5)),
@@ -821,20 +702,9 @@ describe("what a drain costs", () => {
 		expect(turns).toBe(CHARACTERS - 1)
 	})
 
-	// The REFUSED mark rides through `append` exactly as the accepted one
-	// does, and that it does is a claim about WORK no answer can show. A join
-	// holds every unit of both sides, so a side the scan refused makes a join it
-	// would refuse — and saying so costs a property write where asking costs the
-	// whole join. An engine joins two Strings into a ROPE and resolves it the
-	// first time anything reads a unit, so without the mark the scan flattened
-	// everything built so far, every turn: 80,000 non-ASCII characters appended
-	// one at a time measured 203 ms against their ASCII twin's 34.
-	//
-	// Asserted on EVERY turn's answer rather than on the last one, because
-	// the mark is what keeps the next turn from scanning — a turn that drops it
-	// has already paid for the walk by the time the token is finished. The count
-	// at the end is the other half: a mark is only worth carrying while it is
-	// true, and the characters of the token are still counted off the view.
+	// `append` carries a refused mark as it carries an accepted one, since a join
+	// holds every unit of both sides. Without it each turn would scan the whole
+	// join so far, so the mark is asserted every turn.
 	test("a token built by appending is never scanned again", () => {
 		let token = createString("é")
 		let turns = 0
@@ -850,10 +720,8 @@ describe("what a drain costs", () => {
 		expect(Number(length(token).value)).toBe(CHARACTERS + 1)
 	})
 
-	// A prefix test costs the PREFIX. Folding the whole receiver is not
-	// visible as an answer, so it is asserted as work the only way it can be:
-	// the receiver of a folded `starts` is not walked into a view of its own,
-	// and the count of clusters the whole drain holds stays bounded.
+	// A prefix test costs the prefix, so the clusters the drain holds stay
+	// bounded.
 	test("a folded prefix test over a drain stays bounded", () => {
 		let rest = createString("café ".repeat(CHARACTERS / 5))
 		let arrays = new Set<Array<string>>()
@@ -879,9 +747,8 @@ describe("what a drain costs", () => {
 	})
 })
 
-// `compare` decides `is`, and both are decided over the NFC form — so a
-// window and a String written down with the same characters are the same
-// String, whichever way each of them was made.
+// `compare` decides `is` over the NFC form, so a window equals a String written
+// with the same characters.
 describe("a window is the String it spells", () => {
 	test("a cut equals the text written down", () => {
 		let text = createString("café au lait")
