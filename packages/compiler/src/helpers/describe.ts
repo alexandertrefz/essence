@@ -7,8 +7,10 @@ import { closestMatch } from "./suggest"
 import {
 	type AsynchronyMismatch,
 	asynchronyMismatch,
+	choiceArgumentBounds,
 	decidesAnUndecidedSlot,
 	flattenUnionMembers,
+	genericNamesMentioned,
 	matchesType,
 } from "./types"
 
@@ -238,6 +240,67 @@ export function describeType(type: common.Type): string {
 		default:
 			return type.type
 	}
+}
+
+// What a report calls a Type that no Type Annotation can spell and nothing
+// stands in for, or null for any other. Those are a Namespace read as a value
+// and an Overload set. A Case has no spelling either, but its Choice has one,
+// and callers offer that edit first. A Function Type can be spelled.
+export function unnameableTarget(type: common.Type): string | null {
+	if (type.type === "Namespace") {
+		return describeType(type)
+	}
+
+	return type.type === "OverloadedMethod" ||
+		type.type === "OverloadedStaticMethod"
+		? "an overloaded Function"
+		: null
+}
+
+// Why no Namespace is offered for the Type, or null where one can be.
+export function unnameableTargetNote(type: common.Type): string | null {
+	let target = unnameableTarget(type)
+
+	return target === null
+		? null
+		: `No Namespace can be declared for ${target} — no Type Annotation can spell it, so no 'for' clause can name it.`
+}
+
+// A Namespace's head for the Type, written after `name`, as a Help spells it. A
+// Type Parameter the Type mentions is not in scope where the Namespace stands,
+// so the head declares it: `<infer T> for (_: T) -> T`.
+export function namespaceHead(type: common.Type, name: string = ""): string {
+	let parameters = [...genericNamesMentioned(type)].map(
+		(parameter) => `infer ${displayGenericName(parameter)}`,
+	)
+	let target = `for ${describeType(type)}`
+
+	if (parameters.length > 0) {
+		return `${name}<${parameters.join(", ")}> ${target}`
+	}
+
+	return name === "" ? target : `${name} ${target}`
+}
+
+// The `where` clause a Namespace for the Type needs on its conformance, or
+// nothing. A Type Parameter it infers in a bounded position of an applied Choice
+// carries that bound. One a Function only mentions carries none.
+export function namespaceWhere(
+	type: common.Type,
+	parametersOf: (choice: string) => Array<common.GenericDeclaration>,
+): string {
+	let conditions = [
+		...choiceArgumentBounds(
+			type,
+			genericNamesMentioned(type),
+			parametersOf,
+		),
+	].map(
+		([name, bound]) =>
+			`${displayGenericName(name)} is ${displayProtocolName(bound)}`,
+	)
+
+	return conditions.length === 0 ? "" : ` where ${conditions.join(", ")}`
 }
 
 // A member Type as a `case` writes it. A Case Matcher takes no Type Arguments

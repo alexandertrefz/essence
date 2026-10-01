@@ -611,6 +611,204 @@ describe("A Type in want of a conformance", () => {
 			}`),
 		).toBe(true)
 	})
+
+	// A `for` clause takes a Function Type as an annotation writes it.
+	it("should offer a Namespace for a Function value, and compile with it", () => {
+		let source = `implementation {
+			function double(_ n: Integer) -> Integer {
+				<- n
+			}
+
+			Terminal.print(double)
+		}`
+
+		expect(firstOf(source, "unsatisfied-bound").helps).toEqual([
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+			"Declare a Namespace 'for (_: Integer) -> Integer is Printable'.",
+		])
+
+		expect(
+			compiles(`implementation {
+				function double(_ n: Integer) -> Integer {
+					<- n
+				}
+
+				namespace Shown for (_: Integer) -> Integer is Printable {
+					toString() -> String {
+						<- "a function"
+					}
+				}
+
+				Terminal.print(double)
+			}`),
+		).toBe(true)
+	})
+
+	it("should declare nothing for a Namespace read as a value", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(String)
+			}`,
+			"unsatisfied-bound",
+		)
+
+		expect(diagnostic.notes).toContain(
+			"No Namespace can be declared for Namespace 'String' — no Type Annotation can spell it, so no 'for' clause can name it.",
+		)
+		expect(
+			diagnostic.helps.filter((help) => help.startsWith("Declare")),
+		).toEqual([])
+	})
+
+	it("should call an Overload set an overloaded Function", () => {
+		let diagnostic = firstOf(
+			`implementation {
+				Terminal.print(Integer.add)
+			}`,
+			"unsatisfied-bound",
+		)
+
+		expect(diagnostic.notes).toContain(
+			"No Namespace can be declared for an overloaded Function — no Type Annotation can spell it, so no 'for' clause can name it.",
+		)
+	})
+
+	// A Type Parameter of the culprit is not in scope where the Namespace
+	// stands, so the Namespace declares it, inferred from the value.
+	it("should declare the Type Parameters a Function value's Type mentions", () => {
+		let printed = `function pair<A, B>(_ a: A, _ b: B) -> A {
+				<- a
+			}
+
+			Terminal.print(pair)`
+
+		expect(
+			firstOf(
+				`implementation {
+				${printed}
+			}`,
+				"unsatisfied-bound",
+			).helps,
+		).toContain(
+			"Declare a Namespace '<infer A, infer B> for (_: A, _: B) -> A is Printable'.",
+		)
+		expect(
+			compiles(`implementation {
+				namespace Shown<infer A, infer B> for (_: A, _: B) -> A is Printable {
+					toString() -> String {
+						<- "a pair"
+					}
+				}
+
+				${printed}
+			}`),
+		).toBe(true)
+	})
+
+	it("should declare a Type Parameter of the Function around the culprit", () => {
+		let printing = `choice Box<Value> {
+				Full { item: Value },
+				Empty,
+			}
+
+			function show<infer Item>(_ box: Box<Item>) -> String {
+				Terminal.print(box)
+
+				<- ""
+			}`
+
+		expect(
+			firstOf(
+				`implementation {
+				${printing}
+			}`,
+				"unsatisfied-bound",
+			).helps,
+		).toContain(
+			"Declare a Namespace '<infer Item> for Box<Item> is Printable'.",
+		)
+		expect(
+			compiles(`implementation {
+				namespace Shown<infer Item> for Box<Item> is Printable {
+					toString() -> String {
+						<- "a box"
+					}
+				}
+
+				${printing}
+			}`),
+		).toBe(true)
+	})
+
+	// The Choice bounds its Type Parameter, so a Namespace that infers it
+	// conforms only where the bound holds.
+	it("should carry the bound a Choice demands of a Type Parameter it infers", () => {
+		let printing = `choice Ranked<Value is Equatable> {
+				Top { value: Value },
+				Bottom,
+			}
+
+			function show<infer Item is Equatable>(_ ranked: Ranked<Item>) -> Integer {
+				Terminal.print(ranked)
+
+				<- 1
+			}`
+
+		expect(
+			firstOf(
+				`implementation {
+				${printing}
+			}`,
+				"unsatisfied-bound",
+			).helps,
+		).toContain(
+			"Declare a Namespace '<infer Item> for Ranked<Item> is Printable where Item is Equatable'.",
+		)
+		expect(
+			compiles(`implementation {
+				namespace Shown<infer Item> for Ranked<Item> is Printable where Item is Equatable {
+					toString() -> String {
+						<- "ranked"
+					}
+				}
+
+				${printing}
+			}`),
+		).toBe(true)
+	})
+
+	// A Function's Type only mentions the Type Parameter, so no bound applies.
+	it("should carry no bound for a Type Parameter a Function only mentions", () => {
+		let printing = `function show<infer Item is Printable>(_ x: Item) -> Integer {
+				constant same = (_ y: Item) -> Item { <- y }
+
+				Terminal.print(same)
+
+				<- 1
+			}`
+
+		expect(
+			firstOf(
+				`implementation {
+				${printing}
+			}`,
+				"unsatisfied-bound",
+			).helps,
+		).toContain(
+			"Declare a Namespace '<infer Item> for (_: Item) -> Item is Printable'.",
+		)
+		expect(
+			compiles(`implementation {
+				namespace Shown<infer Item> for (_: Item) -> Item is Printable {
+					toString() -> String {
+						<- "a function"
+					}
+				}
+
+				${printing}
+			}`),
+		).toBe(true)
+	})
 })
 
 describe("A bounded Function used as a value", () => {

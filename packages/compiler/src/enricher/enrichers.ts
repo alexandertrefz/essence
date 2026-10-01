@@ -29,8 +29,10 @@ import {
 	displayChoiceName,
 	displayGenericName,
 	displayProtocolName,
+	namespaceHead,
 	specifierTo,
 	undispatchableHelps,
+	unnameableTarget,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
 	undecidedSlotEvidence,
@@ -5195,18 +5197,6 @@ function refuseUngeneratableType(
 	return null
 }
 
-// A Function value under any of its Type spellings. No Namespace can target
-// one, so `snapshot-not-printable` offers it no conformance.
-function isFunctionType(type: common.Type): boolean {
-	return (
-		type.type === "Function" ||
-		type.type === "SimpleMethod" ||
-		type.type === "StaticMethod" ||
-		type.type === "OverloadedMethod" ||
-		type.type === "OverloadedStaticMethod"
-	)
-}
-
 // What a snapshot records: the value rendered through `Printable`, built as the
 // interpolation `"{value}"` an author could write.
 function enrichSnapshotValue(
@@ -5237,23 +5227,23 @@ function enrichSnapshotValue(
 					"A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.",
 					...solved.chain,
 				],
-				// The conformance comes first, since it works for any value
-				// that can carry one. A Function value can carry none. A bare
-				// Case is named by its Choice, since a Namespace can not target
-				// one Case.
-				helps: isFunctionType(expression.type)
-					? [
-							"Snapshot a String you build yourself — a Function value has no Type a Namespace can be declared for.",
-						]
-					: expression.type.type === "Case"
+				// The conformance comes first, since it works for any value a
+				// `for` clause can name. A bare Case is named by its Choice, since
+				// a Namespace can not target one Case.
+				helps:
+					unnameableTarget(expression.type) !== null
 						? [
-								`Declare a 'Printable' conformance for '${displayChoiceName(expression.type.choice)}' and annotate the value at it — a bare Case binds the Case, not the Choice.`,
-								"Or snapshot a String you build yourself.",
+								`Snapshot a String you build yourself — no Namespace can be declared for ${unnameableTarget(expression.type)}.`,
 							]
-						: [
-								`Declare a 'Printable' conformance for it — 'namespace … for ${describeType(expression.type)} is Printable { … }'.`,
-								"Or snapshot a String you build yourself.",
-							],
+						: expression.type.type === "Case"
+							? [
+									`Declare a 'Printable' conformance for '${displayChoiceName(expression.type.choice)}' and annotate the value at it — a bare Case binds the Case, not the Choice.`,
+									"Or snapshot a String you build yourself.",
+								]
+							: [
+									`Declare a 'Printable' conformance for it — '${namespaceHead(expression.type, "namespace …")} is Printable { … }'.`,
+									"Or snapshot a String you build yourself.",
+								],
 			},
 		)
 	}

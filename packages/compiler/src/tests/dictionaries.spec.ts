@@ -1029,10 +1029,12 @@ describe("Dictionary", () => {
 				"unsatisfied-conformance-condition",
 			])
 			// The head of the because-chain repeats the message, so it is
-			// dropped. No Help follows, since no `for` clause names a Function Type.
+			// dropped.
 			expect(diagnostics[0]!.notes).toEqual([
 				"(_: Integer) -> Integer does not conform to 'Printable'.",
-				"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
+			])
+			expect(diagnostics[0]!.helps).toEqual([
+				"Declare a Namespace 'for (_: Integer) -> Integer is Printable'.",
 			])
 		})
 

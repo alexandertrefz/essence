@@ -568,10 +568,14 @@ describe("A Record asks its declared members how to print", () => {
 			Terminal.inspect(text)
 		}`
 
+		// The member's own conformance is still offered.
+		let declare =
+			"Declare a Namespace 'for (_: Integer) -> Integer is Printable'."
+
 		expect(codesOf(direct)).toEqual(["unsatisfied-conformance-condition"])
-		expect(helpsOf(direct)).toEqual([])
+		expect(helpsOf(direct)).toEqual([declare])
 		expect(codesOf(held)).toEqual(["unsatisfied-conformance-condition"])
-		expect(helpsOf(held)).toEqual([])
+		expect(helpsOf(held)).toEqual([declare])
 	})
 
 	// A member whose Choice is not Printable takes the Record's printing away,
@@ -651,14 +655,31 @@ describe("A Record whose member can not compare", () => {
 		}`
 
 		expect(codesOf(source)).toEqual(["unsatisfied-conformance-condition"])
-		// The chain's head repeats the message, so it is dropped. No Help
-		// follows, since no `for` clause names a Function Type.
+		// The chain's head repeats the message, so it is dropped. A `for`
+		// clause names a Function Type as an annotation does.
 		expect(notesOf(source)).toEqual([
 			"Its member 'run' does not conform to 'Equatable'.",
 			"(_: Integer) -> Integer does not conform to 'Equatable'.",
-			"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
 		])
-		expect(helpsOf(source)).toEqual([])
+		expect(helpsOf(source)).toEqual([
+			"Declare a Namespace 'for (_: Integer) -> Integer is Equatable'.",
+		])
+	})
+
+	it("compiles once the Namespace the Help asks for is declared", () => {
+		expect(
+			codesOf(`implementation {
+				namespace SameRun for (_: Integer) -> Integer is Equatable {
+					is(_ other: (_: Integer) -> Integer) -> Boolean {
+						<- true
+					}
+				}
+
+				constant run = (_ value: Integer) -> Integer { <- value }
+
+				Terminal.inspect({ run = run, id = 1 }::is({ run = run, id = 1 }))
+			}`),
+		).toEqual([])
 	})
 
 	// The refusal names the dotted path, so the reader need not open the Types
@@ -673,7 +694,6 @@ describe("A Record whose member can not compare", () => {
 		expect(notesOf(source)).toEqual([
 			"Its member 'inner.run' does not conform to 'Equatable'.",
 			"(_: Integer) -> Integer does not conform to 'Equatable'.",
-			"No Namespace can be declared for (_: Integer) -> Integer — a 'for' clause takes a named Type.",
 		])
 	})
 

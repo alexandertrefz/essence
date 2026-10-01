@@ -35,6 +35,9 @@ import {
 	describeParameter,
 	describeType,
 	displayChoiceName,
+	namespaceHead,
+	namespaceWhere,
+	unnameableTargetNote,
 	displayGenericName,
 	displayProtocolName,
 	protocolIdentity,
@@ -65,6 +68,7 @@ import {
 	borrowedGenericName,
 	buildUnion,
 	bindNamespaceTarget,
+	choiceArgumentBounds,
 	disagreeingTypeArguments,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
@@ -2123,36 +2127,9 @@ export function impliedTargetBounds(
 		resolveType(node.targetType!, scopeWithGenerics(node.generics, scope)),
 	).result
 
-	// Every Case of the applied Choice.
-	for (let candidate of target.type === "UnionType"
-		? target.types
-		: [target]) {
-		if (candidate.type !== "Case") {
-			continue
-		}
-
-		// The declared Parameters, since an instantiated Case keeps only
-		// its `typeArguments`.
-		let parameters = declaredChoiceGenerics(candidate.choice, scope)
-
-		for (let [index, argument] of (
-			candidate.typeArguments ?? []
-		).entries()) {
-			let constraint = parameters[index]?.constraint
-
-			if (
-				argument.type !== "GenericUse" ||
-				!declared.has(argument.name) ||
-				constraint == null
-			) {
-				continue
-			}
-
-			bounds.set(argument.name, constraint)
-		}
-	}
-
-	return bounds
+	return choiceArgumentBounds(target, declared, (choice) =>
+		declaredChoiceGenerics(choice, scope),
+	)
 }
 
 // A Declaration always has its annotation; only a Function literal Argument
@@ -6315,10 +6292,9 @@ function conformanceRemedy(
 		}
 	}
 
-	// For a Function or a Future culprit the Help is withheld, and a Note
-	// says no Namespace can be declared for it. Where no name here binds the
-	// Protocol, the Help names it through an import.
-	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
+	// For a culprit no `for` clause can name the Help is withheld, and a Note
+	// says why. Where no name here binds the Protocol, the Help names it
+	// through an import.
 	let importing =
 		spelling === null ? protocolImport(protocolName, scope) : null
 	let written =
@@ -6327,15 +6303,15 @@ function conformanceRemedy(
 			? importing.exportedAs
 			: null)
 	let declaring = written ?? protocol
+	let unnameable = unnameableTargetNote(culprit)
+	let where = namespaceWhere(culprit, (choice) =>
+		declaredChoiceGenerics(choice, scope),
+	)
 
 	return {
-		notes: undeclarable
-			? [
-					`No Namespace can be declared for ${describeType(culprit)} — a 'for' clause takes a named Type.`,
-				]
-			: [],
+		notes: unnameable === null ? [] : [unnameable],
 		helps:
-			undeclarable || (spelling === null && importing === null)
+			unnameable !== null || (spelling ?? importing) === null
 				? []
 				: importing !== null && importing.taken !== null
 					? [
@@ -6343,14 +6319,14 @@ function conformanceRemedy(
 								importing.name,
 								importing,
 								true,
-								`write that name in a Namespace 'for ${describeType(culprit)} is …'`,
+								`write that name in a Namespace '${namespaceHead(culprit)} is …${where}'`,
 							),
 						]
 					: [
 							protocolName === printableProtocolName &&
 							choiceCasesArePayloadFree(culprit)
-								? `Declare a Namespace 'for ${describeType(culprit)} is ${declaring}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-								: `Declare a Namespace 'for ${describeType(culprit)} is ${declaring}'.`,
+								? `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+								: `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}'.`,
 							...(importing === null
 								? []
 								: [declaredInHelp(importing.name, importing)]),

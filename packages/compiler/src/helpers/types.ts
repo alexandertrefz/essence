@@ -1227,6 +1227,44 @@ export function genericNamesMentioned(
 	return names
 }
 
+// The bound each of `names` gets from an applied Choice that bounds its
+// position. So `X` in `SortedBox<X>` of a `choice SortedBox<Item is
+// Comparable>` is bound to Comparable. `parametersOf` answers a Choice's
+// declared Type Parameters, since an applied Case keeps only its Arguments.
+export function choiceArgumentBounds(
+	target: common.Type,
+	names: ReadonlySet<common.GenericName>,
+	parametersOf: (choice: string) => Array<common.GenericDeclaration>,
+): Map<common.GenericName, string> {
+	let bounds = new Map<common.GenericName, string>()
+
+	for (let candidate of target.type === "UnionType"
+		? target.types
+		: [target]) {
+		if (candidate.type !== "Case") {
+			continue
+		}
+
+		let parameters = parametersOf(candidate.choice)
+
+		for (let [index, argument] of (
+			candidate.typeArguments ?? []
+		).entries()) {
+			let constraint = parameters[index]?.constraint
+
+			if (
+				argument.type === "GenericUse" &&
+				names.has(argument.name) &&
+				constraint != null
+			) {
+				bounds.set(argument.name, constraint)
+			}
+		}
+	}
+
+	return bounds
+}
+
 // Whether a Type mentions any of a set of Generic names, in one pass.
 function typeMentionsAnyGeneric(
 	type: common.Type,

@@ -1510,6 +1510,78 @@ describe("Tests Section Semantics", () => {
 				),
 			).toEqual(["snapshot-not-printable"])
 		})
+
+		// A `for` clause names a Function Type as an annotation writes it.
+		it("offers a Function value the conformance that records it", () => {
+			let double = `function double(_ n: Integer) -> Integer {
+				<- n
+			}`
+			let snapshot = `tests {
+				test "renders" {
+					expect double matches snapshot
+				}
+			}`
+
+			expect(
+				helpsOf(`implementation {
+					${double}
+				}
+
+				${snapshot}`),
+			).toEqual([
+				"Declare a 'Printable' conformance for it — 'namespace … for (_: Integer) -> Integer is Printable { … }'.",
+				"Or snapshot a String you build yourself.",
+			])
+			expect(
+				codesOf(`implementation {
+					${double}
+
+					namespace Shown for (_: Integer) -> Integer is Printable {
+						toString() -> String {
+							<- "a doubler"
+						}
+					}
+				}
+
+				${snapshot}`),
+			).toEqual([])
+		})
+
+		// The Namespace declares the Type Parameter it can not see.
+		it("offers a generic Function value a Namespace that infers its Types", () => {
+			let generic = `function generic<T>(_ x: T) -> T {
+				<- x
+			}`
+			let snapshot = `tests {
+				test "renders" {
+					expect generic matches snapshot
+				}
+			}`
+
+			expect(
+				helpsOf(`implementation {
+					${generic}
+				}
+
+				${snapshot}`),
+			).toEqual([
+				"Declare a 'Printable' conformance for it — 'namespace …<infer T> for (_: T) -> T is Printable { … }'.",
+				"Or snapshot a String you build yourself.",
+			])
+			expect(
+				codesOf(`implementation {
+					${generic}
+
+					namespace Shown<infer T> for (_: T) -> T is Printable {
+						toString() -> String {
+							<- "generic"
+						}
+					}
+				}
+
+				${snapshot}`),
+			).toEqual([])
+		})
 	})
 
 	// A benchmark differs from a test only in what running it means. The form

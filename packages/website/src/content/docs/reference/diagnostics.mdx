@@ -4210,7 +4210,7 @@ Error: { x: Integer } does not conform to 'Comparable'
 
 Pass a type that conforms, or declare a namespace that makes this type conform, as the Help shows.
 
-The Help is written for whatever the type turns out to be, and six shapes read
+The Help is written for whatever the type turns out to be, and eight shapes read
 differently:
 
 - **A bare case.** `Annotate the value at 'Colour': a bare Case binds the Case, not the Choice.` — `namespace X for Colour#Red is …` is not a spelling, so what moves is the value's annotation. That is the whole edit where the choice itself conforms. Where it does not, annotating only moves the refusal one type wider, so the choice's own Help is given in its place: declaring `namespace Doors for Door is Printable {}` makes a member written `Door#Open` print, with no annotation at all.
@@ -4218,6 +4218,8 @@ differently:
 - **A namespace the file has not imported.** `'IntegerSized' in ./Sized.es makes Integer conform to 'Sized' — import it.` A module the file already imports from exports a namespace that makes the type conform, so the edit is an import of it. A **Quick Fix** writes the entry.
 - **A future.** `This describes work that has not run — add 'complete'.` Making futures `Printable` compiles and prints a description of the work, which is why the report never asks for it.
 - **A choice whose cases carry no payload.** The namespace's body may be empty: declaring `namespace Problems for Problem is Printable {}` is the whole of what such a choice needs.
+- **A type that mentions type parameters.** `Declare a Namespace '<infer T> for (_: T) -> T is Printable'.` The namespace stands outside the function that names `T`, so it declares `T` itself, inferred from the value: `namespace Shown<infer T> for (_: T) -> T is Printable { … }`. Where the type parameter stands in a bounded position of a choice, as `Item` in `Ranked<Item>` of `choice Ranked<Value is Equatable>`, the help adds the bound as a condition: `… is Printable where Item is Equatable`.
+- **A namespace read as a value, or an overloaded function.** No type annotation can spell either, so no namespace is offered, and a note says so: `No Namespace can be declared for an overloaded Function — no Type Annotation can spell it, so no 'for' clause can name it.`
 - **An unbounded type parameter.** `Declare it as '<infer Item is Comparable>'`, with a **Quick Fix** that writes the bound onto a declaration in this file.
 
 A namespace's own type parameters are the exception to the last one: the bound
@@ -6297,7 +6299,7 @@ Error: Colour can not be recorded as a snapshot
 
 Declare the conformance, `namespace Colours for Colour is Printable {}`, or snapshot a string you build yourself.
 
-Two shapes are answered differently, because the conformance cannot be written for either. A **bare case** is not a type a namespace can target — `namespace X for Colour#Red` does not parse — so both edits are named: `Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.` A **function value** has no such type at all, and gets the one answer that is left: `Snapshot a String you build yourself — a Function value has no Type a Namespace can be declared for.`
+Two shapes are answered differently, because the conformance cannot be written for either. A **bare case** is not a type a namespace can target — `namespace X for Colour#Red` does not parse — so both edits are named: `Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.` A **namespace read as a value**, or an overloaded function, has no type at all, and gets the one answer that is left: `Snapshot a String you build yourself — no Namespace can be declared for Namespace 'String'.` A function value is not such a shape: `namespace Shown for (_: Integer) -> Integer is Printable { … }` makes one printable, and the help says so.
 
 Taught on: [Tests › Snapshots](/docs/language/tests#snapshots)
 
