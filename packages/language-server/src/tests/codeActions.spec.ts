@@ -1109,15 +1109,11 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Warning offers two spellings and the fix applies one of them, so
-	// it is a rewrite rather than a quickfix and is picked out by the code it
-	// answers. Applying it leaves a Program that says which question it asks, so
-	// the Warning is gone from the buffer the fix produced.
+	// The Warning offers two spellings and the fix applies one. The result
+	// says which question it asks, so the Warning is gone.
 	describe("ambiguous-case", () => {
-		// Two Choices of the Program's own, so both actions leave a
-		// Program that compiles — the builtin `Optional` and `Result` are
-		// generic and would leave `undecided-type-arguments` behind, which the
-		// test below is about.
+		// Two Choices of the Program's own, so both actions leave a Program that
+		// compiles. A generic Choice would leave `undecided-type-arguments`.
 		const TWO_CHOICES = [
 			"implementation {",
 			"\tchoice Colour { Red, Blue }",
@@ -1140,9 +1136,8 @@ describe("Code Actions", () => {
 			])
 		})
 
-		// The Diagnostic underlines the name and stops short of the `#`,
-		// so the Choice is written in FRONT of a sigil that is already there —
-		// the Case's own spelling is never retyped.
+		// The Diagnostic underlines the name and stops short of the `#`, so the
+		// Choice is written in front of the sigil.
 		it("should write the Choice in front of the sigil", () => {
 			let [fix] = quickFixes(TWO_CHOICES)
 			let result = applied(TWO_CHOICES, fix)
@@ -1160,10 +1155,9 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A generic Choice's Type Arguments are the reader's to write —
-		// an ellipsis is no spelling, and picking Arguments is a second
-		// decision. The prefix settles the ambiguity and what is left points at
-		// where the Arguments go, which is exactly what the Helps say.
+		// A generic Choice's Type Arguments are the reader's to write. The
+		// prefix settles the ambiguity, and what is left points at where the
+		// Arguments go.
 		it("should leave a generic Choice's Type Arguments to the reader", () => {
 			let lines = [
 				"implementation {",
@@ -1190,10 +1184,9 @@ describe("Code Actions", () => {
 	})
 
 	describe("ambiguous-namespace", () => {
-		// A Namespace of the Program's own tying with a Method
-		// `Orderable` provides — two candidates, and which of them was meant is
-		// exactly what the Diagnostic could not decide. So one action each, in
-		// the order the notes named them, and neither of them preferred.
+		// A Namespace of the Program's own ties with a Method `Orderable`
+		// provides. One action each, in the order the notes name them, neither
+		// preferred.
 		const TIED = [
 			"implementation {",
 			"\tnamespace Extras for Integer {",
@@ -1230,10 +1223,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The Protocol that PROVIDES the Method is what the specifier
-		// writes — `5::<Integer>isBetween(…)` names a Namespace that declares
-		// no such Method, and the second action would be the first one's edit
-		// spelled a second wrong way.
+		// The specifier names the Protocol that provides the Method, since
+		// `5::<Integer>isBetween(…)` names a Namespace that declares none.
 		it("should name the providing Protocol for a provided Method", () => {
 			let result = applied(TIED, quickFixes(TIED)[1])
 
@@ -1244,9 +1235,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A receiver on a line of its own puts the `::` on the next one,
-		// which is why the specifier is written in front of the NAME rather
-		// than measured off the `::`.
+		// The `::` may sit on the receiver's next line, so the specifier is
+		// written in front of the name.
 		it("should write it over a call broken across lines", () => {
 			let lines = [
 				"implementation {",
@@ -1298,8 +1288,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// An Argument carrying a payload is wrapped whole, and its own text
-		// is never retyped — the fix is two insertions at the ends of the span.
+		// An Argument carrying a payload is wrapped whole by two insertions at
+		// the ends of the span.
 		it("should wrap a Case carrying a payload", () => {
 			let lines = [
 				"implementation {",
@@ -1315,8 +1305,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The Case the fix wraps in is the receiver's, not the standard
-		// library's — a Program's own carrier gets its own Case name.
+		// The fix wraps in the receiver's Case, so a Program's own carrier gets
+		// its own Case name.
 		it("should name the receiver's own holding Case", () => {
 			let lines = [
 				"implementation {",
@@ -1351,10 +1341,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// A carrier holding one Type in TWO Cases offers one rewrite per
-		// Case, because each of them asks a different question — a single action
-		// would present one of two readings as the answer. Both compile, and the
-		// titles are what tell them apart in the list.
+		// A carrier holding one Type in two Cases offers one rewrite per Case,
+		// since each asks a different question. The titles tell them apart.
 		it("should offer one rewrite per Case that holds", () => {
 			let lines = [
 				"implementation {",
@@ -1418,8 +1406,8 @@ describe("Code Actions", () => {
 			"",
 		]
 
-		// The Parameter declares a label the call never wrote, so the
-		// label is written in — the value itself is never retyped.
+		// The Parameter declares a label the call never wrote, so the label is
+		// written in.
 		it("should write a label the call left out", () => {
 			let lines = [...SHOUT, '\tconstant said = shout("hi")', "}"]
 
@@ -1433,9 +1421,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A label was written and it is the wrong one, so the word alone
-		// is replaced — read backwards out of the buffer, because an Argument
-		// is no Node of its own and the label has no Position to read off.
+		// The wrong label is replaced, found by reading back from the value,
+		// since an Argument's label has no Position.
 		it("should change a label the Parameter does not declare", () => {
 			let lines = [
 				...SHOUT,
@@ -1452,8 +1439,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// And a Parameter that takes none has the written label taken
-		// away, together with the space that separated it from the value.
+		// A Parameter that takes no label has the written one removed, with the
+		// space after it.
 		it("should remove a label the Parameter takes none of", () => {
 			let lines = [
 				"implementation {",
@@ -1474,8 +1461,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A label written on a line of its own is found all the same —
-		// what is walked back over is whitespace, line breaks included.
+		// A label on a line of its own is found too, since line breaks are
+		// whitespace.
 		it("should find a label written above its value", () => {
 			let lines = [
 				...SHOUT,
@@ -1494,9 +1481,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A Comment between the label and the value means the span in
-		// front of the value is not the label, and nothing is offered rather
-		// than a rewrite of text nobody read back.
+		// With a Comment between the label and the value, what stands in front
+		// of the value is not the label, so nothing is offered.
 		it("should offer nothing when the label is not what stands there", () => {
 			let lines = [
 				...SHOUT,
@@ -1509,10 +1495,8 @@ describe("Code Actions", () => {
 	})
 
 	describe("fallback-never-used", () => {
-		// The Argument the Warning names goes, and the comma in front of it
-		// goes with it — a call left holding `(by 2, )` is not what the Help asks
-		// for. The Warning is the only thing wrong with this Program, so the
-		// buffer analyses clean once the fix is applied.
+		// The Argument the Warning names goes with the comma in front of it. The
+		// Warning is all that is wrong, so the fixed buffer analyses clean.
 		it("should remove the fallback and the comma in front of it", () => {
 			let lines = [
 				"implementation {",
@@ -1529,8 +1513,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A fallback that is the only Argument has no comma to take, and
-		// the brackets stay.
+		// A fallback that is the only Argument has no comma to take, and the
+		// brackets stay.
 		it("should leave the brackets where the fallback stands alone", () => {
 			let lines = [
 				"implementation {",
@@ -1547,9 +1531,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The Standard Library writes `defaultingTo:` last, but nothing
-		// makes a Program do so — a fallback ahead of another Argument takes the
-		// comma AFTER it instead, or the call is left starting with one.
+		// A fallback ahead of another Argument takes the comma after it, or the
+		// call would start with one.
 		it("should take the comma after a fallback written first", () => {
 			let lines = [
 				"implementation {",
@@ -1584,9 +1567,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A call written over several lines leaves the Argument's line
-		// empty rather than holding a comma on its own, which is what taking the
-		// whitespace with the comma buys.
+		// The comma goes with its whitespace, so a call over several lines keeps
+		// no line holding a lone comma.
 		it("should carry a call written over several lines", () => {
 			let lines = [
 				"implementation {",
@@ -1621,10 +1603,8 @@ describe("Code Actions", () => {
 			"",
 		]
 
-		// `{}` is the hole, and the Argument stays refused until it is
-		// filled — which is why the action is not preferred. `argument-type-
-		// mismatch` is what the reader is left with, and it is what the unit
-		// Type standing where a String and an Integer belong deserves.
+		// `{}` is the hole, and the Argument stays refused until it is filled, so
+		// the action is not preferred.
 		it("should write the missing members beside the ones written", () => {
 			let lines = [
 				...CONNECT,
@@ -1644,9 +1624,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
 		})
 
-		// An empty Literal has no member to write a comma after, and the
-		// padding a one-line Literal is written with is what the fix writes
-		// back.
+		// An empty Literal has no member to write a comma after, and the fix
+		// writes the padding of a one-line Literal.
 		it("should pad an empty Literal it fills in", () => {
 			let lines = [
 				...CONNECT,
@@ -1661,9 +1640,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// A Literal written over lines takes a line per member, indented
-		// as the members already there are — the layout the reader chose is
-		// what the fix goes on writing in.
+		// A Literal written over lines takes a line per member, indented as the
+		// members already there.
 		it("should take a line per member in a Literal broken over lines", () => {
 			let lines = [
 				...CONNECT,
@@ -1686,8 +1664,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
 		})
 
-		// And one whose last member carries no trailing comma is given
-		// the one it needs before anything is written after it.
+		// A last member without a trailing comma is given one first.
 		it("should write the comma a last member never had", () => {
 			let lines = [
 				...CONNECT,
@@ -1703,10 +1680,8 @@ describe("Code Actions", () => {
 			expect(result[9]).toBe("\t\thost = {},")
 		})
 
-		// Everything after a `§` is prose, so a member written behind one
-		// is a member the Literal never gets — and the separator in front of it
-		// takes the last REAL member with it. The scaffold goes in front of the
-		// note, which is where a reader adding a member by hand would write it.
+		// Everything after a `§` is prose, so the scaffold goes in front of the
+		// note rather than into it.
 		it("should write in front of a trailing comment rather than into it", () => {
 			let lines = [
 				...CONNECT,
@@ -1729,9 +1704,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
 		})
 
-		// And a comment standing on its own as the last thing inside the
-		// Literal is not content either — the members go after the member above
-		// it, so the note keeps what it was written about below it.
+		// A comment on its own line last inside the Literal is not content
+		// either. The members go after the last member, before the note.
 		it("should walk back over a comment written on a line of its own", () => {
 			let lines = [
 				...CONNECT,
@@ -1756,8 +1730,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual(["argument-type-mismatch"])
 		})
 
-		// A `§` inside a String is a character of the String, so the walk
-		// steps over it rather than reading the rest of the line as prose.
+		// A `§` inside a String is a character of the String, not the start of
+		// prose.
 		it("should read a comment sigil inside a String as text", () => {
 			let lines = [
 				"implementation {",
@@ -1782,8 +1756,8 @@ describe("Code Actions", () => {
 			])
 		})
 
-		// And a span that has slid into a comment since it was reported
-		// names a `{` the buffer no longer holds, so nothing is offered.
+		// A span that has slid into a comment names a `{` the buffer no longer
+		// holds, so nothing is offered.
 		it("should refuse a span that now stands inside a comment", () => {
 			let lines = [
 				...CONNECT,
@@ -1804,8 +1778,8 @@ describe("Code Actions", () => {
 			).toBeNull()
 		})
 
-		// A Case's payload is a Record Literal measured against a default
-		// exactly as an Argument is, and it takes the same scaffold.
+		// A Case's payload is measured against a default as an Argument is, and
+		// takes the same scaffold.
 		it("should scaffold a Case payload the same way", () => {
 			let lines = [
 				"implementation {",
@@ -1829,10 +1803,9 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// A Record Literal's misspelled member, which reports as a MISMATCH
-	// rather than as `unknown-member`: the Diagnostic stands at the member's
-	// value, because a typed Record holds no Position for a member's name, so
-	// the fix finds the name in the written AST and writes over that.
+	// A Record Literal's misspelled member reports as a mismatch at the
+	// member's value. The fix finds the name in the parsed tree and writes over
+	// it.
 	describe("a misspelled Record member", () => {
 		const STANDING = [
 			"implementation {",
@@ -1883,9 +1856,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The member an update writes and the Record does not declare —
-		// the one position where an extra member is a refusal on its own, since
-		// width subtyping admits one everywhere else.
+		// An update's key the Record does not declare is refused, though width
+		// subtyping admits an extra member elsewhere.
 		it("should answer an update's key", () => {
 			let lines = [
 				...STANDING,
@@ -1905,9 +1877,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A member that is no near miss of anything carries no payload, so
-		// there is nothing to offer and nothing is offered — a fix that guessed
-		// would write a name the reader never meant.
+		// A member that is no near miss of anything carries no suggestion, so
+		// nothing is offered.
 		it("should offer nothing for a member that is not a near miss", () => {
 			expect(
 				quickFixes([
@@ -1934,10 +1905,8 @@ describe("Code Actions", () => {
 
 			let [fix] = quickFixes(lines)
 
-			// Titled for the hole it leaves rather than for the
-			// Diagnostic it does not clear — the report stays until the branch
-			// is filled in, and a fix named "Add an empty else branch" read as
-			// one that had simply failed.
+			// Titled for the hole it leaves, since the report stays until the
+			// branch is filled in.
 			expect(fix.title).toBe("Add an else branch to fill in")
 			expect(fix.isPreferred).toBe(false)
 
@@ -2013,12 +1982,9 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
-		// The Diagnostic that names a String for SWALLOWING the lines below
-		// it stands on that String's own opening quote rather than at the end of
-		// the input, and carries the quote it closed on as a Label of its own.
-		// The fix reads the String's start off the first Label standing on a
-		// `"`, which is the opening one under both shapes — so the quote lands
-		// at the end of line 2, where the reader forgot it, and not on line 3.
+		// The Diagnostic stands on the swallowing String's opening quote. The fix
+		// reads the start off the first Label on a `"`, so the quote lands at the
+		// end of line 2, where it was forgotten.
 		it("should close the String that swallowed the lines below it", () => {
 			let lines = [
 				"implementation {",
@@ -2041,10 +2007,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
-		// `"{\"a\": 1}"` — JSON, whose `{` opened a hole. The quote this
-		// writes is not what is missing there: the file it produced carried the
-		// very Diagnostic it was applied to, so the fix ran again and wrote a
-		// third quote, and a fourth. The report says what to write instead.
+		// In `"{\"a\": 1}"` the `{` opened a hole, and a quote is not what is
+		// missing. The report says what to write instead.
 		it("should withhold the quote where a '{' opened a hole", () => {
 			let lines = [
 				"implementation {",
@@ -2056,8 +2020,7 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).toEqual([])
 		})
 
-		// A hole holding a NAME is a hole somebody meant to open, and the
-		// String really is one quote short.
+		// A hole holding a name was meant, and the String is one quote short.
 		it("should still close a String whose hole holds a name", () => {
 			let lines = [
 				"implementation {",
@@ -2072,11 +2035,9 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
-		// An EVEN number of forgotten quotes leaves nothing unterminated —
-		// the count comes out right and the Lexer runs out of nothing — so this
-		// report comes from the Parser rather than the Lexer. It carries the
-		// same Labels, so it reads the same fix, and applying it twice closes
-		// both.
+		// An even number of forgotten quotes leaves nothing unterminated, so the
+		// Parser reports it. It carries the same Labels, and applying the fix
+		// twice closes both.
 		it("should close each of a pair of Strings that swallowed a line", () => {
 			let lines = [
 				"implementation {",
@@ -2120,10 +2081,8 @@ describe("Code Actions", () => {
 			).toBeNull()
 		})
 
-		// The quote would be escaped by the backslash in front of it, so
-		// the String the fix promised to close would still be open. There is no
-		// reading of the trailing backslash the source supports, so nothing is
-		// offered rather than an edit that leaves its own Diagnostic standing.
+		// The backslash would escape the quote and leave the String open, so
+		// nothing is offered.
 		it("should stay silent behind an odd run of backslashes", () => {
 			let lines = [
 				"implementation {",
@@ -2137,8 +2096,7 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// An even run is a WRITTEN backslash, and closes as any other
-		// character does.
+		// An even run is a written backslash and closes as any character does.
 		it("should close a String ending in a written backslash", () => {
 			let lines = [
 				"implementation {",
@@ -2153,10 +2111,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("unclosed-string")
 		})
 
-		// A buffer saved with CRLF endings carries its `\r` at the end of
-		// every line, and the quote goes in FRONT of it — written behind, the
-		// carriage return becomes a character of the String and that line loses
-		// its terminator.
+		// With CRLF endings the quote goes in front of the `\r`, or the carriage
+		// return would join the String.
 		it("should write the quote in front of a carriage return", () => {
 			let lines = [
 				"implementation {\r",
@@ -2217,10 +2173,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// One fix over four codes, and what it writes is the Diagnostic's own
-	// Help — so what is checked here is that the contract between the Lexer and
-	// this holds for each shape the Lexer spells one for, and that the shape it
-	// spells NO rewrite for is offered none.
+	// The fix writes the Diagnostic's own Help, for each shape the Lexer spells
+	// a rewrite for, and offers nothing for the shape it spells none for.
 	describe("the Unicode escapes", () => {
 		it("rebrackets the JavaScript habit", () => {
 			let lines = [
@@ -2243,12 +2197,9 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// Both halves, in every spelling a pair is written in — and the
-		// APPLIED buffer re-checked, which is the half of this that matters.
-		// The fix is PREFERRED, so an Editor's "fix this" applies it without
-		// asking; a preferred fix that leaves the very code it answers standing
-		// is worse than no fix at all, and that is what a braced pair did while
-		// every test here asserted only the title.
+		// Both halves, in every spelling of a pair, with the applied buffer
+		// checked again. The fix is preferred, so it must clear the code it
+		// answers.
 		it("writes a surrogate pair as the one character it spells", () => {
 			for (let written of [
 				'"\\uD83D\\uDE00"',
