@@ -4622,8 +4622,8 @@ function conformanceProvidersIn(
 	}
 }
 
-// What a call says of a requirement the Namespace does not answer: that it
-// writes none, and which body of the name fails to fulfil it.
+// What a call says of a requirement the Namespace does not answer. It writes
+// none, and a body of the name fails to fulfil it.
 function missingRequirementNotes(
 	namespaceName: string,
 	namespace: common.NamespaceType,
@@ -6011,9 +6011,9 @@ function bodyProtocolCheck(
 	}
 }
 
-// What a report says of a body whose own Protocol's witness fails here: the
-// first entry read that the conformer answers otherwise than that Protocol
-// declares. Failing that, it needs the whole conformance.
+// What a report says of a body whose own Protocol's witness fails here. It
+// names the first entry read that the conformer answers otherwise than that
+// Protocol declares. Failing that, the body needs the whole conformance.
 function unansweredReadReport(
 	body: { methodName: string; provider: string },
 	reads: Array<string>,
@@ -6280,10 +6280,8 @@ function conformanceRemedy(
 			helps: [
 				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocol}' is in scope.`,
 			],
-			// The import a Quick Fix writes. The Module is named by its
-			// canonical path rather than by a specifier, because the specifier
-			// is a question about the file being edited and the Language Server
-			// is the half that holds it.
+			// The import a Quick Fix writes, naming the Module by its canonical
+			// path. The language server works out the specifier.
 			data: {
 				kind: "import-declaration",
 				name: foreign.name,
@@ -6317,17 +6315,9 @@ function conformanceRemedy(
 		}
 	}
 
-	// The Help is WITHHELD for the two Types a Namespace can not be
-	// declared for as they are spelled. `namespace X for (_ Integer) -> Integer`
-	// and `namespace X for Future<Integer>` are both refused by the Parser — a
-	// Function Type reaches a `for` clause only through an Alias, and a reader
-	// following "Declare a Namespace 'for (_: Integer) -> Integer is Equatable'"
-	// literally is handed a syntax error. A Help is an edit that works or it is
-	// not offered; what is left is the Note, which is the fact.
-	//
-	// Where no name here binds the Protocol, a clause can name it only beside
-	// an import of it, under a name of its own where the one it is published as
-	// is taken.
+	// For a Function or a Future culprit the Help is withheld, and a Note
+	// says no Namespace can be declared for it. Where no name here binds the
+	// Protocol, the Help names it through an import.
 	let undeclarable = culprit.type === "Function" || culprit.type === "Future"
 	let importing =
 		spelling === null ? protocolImport(protocolName, scope) : null
@@ -6365,11 +6355,8 @@ function conformanceRemedy(
 								? []
 								: [declaredInHelp(importing.name, importing)]),
 						],
-		// No Parameter, because the Type that failed is a concrete one —
-		// what this asks for is a Namespace declaring the conformance, which is
-		// a Declaration rather than an edit to a span, and no fix answers it.
-		// The Protocol is carried all the same: it is the fact, and what is done
-		// with it is not this site's to decide.
+		// No Parameter, since a concrete Type failed and a Namespace is no
+		// edit to a span. The Protocol is carried all the same.
 		...(written === null
 			? {}
 			: {
@@ -6409,9 +6396,8 @@ function declaresConformanceFor(
 		: bindNamespaceTarget(namespace, type) !== null
 }
 
-// Said where the name a report spells binds another Protocol in this
-// Scope, or no Protocol at all, which is what a reader would otherwise take the
-// report to be about.
+// Said where the name a report spells binds another Protocol in this Scope,
+// or no Protocol, which a reader would take the report to be about.
 function homonymNotes(
 	identity: string,
 	scope: enricher.Scope,
@@ -6495,9 +6481,8 @@ function homonymConformerNotes(
 		)
 }
 
-// Who declares a Protocol, as this Scope's reader says it: this file,
-// another Module, or the standard library, with the line for a nested one, and
-// at its top level where this file declares `beside` as well.
+// Who declares a Protocol, as this file's reader says it: this file, another
+// Module or the standard library. A nested one adds its line, as does `beside`.
 function declarationOf(
 	identity: string,
 	beside: string,
@@ -6515,8 +6500,8 @@ function declarationOf(
 		: `${declarer} declares`
 }
 
-// Another Module is named by its file name, or by the specifier this
-// file would import it by where the Module declaring `beside` has that name too.
+// Another Module, named by its file name, or by its specifier where the Module
+// declaring `beside` has that file name too.
 function declarerOf(
 	identity: string,
 	scope: enricher.Scope,
@@ -6560,16 +6545,9 @@ function preludeProtocolsOf(scope: enricher.Scope): ReadonlySet<string> | null {
 	return null
 }
 
-// The Choice this Type is, when it was declared in a DIFFERENT Module of
-// this graph — read off the nominal identity every Case carries, which is the
-// declaring Module's canonical path and the written name. A Choice reached
-// through an imported Function's return Type is in hand without its name ever
-// being in scope, and that is the whole of the catch-22 this answers: the
-// conformance a Choice derives travels with the Type and is found by the name.
-//
-// Null for a Choice of this Module, for one the Program named itself (a single
-// file compile and the standard library identify a Choice by its bare name, so
-// there is no path to compare), and for everything that is not a Choice.
+// The Choice this Type is, where another Module of this graph declared it,
+// read off the identity every Case carries. Its derived conformance is found
+// by name, which needs an import. Null for anything else.
 function foreignChoiceModule(
 	type: common.Type,
 	scope: enricher.Scope,
@@ -6594,23 +6572,10 @@ function foreignChoiceModule(
 	}
 }
 
-// The Namespace whose OWN Type Parameters declare this name, or null where
-// the name belongs to a Function or a Method. One walk answers both halves: a
-// Namespace's Generics live in a Scope that carries `namespace`, and a Method's
-// own `<infer T>` sits in a Scope of its own inside that one — so the nearest
-// Scope declaring the name is asked, and nothing above it.
-//
-// A BOUNDED Namespace Generic — one a `where` condition or a per-Method bound
-// put in scope — reaches the body through a Scope of its own, and that Scope
-// carries `namespace` too, exactly so this walk still answers with the
-// Namespace. It used to answer null there, and the report took the FUNCTION
-// branch: a Method that had already bounded its Parameter and wanted a SECOND
-// Protocol was told to `Declare it as '<infer Item is Comparable>'`, which is
-// the one spelling a Namespace's own Parameter refuses. That report is now
-// answered one step earlier — a Parameter that carries a bound is told the
-// one-bound rule whoever owns it — so this walk no longer decides that case;
-// the Scope still carries the Namespace because the invariant is what the walk
-// is written against. See `withInjectedBounds`.
+// The Namespace whose own Type Parameters declare this name, or null where a
+// Function or a Method does. The nearest Scope declaring the name answers. A
+// Scope carrying a bounded Namespace Type Parameter carries `namespace` too
+// (`withInjectedBounds`).
 function namespaceDeclaringGeneric(
 	name: string,
 	scope: enricher.Scope,
@@ -6630,23 +6595,15 @@ function namespaceDeclaringGeneric(
 	return null
 }
 
-// What to say about a Type PARAMETER that carries no bound, wherever the
-// want of one is noticed — a call that binds it, a String's hole that has to
-// print it. WHOSE Parameter it is decides everything, and the two answers have
-// nothing in common, so this is the one place that chooses between them.
-//
-// `bounded` is what a Quick Fix keys on, and it is the SAME decision the Helps
-// are chosen by rather than a second one taken beside them: a Function's
-// Parameter is bounded where it was DECLARED, a Namespace's on the METHOD this
-// call stands in, and `none` is every case where neither edit would be accepted
-// — a fix offered there turns one error into two, which is what it used to do.
+// What to say about a Type Parameter that lacks a bound, depending on whose
+// Parameter it is. `bounded` keys the Quick Fix: where a Function declares
+// it, on the Method for a Namespace's, or `none` where neither edit works.
 export function typeParameterBoundReport(
 	parameter: string,
 	protocolName: string,
 	scope: enricher.Scope,
-	// The bound the Parameter already carries, where it carries one. A
-	// Type Parameter takes ONE bound, so every edit that would write a second
-	// is refused wherever it is written — see `oneBoundOnly`.
+	// The bound the Parameter carries already. A Type Parameter takes one
+	// bound; see `oneBoundOnly`.
 	carriedBound: string | null = null,
 	// The name a bound is written with where this Scope binds the
 	// Protocol under none, which an import alongside it binds.
@@ -6689,27 +6646,9 @@ export function typeParameterBoundReport(
 	)
 }
 
-// What there is to say about a bound on a NAMESPACE's Type Parameter.
-// `<infer Item is Comparable>` on the Namespace ITSELF stays refused — it would
-// bind every Method and every receiver — so the two places that carry one are
-// the Method's own `<…>`, which reaches that Method, and a `where` on one of the
-// Namespace's conformances, which reaches the Methods that FULFIL it.
-//
-// The per-Method edit leads and is never withheld: it needs nothing declared and
-// no requirement answered, which is exactly the case a reader lands in.
-//
-// The `where` alternative is offered only where following it would actually fix
-// THIS report. A `where` reaches the Methods that fulfil the conformance and no
-// others, so it answers a bound wanted inside `toString` on an `is Printable`
-// Namespace and does nothing at all for one wanted inside a `biggest` that
-// fulfils nothing — the same Namespace, the same Parameter, two different
-// answers. Which Method is asking is what tells them apart, and the body Scope
-// carries its name for exactly this.
-//
-// This Diagnostic used to end in a dead end — `a Namespace's own Type
-// Parameters take no bounds`, and no Help at all for a Method fulfilling
-// nothing. The Note that said so is gone rather than softened: it is no longer
-// true, and a Note that has to be read around is worse than none.
+// What to say about a bound on a Namespace's Type Parameter. It goes on the
+// Method's own `<…>`, or on a `where` of a conformance the Method fulfils.
+// See "Method bounds on Namespace Type Parameters" in DEVELOPMENT.md.
 function namespaceParameterBound(
 	namespaceType: common.NamespaceType,
 	parameter: string,
@@ -6736,11 +6675,8 @@ function namespaceParameterBound(
 		carrying[0] === undefined
 			? undefined
 			: describeProtocol(carrying[0], scope)
-	// Whether the Method this is reported inside FULFILS a conformance —
-	// asked of the Protocol's surface, which is the same question the conformance
-	// check answers and the only half of it available from a body. A Protocol's
-	// ancestors are already flattened into `methods`, so one lookup covers the
-	// chain.
+	// Whether the enclosing Method fulfils a conformance, asked of the
+	// Protocol's flattened `methods`.
 	let fulfils = (identity: string) => {
 		let name = enclosingMethodName(scope)
 
@@ -6750,30 +6686,15 @@ function namespaceParameterBound(
 		)
 	}
 
-	// The two edits are EXCLUSIVE, and which one works is decided by
-	// whether this Method answers a requirement — ASKED FIRST, because it is the
-	// answer to "is the per-Method bound a thing this Method may write at all",
-	// and every branch below inherits it. A Method that fulfils a requirement is
-	// promised by the conformance unconditionally, so a bound of its own is
-	// refused on the spot by `nonconforming-namespace` — the condition has to go
-	// on the conformance, where it holds for the promise too. A Method that
-	// fulfils nothing has no conformance to hang a condition on, and a `where`
-	// written anyway would reach every fulfilling Method and not this one.
-	// Offering both would mean offering one edit that is refused.
-	//
-	// It is ONE decision rather than two alike: `bounded` travels out with the
-	// text, and the Quick Fix is offered on it. Deciding it a second time in
-	// `resolveConformances` is how the Editor came to offer the very edit the
-	// text withheld, on a Program the text had already got right.
+	// The edits exclude each other. A Method that fulfils a requirement takes
+	// the bound on the conformance's `where`, since its own bound is refused.
+	// One that fulfils nothing takes its own. `bounded` carries this decision.
 	let fulfilled = declared.filter(fulfils)
 
 	if (fulfilled.length > 0) {
-		// A conformance that already binds this Parameter to something
-		// else is no place for the condition either — `conflicting-where-condition`
-		// refuses a second bound on one Parameter, and says where the conformance
-		// belongs. Where every conformance this Method fulfils is closed that
-		// way there is no edit left to name, and nothing is offered rather than
-		// something refused.
+		// A conformance whose `where` bounds this Parameter otherwise can take
+		// no second bound (`conflicting-where-condition`). Where every one is
+		// closed, nothing is offered.
 		let open = fulfilled.filter(
 			(name) =>
 				!conditionsOf(name).some(
@@ -6809,9 +6730,8 @@ function namespaceParameterBound(
 		}
 	}
 
-	// Where the condition the reader needs is already written, saying so
-	// is the whole of the explanation — the bound exists, and this Method is
-	// simply not one the `where` reaches. The edit is the same either way.
+	// Where the needed condition is written already, the Note says this
+	// Method is not one the `where` reaches.
 	if (first !== undefined) {
 		return {
 			notes: [
@@ -6847,24 +6767,16 @@ function enclosingMethodName(scope: enricher.Scope): string | null {
 	return null
 }
 
-// Resolves how each Protocol-bounded Type Parameter of an invocation's
-// signature is fulfilled, given what the invocation bound it to. A binding
-// that is itself a bounded Type Parameter forwards the enclosing Function's
-// conformance parameter; a concrete binding requires exactly one conforming
-// Namespace in scope — the exact-target ones win over covering ones, and
-// anything else is a Diagnostic. Failures report and yield no source; the
-// Diagnostic gates codegen, so a missing source never reaches the Rewriter.
+// How each bounded Type Parameter of an invocation is fulfilled, given its
+// binding. A failure reports and yields no source, and the Diagnostic keeps
+// the Program from reaching the rewriter.
 export function resolveConformances(
 	generics: Array<common.GenericDeclaration>,
 	bindings: GenericBindings,
 	scope: enricher.Scope,
 	position: common.Position,
-	// Whether the call whose bounds these are is `Terminal.print`, which
-	// only the site that read the callee's name can say. It decides ONE Help —
-	// the `Terminal.inspect` escape, which is an edit for a print and for
-	// nothing else. Defaulted, so every caller that is not resolving an
-	// invocation's bounds (a written Dictionary's keys, a Case payload's, a
-	// Type Alias's) says nothing and offers nothing.
+	// Whether the call is `Terminal.print`, which earns the
+	// `Terminal.inspect` Help.
 	atPrintingCall = false,
 ): Array<common.Conformance> {
 	if (!generics.some((generic) => generic.constraint != null)) {
@@ -6883,9 +6795,8 @@ export function resolveConformances(
 
 		let bound = bindings.get(generic.name)
 
-		// An unbound Type Parameter, a binding that names one (a pinned
-		// `Self` spelled `Tag<T>` where the call bound no `T`), or an Error
-		// binding has already been diagnosed — stay silent to avoid cascades.
+		// An unbound Type Parameter, a binding naming one, or an Error was
+		// reported already.
 		if (
 			bound === undefined ||
 			bound.type === "Error" ||
@@ -6894,15 +6805,9 @@ export function resolveConformances(
 			continue
 		}
 
-		// Read as it stands. A PINNED Parameter's binding may name a
-		// sibling the Arguments bind — a generic Namespace's `Self` is pinned
-		// to `List<ItemType>` — and that is settled where this invocation's
-		// Generics still carry their FRESH names, in `settlePins`. Substituting
-		// the invocation's bindings HERE instead is what made `distinct(keys)`
-		// inside a `nestedDistinct<infer Key>` receive a `List<List<Key>>`
-		// witness for a `List<Key>` binding: by this point every binding is a
-		// Type the ARGUMENTS produced, written in the CALLER's names, and a
-		// caller Type Parameter spelled like a callee's was rewritten with it.
+		// Read as it stands: a pin naming a sibling Type Parameter is settled
+		// in `settlePins`, while the names are still fresh. Here every binding
+		// is in the caller's names.
 		let binding = bound
 
 		// The bound is the Protocol the callee's Module resolved, and the
