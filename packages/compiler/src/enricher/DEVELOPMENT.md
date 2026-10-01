@@ -320,6 +320,35 @@ written, so it must refuse what they are refused for. That is `type-without-memb
 is how it discriminates. An annotation on an intermediate step becomes no Statement, so it is checked where it
 is read.
 
+## Matcher Patterns
+
+In Matcher position a Pattern establishes a Record Type (`resolvePatternMatcherType`). Every member contributes a
+Type, so `@.name` works inside the Handler. A value-constrained member gives its literal's Type, and an annotated
+one its annotation. A bare one gives the Type the matched value has for that member. Value-constrained members are
+collected into `literals`, keyed by the dotted path that reaches them, and the rewriter walks each path to build
+the test. That is how a nested Pattern constrains by value, as in `case #Rect({ origin as { x = 0 } })`.
+
+`provenPatternType` gives what a value proves by passing the Pattern. That is each arm of its Type that could
+pass, with the required members merged over the arm's own. The emitted test and the bindings both read it, so an `as` binder
+keeps every member the arm proved. A narrowed Record drops the Alias name it was reached under, since a shape with
+extra members is not that Alias. A Case keeps its name.
+
+A Case Matcher's payload Pattern has two readings, as construction does (`payloadPatternSubject`). The payload
+Record reading is tried first: it applies where the Case carries every member the Pattern names. Otherwise a
+one-member Case reads the Pattern as its one member's value, the shorthand. A Case with several members always
+gets the Record reading.
+
+The payload's requirements stand beside the Matcher rather than inside it (`resolvePayloadRequirements`). The
+Matcher says which arm this is, and the validator reads it for coverage and reachability. Narrowing it would
+call the Case partly handled and the Handler dead. A requirement the declared Type already guarantees is
+dropped. So `case #Rectangle({ width, height })` stays unconditional, and only a Pattern asking more than the
+Case promises makes its arm decline values. A payload member no arm carries is reported here
+(`unknown-member`), because the validator reads only the tag and the arm would silently never run.
+
+Bindings are read at what the arm proved, not at what the Case declared, so `case #Some({ value: Integer })`
+binds an Integer as the equivalent Record Matcher does. The shorthand reading's one step was never written, so it
+stands at the binder's position.
+
 ## Undecided slots
 
 An empty literal leaves a slot undecided: `variable items = []` declares a `List<Unknown>`, and `[=]` leaves both
@@ -456,6 +485,18 @@ out of that test (`undecidedWithoutAReturnType`): `ambiguous-case` and `undecide
 causes them by reading without an expected Type, and the real pass silences them through `positionWasRefused`.
 Counting them would leave a body like `((value) { <- #Value(value) })` with no report at all.
 
+Only a literal in Argument position may omit its annotations, since its Types are written down elsewhere, in
+the signature it is passed to (`resolveContextualReturnType`). Anywhere else a missing `-> Type` is
+`missing-return-type`. The Help spells the Type the body would answer, read once for the Diagnostic alone, unless
+that spelling could not be typed back in. In Argument position, an expected return Type the call has not solved is
+read off the body, as `map`'s `Result` is. A Type Parameter of an enclosing Function or Namespace is a decision,
+not an open slot, so it is taken as it stands. `mentionsUnsolvedTypeParameter` tells the two apart by the fresh
+names only a call still matching produces.
+
+A literal whose return Type could not be read is remembered in `literalsAnsweringNothing`. The call around it
+then stays silent about its unbound Type Parameters, since they follow from that one mistake. Inside a call that
+resolved to nothing, a literal's Parameters stay Error without a report (`refusedCallDepth`).
+
 ## Invocation and overload selection
 
 ### Arguments that read their position
@@ -491,6 +532,30 @@ recording either. So a candidate it does not fit can not decide it.
 A member path records any position that names a Function of one Parameter, even where its steps do not read
 there. The enrichment then reports about the steps rather than about a missing context. A path whose steps do not read
 answers an Error, which matches every Parameter, so the readable Arguments decide the candidate.
+
+### Probe recordings
+
+The Arguments that read their position are read while the call is matched, the only moment the expected Type is
+known. The typed Nodes are built in a later pass without that context, so the reading is recorded per Node and
+read back. The records live in `contextualFunctionTypes`, `contextualCaseValueTypes` and
+`contextualMemberPathTypes`. They are keyed
+by the parser Node, so a re-parse starts empty and nothing needs invalidating.
+
+A record keeps the expected Type together with the call's bindings rather than substituting them at once. An
+Argument is matched before the Arguments after it bind anything: in `id(Box<Integer>#Empty, 1)` against
+`id<infer T>(_ b: Box<T>, _ seed: T)`, only the `1` decides `T`. The bindings are the Map the match keeps filling.
+A record read once the call has finished therefore reads the position as the call decided it. For a Function literal,
+`decidedContextualFunctionType` resolves the literal again under the finished bindings, silently, where they
+close a position the match left open. A callback such as the `step` of `loop` is matched while its `Result` is
+still unbound. Reading its body alone would lose what the position decided.
+
+Every candidate of an Invocation is probed. A losing candidate must not leave a recording behind, since the
+enrichment would then type a literal's body by it. `probeRecordings` is a stack of the recordings of the probes
+running, because an Argument's own Invocation is probed inside its caller's probe. A recording goes into the
+innermost probe, and a read looks innermost first, then at the committed records. A probe's recording is
+committed only for the candidate the caller keeps. A nested winner commits into its enclosing probe, so it is
+still discarded if the outer candidate loses. A decision written onto an Argument Node is held the same way, as
+the work to do (`recordDecidedArgument`).
 
 ### Seeds an Invocation decides
 
@@ -662,3 +727,79 @@ Two more checks keep the Warning true:
 Both probes hold everything aside. Their Diagnostics are dropped and their recordings never committed, so an
 Argument stays typed by the resolution the Program committed to. `probingDeadFallback` keeps a probe from
 re-probing a nested call with its own `defaultingTo`, which would double the work per level and report nothing.
+
+## Refined Aliases and predicates
+
+`type NonZeroInteger = Integer where @::isNot(0)` declares a checked refinement. The Type the Alias answers is
+the evidence every value of that name carries.
+
+### Reading a refined Alias
+
+A refined Alias and the Namespace answering its predicate may name each other: `NonZeroInteger` asks Integer's
+`isNot`, and `namespace Integer` declares a `divide` taking a `NonZeroInteger`. So resolution splits in two.
+`resolveTypeAliasStatementSkeleton` resolves everything but the predicate and returns a Refinement with
+`conjuncts: null`. It is registered once and shared by reference, and the predicate is written into it in place
+once read (`pendingRefinementIn`). Every refusal that needs no predicate is decided in the skeleton, so a broken
+clause never hoists as a Refinement.
+
+A generic refined Alias, such as `NonEmptyList<Item>`, is a Generic Alias around its Refinement, and a use site
+applies its Arguments through the wrapper. Its Type Parameters are in scope as opaque uses while the predicate is
+read (`refinementPredicateScope`). So a predicate about the items, such as `@::contains(0)`, fails ordinary type
+checking, and the conjuncts that survive ask nothing a Type Argument could change.
+
+`resolveRefinementConjuncts` reads the predicate with `@` bound to the base as a Constant. Hoisting calls it once
+per round until the answering Namespace is in scope, and a Diagnostic means "not this round". Nothing read in an
+early round is kept, since that round may report `unknown-method` for a Namespace that has not hoisted yet. A
+refused clause leaves the Alias meaning what it would without one, keeping a generic Alias' wrapper.
+
+A refinement may be written on an Integer, a Rational, a String, an applied List or an applied Dictionary
+(`isRefinableBase`). A bare `List` is refused, since nothing has decided its items. Each base is a promise, because
+every Method the base answers a refinement of it answers too.
+
+A predicate is a conjunction of leaves, flattened: `@::isPositive()::and(@::isNot(1))` is two conjuncts, and so is
+its mirror image. Assignability between refinements is therefore set inclusion (`extractPredicateConjuncts`). A
+leaf is one Method call directly on `@` with literal Arguments. A chain such as `@::trim()::hasCharacters()` would
+need the evidence of the intermediate value, and a computed Argument would need evaluating.
+
+### Predicate aliases
+
+A leaf is stored as the question it asks rather than as it was written (`resolvedConjunct`). A Method answering a
+Boolean whose whole body is one call on `@`, optionally negated, is a predicate alias of that call.
+`Integer::isZero` is `@::is(0)`, and `List::hasItems` is `@::isEmpty()::negate()`. `isLessThanOrEqualTo` is
+`isGreaterThan` negated over the Argument it forwards. So `@::isZero()` and `@::is(0)` are one leaf, and the
+contrary of any leaf is the same leaf with `negated` flipped. No table names Methods as each other's contraries;
+the bodies say it, and a Program's own Methods of that shape are read the same way. The written spelling rides
+along for Diagnostics and decides nothing.
+
+`derivePredicateAliases` reads a Namespace's Methods as it reaches Scope, before the hoisting round that reads
+pending predicates. A refinement written on an alias then resolves with the alias known. The bodies are enriched
+silently, which answers which Namespace each call lands on; the real enrichment later reports. Candidates are
+found by shape first, so a Namespace without such Methods costs one walk of its names.
+`deriveProvidedPredicateAliases` reads a Protocol's provided bodies the same way, with `@` as `Self` bounded by
+the Protocol. Such a leaf records no Namespace, and the witness that reaches the Method fills its own in.
+
+The shapes read:
+
+- `<- @::method(…)`, with an optional `::negate()` that must resolve to `Boolean`'s own `negate`.
+- An `if` whose branches answer opposite written Booleans, as `Equatable::isNot` is written. It can not call
+  `Boolean::negate`, because `Boolean.es` would then import a third cycle.
+- A call written the other way round, `<- other::isGreaterThanOrEqualTo(@)`, read back onto `@` through
+  `CONVERSE_COMPARISONS`. That is only believed where the Namespace answering is the base's own or `Number`, the
+  guard `impliedConjunctKeys` also uses.
+
+Each Argument must be a literal, a Parameter forwarded whole, or `@` handed to a flipped call. A Method with a
+defaulted Parameter is not read, because a template slot is a declared position while a call site counts written
+Arguments. A body that names a Namespace not hoisted yet, or a refinement whose predicate is pending, is
+unresolved and offered again in a later round.
+
+`writePredicateAliases` collapses each candidate to the primitive it names, however many Methods stand between.
+It writes the result onto the Method Type every use site already holds. A target in the same declaration is collapsed
+first, so declaration order decides nothing. Methods written as each other's contraries form a ring and stay
+primitive (`cyclicCandidates`), as does a leaf naming the very Method it was read from. A target collapsed
+elsewhere is folded in from what it recorded, and `collapsedLeaf` follows the rest at the call. An Overloaded
+Method ends the walk, since a leaf's scalars can not choose an entry.
+
+A Rational receiver spells its leaves one way (`forNumericBase`). `@::isNot(0)` and `@::isNot(0/1)` are one
+question, so every bare run of digits becomes `n/1`, and the covering `Number` is spelled as `Rational`. The
+receiver decides it, after any alias is substituted, and a Program's own Namespace over a Rational keeps its
+spelling.

@@ -5388,10 +5388,10 @@ function enrichAssertionStatement(
 	]
 }
 
-// The Constant a `require` Matcher binds, such as `constant row =
-// $assertion.value`, declared in the enclosing block. The base is read at the
-// Matcher's Type, since the rest of the block runs only where the Matcher
-// matched.
+// The Constant a `require` Matcher binds, such as
+// `constant row = $assertion.value`, declared in the enclosing block. The base
+// is read at the Matcher's Type, since the rest of the block runs only where
+// the Matcher matched.
 function declareAssertionBinding(
 	binding: MatcherBinding,
 	baseName: string,
@@ -11785,9 +11785,9 @@ function rearrangedArguments(
 	return rearranged
 }
 
-// The two Arguments a call wrote the other way round, as in `[1, 2,
-// 3]::reduce((total, item) { … }, 0)`, or null. See "The no-matching-overload
-// report" in DEVELOPMENT.md.
+// The two Arguments a call wrote the other way round, as in
+// `[1, 2, 3]::reduce((total, item) { … }, 0)`, or null. See "The
+// no-matching-overload report" in DEVELOPMENT.md.
 function argumentsInOtherOrder(
 	candidate: OverloadCandidate,
 	matchableArguments: Array<MatchableArgument>,
@@ -14624,8 +14624,8 @@ function instantiatedCaseOf(
 }
 
 // One Matcher for several instantiations of the same Case: each member is
-// joined across them, so `@.value` in `Box<Integer> | Box<String>` is `Integer
-// | String`. The join keeps no `typeArguments`.
+// joined across them, so `@.value` in `Box<Integer> | Box<String>` is
+// `Integer | String`. The join keeps no `typeArguments`.
 function joinCaseInstantiations(
 	instantiations: Array<common.CaseType>,
 ): common.CaseType | null {
@@ -14691,13 +14691,9 @@ function typeAtPath(type: common.Type, path: Array<string>): common.Type {
 	return path.reduce(memberTypeOf, type)
 }
 
-// What a value PROVES by passing a Pattern's requirements — each arm of
-// the value's Type that could pass, with the required members merged over its
-// declared ones. One Type serves both halves of a Handler: the emitted test
-// asks it and the bindings read it, so an `as` binder keeps every member the
-// arm proved rather than only the ones the Pattern named. Arms without members
-// contribute nothing, and where none is left the requirement stands alone — a
-// test nothing passes, which is the arm the Validator can prove unreachable.
+// What a value proves by passing a Pattern: each arm that could pass, with the
+// required members merged over its own. The emitted test and the bindings both
+// read it, so an `as` binder keeps every member the arm proved.
 function provenPatternType(
 	valueType: common.Type,
 	required: common.Type,
@@ -14706,13 +14702,9 @@ function provenPatternType(
 		return required
 	}
 
-	// A narrowed Record is a Record the PATTERN built, so the spread that
-	// builds one clears the Alias spelling the arm was reached under: what a
-	// Pattern proves about a `Standing` is that Record with the members the
-	// Pattern required written over the ones `Standing` declares, and a shape
-	// with a member `Standing` never mentions is not a Standing. Left standing,
-	// the name would have a Diagnostic claim the Alias declares it. A Case keeps
-	// its own — a Case is nominal, and narrowing one leaves it the Case it was.
+	// A narrowed Record is one the Pattern built, so it drops the Alias
+	// spelling the arm had: a shape with extra members is no `Standing`. A Case
+	// is nominal and keeps its name.
 	let narrowed = unionArmsOf(valueType).flatMap<common.Type>((arm) => {
 		if (arm.type === "Record") {
 			return [
@@ -14735,31 +14727,19 @@ function provenPatternType(
 	return narrowed.length === 0 ? required : buildUnion(narrowed)
 }
 
-// What a Pattern in Matcher position establishes about the value it
-// matched. Every member contributes a Type, so `@` is a Record and `@.name`
-// works inside the Handler whatever form the member took: a value-constrained
-// member takes its literal's Type, an annotated one the Type it wrote, and a
-// bare one the Type the VALUE has for that member — a bare member being the
-// annotated one with its annotation elided, read off the scrutinee rather than
-// off the source.
-//
-// `literals` is filled with the value-constrained members, keyed by the DOTTED
-// SPINE that reaches each one. A member name can not hold a dot, so the two can
-// not be confused, and the Rewriter walks the spine to build the member reads
-// its test ANDs together. That is what lets a nested Pattern constrain by value
-// at all — `case #Rect({ origin as { x = 0 } })`.
+// What a Pattern in Matcher position establishes: every member contributes a
+// Type, so `@.name` works in the Handler. `literals` collects the
+// value-constrained members keyed by their dotted path, which the rewriter
+// walks to build its test.
 function resolvePatternMatcherType(
 	pattern: parser.PatternNode,
 	valueType: common.Type,
 	scope: enricher.Scope,
 	literals: Record<string, common.typed.ExpressionNode>,
 	path: Array<string> = [],
-	// Set only where a member the VALUE has not got is a mistake rather
-	// than a discrimination. A Matcher over a Union names members only some
-	// arms carry — that is what a Record Matcher is FOR — and an arm nothing
-	// reaches is the Validator's `unreachable-case`. A Case payload is
-	// different: the Validator reads only the tag there, so a member nothing
-	// carries would make the arm silently unreachable with nothing said.
+	// Set only where a member the value lacks is a mistake. A Matcher over a
+	// Union discriminates by members, but a Case payload's arm would silently
+	// never run.
 	reportUnknownIn: parser.PatternNode | null = null,
 ): common.Type {
 	let members: Record<string, common.Type> = {}
@@ -14785,12 +14765,9 @@ function resolvePatternMatcherType(
 					)
 
 		if (member.binder?.nodeType === "Pattern") {
-			// A written annotation is what the arm narrows to, and the
-			// nested Pattern requires its members ON TOP of it — the two are one
-			// requirement, the annotation's arms with the nested requirements
-			// merged over them. Keeping only the annotation would drop what the
-			// nested Pattern asks, and the arm would run for a value without the
-			// very members it reads.
+			// A written annotation is what the arm narrows to. The nested
+			// Pattern's requirements are merged over it, so the arm never runs
+			// for a value without the members it reads.
 			let memberType = declaredType ?? memberTypeOf(valueType, name)
 			let nested = resolvePatternMatcherType(
 				member.binder,
@@ -14825,24 +14802,16 @@ function resolvePatternMatcherType(
 	return { type: "Record", members }
 }
 
-// A name no source could have written, derived from the Position of what
-// it stands for. The Lexer reads `_` as a Symbol, so no Essence Identifier holds
-// one, and the `$` keeps it clear of the Rewriter's own `_self` — the same
-// convention the Optimiser's lowered bindings follow.
-//
-// Derived from a Position rather than from a counter because a Function
-// literal's body is enriched TWICE where its return Type is inferred from it,
-// and a counter would mint a different name on each pass.
+// A name no source can write, derived from a Position. `_` is a Symbol to the
+// Lexer and `$` keeps it apart from `_self`. A Position rather than a counter,
+// so the body read twice for return inference mints the same name.
 function synthesizedName(kind: string, position: common.Position): string {
 	return `$${kind}_${position.start.line}_${position.start.column}`
 }
 
-// The Statements a Pattern that can DECLINE a value would need somewhere
-// to fall through to. A Matcher has the next arm; a Declaration and a Parameter
-// have nothing, so a member matched against a written value is refused there.
-//
-// A member constrained by TYPE is not refused: in an irrefutable position that
-// is an annotation, and it fails as `assignment-type-mismatch` like any other.
+// A Pattern member constrained by value can decline, and only a Matcher has a
+// next arm to fall through to. A member constrained by Type is an annotation
+// and fails as `assignment-type-mismatch`.
 function refuseRefutablePattern(
 	pattern: parser.PatternNode,
 	kind: string,
@@ -14867,12 +14836,8 @@ function refuseRefutablePattern(
 	}
 }
 
-// What a Pattern binds in an irrefutable position, INCLUDING the members
-// that were refused. A refused member still brings its name in — recovery, not
-// semantics: the Program does not compile either way, and a body reading
-// `width` after the Diagnostic about `{ width = 0 }` must not be told a second
-// time that `width` is not declared. The Diagnostic that explains the mistake
-// is the one worth reading, and a cascade buries it.
+// What a Pattern binds in a Declaration or Parameter, refused members included,
+// so a body reading them is not told again that they are undeclared.
 function irrefutablePatternBindings(
 	pattern: parser.PatternNode,
 ): Array<PatternBinding> {
@@ -14881,8 +14846,8 @@ function irrefutablePatternBindings(
 		...refutablePatternMembers(pattern).map(({ member, path }) => ({
 			name: member.name,
 			path,
-			// A refused member is recovered as if it had been written
-			// bare, so the spine ends at its own name and carries no Type.
+			// Recovered as if written bare: the path ends at its own name, with
+			// no Type.
 			steps: path.map((step, index) => ({
 				name:
 					index === path.length - 1
@@ -14900,14 +14865,9 @@ function irrefutablePatternBindings(
 	]
 }
 
-// A binding's value in an irrefutable position — the synthesized base
-// Constant, read down the binding's spine. A whole-value binder has an empty
-// spine and is therefore the base itself.
-//
-// The last step carries the MEMBER's span where one was written, so that
-// renaming the Record's member rewrites the member and not the name it was
-// bound under; every other span is the binder's, which is where a reader's
-// cursor is when they ask about it.
+// A binding's value in a Declaration or Parameter: the base Constant read down
+// the binding's path. The last step carries the member's span, so renaming the
+// member rewrites the member, not the binder.
 function memberPathLookup(
 	baseName: string,
 	baseType: common.Type,
@@ -14936,10 +14896,8 @@ function memberPathLookup(
 			member: {
 				nodeType: "Identifier",
 				content: step.name.content,
-				// The span the step was WRITTEN at, every step of the
-				// way. An intermediate step given the innermost binder's span
-				// instead made the Language Server index it as an occurrence of
-				// the outer member, so renaming `origin` overwrote `x` and `y`.
+				// The span each step was written at, so the language server
+				// indexes each step as its own member.
 				position: step.name.position,
 				type: stepType,
 			},
@@ -14953,21 +14911,19 @@ function memberPathLookup(
 	return node
 }
 
-// One name a Matcher brings into scope, with the spine that reaches it
-// from `@` and the Type at the end of that spine. An empty spine is `@` itself,
-// which only a payload Pattern's own `as` binder can be.
+// One name a Matcher brings into scope, with the path from `@` and the Type at
+// its end. An empty path is `@` itself, which only a payload's `as` binder is.
 type MatcherBinding = {
 	name: parser.IdentifierNode
 	member: parser.IdentifierNode | null
 	path: Array<string>
-	// Where each step of the spine was written — see `selfPathLookup`.
+	// Where each step of the path was written; see `selfPathLookup`.
 	stepPositions: Array<common.Position>
 	type: common.Type
 }
 
-// Every name a Handler's Matcher binds. Two Matchers bind anything: a
-// Pattern binds what its members name, and a Case Matcher binds what its
-// payload binder names.
+// Every name a Handler's Matcher binds: a Pattern's member names, or a Case
+// Matcher's payload binder.
 function resolveMatcherBindings(
 	node: parser.MatcherNode,
 	matcher: common.Type,
@@ -14981,18 +14937,14 @@ function resolveMatcherBindings(
 		return []
 	}
 
-	// An unresolved Case already reported; adding a second Diagnostic
-	// about its payload would bury the one that matters.
+	// An unresolved Case was already reported.
 	if (matcher.type !== "Case") {
 		return []
 	}
 
 	if (node.binding.nodeType === "Pattern") {
-		// Read at what the arm PROVED, not at what the Case declared. The
-		// requirements the Handler tests are exactly the narrowing, so
-		// `case #Some({ value: Integer })` binds an Integer — the same answer
-		// the equivalent Record Matcher gives, which is the whole point of the
-		// two spellings meaning one thing.
+		// Read at what the arm proved, so `case #Some({ value: Integer })`
+		// binds an Integer as the equivalent Record Matcher does.
 		let subject = payload ?? {
 			subjectType: payloadPatternSubject(node.binding, matcher).type,
 			subjectPath: payloadPatternSubject(node.binding, matcher).path,
@@ -15016,10 +14968,8 @@ function resolveMatcherBindings(
 	let binding = node.binding
 	let memberNames = Object.keys(matcher.members)
 
-	// A binder that is one NAME names what the constructor takes, which
-	// for a one-member Case is that member's value. A Case with no members has
-	// nothing to name, and one with several has nothing SINGLE to name — for
-	// those the Pattern form is the answer, and the help says so.
+	// A binder that is one name names a one-member Case's value. A Case with no
+	// members or several has no single value; the Help offers the Pattern form.
 	if (memberNames.length !== 1) {
 		reportError(
 			`'${describeType(matcher)}' has no single value to bind`,
@@ -15058,18 +15008,15 @@ function resolveMatcherBindings(
 			name: binding,
 			member: null,
 			path: [memberName],
-			// The shorthand's one step is not written anywhere, so it
-			// stands at the binder the reader DID write.
+			// The shorthand's step is not written, so it stands at the binder.
 			stepPositions: [binding.position],
 			type: matcher.members[memberName]!,
 		},
 	]
 }
 
-// A payload Pattern naming a member no arm of the payload carries. The
-// same shape `reportUnknownMember` writes for a Lookup, because it is the same
-// mistake — the Pattern reads a member off the payload, and the payload has not
-// got one.
+// A payload Pattern naming a member no arm of the payload carries, reported as
+// `reportUnknownMember` reports it for a Lookup.
 function reportUnknownPayloadMember(
 	name: parser.IdentifierNode,
 	valueType: common.Type,
@@ -15104,32 +15051,13 @@ function reportUnknownPayloadMember(
 	)
 }
 
-// What a Case Matcher's payload Pattern REQUIRES, keyed by the dotted
-// spine that reaches each requirement from the matched value. Without it a
-// payload Pattern would say where to read and never what must be there:
-// `case #Fired({ x, y })` on a `Fired { payload: Click | KeyPress }` would
-// accept every `#Fired` and then read `x` off a KeyPress.
-//
-// Beside the Matcher rather than inside it, which is the same split
-// `memberLiterals` makes and for the same reason: `matcher` says WHICH ARM this
-// is, and the Validator reads it to decide both coverage and reachability.
-// Narrowing it would claim the Case is only partly handled AND that the Handler
-// is dead — the second of which is plainly false.
-//
-// Only the member the Pattern's own spine reaches is required. Anything deeper
-// is already inside that requirement, because a Pattern's Type is a Record whose
-// members are Records in turn, and the runtime check walks the whole of it.
-//
-// The value-constrained members are collected on the way, under the same
-// spines — which is where the tie-break shows in the emitted test: the Record
-// reading compares `@.width`, the shorthand reading `@.state.index`.
+// What a Case Matcher's payload Pattern requires, keyed by dotted path, beside
+// the Matcher rather than inside it. See "Matcher Patterns" in DEVELOPMENT.md.
 type PayloadRequirements = {
-	// What the Handler TESTS, keyed by dotted spine.
+	// What the Handler tests, keyed by dotted path.
 	memberTypes: Record<string, common.Type> | null
-	// What the Handler PROVED — where the payload Pattern's bindings are
-	// read, and at which Type. A requirement is a narrowing, so an arm that
-	// tests `value: Integer` must bind an Integer and not the Union the Case
-	// declared: the test and the binding are two halves of one statement.
+	// What the Handler proved: where the payload Pattern's bindings are read,
+	// and at which Type, so a tested `value: Integer` binds an Integer.
 	subjectPath: Array<string>
 	subjectType: common.Type
 }
@@ -15153,11 +15081,8 @@ function resolvePayloadRequirements(
 		scope,
 		literals,
 		subject.path,
-		// A payload member no arm of the payload carries is a typo, and
-		// is reported HERE because nothing downstream can see it: the Validator
-		// reads only `matcher`, which for a Case Matcher is the tag. Left
-		// silent, the emitted test demanded a member nothing has and the arm
-		// simply never ran.
+		// A payload member no arm carries is reported here, since the validator
+		// reads only the tag and the arm would never run.
 		node.binding,
 	)
 
@@ -15169,17 +15094,10 @@ function resolvePayloadRequirements(
 		}
 	}
 
-	// The SHORTHAND reading requires its one member to be the Record the
-	// Pattern describes; the Record reading has no spine of its own and
-	// requires each named member individually.
-	//
-	// A requirement the DECLARED Type already guarantees is dropped, and that
-	// is what keeps the everyday `case #Rectangle({ width, height })`
-	// unconditional: naming members the Case itself declares asks nothing new,
-	// so the arm still retires its Case and a Match over a Choice stays
-	// exhaustive without a `case _`. Only a Pattern that asks for MORE than the
-	// Case promises — the union-typed payload it can decline — makes it
-	// conditional.
+	// The shorthand reading requires its one member to be the Pattern's Record;
+	// the Record reading requires each named member. A requirement the declared
+	// Type already guarantees is dropped, so naming declared members stays
+	// unconditional.
 	let requirements: Record<string, common.Type> = {}
 	let require = (path: string, requiredType: common.Type) => {
 		if (!matchesType(requiredType, typeAtPath(caseType, path.split(".")))) {
@@ -15198,27 +15116,15 @@ function resolvePayloadRequirements(
 	return {
 		memberTypes: Object.keys(requirements).length > 0 ? requirements : null,
 		subjectPath: subject.path,
-		// What the arm proved about the payload — the subject's declared
-		// arms with the Pattern's requirements merged over them, so the bindings
-		// below read the narrowed Types AND an `as` binder keeps the declared
-		// members the Pattern did not name.
+		// What the arm proved about the payload. The bindings read the narrowed
+		// Types, and an `as` binder keeps the members the Pattern did not name.
 		subjectType: provenPatternType(subject.type, required),
 	}
 }
 
-// Which of the two readings a payload Pattern is. Construction faces the
-// same fork — `#Done(x)` and `#Done({ value = x })` are two spellings of one
-// value — and answers it by trying the payload Record first; the Matcher
-// mirrors that, so a reader who knows how a value is built knows how it comes
-// apart. The question is different only in what it can ask: a Pattern carries no
-// Type to compare, so it asks whether the Case carries the members the Pattern
-// names.
-//
-// The Record reading is also what a Case with any number of members but one
-// gets, because the shorthand exists only for a one-member Case. A member the
-// Case does not carry then answers `Unknown` and shows up as an arm the
-// Validator can prove unreachable, which is the same answer a Record Matcher
-// naming a stray member has always given.
+// Which reading a payload Pattern is: the payload Record where the Case carries
+// every member the Pattern names, else the one-member shorthand. See "Matcher
+// Patterns" in DEVELOPMENT.md.
 function payloadPatternSubject(
 	pattern: parser.PatternNode,
 	matcher: common.CaseType,
@@ -15237,15 +15143,9 @@ function payloadPatternSubject(
 	return { path: [memberName], type: matcher.members[memberName]! }
 }
 
-// `patternBindings` decides WHICH names a Pattern brings in and under
-// which spine; this only has to say what each one's Type is. `subjectType` is
-// the Type at the end of `prefix`, so a binding's own steps are the ones past
-// it.
-//
-// The prefix is a step the SOURCE DID NOT WRITE — the one member a one-member
-// Case carries, which the shorthand reading walks through without naming. It
-// stands at the Matcher's own Position, because that is the nearest thing a
-// reader could point at.
+// The Type of each name `patternBindings` brings in. `subjectType` is the Type
+// at the end of `prefix`, the unwritten shorthand step, which stands at the
+// Matcher's Position.
 function bindingsOf(
 	pattern: parser.PatternNode,
 	subjectType: common.Type,
@@ -15260,13 +15160,9 @@ function bindingsOf(
 	}))
 }
 
-// The Scope a Guard is enriched in when its Handler binds anything. Each
-// name is declared for real — shadowing a Namespace, refusing reassignment —
-// but resolves through `selfMemberAliases` into the `@.member` spine it stands
-// for rather than through the body's Constant, which does not exist where a
-// Guard runs. A Scope of its own so that the body's Constants are still the
-// body's, declared in the Scope the body is enriched in and reported against
-// whatever they collide with there.
+// The Scope a Guard is enriched in when its Handler binds anything. Each name
+// is declared, but resolves through `selfMemberAliases` to its path off `@`,
+// since the body's Constants do not exist where a Guard runs.
 function scopeLendingBindings(
 	bindings: Array<MatcherBinding>,
 	matcher: common.Type,
@@ -15292,16 +15188,10 @@ function scopeLendingBindings(
 	return guardScope
 }
 
-// Desugared into the Constants an author could have written —
-// `constant item = @.item` at the head of the arm — so the Simplifier, the
-// Rewriter and every walker downstream see nothing new.
-//
-// `narrowings` holds what the Handler's Guard proved about a binding, and
-// it is what the SCOPE holds while the body is enriched. The Statement keeps the
-// Matcher's own Type, because a refinement is evidence the Enricher carries and
-// never something the emitted Program has heard of — which is the shape a
-// narrowing takes everywhere: a Scope entry the body reads, and a typed tree that
-// says what it always said.
+// Desugared into the Constants an author could write, such as
+// `constant item = @.item` at the head of the arm. The Scope holds the Guard's
+// narrowings, while the Statement keeps the Matcher's Type, since refinements
+// never reach the emitted Program.
 function declareMatcherBindings(
 	bindings: Array<MatcherBinding>,
 	matcher: common.Type,
@@ -15341,25 +15231,15 @@ function declareMatcherBindings(
 	})
 }
 
-// A `Self` Node at the bottom, not an Identifier spelled "@" — the
-// Rewriter escapes an Identifier as a user name, and inside a lifted Handler the
-// scrutinee is the `_self` Parameter.
-//
-// `memberPosition` is where the LAST step of the spine was written, which is a
-// different span from the binding's own name wherever `as` renamed it. The
-// Language Server reads a member Lookup off this tree to join a Pattern member
-// to the Record member it reads, so handing it the binder's span would make
-// renaming the member rewrite the binder's text instead.
+// A `Self` Node at the bottom, not an Identifier spelled `@`: inside a lifted
+// Handler the subject is the `_self` Parameter.
 function selfPathLookup(
 	path: Array<string>,
 	type: common.Type,
 	selfType: common.Type,
 	position: common.Position,
-	// Where each step of the spine was WRITTEN, where the caller knows —
-	// a Matcher's bindings do, a Guard's lent alias does not, because the alias
-	// stands for a Lookup nobody wrote. Every step given the same span would
-	// make the Language Server index an intermediate member as an occurrence of
-	// the binder, and renaming the member would overwrite the binder's text.
+	// Where each step was written, where the caller knows. A Guard's lent alias
+	// stands for a Lookup nobody wrote, so it has none.
 	stepPositions?: Array<common.Position>,
 ): common.typed.ExpressionNode {
 	let base: common.typed.ExpressionNode = {
@@ -15393,10 +15273,9 @@ function selfPathLookup(
 	return base
 }
 
-// A bare Case Matcher (`case #Add`) resolves against the matched
-// value's own Union — the Case's name never has to be in scope by itself.
-// Ambiguity (two Choices in one Union sharing a Case name) asks for the
-// prefixed form instead of guessing.
+// A bare Case Matcher, `case #Add`, resolves against the matched value's own
+// Union, so the Case need not be in scope. Two Choices sharing the name ask for
+// the prefixed form.
 function resolveCaseMatcherType(
 	node: parser.CaseMatcherNode,
 	valueType: common.Type,
@@ -15414,34 +15293,18 @@ function resolveCaseMatcherType(
 			return declaredCase
 		}
 
-		// The prefix only says WHICH Choice's Case is meant — never with
-		// which Type Arguments. A generic Choice's DECLARED Case still carries
-		// its Type Parameters (`Walk#Done` is `{ value: Result }`), and the
-		// scrutinee is what applied them, so `@` binds to the matching member of
-		// the scrutinee's own Union, exactly as the bare form does. Written out,
-		// `case Walk#Done` left `@.value` an opaque `Result` while the identical
-		// `case #Done` narrowed it to Integer — and the prefix is the form the
-		// ambiguity Diagnostic asks for.
+		// The prefix names the Choice, never its Type Arguments. `@` binds to
+		// the matching member of the subject's Union, as the bare form does, so
+		// `case Walk#Done` types `@.value` like `case #Done`.
 		let instantiated = instantiatedCaseOf(declaredCase, valueType)
 
 		if (instantiated !== null) {
 			return instantiated
 		}
 
-		// The prefix names a Case the matched value can not be, which the
-		// bare form says outright and this one used to answer with the declared
-		// Case instead — a Handler that can never run, typed by Type Parameters
-		// nothing here binds.
-		//
-		// The NAME alone is underlined, as the bare form's is and for the
-		// same reason — a Quick Fix rewrites exactly what the Diagnostic
-		// underlines, and the prefix the reader wrote is no part of a near miss.
-		// The near miss is looked for among the matched Union's Cases OF THIS
-		// CHOICE and nowhere else, because a name is all the fix replaces: a
-		// Case of another Choice written after this prefix would not resolve
-		// either. Where the PREFIX is what went wrong there is no such name, so
-		// nothing is suggested rather than a rewrite that changes the spelling
-		// without changing the answer.
+		// The prefix names a Case the value can not be. Only the name is
+		// underlined, so the Quick Fix replaces just the name, and the near
+		// miss comes from this Choice's Cases in the Union.
 		if (!typeContainsError(valueType)) {
 			reportError(
 				`The matched value has no Case '${node.choice.content}#${node.caseName.content}'`,
@@ -15482,10 +15345,9 @@ function resolveCaseMatcherType(
 			member.type === "Case" && member.name === node.caseName.content,
 	)
 
-	// Several candidates of ONE Choice are instantiations of the same
-	// Case, which no Matcher can tell apart at runtime — they are joined, the
-	// way the prefixed form joins them. Only candidates of DIFFERENT Choices
-	// are an ambiguity the prefix can resolve.
+	// Several candidates of one Choice are instantiations of one Case, which no
+	// Matcher tells apart at runtime, so they are joined. Only different
+	// Choices are ambiguous.
 	if (
 		candidates.length > 0 &&
 		new Set(candidates.map((candidate) => candidate.choice)).size === 1
@@ -15494,10 +15356,7 @@ function resolveCaseMatcherType(
 	}
 
 	if (candidates.length === 0) {
-		// De-duplicated by name, because the matched Union may be
-		// `A | B` with both Choices declaring the same Case — which is the
-		// `ambiguous-case` branch below when it IS the name written, and
-		// nothing but a repeated entry in this list when it is not.
+		// De-duplicated by name, since `A | B` may both declare one Case.
 		let memberCaseNames = [
 			...new Set(
 				members.flatMap((member) =>
@@ -15506,15 +15365,8 @@ function resolveCaseMatcherType(
 			),
 		]
 
-		// A subject that HOLDS the Choice rather than being it — a
-		// `match` written on the Future that answers one, which declares no
-		// Case at all and so is answered with a list of nothing. Asked with
-		// the same question `unknown-method` asks of a receiver, and it says
-		// the same thing: the value is one level out.
-		// A subject that HOLDS the Choice is one mistake about the whole
-		// Match, and every arm would say it over again about a different Case
-		// name. Said on the first arm, and the rest answer with the Error they
-		// would have answered with anyway.
+		// A subject that holds the Choice, as a Future answering one does, is
+		// one mistake about the whole Match. Only the first arm reports it.
 		let held =
 			armIndex === 0
 				? heldCaseSubject(valueType, node.caseName.content, scope)
@@ -15526,9 +15378,7 @@ function resolveCaseMatcherType(
 
 		let suggestion = caseSuggestion(node.caseName.content, memberCaseNames)
 
-		// The name alone, not the whole Matcher — a Quick Fix rewrites
-		// exactly what the Diagnostic underlines, and the `#` the reader
-		// already wrote is not part of the near miss.
+		// Only the name is underlined, so a Quick Fix replaces just the name.
 		reportError(
 			`The matched value has no Case '#${node.caseName.content}'`,
 			node.caseName.position,
@@ -15575,14 +15425,9 @@ function resolveFunctionValueType(
 	)
 }
 
-// The Enricher builds a Function literal's typed Nodes in a separate
-// pass from the one that matched it against a signature, so the Types its
-// omitted annotations resolved to have to be read back rather than worked out
-// again — there is no expected Type left to work them out from.
-//
-// A literal that is not an Argument was never matched against anything, so
-// nothing recorded it. Its annotations can only have come from its own body,
-// and this is the first and last chance to work them out.
+// A Function literal's typed Nodes are built after the match, so the Types its
+// omitted annotations resolved to are read back. A literal no call matched is
+// resolved here from its own body.
 function contextualFunctionTypeOf(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
@@ -15600,24 +15445,9 @@ function contextualFunctionTypeOf(
 	return resolveFunctionDefinitionType(node, scope)
 }
 
-// The literal read back as the FINISHED call decided its position, rather
-// than as the match could see it while it was still running. A callback is
-// matched before the call has solved every Type Parameter — the general `loop`
-// entry's `step` is matched against `(_: State) -> Step<State, Result>` with
-// `Result` bound by nothing but this very literal — and a return Type that still
-// carries one is no context at all, so the literal fell back to reading its own
-// body. Reading it off the body loses whatever the position DID say: a `<-
-// #Done(item)` decided `Step`'s `Result` from its payload and left `State`
-// standing as the Choice's own Parameter, which is the undecided Type the body
-// then enriched against.
-//
-// So the position is re-read once the call has committed and its bindings are
-// final, and only when they turn a position the match left open into a decided
-// one — the literal is resolved again against that, and the second resolution is
-// what the enrichment pass reads. Silent, because everything a resolution of
-// this literal can report was reported when it was matched: a decided expected
-// Type resolves a superset of the annotations the open one did, so this pass has
-// only fewer things to say, never more.
+// The literal resolved again under the finished call's bindings, where they
+// close a position the match left open. Silent, since the match already
+// reported. See "Probe recordings" in DEVELOPMENT.md.
 function decidedContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
@@ -15633,9 +15463,8 @@ function decidedContextualFunctionType(
 
 	let decided = applyGenericBindings(recorded.expectedType, recorded.bindings)
 
-	// Still open, so the call never decided it and the body stays the only
-	// thing that could — `map`'s `(_ item: ItemType) -> Result` where the literal
-	// itself is what binds `Result`.
+	// Still open, so only the body can decide it, as `map`'s `Result` is
+	// decided by the literal.
 	if (mentionsUnsolvedTypeParameter(decided)) {
 		return recorded.resolved
 	}
@@ -15647,20 +15476,9 @@ function decidedContextualFunctionType(
 	return result
 }
 
-// What a contextually typed Function literal resolved to, and the position
-// it was resolved against. It is worked out while the invocation's signature is
-// being matched — the only moment the expected Type is known — and read back
-// when the same Node is enriched, which happens separately and without that
-// context. Keyed by the Node, so a re-parse starts empty and nothing has to be
-// invalidated.
-//
-// The position is kept with the call's bindings rather than substituted on
-// the spot, for the same reason a prefixed Case construction's is: the Map is
-// the one the match keeps filling, so reading the record back once the call has
-// finished reads the position as the call finally decided it. `expectedType` is
-// null for a literal no invocation matched, and `bindings` for one matched
-// against a signature with no Generics to solve — neither has anything left to
-// decide.
+// What a contextually typed Function literal resolved to, and the position and
+// bindings it was resolved against. See "Probe recordings" in DEVELOPMENT.md.
+// `expectedType` is null for a literal no call matched.
 type RecordedContextualFunctionType = {
 	resolved: common.FunctionType
 	expectedType: common.FunctionType | null
@@ -15672,19 +15490,10 @@ const contextualFunctionTypes = new WeakMap<
 	RecordedContextualFunctionType
 >()
 
-// The Parameter Type an Argument was matched against, for the prefixed
-// Case constructions that read their Choice's Type Arguments off it — the
-// Argument counterpart of an annotation, and the reason `take(Holder#Bare)`
-// needs no application of its own.
-//
-// Kept with the call's bindings rather than substituted on the spot,
-// because an Argument is matched before the Arguments after it have bound
-// anything: the Parameter Type of `id(Box<Integer>#Empty, 1)` against
-// `id<infer T>(_ b: Box<T>, _ seed: T)` is recorded while `T` is still open, and
-// only `1` decides it. The Map is the one the match keeps filling, so reading
-// the record back once the call has finished reads the position as the call
-// finally decided it — `Box<Integer>`, agreeing with what was written — rather
-// than as a `T` that exists in no scope the caller can see.
+// The Parameter Type an Argument was matched against, for a prefixed Case
+// construction that reads its Type Arguments off it, as in `take(Holder#Bare)`.
+// It is kept with the call's bindings. See "Probe recordings" in
+// DEVELOPMENT.md.
 type RecordedCaseValueContext = {
 	expectedType: common.Type
 	bindings: GenericBindings | null
@@ -15695,22 +15504,15 @@ const contextualCaseValueTypes = new WeakMap<
 	RecordedCaseValueContext
 >()
 
-// The position a member path was matched against — the Parameter Type
-// whose one Parameter says what the path reads its members off. Kept and read
-// back exactly as a prefixed Case construction's is, and for exactly the same
-// reason: a path is matched while the call is still binding its Type
-// Parameters, and what it finally stands under is only settled once the call has
-// decided them.
+// The position a member path was matched against, kept as a Case construction's
+// is.
 const contextualMemberPathTypes = new WeakMap<
 	parser.MemberPathNode,
 	RecordedCaseValueContext
 >()
 
-// What ONE probe of a candidate resolved for the Nodes that react to an
-// expected Type — a contextually typed Function literal's signature, the
-// Parameter Type a Case construction or a member path is read against, and
-// what the candidate decided for its Argument Nodes. Each is only right for the
-// candidate that wins, so all of them are held aside together and committed
+// What one probe of a candidate resolved for the Nodes that read their
+// position. Each is right only for the winner, so all are held and committed
 // together.
 type ContextualFunctionTypeRecording = {
 	functions: Map<
@@ -15719,28 +15521,18 @@ type ContextualFunctionTypeRecording = {
 	>
 	cases: Map<parser.CaseValueNode, RecordedCaseValueContext>
 	paths: Map<parser.MemberPathNode, RecordedCaseValueContext>
-	// What a candidate decided for the Argument Nodes it was matched
-	// against — held as the work rather than as a Type, because the Node it
-	// writes onto belongs to the typer of whichever Invocation is being probed,
-	// and a nested one is probed inside its caller's probe. See
+	// A candidate's decisions for its Argument Nodes, held as the work, since
+	// the Node belongs to the typer of the Invocation being probed. See
 	// `decideWrittenArguments`.
 	decided: Array<() => void>
 }
 
-// The recordings of the probes currently running, innermost last. An
-// Invocation probes EVERY candidate — that is how an ambiguity is found — and
-// resolving a contextually typed Function literal against a candidate's
-// Parameter Type records what the literal's omitted annotations resolved to. A
-// candidate that then LOSES resolution must not leave that recording behind:
-// the enrichment pass reads it back to type the literal's body, so the losing
-// candidate would decide what the body means. Probes hold their recordings
-// aside and the caller commits the winner's. A stack rather than one recording,
-// because an Argument's own Invocation is probed while the outer one is.
+// The recordings of the probes running, innermost last. See "Probe recordings"
+// in DEVELOPMENT.md.
 let probeRecordings: Array<ContextualFunctionTypeRecording> = []
 
-// A nested probe commits into the enclosing probe's recording rather than
-// straight into the shared one, so an inner Invocation's winner is still
-// discarded when the outer candidate it was probed for loses.
+// A nested probe records into the enclosing probe's recording, so a losing
+// outer candidate discards it.
 function recordContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
 	recorded: RecordedContextualFunctionType,
@@ -15754,8 +15546,7 @@ function recordContextualFunctionType(
 	}
 }
 
-// Innermost first, so a probe sees what it recorded itself before what an
-// enclosing one recorded, and the committed record answers when no probe did.
+// Innermost first, then the committed record.
 function recordedContextualFunctionType(
 	node: parser.FunctionDefinitionNode,
 ): RecordedContextualFunctionType | undefined {
@@ -15770,8 +15561,7 @@ function recordedContextualFunctionType(
 	return contextualFunctionTypes.get(node)
 }
 
-// The same rail for a decision written onto an Argument Node — held by the
-// probe that made it, run where no probe is.
+// The same rail for a decision written onto an Argument Node.
 function recordDecidedArgument(decide: () => void): void {
 	let innermost = probeRecordings[probeRecordings.length - 1]
 
@@ -15808,10 +15598,9 @@ function recordContextualMemberPathType(
 	}
 }
 
-// The recorded position with the call's bindings substituted in — the
-// Function the finished call decided the path stands for. A Type Parameter
-// nothing ever bound is left standing, and the step walk answers Error for it
-// in silence: the call reports the unbound Parameter for itself.
+// The recorded position with the call's bindings substituted: the Function the
+// finished call decided the path stands for. An unbound Type Parameter stays,
+// and the call reports it.
 function recordedMemberPathType(
 	node: parser.MemberPathNode,
 ): common.Type | null {
@@ -15834,10 +15623,9 @@ function decidedContext(recorded: RecordedCaseValueContext): common.Type {
 		: applyGenericBindings(recorded.expectedType, recorded.bindings)
 }
 
-// The recorded Parameter Type with the call's bindings substituted in —
-// the position as the finished call decided it. A Type Parameter that nothing
-// ever bound is left standing, which is the undecided state
-// `mentionsUnsolvedTypeParameter` answers for and the call reports for itself.
+// The recorded Parameter Type with the call's bindings substituted. An unbound
+// Type Parameter stays, which `mentionsUnsolvedTypeParameter` detects and the
+// call reports.
 function recordedContextualCaseValueType(
 	node: parser.CaseValueNode,
 ): common.Type | undefined {
@@ -15910,12 +15698,9 @@ function commitContextualFunctionTypes(
 	}
 }
 
-// Enriches under a recording that is NOT the committed one — how a
-// dispatch branch builds its own typed copy of a shared Function literal, which
-// only exists as long as the copy is being built. A COPY of the recording is
-// pushed, so what the copy's own body records while it is enriched (a nested
-// Invocation's literal, resolved against the copy's Parameter Types) is dropped
-// with it rather than added to the branch recording the caller also commits.
+// Enriches under a recording that is not the committed one, as a dispatch
+// branch does for its copy of a literal. A copy is pushed, so what the copy's
+// body records is dropped with it.
 function withContextualFunctionTypes<Result>(
 	recording: ContextualFunctionTypeRecording,
 	work: () => Result,
@@ -15941,14 +15726,9 @@ function needsContext(node: parser.FunctionDefinitionNode): boolean {
 	)
 }
 
-// How many calls that RESOLVED TO NOTHING are having their Arguments
-// enriched. A Function literal takes its Parameter Types from the call it is
-// passed to, so a call that no candidate answered has none to give — and saying
-// so is the same mistake reported a second and a third time. `[1, 2,
-// 3]::reduce((total, item) { … }, 0)` answered with the refusal the reader has
-// to act on, and then twice more about a literal they would not touch.
-//
-// The refusal is what a reader fixes; every Type in the literal follows from it.
+// How many calls that resolved to nothing are having their Arguments enriched.
+// A Function literal passed to one has no Parameter Types to take, and the
+// call's own refusal is the one to report.
 let refusedCallDepth = 0
 
 function underRefusedCall<T>(refused: boolean, work: () => T): T {
@@ -15965,10 +15745,9 @@ function underRefusedCall<T>(refused: boolean, work: () => T): T {
 	}
 }
 
-// An unannotated Parameter takes its Type *and* its label from the
-// expected signature, positionally — which is why the Parser records no
-// external name for one. An annotated Parameter is resolved exactly as it
-// always was, so the two forms can be mixed across a Parameter list.
+// An unannotated Parameter takes its Type and label from the expected signature
+// by position, so the Parser records no external name for it. Annotated and
+// unannotated Parameters may mix.
 function resolveContextualParameterTypes(
 	node: parser.FunctionDefinitionNode,
 	scope: enricher.Scope,
@@ -15994,9 +15773,7 @@ function resolveContextualParameterTypes(
 		let expectedParameter = expectedFunction?.parameterTypes[index]
 
 		if (expectedParameter === undefined) {
-			// Silent inside a call nothing answered — see
-			// `refusedCallDepth`. The Type is still an Error, so nothing
-			// downstream reads a Parameter this never gave one.
+			// Silent inside a refused call; see `refusedCallDepth`.
 			if (refusedCallDepth > 0) {
 				return { name: null, type: { type: "Error" }, documentation }
 			}
@@ -16017,13 +15794,9 @@ function resolveContextualParameterTypes(
 							? "Only a Function passed as an Argument takes its Types from the surrounding context."
 							: `The expected Function Type takes ${countOf(expectedFunction.parameterTypes.length, "Parameter")}, so there is nothing for Parameter ${index + 1} to infer from.`,
 					],
-					// A literal nothing types from the outside is missing
-					// its return Type too, and the return Type is asked for only
-					// once every Parameter has one — so a reader who writes the
-					// Parameter's Type and stops meets `missing-return-type` on
-					// the next run, which is two round trips for one
-					// under-annotated literal. Both halves are named here, where
-					// the first of them is reported.
+					// A literal typed by nothing around it also lacks its
+					// return Type, which is asked only once every Parameter has
+					// one. Both are named here to save a round trip.
 					helps: [
 						node.returnType === null && expectedFunction === null
 							? "Write the Parameter's Type and the Function's return Type — a literal outside Argument position takes neither from around it."
@@ -16043,25 +15816,13 @@ function resolveContextualParameterTypes(
 	})
 }
 
-// The Function literals whose return Type could not be read off their
-// body. One mistake, and the call AROUND such a literal is full of consequences
-// of it: `Result::andThen`'s `Other` is written in the step's own answer Type, so
-// a literal answering nothing leaves `Other` unbound, leaves the `#Failure(…)` in
-// its body measured against an Error, and leaves the `#Value(…)` beside it with
-// no Choice to pick from. Each of those reported in its own words, and only the
-// first of the four named an edit that helps.
-//
-// Remembered by Node rather than by Type, because the call that reports is a
-// stage away from the literal that failed and an Error Type says only that
-// SOMETHING went wrong. A WeakSet over Parser Nodes holds nothing once a run's
-// tree is gone, so a long-lived Language Server keeps no more than the trees it
-// is already keeping.
+// The Function literals whose return Type could not be read off their body. The
+// call around one stays silent about the consequences, such as an unbound
+// `Other` of `Result::andThen`. Kept per parser Node in a WeakSet.
 let literalsAnsweringNothing = new WeakSet<parser.FunctionDefinitionNode>()
 
-// Whether the body's last line is a VALUE rather than a `<-` — the usual
-// cause of a return Type nothing can read, and the one thing the report about it
-// could not say before. Asked as "is the last line a Statement", because the
-// Parser spells every Statement form out and an Expression is what is left over.
+// Whether the body's last line is a value rather than a `<-`, the usual cause.
+// Everything that is no Statement form is an Expression.
 function endsInAnUnreturnedValue(
 	body: Array<parser.ImplementationNode>,
 ): boolean {
@@ -16092,17 +15853,9 @@ function endsInAnUnreturnedValue(
 	}
 }
 
-// The annotation a literal outside Argument position has to write, spelled
-// out where the Compiler can spell it. The body is read for the Diagnostic alone
-// — `inferReturnTypeFromBody` drops what that pass reports — which is a thing
-// this stage refuses to do for the PROGRAM on purpose: a Type nothing constrains
-// is hard to follow across a Program, and is easy to read once, here, to say what
-// the missing annotation would have been.
-//
-// Withheld where what came back can not be written down. `describeType` collapses
-// a nested Function to `(_: …) -> …` and prints a blank as `Unknown`, and neither
-// is a Type a reader can type back in — so the schematic stands there instead,
-// and says it is one.
+// The annotation a literal outside Argument position has to write, spelled from
+// its body where it can be. A nested Function or an Unknown can not be typed
+// back in, so a schematic stands there.
 function returnTypeHelp(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
@@ -16131,19 +15884,14 @@ function resolveContextualReturnType(
 		return resolveType(node.returnType, scope)
 	}
 
-	// A Parameter that could not be inferred has already been reported,
-	// and its Error Type poisons whatever the body returns — a second
-	// Diagnostic here would only restate the first in vaguer terms.
+	// A Parameter that could not be inferred was already reported.
 	if (parameterTypes.some((parameter) => parameter.type.type === "Error")) {
 		return { type: "Error" }
 	}
 
-	// With no expected signature the body is the only thing that could
-	// say what this Function returns, and reading a Type off a body that
-	// nothing else constrains is exactly the inference that is hard to follow
-	// across a whole Program. A literal in Argument position is the one place
-	// the Type is still written down — just elsewhere — so it is the one place
-	// an omitted `-> Type` is allowed.
+	// Without an expected signature only the body could say what this returns,
+	// which is hard to follow across a Program. Only a literal in Argument
+	// position may omit `-> Type`.
 	if (expectedFunction === null) {
 		reportError(
 			"This Function must write its return Type",
@@ -16163,17 +15911,10 @@ function resolveContextualReturnType(
 		return { type: "Error" }
 	}
 
-	// An expected return Type the CALL has not solved says nothing — in
-	// `map`'s `(_ item: ItemType) -> Result` nothing binds `Result` but this
-	// literal's own body, so the body is what it is read off.
-	//
-	// A Type Parameter of an enclosing Namespace or Function is not that: it is
-	// a decision, a generic one, and reading `List.firstItem(where:)`'s fold off
-	// its body instead threw away the `Step<Optional<ItemType>,
-	// Optional<ItemType>>` its `reduce` had already decided — leaving the
-	// `#Done(item)` in it carrying whichever Parameters its payload happened to
-	// mention. `mentionsUnsolvedTypeParameter` tells the two apart by the fresh
-	// name only a call still matching can produce.
+	// An expected return Type the call has not solved is read off the body, as
+	// for `map`'s `Result`. A Type Parameter of an enclosing Namespace or
+	// Function is a decision. See "Return Type inference from a body" in
+	// DEVELOPMENT.md.
 	if (mentionsUnsolvedTypeParameter(expectedFunction.returnType)) {
 		let refused = { body: false }
 		let inferred = inferReturnTypeFromBody(
@@ -16187,23 +15928,15 @@ function resolveContextualReturnType(
 			return inferred
 		}
 
-		// A body that was refused in its own right is answered where it
-		// was refused. Saying here that its Type could not be read is the same
-		// mistake restated in vaguer words, one line further from it — which is
-		// what the Parameter-Type gate above this does for the same reason.
+		// A body refused in its own right is answered where it was refused.
 		if (refused.body) {
 			return { type: "Error" }
 		}
 
 		let position = functionLiteralPosition(node)
 		let message = "The return Type could not be inferred from the body"
-		// A body that forgets `<-` is the usual cause, and the annotation
-		// this asked for does not fix it — it moves the report to
-		// `missing-return` one run later, which is the same mistake said in
-		// another stage's words. `::reduce` reports it as `missing-return`
-		// straight away, so the Compiler can say it here too. The annotation
-		// stays, second: a body that DOES return and still answers nothing has
-		// no other way out.
+		// A missing `<-` is the usual cause, so the Help names it first; an
+		// annotation would only move the report to `missing-return`.
 		let helps = endsInAnUnreturnedValue(node.body)
 			? [
 					"Return the value with '<-' — a body whose last line is a value answers with nothing.",
@@ -16249,18 +15982,9 @@ function functionLiteralPosition(
 	return node.parameters[0]?.position ?? null
 }
 
-// What a Type Alias means, `where` clause and all. Without a clause this
-// is nothing but `resolveAliasedType`; with one the Alias declares a checked
-// refinement, and the Type it answers with is the evidence every value of the
-// name carries.
-//
-// The predicate is enriched on EVERY call, and no resolution of it is kept
-// anywhere. Hoisting resolves speculatively, round after round, and the first
-// round a refined Alias is offered in may well be the one before the Namespace
-// answering its predicate has hoisted at all — the standard library declares
-// `type NonZeroInteger` in the same file as `namespace Integer`. That round
-// reports `unknown-method` into a collection it then throws away, and the next
-// one resolves cleanly. A cached first answer would be the wrong one forever.
+// What a Type Alias means, `where` clause included. The predicate is enriched
+// on every call and never kept, since an early hoisting round may read it
+// before the Namespace answering it exists.
 export function resolveTypeAliasStatementType(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
@@ -16278,13 +16002,9 @@ export function resolveTypeAliasStatementType(
 		refinementPredicateScope(node, scope),
 	)
 
-	// Poison recovery — a refused clause leaves the Alias meaning exactly
-	// what it would have meant without one. A Diagnostic has already named the
-	// clause, and every use of the name downstream is then about itself rather
-	// than about an Error Type nobody wrote. A generic Alias keeps its wrapper —
-	// what it stands for without the clause is still `List<Item>` applied at each
-	// use, and dropping the wrapper would leave every `NonEmptyList<String>` naming a
-	// Type that takes no Arguments.
+	// A refused clause leaves the Alias meaning what it would without one. A
+	// generic Alias keeps its wrapper, so `NonEmptyList<String>` still takes
+	// Arguments.
 	if (conjuncts === null) {
 		return type.type === "GenericAlias"
 			? { ...type, aliasedType: refinement.base }
@@ -16296,11 +16016,8 @@ export function resolveTypeAliasStatementType(
 	return type
 }
 
-// The refinement a skeleton hoisted with its predicate unread, or null when
-// the Type is not one. A GENERIC refined Alias resolves to a Generic Alias
-// WRAPPING the refinement — the Arguments are applied through the wrapper, and the
-// refinement one level in is the object the fill writes into — so every reader
-// that means "is this predicate still pending" has to look inside.
+// The Refinement a skeleton hoisted with its predicate unread, or null. A
+// generic refined Alias wraps it, so this looks inside the wrapper.
 export function pendingRefinementIn(
 	type: common.Type,
 ): common.RefinementType | null {
@@ -16314,11 +16031,8 @@ export function pendingRefinementIn(
 		: null
 }
 
-// The Scope a refined Alias' predicate resolves in. A generic one's base
-// mentions its Type Parameters (`@: List<Item>`), so the Parameters have to be in
-// Scope as the opaque Generics they are — which is also what makes an
-// item-dependent predicate (`@::contains(0)`) fail as the ordinary typechecking
-// mistake it is, rather than needing a special refusal of its own.
+// The Scope a refined Alias' predicate resolves in, with a generic one's Type
+// Parameters as opaque uses. See "Reading a refined Alias" in DEVELOPMENT.md.
 export function refinementPredicateScope(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
@@ -16328,23 +16042,8 @@ export function refinementPredicateScope(
 		: scopeWithGenerics(node.generics, scope)
 }
 
-// The Alias' Type up to — but not including — reading its predicate,
-// which is the half hoisting can always resolve on its own. A refined Alias and
-// the Namespace answering its predicate may name each other (`NonZeroInteger`
-// asks Integer's `isNot`; `namespace Integer` declares a `divide` taking a
-// NonZeroInteger), and reading the predicate here would deadlock the two. So
-// what comes back for a clean refined Alias is the Refinement with `conjuncts:
-// null` — registered once, shared by reference, and written into in place when
-// the predicate is read — while every REFUSAL that needs no predicate (a base
-// outside the three) is decided and reported here, so a broken clause never
-// hoists as a Refinement at all: it poisons to its base exactly as it always did.
-//
-// A GENERIC refined Alias comes back as the Generic Alias `resolveAliasedType`
-// built with the refinement in place of its body — `NonEmptyList<Item>` is a Generic
-// Alias over `List<Item> where @::hasItems()`, and a use site applies its Arguments
-// through the wrapper, substituting them into the base the refinement stands on.
-// The refinement itself is what the predicate is about, so the admissibility of the
-// base is asked of the BODY rather than of the wrapper.
+// The Alias' Type without its predicate, the half hoisting can always resolve.
+// See "Reading a refined Alias" in DEVELOPMENT.md.
 export function resolveTypeAliasStatementSkeleton(
 	node: parser.TypeAliasStatementNode,
 	scope: enricher.Scope,
@@ -16376,9 +16075,8 @@ export function resolveTypeAliasStatementSkeleton(
 		: refinement
 }
 
-// The Scope a predicate is read in — the surrounding one plus `@`, bound
-// to the base as a CONSTANT, which is what a Match Handler's `@` is too. A child
-// Scope, so the binding never reaches the Program's own.
+// The Scope a predicate is read in: `@` bound to the base as a Constant, in a
+// child Scope.
 function scopeWithRefinedSelf(
 	base: common.Type,
 	scope: enricher.Scope,
@@ -16386,18 +16084,12 @@ function scopeWithRefinedSelf(
 	return declareVariableInScope("@", base, childScope(scope), true)
 }
 
-// The refusals that need no predicate reading — decided from the written
-// declaration and the resolved base alone, which is what lets the skeleton
-// above answer them without touching a Namespace. Every refusal reports before
-// it answers, so a false here is always a Diagnostic there.
+// The refusals that need no predicate. Each reports before it answers false.
 function refinementSkeletonAdmissible(
 	node: parser.TypeAliasStatementNode,
 	aliasedType: common.Type,
 ): boolean {
-	// A poisoned base says nothing about the clause — the Type it names is
-	// not declared, or names itself — and whatever produced the Error has already
-	// been reported. Refused silently, exactly as the Boolean check in
-	// `resolveRefinementConjuncts` refuses an Error-typed predicate.
+	// A poisoned base was already reported, so it is refused silently.
 	if (typeContainsError(aliasedType)) {
 		return false
 	}
@@ -16414,12 +16106,9 @@ function refinementSkeletonAdmissible(
 				notes: [
 					"A checked refinement is written on an Integer, a Rational, a String, an applied List or an applied Dictionary — 'List<String>', never a bare 'List'.",
 				],
-				// Dropping the clause compiles, and it quietly answers a
-				// DIFFERENT Declaration: "a Boolean that is true" becomes "any
-				// Boolean", which is the Type the reader was refining their
-				// way out of. So the edit says what it costs, and the other
-				// half names what can carry the clause instead — the intent
-				// survives a change of base, and it survives nothing else.
+				// Dropping the clause answers a different Declaration, so the
+				// Help says what it costs. The other Help names the bases that
+				// can carry the clause.
 				helps: [
 					`Drop the 'where' clause from '${node.name.content}', which leaves the Alias naming ${described} and nothing more.`,
 					"Or write the refinement on a base one can be checked against — an Integer, a Rational, a String, an applied List or an applied Dictionary.",
@@ -16433,12 +16122,8 @@ function refinementSkeletonAdmissible(
 	return true
 }
 
-// The predicate read at last — the half that needs the answering
-// Namespace in Scope, which is why hoisting calls it apart from the skeleton:
-// per round for an Alias whose Namespace is still on its way, with a Diagnostic
-// here read as "not this round". Null when the clause is refused, and every
-// refusal reports before it returns — either here or, for an Error-typed
-// predicate, wherever the Error was made.
+// The predicate read at last, once the answering Namespace is in Scope. Null
+// when the clause is refused, and every refusal is reported.
 export function resolveRefinementConjuncts(
 	predicateNode: parser.ExpressionNode,
 	base: common.Type,
@@ -16449,9 +16134,7 @@ export function resolveRefinementConjuncts(
 		scopeWithRefinedSelf(base, scope),
 	)
 
-	// The same question `validateCondition` asks of an `if` — a predicate
-	// that is not a Boolean proves nothing — and an Error Type is let through
-	// silently, because whatever produced it has already been reported.
+	// As `validateCondition` asks of an `if`. An Error was already reported.
 	if (predicate.type.type !== "Boolean") {
 		if (predicate.type.type !== "Error") {
 			reportError(
@@ -16468,13 +16151,8 @@ export function resolveRefinementConjuncts(
 					notes: [
 						"A 'where' clause is a question about the value being refined, so it has to answer 'true' or 'false'.",
 					],
-					// A question of '@' ITSELF, never of what the clause
-					// answers. `@::absolute()` is a perfectly good call, and the
-					// comparison a reader would chain onto it is refused by the
-					// next rail along — a predicate is ONE call on '@', which is
-					// what the Note beside this says. So the Method named is one
-					// the refined base has, and writing it in place of the call
-					// is the whole edit.
+					// A predicate is one call on `@`, so the Help names a
+					// Boolean Method the base has.
 					helps: [
 						`Call a Method on '@' that answers a Boolean — '@::${booleanQuestionFor(base)}', for instance.`,
 					],
@@ -16494,27 +16172,8 @@ export function resolveRefinementConjuncts(
 	return canonicalPredicateConjuncts(conjuncts)
 }
 
-// The bases a `where` clause may be written on. Integer, Rational and
-// String are the three scalars every predicate in the standard library's own
-// slice is about, and an APPLIED List is the fourth — `List<String>` or
-// `List<Item>`, never a bare `List`, whose item Type nothing has decided. The
-// list is short because each base is a promise: every Method a base answers, a
-// refinement of it answers too, and every one of those has to keep meaning what
-// it meant.
-//
-// A generic Alias' base is an applied List whose item Type is still its Type
-// Parameter, which passes for the same reason `List<String>` does — what nothing has
-// decided about a bare `List` is decided here, by the use site. That the Parameter is
-// OPAQUE while the predicate is read is what keeps the conjuncts item-agnostic: a
-// predicate about the items (`@::contains(0)`) is refused by ordinary typechecking,
-// and the ones that survive ask nothing a Type Argument could answer differently.
-//
-// An APPLIED Dictionary is the fifth, and it is here on exactly the List's
-// terms — `Dictionary<Key, Value>` with both slots still Type Parameters is what
-// `NonEmptyDictionary` is written on, and a predicate that could ask about
-// either slot is refused by ordinary typechecking before it reaches a conjunct.
-// A bare `Dictionary` is refused for the reason a bare `List` is: nothing has
-// decided what is in it.
+// The bases a `where` clause may refine. See "Reading a refined Alias" in
+// DEVELOPMENT.md.
 function isRefinableBase(type: common.Type): boolean {
 	return (
 		type.type === "Integer" ||
@@ -16525,26 +16184,16 @@ function isRefinableBase(type: common.Type): boolean {
 	)
 }
 
-// An anonymous Union takes the Alias' own name as it resolves, so
-// describing a refused base straight would report that 'Weird' is Weird. The
-// refusal is about the SHAPE, so the borrowed name is dropped and the members
-// are spelled out.
+// An anonymous Union takes the Alias' own name, so the borrowed name is dropped
+// and the members are spelled out.
 function describeRefinementBase(type: common.Type): string {
 	return type.type === "UnionType" && type.name !== undefined
 		? describeType({ ...type, name: undefined })
 		: describeType(type)
 }
 
-// The conjunct set a typed predicate spells, or null when it spells
-// something a refinement can not be compared by — every refusal reports before
-// it returns, so a null here is always a Diagnostic there.
-//
-// A predicate is a conjunction, flattened: `@::isPositive()::and(@::isNot(1))`
-// is two conjuncts and so is the mirror image of it, which is what makes
-// assignability set inclusion rather than Expression comparison. Everything else
-// is one leaf, and a leaf is a single Method call directly on `@` with literal
-// Arguments — a chain (`@::trim()::hasCharacters()`) would need the intermediate
-// value's evidence, and a computed Argument would need evaluating.
+// The conjunct set a typed predicate spells, or null after a report. See
+// "Reading a refined Alias" in DEVELOPMENT.md.
 function extractPredicateConjuncts(
 	predicate: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -16621,20 +16270,9 @@ function reportInvalidPredicateLeaf(
 
 // #region Predicate Aliases
 
-// One predicate leaf as the question it really asks. A Method written on
-// another one is put down as the one it calls, with `negated` carrying whatever
-// `::negate()` the body spelled — so `@::isZero()` and `@::is(0)` are one leaf,
-// `@::hasItems()` is `List::isEmpty()` negated, and the opposite of any of them
-// is the same leaf with the flag flipped.
-//
-// The name it was WRITTEN as rides along for the Diagnostic that has to say
-// which predicate a value did not answer. It decides nothing.
-//
-// An alias is a TEMPLATE, so this is where the Arguments a call was given are
-// substituted into it: `n::isLessThanOrEqualTo(9)` reads the leaf
-// `Integer::isGreaterThan(9)` negated off `isLessThanOrEqualTo`'s body, which
-// forwards the Argument it was handed. Nothing here resolves an Overload — the
-// entry the call already resolved to is the one whose template is read.
+// One predicate leaf as the question it asks, with the call's Arguments
+// substituted into an alias template. See "Predicate aliases" in
+// DEVELOPMENT.md.
 function resolvedConjunct(
 	invocation: common.typed.MethodInvocationNode,
 	args: Array<string | boolean>,
@@ -16642,11 +16280,8 @@ function resolvedConjunct(
 ): common.PredicateConjunct {
 	let spelling: common.PredicateSpelling = {
 		methodName: invocation.member.name,
-		// The LABEL rides along with the scalar it stood in front of, and
-		// nowhere else: the conjunct's own `args` are the key and two spellings
-		// of one question are one question. It is the printed text that needs
-		// it, because a `match` guard is written the way the text reads and
-		// `@::isBetween(0, 9)` answers no Overload.
+		// The label rides with its scalar for printing only, since a guard is
+		// written as the text reads; the conjunct's `args` are the key.
 		args: args.map((value, index) => {
 			let label = invocation.arguments[index]?.name
 
@@ -16654,15 +16289,10 @@ function resolvedConjunct(
 		}),
 	}
 	let alias = predicateAliasOf(invocation)
-	// The receiver's own Type is what says how a bound is spelled, and it
-	// is unwrapped first: a `where` clause asks `@` bound to the bare base,
-	// while a condition asks an ordinary binding whose Type is often a
-	// refinement already. Both have to key alike, or an `if` would stop
-	// rewriting where the clause it has to match kept on.
+	// The receiver's base Type, unwrapped, decides how a bound is spelled, so a
+	// `where` clause and an `if` key alike.
 	let tag = refinableBaseTag(invocation.base.type)
-	// The leaf a Method with nothing to read stands for — itself. No
-	// Method is named anywhere as the contrary of another: a body says it, and
-	// a Method whose body says nothing asks its own question.
+	// A Method whose body says nothing is its own leaf.
 	let written: common.PredicateConjunct = {
 		namespaceName: invocation.namespace.name,
 		methodName: spelling.methodName,
@@ -16674,12 +16304,9 @@ function resolvedConjunct(
 			? null
 			: aliasLeafOf(alias, invocation.namespace.name, args)
 
-	// And whatever the leaf itself is written on is followed from here,
-	// which is the step the reading could not take. A Protocol sees a
-	// REQUIREMENT where a conformer may have written a body, and a body read
-	// while what it names was still on its way records the name rather than the
-	// leaf. Both are settled by the time anything asks, so asking is what this
-	// does.
+	// The leaf is followed further here: a Protocol requirement may have a
+	// conformer's body, and a body read before its target recorded only the
+	// name.
 	if (resolved !== null) {
 		resolved = collapsedLeaf(resolved, scope)
 	}
@@ -16687,15 +16314,9 @@ function resolvedConjunct(
 	return { ...forNumericBase(resolved ?? written, tag), spelling }
 }
 
-// A leaf followed to the end of whatever it names. Every step is one
-// Method's recorded reading, so a chain the hoist collapsed answers at the first
-// step and stops; what is left to follow here is what hoisting could not see —
-// the witness's own body under a Protocol's requirement, and a target whose
-// reading was recorded after the body naming it had been read.
-//
-// A leaf coming back round is left EXACTLY as it arrived: two Methods written
-// as each other's contraries say nothing about either, and believing a step
-// would make the answer depend on which of them was asked.
+// A leaf followed to the end of what it names. A leaf coming back round is
+// returned as it arrived, since two Methods written as each other's contraries
+// say nothing.
 function collapsedLeaf(
 	leaf: common.PredicateConjunct,
 	scope: enricher.Scope,
@@ -16721,17 +16342,9 @@ function collapsedLeaf(
 	}
 }
 
-// The leaf one Method's own reading names, or null where the Method has
-// nothing recorded. `Ranked::isAtMost` is written on `Self::isAbove`, and what
-// `isAbove` asks is the conformer's business — `namespace Rank for Integer`
-// writes it as `@::isGreaterThan(n)`, so a receiver of Rank's proves the leaf
-// both spellings mean.
-//
-// An OVERLOADED Method ENDS the walk: which entry a leaf names is the Arguments'
-// business, and a leaf carries scalars where an Overload is chosen by typed,
-// labelled Arguments. So the leaf stays the name it had, which is a question a
-// refinement spelled the same way still matches and a refinement spelled as the
-// entry's own body does not.
+// The leaf one Method's own reading names, or null: `Ranked::isAtMost` is
+// written on `Self::isAbove`, which a conformer writes. An Overloaded Method
+// ends the walk, since a leaf's scalars can not choose an entry.
 function throughWitness(
 	leaf: common.PredicateConjunct,
 	scope: enricher.Scope,
@@ -16757,9 +16370,8 @@ function throughWitness(
 		: { ...resolved, negated: resolved.negated !== leaf.negated }
 }
 
-// The Namespace a name stands for, or null where the name is not one. A
-// Namespace is declared as a MEMBER, so this is the ordinary name lookup with
-// the answer's kind checked.
+// The Namespace a name stands for, or null. A Namespace is declared as a
+// member.
 function namespaceNamedInScope(
 	name: string,
 	scope: enricher.Scope,
@@ -16770,13 +16382,9 @@ function namespaceNamedInScope(
 	return member?.type === "Namespace" ? member : null
 }
 
-// The leaf an alias stands for at THIS call — the recorded template with
-// the Arguments the caller wrote substituted into its forwarded slots, and the
-// witness' own Namespace where the body was read on `Self`.
-//
-// `null` where a slot names an Argument the call did not write, which nothing
-// reaches today: a Method a caller may write fewer Arguments to is refused a
-// reading outright, so every slot a template holds has an Argument to take.
+// The leaf an alias stands for at this call: the template with the caller's
+// Arguments in its slots. `null` where a slot has no Argument, which can not
+// happen, since defaulted Methods are never read.
 function aliasLeafOf(
 	alias: common.PredicateAlias,
 	witnessName: string,
@@ -16808,27 +16416,9 @@ function aliasLeafOf(
 	}
 }
 
-// The leaf a RATIONAL receiver asks, spelled one way. `@::isNot(0)` and
-// `@::isNot(0/1)` are one question about one number, and they were two keys: a
-// fraction is answered by `Rational`'s own entry, while a bare Integer bound
-// finds no same-kind entry and falls to the covering `Number`. So
-// `NonZeroRational` was reachable through one spelling and not the other — and
-// `@::isNot(0)`, the spelling the Compiler's own Help offers, was the one that
-// missed. `isLessThan` and `isGreaterThan` split the same way without `Number`
-// coming into it at all, since Rational declares an Overload for each kind.
-//
-// The RECEIVER decides it, not the entry that answered: where a Rational stands
-// in front of the call, every bare run of digits is read as `n/1` — which is
-// what widening an Integer bound to a Rational does, and what the admission
-// table has always read one as — and the covering Namespace is spelled as
-// Rational's own. A Program's own Namespace over a Rational is left exactly as
-// written: what `Frac::isHalf` asks is the Program's question, not the
-// ordering's, and nothing may quietly rename it.
-//
-// Read AFTER an alias is substituted rather than before, because a template
-// slot holds no bound to respell: `isLessThanOrEqualTo(_ other)` forwards
-// whatever number the caller wrote, and the caller is the one who wrote `2`
-// where `2/1` was meant.
+// The leaf a Rational receiver asks, spelled one way. A Program's own
+// Namespace, such as a `Frac::isHalf`, keeps its spelling. See "Predicate
+// aliases" in DEVELOPMENT.md.
 function forNumericBase(
 	leaf: common.PredicateConjunct,
 	tag: string,
@@ -16844,29 +16434,23 @@ function forNumericBase(
 	}
 }
 
-// A bare run of digits as the Rational it stands for, and everything else
-// as it was written — a fraction is already in this form, a String keeps its
-// quotes, and a Boolean is no bound at all.
+// A bare run of digits as its Rational; anything else as written.
 function rationalBound(scalar: string | boolean): string | boolean {
 	return typeof scalar === "string" && /^-?\d+$/.test(scalar)
 		? reducedRationalSpelling(scalar, "1")
 		: scalar
 }
 
-// The alias recorded on the entry this call resolved to, if it is one. The
-// Namespace Type on a typed Invocation is the very object hoisting registered —
-// `namespacesTargeting` hands the Scope's own — so the annotation written at the
-// hoist is read straight off it, and it rides the standard library's snapshot
-// like every other field of a Type.
+// The alias recorded on the entry this call resolved to. The Namespace Type on
+// the Invocation is the object hoisting registered, so it carries the
+// annotation.
 function predicateAliasOf(
 	invocation: common.typed.MethodInvocationNode,
 ): common.PredicateAlias | undefined {
 	return resolvedEntryOf(invocation)?.predicateAlias
 }
 
-// The one signature a Method call settled on. A Method of one entry is
-// that entry; an Overloaded one is the entry the call bound, which the Enricher
-// has already chosen by the time anything asks.
+// The one signature a Method call settled on.
 function resolvedEntryOf(
 	invocation: common.typed.MethodInvocationNode,
 ): common.BaseFunction | undefined {
@@ -16889,23 +16473,9 @@ function resolvedEntryOf(
 		: method.overloads[invocation.overloadedMethodIndex]
 }
 
-// The two names an ordering answers when the call is written the other way
-// round, which is what makes `<- other::isGreaterThanOrEqualTo(@)` readable at
-// all. Each row is one line of the same truth table:
-//
-//   other = @   is  other ≠ @   isNot   — each is its own converse
-//   other < @   isLessThan             @ > other   isGreaterThan
-//   other > @   isGreaterThan          @ < other   isLessThan
-//   other ≤ @   isLessThanOrEqualTo    @ ≥ other   isGreaterThanOrEqualTo
-//   other ≥ @   isGreaterThanOrEqualTo @ ≤ other   isLessThanOrEqualTo
-//
-// It is the ordering's own law and nothing more — the same law
-// `impliedConjunctKeys` reads off these very names — so it is read under the
-// same guard: both the Namespace that ANSWERED the flipped call and the
-// Namespace the body belongs to have to be one the base's ordering speaks
-// through. A Program's `namespace Tally for String { isLessThan(…) }` means
-// whatever its body means, and reading a converse off the word would invent a
-// comparison nobody made.
+// The converse of each ordering, so `<- other::isGreaterThanOrEqualTo(@)` reads
+// as `@::isLessThanOrEqualTo(other)`. Believed only under the guard
+// `impliedConjunctKeys` uses.
 const CONVERSE_COMPARISONS: ReadonlyMap<string, string> = new Map([
 	["is", "is"],
 	["isNot", "isNot"],
@@ -16915,14 +16485,12 @@ const CONVERSE_COMPARISONS: ReadonlyMap<string, string> = new Map([
 	["isGreaterThanOrEqualTo", "isLessThanOrEqualTo"],
 ])
 
-// An Argument slot while a body is still being read. `Self` is `@` handed
-// to somebody else, which only the converse below can turn back into a slot a
-// caller fills — every other body carrying one is refused, since a leaf has
-// nowhere to put the receiver.
+// An Argument slot while a body is read. `Self` is `@` handed on, which only a
+// converse can turn back into a slot.
 type DerivedArgument = common.PredicateAliasArgument | { kind: "Self" }
 
-// One step of the reading — the call a body makes, before anything the
-// call's own target says about itself is folded in.
+// One step of the reading: the call a body makes, before its target is folded
+// in.
 type AliasStep = {
 	namespaceName: string | null
 	methodName: string
@@ -16930,11 +16498,8 @@ type AliasStep = {
 	negated: boolean
 }
 
-// One Method read as an alias, and everything the chain needs of it. The
-// TARGET is the entry object the body's call resolved to, which is what lets a
-// chain be followed without resolving a name twice; `converse` is the Parameter
-// the call was made ON where the body flipped it, and null where `@` stood in
-// front of the call as usual.
+// One Method read as an alias. `target` is the entry the body's call resolved
+// to, and `converse` the Parameter a flipped call was made on.
 type AliasCandidate = {
 	methodName: string
 	entry: common.BaseFunction
@@ -16944,25 +16509,19 @@ type AliasCandidate = {
 	converseTrusted: boolean
 }
 
-// What the reading needs of whatever DECLARED the body — a Namespace or a
-// Protocol. `selfNamespaceName` is the name a leaf read off `@` belongs to, and
-// is null for a Protocol: a provided Method belongs to whichever witness reaches
-// it, so the Namespace is filled in at the call site instead.
+// What the reading needs of the declaring Namespace or Protocol.
+// `selfNamespaceName` is null for a Protocol, whose witness fills it in.
 type AliasContainer = {
 	selfNamespaceName: string | null
 	trustsOrdering: boolean
-	// What `Self` stands for while a PROTOCOL's provided body is read —
-	// the Type Parameter BOUNDED by the Protocol, which is what makes a call on
-	// `@` resolve through the Protocol's own surface. A Namespace needs none:
-	// its receiver Parameter already names the Type it is for.
+	// `Self` while a Protocol's provided body is read: the Type Parameter
+	// bounded by the Protocol.
 	selfType?: common.Type
 	canonicalTarget?: (methodName: string) => common.BaseFunction | null
 }
 
-// What one body came to. `Unresolved` is the reading that has to be
-// offered AGAIN: the call named a Namespace that had not hoisted yet, which is
-// what the two numeric kinds do to each other. `None` is settled — the body
-// says something a leaf can not, and no later round changes that.
+// What one body came to. `Unresolved` is offered again in a later round; `None`
+// is settled.
 type AliasReading =
 	| { kind: "Alias"; candidate: AliasCandidate }
 	| { kind: "None" }
@@ -16971,29 +16530,8 @@ type AliasReading =
 const NO_ALIAS: AliasReading = { kind: "None" }
 const UNRESOLVED_ALIAS: AliasReading = { kind: "Unresolved" }
 
-// What a Namespace's own Methods say about each other, written onto the
-// Method Types as the Namespace reaches Scope. A Method that answers a Boolean
-// and whose whole body is one call on `@` — optionally negated — is a PREDICATE
-// ALIAS of that call: `Integer::isZero` is `@::is(0)`, `List::hasItems` is
-// `@::isEmpty()::negate()`, `Integer::isLessThanOrEqualTo` is
-// `@::isGreaterThan(other)` negated over the Argument it forwards, and a
-// Program's own `isInStock() -> Boolean { <- @::isGreaterThan(0) }` is the same
-// shape and gets the same treatment.
-//
-// Read off the BODY rather than declared. A Namespace could declare that one
-// Method is the contrary of another and be wrong; there is nothing to be wrong
-// about here, and every pair a hardcoded table once held falls out of it.
-//
-// Called once per Namespace, the moment it reaches Scope and before the
-// hoisting round that reads a pending predicate — so a refinement written on an
-// alias is resolved with the alias already known, in the standard library's own
-// files as much as in a Program. The body is ENRICHED, silently, which is what
-// answers the one question the source can not: which Namespace answers the call
-// `@` makes. That is the same thing a `where` clause does at the same point.
-//
-// The candidates are found by SHAPE before anything is enriched, so a Namespace
-// with no Method of this shape costs one walk of its Method names and nothing
-// else.
+// Reads a Namespace's predicate aliases as it reaches Scope. See "Predicate
+// aliases" in DEVELOPMENT.md.
 export function derivePredicateAliases(
 	node: parser.NamespaceDefinitionStatementNode,
 	namespaceType: common.NamespaceType,
@@ -17007,10 +16545,8 @@ export function derivePredicateAliases(
 
 	let container: AliasContainer = {
 		selfNamespaceName: namespaceType.name,
-		// The same guard `impliedConjunctKeys` and `narrowedBy` read: the
-		// ordering is the BASE's promise, so its words are only believed where
-		// the Namespace answering them is the base's own or the covering
-		// `Number`.
+		// The ordering is the base's promise, believed only where the Namespace
+		// is the base's own or `Number`.
 		trustsOrdering: namespaceAnswersForBase(
 			namespaceType.name,
 			refinableBaseTag(targetType),
@@ -17021,9 +16557,7 @@ export function derivePredicateAliases(
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
 		for (let [index, value] of methodEntries(method).entries()) {
-			// A body-less entry of a mixed `overload` block holds its
-			// POSITION and offers nothing to read, which is what keeps every
-			// other entry of the block on the index its Overload has.
+			// A body-less entry of a mixed `overload` block keeps its position.
 			if (value === null) {
 				continue
 			}
@@ -17057,21 +16591,8 @@ export function derivePredicateAliases(
 	return complete
 }
 
-// The same reading of a PROTOCOL's provided bodies, run as the Protocol
-// reaches Scope. The three `if` bodies that are one call on `@` —
-// `Comparable`'s two `…OrEqualTo` entries and `Equatable`'s `isNot` — are read
-// this way, and every conformer answers them through those very bodies — so the leaf a conformer's receiver proves is read here, once, rather
-// than being named in a table of Methods declared to be each other's
-// contraries.
-//
-// `@` is `Self` BOUNDED by this Protocol, exactly as it is where the body is
-// enriched for real, so the call resolves through the Protocol's own surface
-// and nothing else. The Namespace it lands on is therefore no Namespace a
-// Program has: the leaf is recorded WITHOUT one, and the witness that reaches
-// the Method fills its own in.
-//
-// Only the Methods THIS Protocol wrote. An inherited one was read where it was
-// written, and the descendant holds the same annotation on its copy of it.
+// Reads a Protocol's provided predicate aliases as it reaches Scope. See
+// "Predicate aliases" in DEVELOPMENT.md.
 export function deriveProvidedPredicateAliases(
 	node: parser.ProtocolDeclarationStatementNode,
 	protocolType: common.ProtocolType,
@@ -17085,9 +16606,7 @@ export function deriveProvidedPredicateAliases(
 	let container: AliasContainer = {
 		selfNamespaceName: null,
 		selfType,
-		// A Protocol's `Self` is no base, so there is no ordering of one
-		// to read a flipped call against. Nothing in the standard library writes
-		// one, and a Protocol that did would keep it as the question it wrote.
+		// A Protocol's `Self` is no base, so no ordering is trusted.
 		trustsOrdering: false,
 		canonicalTarget: (methodName) => {
 			let target = protocolType.methods[methodName]
@@ -17145,18 +16664,9 @@ export function deriveProvidedPredicateAliases(
 	return complete
 }
 
-// A Method's bodied entries, in the order its Overloads are registered in,
-// with a null standing for every entry that has no body to read.
-//
-// The standard library is a `declarations { … }` Program, where a Method with a
-// body still parses as a bodied one but an `overload` block ALWAYS parses as
-// signatures — bodied and native entries mixed under one name. So the block form
-// has to be read for the bodies it does carry, or `List::hasItems` and every
-// other predicate the standard library writes inside an `overload` would be
-// invisible here while the same Method in a Program was not.
-//
-// A static Method is skipped entirely: `@` is not bound in one, so no body of one
-// can be a predicate on a receiver.
+// A Method's bodied entries in Overload order, null for an entry without a
+// body. In a `declarations { … }` Program an `overload` block parses as
+// signatures, so its bodied entries are read here. Static Methods are skipped.
 function methodEntries(
 	method: parser.NamespaceMethods[string],
 ): Array<parser.FunctionValueNode | null> {
@@ -17174,9 +16684,7 @@ function methodEntries(
 	}
 }
 
-// The resolved entry standing at this position under this name, where it
-// answers a Boolean and nothing else. Asked of the RESOLVED Method rather than
-// of the written `-> Boolean`, so a name shadowing decides nothing.
+// The resolved entry at this position, where it answers a Boolean.
 function booleanEntryOf(
 	namespaceType: common.NamespaceType,
 	methodName: string,
@@ -17197,16 +16705,9 @@ function booleanEntryOf(
 		: null
 }
 
-// The call an alias body makes, and whether the body negated it. Every
-// other body answers null: one Statement, and either a `<-` of a Method call or
-// the `if` that spells one out. A chain (`@::length()::is(0)`) is a leaf of its
-// own — the intermediate value's evidence is nobody's to read here — which is
-// why the standard library's emptiness Methods stay primitives and their
-// negations do not.
-//
-// The receiver may be `@` or a bare name, since a body may write the ordering
-// backwards (`<- other::isGreaterThanOrEqualTo(@)`). Which of the two it was is
-// settled once the call is enriched and the name has a Parameter to be.
+// The call an alias body makes and whether it is negated: a `<-` of a Method
+// call, or the `if` spelling one. A chain is a leaf of its own. The receiver
+// may be a name where the ordering is written backwards.
 function aliasBodyOf(
 	definition: parser.FunctionDefinitionNode,
 ): AliasBody | null {
@@ -17225,20 +16726,16 @@ function aliasBodyOf(
 		: null
 }
 
-// A body as the reading has to enrich it. `expression` is the WHOLE of
-// what was written, `::negate()` and all, because a name is nobody's until the
-// Enricher says whose it is — `peeled` only records that a trailing `negate`
-// was found by shape, and whether it is Boolean's own is settled after.
+// A body as the reading enriches it, `::negate()` included. `peeled` records
+// that a trailing `negate` was found by shape; whose it is is settled later.
 type AliasBody = {
 	expression: parser.ExpressionNode
 	peeled: boolean
 	negated: boolean
 }
 
-// A Method call, with an outermost `::negate()` found by shape and
-// counted. The Expression is handed on WHOLE: peeling here and enriching what
-// is left would take a Program's own `negate` for Boolean's, and every body
-// carrying one would be read as the contrary of what it asks.
+// A Method call with an outermost `::negate()` found by shape. The Expression
+// is kept whole, so a Program's own `negate` is not taken for Boolean's.
 function aliasCallOf(expression: parser.ExpressionNode): AliasBody | null {
 	let call = expression
 	let peeled = false
@@ -17258,15 +16755,9 @@ function aliasCallOf(expression: parser.ExpressionNode): AliasBody | null {
 		: null
 }
 
-// `if @::is(other) { <- false } else { <- true }` — a call spelled out as
-// the two answers it gives. `Equatable::isNot` is written this way and has to
-// be: reaching `Boolean::negate` would need `Boolean` imported into the file
-// `Boolean.es` itself imports, which is a third cycle in a graph that has two.
-// See the standard library's DEVELOPMENT.md, The shape of the graph is frozen.
-//
-// Exactly that shape and no other: the `if` is the whole body, each branch
-// answers one written Boolean, and the two differ. `{ <- true } else { <- false }`
-// is the call itself; `{ <- false } else { <- true }` is the call negated.
+// `if @::is(other) { <- false } else { <- true }`, a call spelled as its two
+// answers, which is how `Equatable::isNot` is written. See "The shape of the
+// graph is frozen" in packages/standard-library/DEVELOPMENT.md.
 function aliasIfShapeOf(
 	statement: parser.IfElseStatementNode,
 ): AliasBody | null {
@@ -17284,8 +16775,7 @@ function aliasIfShapeOf(
 		: { ...call, negated: call.negated !== !answered }
 }
 
-// The one written Boolean a branch answers, or null where the branch does
-// anything else at all.
+// The one written Boolean a branch answers, or null.
 function returnedBooleanOf(
 	body: Array<parser.ImplementationNode>,
 ): boolean | null {
@@ -17300,15 +16790,9 @@ function returnedBooleanOf(
 		: null
 }
 
-// One Method read as an alias of another, or null where its body says
-// something this can not be sure of. Enriched in a collection of its own: the
-// body is enriched again for real when the declaration's Statement is reached,
-// and this reading is a question asked ahead of that one — a Diagnostic here
-// would be the same Diagnostic twice.
-//
-// The Parameters are declared from the RESOLVED signature, which is what lets a
-// forwarded name be recognised as the Parameter it is. Their Types are the ones
-// the entry already carries, so nothing is resolved a second time.
+// One Method read as an alias of another, or a reason it can not be. Enriched
+// silently, since the real enrichment reports later. The Parameters come from
+// the resolved signature.
 function aliasCandidateOf(
 	body: AliasBody,
 	definition: parser.FunctionDefinitionNode,
@@ -17317,20 +16801,13 @@ function aliasCandidateOf(
 	scope: enricher.Scope,
 	container: AliasContainer,
 ): AliasReading {
-	// A Parameter list the signature does not agree with is a Method
-	// whose Types were never resolved — nothing to read a forwarded name off.
+	// A Parameter list the signature disagrees with was never resolved.
 	if (entry.parameterTypes.length !== definition.parameters.length + 1) {
 		return NO_ALIAS
 	}
 
-	// A Method a caller may write fewer Arguments to is not read at all.
-	// A slot is a POSITION, and the two sides count positions differently: the
-	// reading counts a Parameter where it was DECLARED, while the call site
-	// counts the Arguments that were WRITTEN. A default lets the two disagree,
-	// and every slot after the omitted one would then be filled from the wrong
-	// Argument — silently, since a leaf carries no names to check. Pairing the
-	// written Arguments back to their Parameters is what would be needed to
-	// read one, and no predicate in the standard library asks for it.
+	// A Method with a defaulted Parameter is not read: slots are declared
+	// positions, while a call counts written Arguments.
 	if (
 		definition.parameters.some(
 			(parameter) => parameter.defaultValue !== null,
@@ -17344,8 +16821,7 @@ function aliasCandidateOf(
 		diagnostics: Array<common.Diagnostic>
 	}
 
-	// A body that checks a value against a refinement whose predicate is
-	// still unread is offered again later, as an unresolved call is.
+	// A body checking against a pending refinement is offered again later.
 	try {
 		reading = collectDiagnostics(() =>
 			enrichExpression(
@@ -17363,20 +16839,14 @@ function aliasCandidateOf(
 
 	let { result, diagnostics } = reading
 
-	// A call that did not resolve is a call whose Namespace has not
-	// hoisted YET — the two numeric kinds name each other's Methods, and one of
-	// them reaches Scope first. Answered as unresolved rather than as no alias,
-	// so the reading is offered again once the round that hoists the other one
-	// is over.
+	// An unresolved call names a Namespace not hoisted yet, so the reading is
+	// offered again.
 	if (containsErrors(diagnostics)) {
 		return UNRESOLVED_ALIAS
 	}
 
-	// The trailing `::negate()` is taken off HERE, where the call has
-	// resolved and the Method it names has an owner. A body ending in anything
-	// else is no alias: `Boolean::negate` is the one Method whose answer the
-	// polarity flag stands for, and reading a Program's own `negate` as it
-	// would put a value's opposite down as the value.
+	// The trailing `::negate()` comes off only if it resolved to `Boolean`'s
+	// own.
 	let call = body.peeled ? peeledNegationOf(result, scope) : result
 
 	if (
@@ -17435,12 +16905,8 @@ function aliasCandidateOf(
 	}
 }
 
-// What a trailing `::negate()` was written ON, or null where the call it
-// resolved to is not `Boolean`'s own. `negate` is a name like any other until
-// the Enricher says whose it is, and a Program may write one over a Boolean of
-// its own — an identity `negate` would have every body carrying it recorded as
-// the contrary of the question it asks, and a value proven the opposite of what
-// it is.
+// What a trailing `::negate()` was written on, or null where it is not
+// `Boolean`'s `negate`.
 function peeledNegationOf(
 	result: common.typed.ExpressionNode,
 	scope: enricher.Scope,
@@ -17459,13 +16925,8 @@ function peeledNegationOf(
 		: null
 }
 
-// The Scope an alias body is read in — `@`, the Type Parameters, and each
-// Parameter under the name its body calls it by, every one of them read off the
-// RESOLVED signature. That is what makes a generic Method readable: an enclosing
-// Namespace's Type Parameters are merged into each signature, so the receiver's
-// `List<ItemType>` and the Argument's `ItemType` are one Parameter there, and a
-// bound the Method declares is on it. Resolving the written Types again would
-// give two.
+// The Scope an alias body is read in, built from the resolved signature, where
+// an enclosing Namespace's Type Parameters are merged with the Method's.
 function aliasBodyScope(
 	definition: parser.FunctionDefinitionNode,
 	entry: common.BaseFunction,
@@ -17475,11 +16936,8 @@ function aliasBodyScope(
 	let types: Record<string, common.Type> = {}
 	let bindings: GenericBindings = new Map()
 
-	// The Method's own bound is on the Parameter it declares and NOT on
-	// the receiver, which was resolved where the Namespace's Type Parameter is
-	// bare — `List<ItemType>` against `item: ItemType is Equatable`. Bound into
-	// the receiver here, so that a call binding the items off `@` gets the
-	// Parameter the Method declared rather than the one it shadows.
+	// The Method's own bound is put on the receiver's item Type too, so a call
+	// binding the items off `@` gets the bounded Parameter.
 	for (let generic of entry.generics) {
 		let use: common.GenericUse = {
 			type: "GenericUse",
@@ -17510,9 +16968,8 @@ function aliasBodyScope(
 		let name = parameterInternalName(parameter)
 		let type = entry.parameterTypes[index + 1]?.type
 
-		// A Parameter taken apart by a Pattern binds no one name, so
-		// nothing it binds can be forwarded whole. The body simply reads names
-		// this Scope does not hold, and the reading refuses.
+		// A Parameter taken apart by a Pattern binds no one name, so the
+		// reading refuses.
 		if (name !== null && type !== undefined) {
 			declareVariableInScope(
 				name,
@@ -17526,9 +16983,7 @@ function aliasBodyScope(
 	return bodyScope
 }
 
-// A signature's Type with the bindings above applied, and untouched where
-// there is nothing to apply — which is every Method of a Namespace with no Type
-// Parameters, and so nearly all of them.
+// A signature's Type with the bindings applied, untouched when there are none.
 function aliasBodyType(
 	type: common.Type | undefined,
 	bindings: GenericBindings,
@@ -17540,10 +16995,7 @@ function aliasBodyType(
 	return bindings.size === 0 ? type : applyGenericBindings(type, bindings)
 }
 
-// Each Parameter's POSITION under the name the body reads it by, counted
-// where the Parameter was DECLARED. A template slot stands for the position of
-// an Argument a caller WRITES, and the two are the same number only because a
-// Method with a defaulted Parameter is refused a reading above.
+// Each Parameter's declared position under the name the body reads it by.
 function parameterSlotsOf(
 	definition: parser.FunctionDefinitionNode,
 ): Map<string, number> {
@@ -17560,9 +17012,8 @@ function parameterSlotsOf(
 	return slots
 }
 
-// One Argument of an alias body as the slot it fills — a value written
-// down, a Parameter forwarded whole, or `@` handed on. Anything computed answers
-// null, and the body is no alias.
+// One Argument of an alias body as the slot it fills: a literal, a forwarded
+// Parameter, or `@`. Anything computed answers null.
 function argumentSlotOf(
 	value: common.typed.ExpressionNode,
 	slots: ReadonlyMap<string, number>,
@@ -17586,11 +17037,8 @@ function argumentSlotOf(
 	return index === undefined ? null : { kind: "Parameter", index }
 }
 
-// The Parameter a body made the call ON, where it wrote the ordering
-// backwards — `<- other::isGreaterThanOrEqualTo(@)`, which asks the same
-// question of the same two numbers as `@::isLessThanOrEqualTo(other)` does.
-// Null for every ordinary body, and for a flipped one that hands over anything
-// but `@` alone.
+// The Parameter a body made the call on where it wrote the ordering backwards,
+// or null.
 function converseReceiverOf(
 	result: common.typed.MethodInvocationNode,
 	args: Array<DerivedArgument>,
@@ -17605,11 +17053,8 @@ function converseReceiverOf(
 		: null
 }
 
-// Every candidate collapsed to the leaf it really names, and written onto
-// the entries in place. The Type is the object every use site already holds —
-// hoisting registered it and handed it out — so the annotation reaches the
-// Invocations resolved before this ran as surely as the ones after, and it is
-// part of the Type wherever that Type is kept.
+// Every candidate collapsed to the leaf it names and written onto its entry,
+// the object every use site holds.
 function writePredicateAliases(
 	candidates: Array<AliasCandidate>,
 	container: AliasContainer,
@@ -17640,13 +17085,8 @@ function writePredicateAliases(
 	}
 }
 
-// The entries that stand in a RING — `a` written as the contrary of `b`
-// while `b` is written as the contrary of `a`. Each candidate names exactly one
-// target, so following the targets is a walk that either runs out or comes back;
-// everything on the part that comes back is left primitive. Believing either
-// half would make the other say that it is its own contrary, and a Program that
-// writes such a pair has written two Methods that call each other for ever —
-// which is its own mistake to make and not one a leaf can describe.
+// The entries that form a ring, such as two Methods written as each other's
+// contraries. They stay primitive.
 function cyclicCandidates(
 	candidates: Array<AliasCandidate>,
 	byEntry: ReadonlyMap<common.BaseFunction, AliasCandidate>,
@@ -17688,14 +17128,9 @@ type CollapseContext = {
 	done: Map<common.BaseFunction, common.PredicateAlias | null>
 }
 
-// One candidate as the PRIMITIVE it names, however many Methods stand
-// between the two. A target read in the same declaration is collapsed first, so
-// which of the pair was written above the other decides nothing; a target
-// somewhere else is folded in from whatever it had recorded by now, which is
-// the whole of the chain wherever that reading was already finished. Where it
-// was not, the leaf is followed the rest of the way at the call. Remembered per
-// entry, so a declaration whose Methods all forward to one of them costs one
-// walk.
+// One candidate as the primitive it names. A target in the same declaration is
+// collapsed first; one elsewhere is folded in from what it recorded. Remembered
+// per entry.
 function collapsedAlias(
 	candidate: AliasCandidate,
 	context: CollapseContext,
@@ -17744,10 +17179,7 @@ function finishedAlias(
 	let args: Array<common.PredicateAliasArgument> = []
 
 	for (let slot of step.args) {
-		// `@` reached a leaf that has nowhere to put it, which every body
-		// but a flipped one leaves standing. A leaf asks about its receiver, so
-		// a receiver written as one of its Arguments is a question of a shape
-		// this can not spell.
+		// `@` reached a leaf as an Argument, which a leaf can not spell.
 		if (slot.kind === "Self") {
 			return null
 		}
@@ -17755,10 +17187,8 @@ function finishedAlias(
 		args.push(slot)
 	}
 
-	// A leaf naming the very Method it was read off says nothing at all —
-	// which is what a flipped call to a sibling Overload of one's own name
-	// collapses to, and what one half of a ring would say. Left primitive, so
-	// the question is the one the Method's own name asks.
+	// A leaf naming the Method it was read off says nothing, so it stays
+	// primitive.
 	if (
 		step.namespaceName === context.container.selfNamespaceName &&
 		step.methodName === candidate.methodName
@@ -17774,16 +17204,8 @@ function finishedAlias(
 	}
 }
 
-// A body's call folded together with what its TARGET says it asks. The
-// target's Arguments are its own Parameters' positions, and each of them is
-// filled with whatever the body handed that Parameter — so
-// `isLessThanOrEqualTo(_ other) { <- @::isGreaterThan(other)::negate() }` on a
-// `isGreaterThan` that is itself written on something else comes out as that
-// something else, over the very Argument a caller writes.
-//
-// The Namespace is the target's, and the polarity is the two of them counted
-// together: a Method written as the contrary of a contrary asks the plain
-// question.
+// A body's call folded together with what its target asks: each of the target's
+// Parameter slots takes what the body handed it. The polarities combine.
 function composedStep(
 	outer: AliasStep,
 	inner: common.PredicateAlias,
@@ -17814,10 +17236,8 @@ function composedStep(
 	}
 }
 
-// A flipped call read back onto `@`. What is left of the body by now is
-// one question about the two values in the other order, so the leaf is the
-// converse of it over the Parameter the call was made on. The guard is the
-// ordering's, checked where the body was read.
+// A flipped call read back onto `@` as the converse over the Parameter it was
+// made on.
 function conversedStep(
 	step: AliasStep,
 	candidate: AliasCandidate,
