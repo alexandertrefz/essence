@@ -585,6 +585,33 @@ describe("Call Hierarchy inside a refused value", () => {
 	})
 })
 
+describe("Call Hierarchy of a refinement's predicate", () => {
+	let source = [
+		"implementation {",
+		"\tnamespace Checks for Integer {",
+		"\t\tisSmall() -> Boolean {",
+		"\t\t\t<- @::isLessThan(10)",
+		"\t\t}",
+		"\t}",
+		"",
+		"\ttype Small = Integer where @::isSmall()",
+		"",
+		"\tconstant value: Small = 3",
+		"}",
+	].join("\n")
+
+	it("should count the predicate's call as an incoming call", () => {
+		expect(summarise(incoming(source, { line: 3, column: 3 }))).toEqual([
+			{
+				name: "implementation",
+				kind: "implementation",
+				container: null,
+				calls: 1,
+			},
+		])
+	})
+})
+
 // Only the standard library declares natives, so the document is analysed as
 // one of its files.
 describe("Call Hierarchy of a native Method's default", () => {

@@ -639,6 +639,19 @@ function callerFor(
 	return context.items.get(positionKey(position)) ?? fallback
 }
 
+// A refinement's predicate calls Methods on `@`, which may be the Program's
+// own.
+function visitPredicate(
+	node: common.typed.TypeAliasStatementNode,
+	caller: CallHierarchyItem,
+	context: Context,
+	sites: Array<CallSite>,
+) {
+	if (node.predicate !== null) {
+		visitNode(node.predicate, caller, context, sites)
+	}
+}
+
 // A native Method's calls live in the frame the Compiler synthesizes for its
 // defaults: `to end: Integer = @::length()` calls `length`.
 function visitNativeShims(
@@ -921,6 +934,8 @@ function visitNode(
 
 			return
 		case "TypeAliasStatement":
+			visitPredicate(node, caller, context, sites)
+			return
 		case "Identifier":
 		case "Self":
 		case "StringValue":
