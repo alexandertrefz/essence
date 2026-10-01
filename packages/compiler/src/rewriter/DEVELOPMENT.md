@@ -609,6 +609,11 @@ sends the counter to bigint, decided once before the first turn. The start is th
 since a number stepped by a bigint throws. Where both bounds are written as safe Integer literals, none of
 the bigint machinery is emitted.
 
+A bigint counter with one bound inside the safe range still passes through values a double holds exactly.
+Emitted `===` must never see two spellings of one Integer, so `canonicalCounter` hands the body
+`Integer.canonical(index)` on a bigint walk. A body that keeps its Integer gets `createInteger`, which
+canonicalises too.
+
 ### Step answers
 
 A `general` walk and an early-stopping fold answer with a `Step` each turn. `steppedTarget` writes the answer
@@ -620,8 +625,13 @@ a name or answered by a Method, its tag is read as the driver would read it.
 A `general` walk's label is emitted only where a `#Done` leaves through it. A body that never answers
 `#Done` never ends, as the driver's would not.
 
-A fold reads the receiver's count together with the receiver, before the seed. So a seed that appends to the
-receiver does not lengthen the walk.
+### List walks
+
+A walk over a List reads its items with `List.materialise`, which answers the one Array the List's items live
+in. A List that was prepended to holds two runs. `heldItems` reads the count once, before the first turn,
+and `itemsWalk` stops at that count rather than the Array's live length. An append that finds its receiver
+at the Array's tip grows the Array in place. A body appending to the List it walks would otherwise lengthen
+the walk. A fold reads the count with the receiver, before the seed, for the same reason.
 
 ### Lists built in place
 

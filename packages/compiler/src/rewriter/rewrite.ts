@@ -6379,20 +6379,8 @@ function mentionsBeyondValue(
 	return found
 }
 
-// Whether the SLOT is mentioned anywhere the swap does not understand.
-// `mentionsBeyondValue` asks this of the Parameter a body reads the State under;
-// this asks it of the name the State is threaded through, and it is what holds
-// `unboxWrites` to the same standard the fence holds a body to. Three positions
-// are understood and no others: the two `writtenValue` rewrites — the `let` a
-// seed declares and the plain assignment an answer is written as — and the
-// `const` a turn binds a body's Parameter through, which is the one read of the
-// slot the swap is FOR.
-//
-// It is what makes recognising the two admitted writes by their shape
-// enough. Every assignment to the slot is one this admitted and one
-// `unboxWrites` rewrites, so an assignment standing somewhere the walk did not
-// put it — inside a Function a later pass emitted, say — refuses the swap
-// instead of being read at a time nobody checked.
+// Whether the slot is mentioned other than in the writes `unboxWrites`
+// rewrites and the `const` binding a body's Parameter to it.
 function mentionsBeyondWrites(
 	root: unknown,
 	name: string,
@@ -6438,12 +6426,8 @@ function mentionsBeyondWrites(
 	return found
 }
 
-// The State written straight into the slot a walk ANSWERS with —
-// `<- #Done(carried)`, which is how a `Step`-answering body ordinarily finishes
-// — boxed where it is written. That slot holds Integers, because every other
-// `#Done` writes one into it, and this is the one write that would otherwise put
-// a value there. It is one Integer per WALK and not per turn: a `#Done` is what
-// leaves the walk.
+// Boxes `<- #Done(carried)` where it writes the answer slot, which holds
+// Integers. It runs once per walk.
 function boxedAnswers(root: unknown, answer: string, name: string): void {
 	function visit(node: unknown): void {
 		if (node === null || typeof node !== "object") {
@@ -6471,12 +6455,8 @@ function boxedAnswers(root: unknown, answer: string, name: string): void {
 	visit(root)
 }
 
-// The other half, run only once the question above has been answered:
-// every `<name>.value` becomes a read of the name holding that value, in place —
-// the counter itself for a counted walk's index, and the Parameter itself for a
-// State, which is bound to the raw slot and reads it. Written as a walk over the
-// PARENT so the read can be replaced where it sits, since a node can not turn
-// itself into another kind.
+// Replaces every `<name>.value` with a read of `held`, in place, from the
+// parent node.
 function replaceValueReads(root: unknown, name: string, held: string): void {
 	function visit(node: unknown): void {
 		if (node === null || typeof node !== "object") {
@@ -6517,19 +6497,8 @@ function isValueRead(node: unknown, name: string): boolean {
 	)
 }
 
-// What an inlined List walk begins with: the items under a name, and how
-// many of them there are under another. `List.materialise` answers the Array a
-// List's logical items live in — a List that has been prepended to holds two
-// runs, and reading `.value` would walk one of them — and caches the work on
-// the box, so the second walk over the same List pays nothing.
-//
-// The count is read HERE and never again. A List's backing Array grows
-// under an append that finds its receiver at the Array's tip, so a body that
-// appends to the very List it walks pushes onto the Array the walk is reading:
-// `list::reduce(startingWith list, (acc, item) { <- acc::append(item) })` seeds
-// the accumulator with the walked List and does exactly that. The walk covers
-// the items the receiver held when it began — which is what it covered when
-// every append copied — and only a count fixed before the first turn says so.
+// A List walk's items and their count, read once. See "List walks" in
+// DEVELOPMENT.md.
 function heldItems(
 	items: string,
 	count: string,
@@ -6545,10 +6514,8 @@ function heldItems(
 	]
 }
 
-// The walk every List Method performs — over the positions of the Array
-// the List holds, which is the walk the natives perform and the one shape a
-// `for` says better than an iterator does. Its bound is the count `heldItems`
-// froze, not the Array's own live length.
+// A `for` over the positions of a List's Array, up to the count `heldItems`
+// read.
 function itemsWalk(
 	count: string,
 	position: string,
@@ -6583,11 +6550,8 @@ function itemAt(items: string, position: string): estree.MemberExpression {
 	}
 }
 
-// The raw JavaScript boolean a predicate's answer decides by — and, where
-// the answer is a Boolean an earlier pass BUILT out of a JavaScript test, the
-// test it was built from. It is the same collapse `unbox-conditions` performs
-// on a condition, in the one other place a Boolean is built only to be read
-// back.
+// The raw boolean a predicate's answer decides by. A Boolean built from a
+// JavaScript test answers that test.
 function rawAnswer(answer: LoopAnswer): estree.Expression {
 	let node = answer.node
 
@@ -6607,8 +6571,7 @@ function negatedAnswer(test: estree.Expression): estree.Expression {
 	}
 }
 
-// The literal constructors, spelled exactly as every other emission site
-// spells them — a read off the `import * as <Namespace>` the Program opens with.
+// A literal constructor, read off the runtime Namespace import.
 function createdInteger(value: estree.Expression): estree.Expression {
 	return {
 		type: "CallExpression",
@@ -6618,12 +6581,8 @@ function createdInteger(value: estree.Expression): estree.Expression {
 	}
 }
 
-// Whether a bound is written as an Integer the canonical invariant holds
-// as a NUMBER, which is what a counted walk asks of both of its bounds before it
-// writes any of the bigint half. Only a Literal answers yes — a folded operation
-// is one by the time this reads it, and `pool-constants` has already put every
-// Literal behind a reference, so the value is read through that. Anything else
-// is a value nothing is known about, and the walk decides at run time.
+// Whether a bound is an Integer Literal held as a number, read through a
+// pooled reference. Anything else is decided at run time.
 function safeBound(node: common.typedSimple.ExpressionNode): boolean {
 	if (node.nodeType === "Intrinsic" && node.kind === "pooled-reference") {
 		return safeBound(node.value)
@@ -6638,34 +6597,18 @@ function safeBound(node: common.typedSimple.ExpressionNode): boolean {
 	return held >= -BigInt(SAFE_INTEGER) && held <= BigInt(SAFE_INTEGER)
 }
 
-// One step of the counter, in numbers: up or down by one, which is the
-// step of every walk whose bounds a double holds. Which way is the entry that
-// was called, so the step is a literal rather than a read.
+// One step of a number counter, up or down by one.
 function steppedBy(descending: boolean): estree.Expression {
 	return numberLiteral(descending ? -1 : 1)
 }
 
-// One step of a counter that had to escape to bigint, as the literal an
-// Integer past safe range holds.
+// One step of a bigint counter.
 function countLiteral(value: bigint): estree.BigIntLiteral {
 	return { type: "Literal", bigint: value.toString(), value }
 }
 
-// The turn's counter, in the representation the canonical invariant gives
-// it. The KIND is decided once, from the bounds, because a `for` counter can not
-// change kind mid-walk — its `+=` would throw — but canonicality is a property
-// of each VALUE, and a walk with one bound inside safe range and one outside
-// counts in bigint through values a double holds exactly. A bigint spelling of
-// one of those is a second spelling of a value that already has one, which is
-// exactly what emitted `===` may not be handed — `9007199254740990n` and
-// `9007199254740990` are one Integer and compare `false`. The body that keeps
-// its Integer is handed a `createInteger` that settles this; the body the box
-// was elided out of is handed this.
-//
-// The escaped `const` is asked FIRST, so the walk that counts in numbers —
-// every walk over ordinary quantities — reads one loop-invariant `false` and
-// then the counter it already had. The call is on the arm no walk a Program can
-// finish takes more than a few turns of.
+// The turn's counter in its canonical representation, for an unboxed body.
+// See "Counted walks" in DEVELOPMENT.md.
 function canonicalCounter(
 	held: string,
 	index: string,
@@ -6693,18 +6636,8 @@ function createdList(value: estree.Expression): estree.Expression {
 	}
 }
 
-// The Array a List's logical items live in, read off the `import * as
-// List` the same way `createdList` reads its constructor. Not a member the
-// language has: it is the runtime's own choke point, the one place a List that
-// carries its items in two runs is made to carry them in one.
-//
-// It is what the natives WRITTEN AGAINST ONE ARRAY reach for — `slice`,
-// `reverse`, `insert`, `sort`, `split`, `pair` — and what an inlined walk
-// reaches for because the `for` below indexes one Array rather than two. The
-// natives that WALK a List do the opposite deliberately: `map`, `everyItem`,
-// both `reduce` entries, `is`, `compare`, `join` and the rest take a view and
-// read the two runs in turn, so that walking a List never collapses it. An
-// emitted walk cannot afford that shape, and pays one combining instead.
+// The one Array a List's items live in, through the runtime's
+// `List.materialise`.
 function materialisedRead(list: estree.Expression): estree.Expression {
 	return {
 		type: "CallExpression",
@@ -6729,9 +6662,8 @@ function pushed(
 	}
 }
 
-// The names an inlined loop binds are the Compiler's own and are emitted
-// verbatim — every one of them is spelled from the loop's prefix, which holds a
-// `_` and is therefore a name no Essence Program can write.
+// A name an inlined loop binds, emitted as it is. It comes from the loop's
+// prefix, which contains `_`.
 function loopIdentifier(name: string): estree.Identifier {
 	return { type: "Identifier", name }
 }
@@ -6790,10 +6722,7 @@ function rewriteBlockStatement(
 ): estree.BlockStatement {
 	return {
 		type: "BlockStatement",
-		// One emitted block is one Namespace Scope, so a `namespace List`
-		// declared inside a Function is the user's for the rest of that Function
-		// and the import again the moment the block closes — which is what lets a
-		// sibling Function beside it keep calling the runtime's List.
+		// One emitted block is one Namespace Scope.
 		body: withNamespaceScope(() =>
 			nodes
 				.flatMap((node) => rewriteStatements(node))
@@ -6802,12 +6731,8 @@ function rewriteBlockStatement(
 	}
 }
 
-// A Parameter carrying a default becomes an `AssignmentPattern` — the
-// JavaScript default parameter, whose semantics are the ones the language
-// declares. `@` is `_self`, which is Parameter 0, so a default reading `@`
-// reads a BINDING rather than re-computing the receiver expression: that
-// property is exactly what filling a default in at the call site could not
-// offer, and it is why the language puts the default on the callee.
+// A default becomes a JavaScript default parameter. A default reading `@`
+// reads the `_self` Parameter rather than recomputing the receiver.
 function rewriteParameter(
 	parameter: common.typedSimple.ParameterNode,
 ): estree.Pattern {
