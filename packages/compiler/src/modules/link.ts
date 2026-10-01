@@ -1254,6 +1254,8 @@ function usedNames(
 	let byName = false
 	// The Choices a call printed through the derive.
 	let printedChoices = new Set<string>()
+	// The refinements a narrowing gave a binding, by name.
+	let narrowedRefinements = new Set<string>()
 
 	// A bare Case with no Choice expected resolves through the Choices in
 	// Scope. One the position resolved counts too, which only quiets the
@@ -1306,7 +1308,16 @@ function usedNames(
 	// A resolved Type's name is not a use, or an import whose Type only flows
 	// through would never be reported. So the walk reads no Type but the
 	// Namespace a call resolved to.
-	let visitTyped = (node: TypedNode): void => {
+	let visitTyped = (node: TypedNode, narrowed: boolean): void => {
+		// A narrowed binding, or `@`, reads the refinement a narrowing chose.
+		if (
+			narrowed &&
+			(node.nodeType === "Identifier" || node.nodeType === "Self") &&
+			node.type.type === "Refinement"
+		) {
+			narrowedRefinements.add(node.type.name)
+		}
+
 		if (node.nodeType === "Identifier") {
 			names.add(node.content)
 		} else if (node.nodeType === "MethodInvocation") {
@@ -1327,7 +1338,7 @@ function usedNames(
 			// A branch types its Function literal Arguments anew.
 			for (let branch of node.dispatch ?? []) {
 				for (let contextual of branch.contextualArguments) {
-					visitTyped(contextual.argument)
+					visitTyped(contextual.argument, narrowed)
 				}
 			}
 		} else if (node.nodeType === "CaseValue" && node.choice === null) {
@@ -1336,11 +1347,11 @@ function usedNames(
 
 		noteRecord(node)
 		forEachHeldRecord(node, noteRecord)
-		forEachTypedChild(node, visitTyped)
+		forEachTypedChild(node, visitTyped, narrowed || narrowsInside(node))
 	}
 
 	visitParsed(module.program.implementation)
-	visitTyped(program)
+	visitTyped(program, false)
 	// The parser's tests section and `@example` blocks, which only a test
 	// compile types. Parsed here, so an import an example needs counts.
 	byName = program.tests === null
@@ -1373,6 +1384,16 @@ function usedNames(
 		) {
 			names.add(name)
 		}
+
+		// A narrowing establishes only a refinement declared in Scope.
+		let refinement = type.type === "GenericAlias" ? type.aliasedType : type
+
+		if (
+			refinement.type === "Refinement" &&
+			narrowedRefinements.has(refinement.name)
+		) {
+			names.add(name)
+		}
 	}
 
 	for (let [name, value] of Object.entries(scope.members)) {
@@ -1389,6 +1410,23 @@ function usedNames(
 	}
 
 	return names
+}
+
+// Whether a binding may be narrowed somewhere inside a node. A Match narrows
+// `@` and its bindings through its Matchers and Guards, which leave no record.
+function narrowsInside(node: TypedNode): boolean {
+	switch (node.nodeType) {
+		case "IfStatement":
+			return node.narrows
+		case "IfElseStatement":
+			return node.narrows || node.narrowsFalse
+		case "Define":
+			return node.arms.some((arm) => arm.narrows || arm.narrowsBelow)
+		case "Match":
+			return true
+		default:
+			return false
+	}
 }
 
 // The Cases a Type declares: a Choice's, a generic Choice's through its

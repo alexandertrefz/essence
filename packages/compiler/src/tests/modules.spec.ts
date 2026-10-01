@@ -2638,6 +2638,64 @@ export {
 		)
 	})
 
+	// The `if` narrows `n` only to a refinement declared in Scope, so without
+	// `Even` the call is an `argument-type-mismatch`.
+	it("counts a refinement Alias a narrowing establishes as a use", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Parity.es" {
+		Even
+		Parity
+		halved
+	}
+}
+
+implementation {
+	function halvedOrZero(_ n: Integer) -> Integer {
+		if n::isTwice() {
+			<- halved(n)
+		}
+
+		<- 0
+	}
+
+	Terminal.print(halvedOrZero(4))
+}
+`,
+				"Parity.es": `implementation {
+	namespace Parity for Integer {
+		isTwice() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+	}
+
+	type Even = Integer where @::isTwice()
+
+	function halved(_ n: Even) -> Integer {
+		<- n::divide(by 2)::round(toward #TowardZero)
+	}
+}
+
+export {
+	Parity
+	Even
+	halved
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
 	it("refuses an export of a Variable and of a name the Module does not declare", () => {
 		withProject(
 			{

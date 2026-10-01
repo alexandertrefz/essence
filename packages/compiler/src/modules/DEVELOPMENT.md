@@ -70,6 +70,10 @@ It reads both trees, since neither holds every use:
   Such a compile also parses each `@example` here, so what an example reads counts.
 - A Choice printed through the derive needs the Namespace that declared it `is Printable`, though the call
   names neither. Every bound Namespace over that Choice declaring `is Printable` counts.
+- A narrowing establishes only a refinement declared in Scope, so `if n::isTwice()` needs `Even` imported for
+  `n` to become one. The typed tree does not say which condition chose a refinement. So inside a narrowing
+  `if`, `define` or Match, every refinement a binding or `@` carries counts by name, which only quiets the
+  warning.
 
 A named Type the typed tree resolved to does not count as a use. Every Type object carries a name, so an
 import whose Type merely flows through a call would otherwise never be reported. So the walk reads no Type but
