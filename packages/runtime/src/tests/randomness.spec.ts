@@ -33,11 +33,9 @@ import { createRational, type RationalType } from "../Rational"
 import { createString, type StringType } from "../String"
 import { typeKeySymbol } from "../type"
 
-// The Namespace `stdlibGolden.spec.ts` can not capture — what every entry
-// answers is random, so there is no value to check in against a record. The
-// natives are driven here instead, directly, over fixed seeds: what is asserted
-// about each answer is the range it lands in, the exactness it keeps, and that
-// one seed answers one sequence.
+// `stdlibGolden.spec.ts` can not record random answers, so the natives are
+// driven here over fixed seeds. Each answer is held to its range and its
+// exactness, and one seed answers one sequence.
 
 function sourceOf(seed = "beef"): RandomnessType {
 	return createRandomness(seedOf(seed))
@@ -45,16 +43,13 @@ function sourceOf(seed = "beef"): RandomnessType {
 
 const TEAMS = ["Lions", "Tigers", "Bears", "Wolves"]
 
-// A fresh List per call, because the natives that reorder one take the
-// Array they are handed over and a shared box would be read twice.
 function teamsOf(): ListType<StringType> {
 	return createList(TEAMS.map((team) => createString(team)))
 }
 
 describe("Randomness", () => {
-	// A bound WIDER than a word has no whole multiple inside one, so the
-	// rejection loop would reject every draw. It is reachable from
-	// `drawString(upTo:)`, whose bound is whatever a caller wrote.
+	// A bound wider than a word has no whole multiple inside one, so the
+	// rejection loop would reject every draw.
 	test("answers a bound wider than a word rather than looping", () => {
 		let source = sourceOf()
 		let bound = 4294967296 * 4
@@ -100,8 +95,7 @@ describe("Randomness", () => {
 			drawn.push(drawBoolean__overload$1(source))
 		}
 
-		// Two reads of ONE source answer two values, which is the whole
-		// reason a source is the one value in the language that changes.
+		// Two reads of one source answer two values.
 		expect(drawn.some((value) => value.value !== first.value)).toBe(true)
 	})
 
@@ -130,8 +124,8 @@ describe("Randomness", () => {
 			)
 		})
 
-		// The same door the test runtime builds a run's source through, so
-		// a Program replaying a seed and `--seed` replaying one draw alike.
+		// The test runtime builds a run's source through `seedOf`, so a Program
+		// replaying a seed draws as `--seed` does.
 		test("answers what the seeded door answers", () => {
 			let named = seeded(createString("41c37ea3"))
 			let built = createRandomness(seedOf("41c37ea3"))
@@ -179,8 +173,7 @@ describe("Randomness", () => {
 			}
 		})
 
-		// A chance outside the unit range is clamped into it, which is
-		// what an entry with no Optional in its answer can do about one.
+		// The entry answers no Optional, so clamping is all it can do.
 		test("clamps a chance outside the unit range", () => {
 			let source = sourceOf()
 
@@ -192,9 +185,8 @@ describe("Randomness", () => {
 			).toBe(true)
 		})
 
-		// A third is a third of the DRAWS and not a third of a word
-		// rounded, which is what drawing over the chance's own denominator
-		// buys. 6000 draws land within 150 of 2000 with room to spare.
+		// Drawn over the chance's own denominator, so a third is a third of the
+		// draws rather than a rounded third of a word.
 		test("answers true as often as the chance says", () => {
 			let source = sourceOf()
 			let trues = 0
@@ -359,9 +351,8 @@ describe("Randomness", () => {
 			expect(drawn.value >= low).toBe(true)
 		})
 
-		// The half open entry, whose bound is outside the range. Every
-		// value below four is drawn in 400 turns with odds of four in 10^49
-		// against a miss.
+		// The half open entry, whose bound is outside the range. Some value
+		// goes unseen in 400 draws with odds below 10^-49.
 		test("counts from zero and stops below the bound", () => {
 			let source = sourceOf()
 			let seen = new Set<number | bigint>()
@@ -383,8 +374,8 @@ describe("Randomness", () => {
 			).toBe(0)
 		})
 
-		// The bound is proven above zero, and the proof erases before
-		// anything runs, so the guard is what a computed zero meets.
+		// The proof that the bound is above zero erases, so a computed zero
+		// meets the guard.
 		test("answers zero for a bound the proof would refuse", () => {
 			let source = sourceOf()
 
@@ -441,9 +432,8 @@ describe("Randomness", () => {
 				)
 			}
 
-			// Every denominator is one of the table's, which is what makes
-			// a drawn Rational one a reader recognises rather than a scaled
-			// double.
+			// Every denominator comes from the table, so a drawn Rational reads
+			// as a plain fraction rather than a scaled double.
 			expect(
 				[...denominators].every((denominator) =>
 					[1n, 2n, 3n, 4n, 5n, 6n, 8n, 10n, 12n, 16n, 100n, 1000n]
@@ -478,9 +468,8 @@ describe("Randomness", () => {
 			}
 		})
 
-		// The named lattice, which is the entry for every denominator the
-		// twelve above are wrong for. The range starts at one so that no draw
-		// is zero, which `createRational` writes over a denominator of one.
+		// The range starts at one so that no draw is zero, which
+		// `createRational` writes over a denominator of one.
 		test("answers over the denominator it is given", () => {
 			let source = sourceOf()
 			let low = createRational(1n, 1n)
@@ -532,8 +521,8 @@ describe("Randomness", () => {
 			expect(drawn.denominator).toBe(7n)
 		})
 
-		// The denominator is proven above zero, and the proof erases, so
-		// the guard is what a computed zero meets: one whole.
+		// The proof that the denominator is above zero erases, so a computed
+		// zero meets the guard, which draws over one whole.
 		test("draws over one whole for a denominator the proof would refuse", () => {
 			let drawn = drawRational__overload$2(
 				sourceOf(),
@@ -599,7 +588,7 @@ describe("Randomness", () => {
 			expect(pick__overload$1(sourceOf(), items).value).toBe("Wolves")
 		})
 
-		// Without replacement, so a drawn item is never drawn again.
+		// Drawn without replacement.
 		test("answers as many items as asked for, none of them twice", () => {
 			let source = sourceOf()
 
@@ -624,8 +613,8 @@ describe("Randomness", () => {
 			expect([...drawn].sort()).toEqual([...TEAMS].sort())
 		})
 
-		// The count is proven above zero, and the proof erases before
-		// anything runs, so the guard is what a computed zero meets.
+		// The proof that the count is above zero erases, so a computed zero
+		// meets the guard.
 		test("answers one item for a count the proof would refuse", () => {
 			let drawn = materialise(
 				pick__overload$2(sourceOf(), createInteger(0), teamsOf()),
@@ -634,13 +623,9 @@ describe("Randomness", () => {
 			expect(drawn.length).toBe(1)
 		})
 
-		// A count small against the length is drawn through a Map of the
-		// positions the swaps displaced rather than through a copy of the whole
-		// receiver, and the line between the two is a twenty-fifth of the
-		// length. Both spellings issue the same draws in the same order, so
-		// the two sides of that line agree item for item as far as the smaller
-		// one goes: 200 of 5,000 is the last count drawn sparsely and 201 is
-		// the first drawn through the copy.
+		// A count up to a twenty-fifth of the length draws through a Map of
+		// displaced positions, and a larger one through a copy. Both issue the
+		// same draws in order, so 200 and 201 of 5,000 agree item for item.
 		test("draws the same items on either side of the sparse line", () => {
 			let items = createList(
 				Array.from({ length: 5_000 }, (_, index) =>
@@ -664,9 +649,8 @@ describe("Randomness", () => {
 			expect(copied.slice(0, 200)).toEqual(sparse)
 		})
 
-		// A List built from the front holds its items in a REVERSED run,
-		// so the sparse draw has to index that run backwards. Drawing the same
-		// items out of a flat List under the same seed is what says it does.
+		// A List built from the front holds its items in a reversed run, which
+		// the sparse draw must index backwards.
 		test("draws the same items out of a front-built List", () => {
 			let flat = createList(
 				Array.from({ length: 400 }, (_, index) => createInteger(index)),
@@ -689,15 +673,8 @@ describe("Randomness", () => {
 			expect(drawnFrom(front)).toEqual(drawnFrom(flat))
 		})
 
-		// A draw costs the COUNT rather than the length, and the claim is
-		// held by counting what the draw READS rather than by timing it: the
-		// receiver's Array stands behind a Proxy that counts every position read,
-		// so 200 draws of ten items out of two hundred thousand read two thousand
-		// positions and not one more. When every draw copied the whole receiver
-		// first the same walk read forty million. This was a stopwatch once —
-		// 0.5 ms measured against a 50 ms ceiling — and a ceiling on a wall clock
-		// fails on a loaded machine while the claim is still true: it read 71.5 ms
-		// at a load of 21 with nothing about the draw changed.
+		// A draw costs the count, not the length. A Proxy counts the positions
+		// read, since a wall-clock ceiling fails on a loaded machine.
 		test("draws a few items without reading the whole List", () => {
 			let reads = 0
 			let counted = new Proxy(
@@ -767,12 +744,8 @@ describe("Randomness", () => {
 			}
 		})
 
-		// The weights are exact, which is the whole reason they are
-		// Rationals. Halves and a third weigh 3, 3 and 2 parts of eight, so
-		// 8000 draws land near 3000, 3000 and 2000. Scaling each weight to the
-		// common denominator is what answers that: adding the parts up as they
-		// come and drawing over the sum's own denominator answers 4000, 2000
-		// and 2000 instead, which the bands below refuse.
+		// Over a common denominator the weights are 3, 3 and 2 parts of eight.
+		// So 8000 draws land near 3000, 3000 and 2000.
 		test("weighs the items against each other exactly", () => {
 			let source = sourceOf()
 			let items = createList([
@@ -809,8 +782,6 @@ describe("Randomness", () => {
 			expect(counts.Bears).toBeLessThan(2200)
 		})
 
-		// A weight of zero or less is drawn as zero, and weights that are
-		// all zero leave nothing to weigh with, so the draw is the even one.
 		test("draws a negative weight as zero", () => {
 			let source = sourceOf()
 			let items = createList([
@@ -873,8 +844,7 @@ describe("Randomness", () => {
 			])
 		})
 
-		// Four items have 24 orders, so 200 draws answering one order
-		// throughout has odds of one in 24^199.
+		// Four items have 24 orders, and 200 seeded draws reach them all.
 		test("reaches more than one order", () => {
 			let source = sourceOf()
 			let seen = new Set<string>()
@@ -916,11 +886,9 @@ describe("Randomness", () => {
 		})
 	})
 
-	// An entropy source has no seed, so nothing about its SEQUENCE can be
-	// asserted — only the ranges every draw stays in, and that it never answers
-	// the same run of words twice. Where a test below counts on chance, the odds
-	// of a miss are written out: none is within 10^30 of a flake, so a failure
-	// here is a broken source and never a rerun.
+	// An entropy source has no seed, so only its ranges and its variety are
+	// asserted. Where a test counts on chance, its odds of a miss are below
+	// 10^-30, so a failure is a broken source.
 	describe("entropy", () => {
 		test("carries the Randomness tag", () => {
 			expect(entropy()[typeKeySymbol]).toBe("Randomness")
@@ -939,8 +907,8 @@ describe("Randomness", () => {
 			expect(first).not.toEqual(second)
 		})
 
-		// 2000 draws cross the 256 word buffer's edge a handful of times,
-		// so the refill is walked here rather than the first fill alone.
+		// 2000 draws cross the edge of the 256-word buffer several times, so the
+		// refill is walked too.
 		test("stays inside the bound", () => {
 			let source = entropy()
 
@@ -952,8 +920,7 @@ describe("Randomness", () => {
 			}
 		})
 
-		// A value of six goes unseen in 400 draws with odds of six in
-		// 10^32.
+		// Some value goes unseen in 400 draws with odds below 10^-30.
 		test("reaches every value of a small bound", () => {
 			let source = entropy()
 			let seen = new Set<number>()
@@ -965,9 +932,8 @@ describe("Randomness", () => {
 			expect([...seen].sort()).toEqual([0, 1, 2, 3, 4, 5])
 		})
 
-		// The natives never mind the kind — every draw runs through the
-		// one word door — so one of them driven over entropy stands for all.
-		// A bound of four goes unseen in 400 draws with odds of four in 10^49.
+		// Every native draws through `nextWord`, so one over entropy stands for
+		// all. Some value goes unseen in 400 draws with odds below 10^-49.
 		test("drives the natives as the seeded kind does", () => {
 			let source = entropy()
 			let seen = new Set<number | bigint>()
