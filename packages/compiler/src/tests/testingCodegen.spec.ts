@@ -16,14 +16,10 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// What a `tests { … }` block becomes, and what it does when it runs. The
-// two halves are here together on purpose: a golden that says what was emitted
-// proves nothing on its own, and a run that passes says nothing about the shape
-// somebody has to read when it stops passing.
+// What a `tests { … }` block emits, and what it does when it runs.
 
-// The stages the CLI runs, with the tests asked for — `simplify` is
-// handed the source because the span table carries the text of every
-// instrumented point.
+// The stages the CLI runs, with the tests asked for. `simplify` is handed the
+// source because the span table carries the text of every instrumented point.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -37,7 +33,7 @@ function generate(source: string): string {
 	return rewrite(optimise(simplify(enriched.program, { source })))
 }
 
-// The same, with the tests left alone — what `essence build` emits.
+// The same, with the tests left alone, as `essence build` emits.
 function build(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 	let enriched = enrich(parsed.program)
@@ -45,10 +41,8 @@ function build(source: string): string {
 	return rewrite(optimise(simplify(enriched.program)))
 }
 
-// Everything from `$testing.register(` on, which is the whole of what a
-// tests section emits. Snapshotting the file would snapshot the standard
-// library prelude with it, and every unrelated change to that would rewrite
-// this golden.
+// Everything from `$testing.register(` on, which is what a tests section
+// emits. The whole file would snapshot the standard library prelude too.
 function registration(javaScript: string): string {
 	let start = javaScript.indexOf("$testing.register(")
 
@@ -59,15 +53,8 @@ function registration(javaScript: string): string {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// Writes the emitted Program to a throwaway module and imports it, the
-// way `codeGeneration.spec.ts` does — the emitted imports are absolute paths
-// into this repo's runtime, so the module resolves from anywhere.
-//
-// The run is driven through the bundle's OWN `$tests`, never through this
-// package's copy of the test runtime. Every Essence value carries a hidden Type
-// key that is a `Symbol` of the runtime instance that built it, so a diff or a
-// rendering asked from outside would read `undefined` off every value it was
-// handed.
+// Writes the emitted Program to a throwaway module and imports it. The
+// emitted imports are absolute paths into this repository's runtime.
 async function load(
 	javaScript: string,
 	extension = ".ts",
@@ -88,17 +75,11 @@ type Run = {
 	summary: Awaited<ReturnType<typeof entryPoints.run>>
 }
 
-// An emitted `.ts` program imports the runtime by its absolute path, which
-// is the very module this spec file imports — so every program loaded ANYWHERE
-// in this process registers into ONE array, and a run has to be given the
-// Modules its own program put there. The count is read immediately before the
-// load rather than kept between runs, because another spec file sharing this
-// process registers into the same array and would otherwise be run by this one.
-// A bundle has no such trouble: esbuild inlines a runtime of its own.
-
-// Essence source in, the events its tests emitted out — the whole
-// pipeline, then the run, which is the only way to be sure the emitted shape
-// asserted on above is a shape that WORKS.
+// Essence source in, the events its tests emitted out.
+//
+// WARNING: every program loaded in this process registers into one array,
+// shared with other spec files. The count is read just before the load, and
+// the run is given only the Modules its own program added.
 async function run(
 	source: string,
 	filters?: Parameters<typeof entryPoints.run>[1]["filters"],
@@ -110,10 +91,9 @@ async function run(
 	let before = registry().modules.length
 	let { loaded, dispose } = await load(generate(source))
 	let modules = loaded.$tests.registry().modules
-	// `registryOf` only indexes what it is handed — no Essence value is
-	// read — so this spec's copy of it answers for a Module whichever runtime
-	// instance registered it. The RUN goes through the loaded program's own
-	// `$tests`, which is where the values belong.
+	// `registryOf` reads no Essence value, so this copy may index the Modules.
+	// The run goes through the program's own `$tests`, since every value
+	// carries a Type key of the runtime instance that built it.
 	let scoped = registryOf(modules.slice(before))
 	let events: Array<TestEvent> = []
 
@@ -264,10 +244,9 @@ describe("Test codegen — the emitted shape", () => {
 			}
 		}`)
 
-		// One call rather than a guarded early return — the runtime
-		// unwinds a failed `require`, so the Constants the Matcher binds below
-		// it are never reached however deep in the lowering the assertion
-		// stands.
+		// One call rather than a guarded early return. The runtime unwinds a
+		// failed `require`, so the Constants the Matcher binds after it are
+		// never reached.
 		expect(javaScript).toMatch(
 			/\$testing\.required\(\$context, \d+, [\s\S]*?\);\n\s*const first =/,
 		)
@@ -275,9 +254,7 @@ describe("Test codegen — the emitted shape", () => {
 	})
 
 	// An assertion's Matcher is a Match Handler standing on its own, so
-	// `compile-type-tests` has to reach it where it stands — the same question
-	// asked the general way here and the cheap way in the `match` this is
-	// spelled like is exactly the drift the shared node was for.
+	// `compile-type-tests` compiles it to the same tag test.
 	it("compiles an assertion's Matcher to the tag test a Handler gets", () => {
 		let javaScript = generate(`implementation {
 			constant rows = [1, 2]
@@ -346,9 +323,9 @@ describe("Test codegen — the emitted shape", () => {
 		)
 	})
 
-	// The indices are the half-open run of the manifest the suite holds,
-	// and a nested one is inside its parent's run — which is what lets a run
-	// step over a whole branch of the tree at its head.
+	// The indices are the half-open run of the manifest the suite holds, and a
+	// nested run lies inside its parent's. A run can skip a whole branch at its
+	// head.
 	it("carries the run of tests every suite holds, nested ones included", () => {
 		let javaScript = generate(`implementation {}
 
@@ -385,9 +362,8 @@ describe("Test codegen — the emitted shape", () => {
 		])
 	})
 
-	// The one place the two forms part company. A benchmark is the same
-	// call with the key its baseline is stored under wedged in before the body,
-	// which is what says the runtime is to TIME the body rather than run it once.
+	// A benchmark is the same call with its baseline key before the body. The
+	// key tells the runtime to time the body rather than run it once.
 	it("emits a benchmark as the sibling of the entry call", () => {
 		let emitted = registration(
 			generate(`implementation {}
@@ -584,12 +560,8 @@ describe("Test codegen — running what was emitted", () => {
 		})
 	})
 
-	// A `define` is the one construct written IN expression position that
-	// asks questions of its own, and an assertion is exactly where one will be
-	// written — so a reader is shown what each Condition answered and what the
-	// arm that held answered with, the same as if they had been written beside
-	// the assertion rather than inside it. Nothing about the ladder itself is
-	// reported: an arm nobody took evaluates nothing and traces nothing.
+	// A `define` in an assertion reports what each Condition answered and what
+	// the arm that held answered with. An arm nobody took traces nothing.
 	it("explains a failure through the arms of a define", async () => {
 		let { events } = await run(`implementation {
 			function grade(_ score: Integer) -> String {
@@ -621,9 +593,8 @@ describe("Test codegen — running what was emitted", () => {
 			["grade(95)", '"A"'],
 			['grade(95)::is("A")', "true"],
 			["grade(85)", '"B"'],
-			// The ladder's own value, which the assertion records the way
-			// it records any asserted Expression — spelled across the four
-			// lines it was written on.
+			// The ladder's own value, spelled across the lines it was written
+			// on.
 			[
 				'define {\n\t\t\t\t\tas grade(85) if grade(95)::is("A")\n\t\t\t\t\tas "nope" otherwise\n\t\t\t\t}',
 				'"B"',
@@ -632,11 +603,8 @@ describe("Test codegen — running what was emitted", () => {
 		])
 	})
 
-	// `require MATCHER = EXPR` asserts a Matcher's test over a value held
-	// under a name, so there is no expression tree at the assertion to take
-	// apart — the subject is the Statement in front of it, and that is what is
-	// instrumented. Without it a failed Matcher explained itself with nothing
-	// at all.
+	// `require MATCHER = EXPR` has no expression tree at the assertion to take
+	// apart, so the subject Expression is instrumented instead.
 	it("explains a failed Matcher out of what its subject held", async () => {
 		let { events } = await run(`implementation {
 			function rows() -> List<Integer> {
@@ -829,10 +797,8 @@ describe("Test codegen — running what was emitted", () => {
 		).toEqual(["/one", "/two"])
 	})
 
-	// "Fresh evaluation of the bindings a test can SEE" — a suite's setup
-	// is not one of them for a test written beside it. Printing is again the
-	// one thing that can tell, and it is also what made this visible: a test
-	// outside the suite was shown the suite's output as its own.
+	// A test evaluates afresh only the bindings it can see, so a suite's setup
+	// does not run for a test beside the suite. Printing shows which ran.
 	it("evaluates the setup of the suites a test is in, and no others", async () => {
 		let { events } = await run(`implementation {}
 
@@ -864,11 +830,8 @@ describe("Test codegen — running what was emitted", () => {
 	})
 
 	it("keeps a Constant nothing but a test reads", async () => {
-		// `eliminate-dead-code` decides what a Program READS, and a test
-		// body is where the only read of `shipped` is. A pass that did not walk
-		// the section would drop the Constant out from under the test that
-		// names it, and the run below would be a `ReferenceError` rather than a
-		// failure.
+		// Only the tests section reads `shipped`, so `eliminate-dead-code` must
+		// walk the section to keep the Constant.
 		let { summary } = await run(twoTests)
 
 		expect(summary).toMatchObject({ passed: 2, failed: 0 })
@@ -942,12 +905,9 @@ describe("Test codegen — running what was emitted", () => {
 	})
 })
 
-// A test body may `complete` whatever it likes, and the runner waits for
-// it — which is the whole of what makes asynchrony testable in the language it
-// is written in. What these ask is that the wait is really waited for: that a
-// value only a completed future can hold reaches an `expect`, that output
-// written after a wait is still attributed to the test that wrote it, and that
-// a run of several such tests is a run in the order they were written.
+// A test body may `complete` whatever it likes, and the runner waits for it.
+// Output after a wait belongs to the test that wrote it, and tests run in the
+// order they were written.
 describe("Test codegen — a test that completes", () => {
 	it("waits for what a test body completes", async () => {
 		let { events, summary } = await run(`implementation {
@@ -1051,11 +1011,8 @@ describe("Test codegen — a test that completes", () => {
 		expect(summary.failed).toBe(0)
 	})
 
-	// A test may walk away from a run — `unobserved-started` is an
-	// Information — and what it walks away from is stopped when the test ends.
-	// Without that, the work goes on into the NEXT test: what it prints is
-	// captured under that test's sink and reported against the wrong test, and
-	// the runner stays open for as long as the abandoned work has left to run.
+	// Work a test leaves running is stopped when the test ends, so it can not
+	// print into the next test or keep the runner open.
 	it("stops work a test left running when the test ends", async () => {
 		let { events, summary } = await run(`implementation {
 			function late(_ name: String, after milliseconds: Integer) -> Future<{}> {
@@ -1324,9 +1281,8 @@ describe("Test codegen — the Tests.es fixture", () => {
 		let source = readFileSync(fixturePath("Tests.es"), "utf8")
 		let { events, summary } = await run(source)
 
-		// The fixture writes one `focused` test, so a plain run of it
-		// runs exactly that one and reports the rest as not focused — which is
-		// the whole of what `focused` promises.
+		// The fixture writes one `focused` test, so a plain run runs that one
+		// and deselects the rest.
 		expect(summary).toMatchObject({
 			passed: 1,
 			failed: 0,
@@ -1491,9 +1447,8 @@ tests {
 		expect(eventsOf(events, "probe")).toHaveLength(0)
 	})
 
-	// The one a compile can not answer. Everything above is written
-	// inside the section, which is where a value comment records; one written
-	// outside it records nothing, and used to say nothing about that either.
+	// A value comment records only inside the tests section, so one outside it
+	// is reported.
 	it("refuses one written outside the tests section", () => {
 		let source = `implementation {
 	constant outside = 1 §?
@@ -1587,9 +1542,8 @@ tests {
 		])
 	})
 
-	// A row that is not the one running costs nothing but its own value —
-	// the body is one closure, and the name is worked out for the row being
-	// enumerated or run.
+	// The body is one closure, so a row that is not running costs only its own
+	// value.
 	it("evaluates one row's body per test", async () => {
 		let { events } = await run(`implementation {
 	function twice(_ n: Integer) -> Integer {
@@ -1686,9 +1640,8 @@ tests {
 		)
 	})
 
-	// One entry per ROW. The rows share a body, so one name would be one
-	// entry they overwrite in turn — the first run would store the last row's
-	// value and every run after would report the others as differing, for ever.
+	// One entry per row. The rows share a body, so one entry would be
+	// overwritten in turn and every later run would report a difference.
 	it("keeps a table's stored snapshot per row", async () => {
 		let source = `implementation {
 	function twice(_ n: Integer) -> Integer {
