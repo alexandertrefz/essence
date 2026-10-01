@@ -108,7 +108,6 @@
 	"packages/language-server/src/codeActions/defines.ts": {"sentence-length": 19, "em-dash": 13, "all-caps": 4, "position": 2, "block-length": 3},
 	"packages/language-server/src/codeActions/extractFunction.ts": {"sentence-length": 17, "em-dash": 12, "all-caps": 15, "position": 2, "block-length": 3},
 	"packages/language-server/src/codeActions/fixes.ts": {"sentence-length": 141, "em-dash": 79, "all-caps": 62, "history": 1, "position": 9, "block-length": 33},
-	"packages/language-server/src/codeActions/futureFixes.ts": {"sentence-length": 15, "em-dash": 10, "all-caps": 4, "position": 2, "block-length": 6},
 	"packages/language-server/src/codeActions/geometry.ts": {"sentence-length": 40, "em-dash": 30, "all-caps": 27, "position": 2, "block-length": 8},
 	"packages/language-server/src/codeActions/implementProtocol.ts": {"sentence-length": 22, "em-dash": 17, "all-caps": 11},
 	"packages/language-server/src/codeActions/index.ts": {"sentence-length": 37, "em-dash": 25, "all-caps": 11, "history": 3, "position": 3, "block-length": 6},

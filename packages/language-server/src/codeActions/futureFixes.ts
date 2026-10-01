@@ -4,23 +4,17 @@ import { containsRange, keywordAt, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// The fixes for the Diagnostics asynchrony reports. Four of the five have
-// a mechanical answer and are written below; `unobserved-started` has none and
-// is the reason the NOTE at the bottom of this file exists.
+// Fixes for the Diagnostics asynchrony reports. `unobserved-started` gets
+// none: its answers are to leave the line, or to name the work, which only the
+// reader can.
 
-// The Keyword each Node is written with, which is what
-// `dropKeywordAction` checks the buffer against before cutting it.
+// The keyword each Node is written with, which `dropKeywordAction` checks the
+// buffer against.
 const keywords = { Start: "start", Complete: "complete" } as const
 
-// `complete` in a body that declared something other than a Future. The
-// body is right and the signature is behind it: what it answers with is a
-// Future of what it says today, so the annotation is wrapped rather than
-// replaced — the Type the author wrote is the Value the future carries.
-//
-// Offered only where the `complete` stands in a BODY. The other site this code
-// is reported at is a Parameter's default, which suspends nothing and is inside
-// no body at all: wrapping the enclosing Function's return Type there would
-// answer a question nobody asked and leave the default exactly as wrong.
+// `complete` in a body whose return Type is not a Future: the annotation is
+// wrapped as `Future<…>`, keeping what the author wrote. Not offered for a
+// Parameter's default, which is in no body.
 export function declareFutureReturnAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -34,8 +28,7 @@ export function declareFutureReturnAction(
 
 	let written = sliceOf(lines, definition.returnType.position).trim()
 
-	// Nothing is offered where the annotation is empty or already reads
-	// `Future<…>`, rather than `Future<Future<Integer>>`.
+	// Nothing where the annotation is empty or already a `Future<…>`.
 	if (written === "" || written.startsWith("Future<")) {
 		return null
 	}
@@ -55,13 +48,9 @@ export function declareFutureReturnAction(
 	}
 }
 
-// The Function definition whose own body holds a Position, innermost
-// first — the body rather than the whole Node, which is what tells a `complete`
-// written in a Statement from one written in a Parameter's default.
-//
-// Innermost wins on the reading `findInnermostNodeContaining` takes of the same
-// walk: a Node is visited before the Nodes it holds, so the last definition
-// holding the Position is the one no other definition of the list is nested in.
+// The innermost Function definition whose body holds a Position, so a
+// Parameter's default does not count. The walk visits outer Nodes first, so
+// the last match is innermost.
 function completingDefinitionAt(
 	program: parser.Program,
 	position: common.Position,
@@ -88,12 +77,9 @@ function completingDefinitionAt(
 	return found
 }
 
-// A Future written where its value goes nowhere, which is the one
-// Diagnostic of the five with two answers: waiting for it and putting it in
-// flight are both whole things to mean, and nothing in the source says which.
-// Neither is preferred for that reason, and `complete` is offered first because
-// it is the answer that leaves the line's value where a reader can still reach
-// it — a `start` dropped on the floor is the Information below this one.
+// A Future whose value goes nowhere: wait for it or put it in flight. The
+// source does not say which, so neither is preferred. `complete` comes first,
+// since a dropped `start` is reported again.
 export function discardedFutureActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 ): Array<CodeActionEntry> {
@@ -103,16 +89,9 @@ export function discardedFutureActions(
 	].map((entry) => ({ ...entry, isPreferred: false }))
 }
 
-// A Type mismatch that is one missing word: a Future or a Started
-// standing where the value it answers with is wanted. The Validator has already
-// decided that, by assignability, and says so in its `data` — so what is left
-// here is writing the word.
-//
-// Read off the DATA rather than off the Help's sentence. The codes these
-// arrive under are reported for every other mismatch in the language as well,
-// so the code alone can not decide it — and the Helps are written per report
-// site, in wording `interfaces/common` explicitly reserves the right to change.
-// A fix keyed on prose is a fix that stops firing with the whole suite green.
+// A Future or Started where its value is wanted, which the Validator marks in
+// `data`. The code alone is shared with every other mismatch, and Help wording
+// may change, so the `data` decides.
 export function waitForValueAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 ): CodeActionEntry | null {
@@ -123,15 +102,9 @@ export function waitForValueAction(
 	return insertKeywordAction(diagnostic, "complete", "Wait for it with")
 }
 
-// The same missing word on a call that picked no Overload at all, where
-// the Diagnostic is reported at the WHOLE call and the Argument that was refused
-// is what its primary Label points at. So the edit is measured off that Label
-// rather than off the Diagnostic's own span — writing the word in front of the
-// call would wait for the call, which is not what the Help describes and not
-// what the reader meant.
-//
-// The Enricher withholds the payload for a `::` call's receiver, which is the
-// one Argument whose Label is not a place this word can go.
+// The same on a call that picked no Overload. The Diagnostic spans the call,
+// so the word goes before the refused Argument, its primary Label. The
+// Enricher sends no `data` for a `::` receiver.
 export function waitForArgumentAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 ): CodeActionEntry | null {
@@ -157,8 +130,7 @@ function insertKeywordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	keyword: string,
 	title: string,
-	// Where the word goes, which is the Diagnostic's own span for every
-	// report that points at the value itself.
+	// Where the word goes; by default the Diagnostic's own span.
 	at: common.Position = diagnostic.position,
 ): CodeActionEntry {
 	return {
@@ -166,9 +138,7 @@ function insertKeywordAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// Preferred where it is the answer rather than one of two —
-		// `discardedFutureActions` overrides this on both of the pair it
-		// offers, since choosing between them is the reader's.
+		// `discardedFutureActions` overrides this for its pair.
 		isPreferred: true,
 		edits: [
 			{
@@ -179,13 +149,8 @@ function insertKeywordAction(
 	}
 }
 
-// A Keyword in front of a value that is neither a Future nor a Started.
-// The word is the whole of what is wrong, so the whole of the fix is to take it
-// out — everything from where it starts to where its operand does, which is the
-// word and the space behind it.
-//
-// The buffer is read back before cutting: a Diagnostic that has slid by a
-// keystroke would otherwise take a column of somebody's Expression with it.
+// Drops a keyword before a value that is neither a Future nor a Started. The
+// span runs from the keyword to its operand, once the buffer confirms the word.
 export function dropKeywordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -221,10 +186,8 @@ export function dropKeywordAction(
 	}
 }
 
-// The `start` or `complete` the Diagnostic was reported against. Both are
-// reported at the whole Expression's Position, so the Node wanted is the one
-// standing exactly there — and the walk answers with the innermost, which is
-// what tells the inner Keyword of `complete start x` from the outer one.
+// The innermost `start` or `complete` at the Diagnostic, which tells the
+// keywords of `complete start x` apart.
 function keywordNodeAt(
 	program: parser.Program,
 	position: common.Position,
@@ -242,11 +205,3 @@ function keywordNodeAt(
 
 	return found
 }
-
-// And the one that is offered nothing. `unobserved-started` is an
-// Information about a line that is legal — fire and forget is a real thing to
-// write — and its two answers are "leave it", which is no edit, and "hold it in
-// a Constant", whose whole content is a name only the reader knows. A fix that
-// invented one would name the work after the Function that built it and shadow
-// that Function on the line below, which is worse than the Information it
-// answered.
