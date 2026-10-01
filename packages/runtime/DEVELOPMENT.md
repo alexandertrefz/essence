@@ -454,3 +454,93 @@ Integer as digits, a Union's arm as its index, a Case's tag and a Dictionary's e
 when the Type changes under a stored value, `decode` answers `null` rather than a value of the wrong shape, and the
 entry is dropped. `decode` trusts nothing: it checks every kind, tag, member set and digit string, and asks a
 refinement's predicate again. A value of a Namespace's own generator is never written down.
+
+## Dictionaries
+
+A Dictionary box is a view of a shared store at one generation. The store holds one slot per key in insertion order.
+Each slot holds the versions its value has had, each stamped with the generation of the write that made it, newest
+last. A box sees every version stamped no later than its own generation. So a write pushes one version onto a shared
+Array and answers a new box. The box it was written from still answers what it did before.
+
+Sharing is unobservable, as it is for a List: values are immutable, and Essence can not ask whether two values are
+the same object. That holds because every reader applies one rule. A slot is live at a generation when it has a
+version there and that version is not `TOMBSTONE`. `liveValueOf` is that rule in `Dictionary.ts`, and
+`everyLiveEntry` spells it again in `type.ts`. A removal pushes `TOMBSTONE`, a Symbol, since any in-band value could
+be one a Program stores. Lookup finds a slot through the index and reads it through `liveValueOf`. Iteration,
+printing, equality, `keys`, `values`, `entries` and `map` walk the slots in order and skip the ones that are not live.
+
+A slot is never moved or removed. An overwritten key keeps its place because its slot does, and a removed key leaves
+a tombstoned slot standing until a repack. A slot keeps the key box that arrived first, so `keys` answers what the
+Program handed over. `3` and `3/1` are one key under a `Number` key Type, and the first spelling stays.
+
+### Writing to a Dictionary
+
+Only the store's tip, the box whose generation is the store's newest, writes in place. `set` and `remove` repack
+first when any of these holds:
+
+- The box is not the tip. The chain has forked, and two branches must not write into one another's future.
+- The store's dead versions outnumber its slots. A dead version is not any live key's newest. An
+  overwrite leaves one, and a removal leaves two.
+- The key is being added back after a removal. A re-added key lands at the end, and only dropping its tombstoned slot
+  can put it there.
+
+`repack` copies the box's live view into a fresh store, one version per live key at generation zero, and leaves the
+old store untouched. It also moves the box it was made from onto the fresh store. That is unobservable, since the
+fresh store holds exactly that box's view. A box left behind is usually a base several writes derive from. Each
+derivation then repacks a store the size of the box, not the whole history in front of it.
+
+The repack rule keeps writes amortised constant. A cap on one slot's versions would turn repeated overwrites of one
+key into a repack of the whole Dictionary every few writes. The cost falls on old boxes instead: reading an early box
+of a much-overwritten key walks back through that key's later versions. Removing a key and adding it back repacks every
+time, so a loop that does it on every turn is quadratic in the entries.
+
+`createDictionary`, `of`, `map`, the filters, the sorts and `freshStore` each fill a store nobody else holds yet, with
+every version at generation zero. That is the shape a repack would leave, so a duplicate key overwrites its version in
+place and the finished store has no dead versions. `map`, the filters and the sorts carry each slot's encoding over,
+since their keys are the receiver's own and already distinct. `freshStore`, `foldIntoFreshStore` and
+`dictionaryOverFreshStore` are for `GroupedList.ts`, which folds each item into the entry its key already has.
+
+### Finding a Dictionary key
+
+A key the canonical encoding in `keyEncoding.ts` can spell is found with one Map read. Encodings that are primitives
+go in `index` and text encodings go in `texts`. So a String key never collides with a Rational, Case or Record key. A
+key with no encoding takes the scan path: every visible slot is asked through the Equatable witness. `encodeKey`
+answers no encoding for a witness without the `structural` brand. So a slot opened through a witness a Namespace
+wrote has none either.
+
+So one store may hold both kinds of slot, and `unencoded` counts the second kind. A key with an encoding that misses
+the index still falls through to the scan, over the unencoded slots, while any stand. Where none does, a miss is a
+miss in one step. A fresh store needs the same fallthrough. One branded witness can cover kinds that encode and kinds
+that scan. A `Number` witness covers Integers and Rationals, which encode, and Algebraics and Transcendentals, which
+do not. No such pair is equal under the standard library's `is` today. Relying on that would let a future kind
+silently open two slots for one key.
+
+The index holds every slot the store ever opened, including slots opened after a given box. A lookup therefore
+checks that the box can see the slot. On the tip, where every write looks, that check always passes.
+
+### Dictionary equality
+
+`is` is order-insensitive: the same keys, each with an equal value. Equal lengths are checked first, so walking one
+side and looking each key up in the other is enough. The key witness finds the entry and the value witness compares
+what it holds.
+
+The kind registry's `equals` compares two Dictionaries with no witness in hand. It walks one side and looks each key
+up in the other through its canonical encoding. That is sound because the encoding is written to agree with the
+universal comparison. `equalsBy` compares each half of an entry by a rule the descriptor names, which is not the
+equality the keys are organised by. So it holds one side and searches the other, striking out each match so one entry
+answers for one.
+
+### Dictionaries from a host
+
+`createDictionaryFrom` builds a Dictionary from a host's values. Nothing that crosses the boundary carries a witness,
+so the universal comparison stands in, as it does for a drawn Dictionary. It can not stand in for an `is` a Namespace
+wrote. A duplicate key is answered rather than merged. A JavaScript `Map` tells `1` and `1n` apart where a Dictionary
+does not, and the boundary must not drop an entry a host wrote. The answer is the index of the duplicate, since only
+the marshaller knows the path to name in the error.
+
+### Registering the Dictionary kind
+
+The Dictionary kind is registered by the first construction rather than at the top of the module. Every emitted
+Program imports every runtime module and leaves esbuild to shake away the unused ones. A top-level call is a side
+effect a bundler must keep. A Program that holds a Dictionary built it through one of the constructors, so the kind is
+registered before anything prints or compares one.
