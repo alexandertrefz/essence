@@ -167,7 +167,6 @@
 	"packages/compiler/src/parser/nodeGenerators.ts": {"sentence-length": 3, "em-dash": 7},
 	"packages/compiler/src/printType.ts": {"sentence-length": 19, "em-dash": 20, "all-caps": 10, "position": 2, "block-length": 4},
 	"packages/compiler/src/rewriter/rewrite.ts": {"sentence-length": 527, "em-dash": 391, "all-caps": 257, "history": 5, "position": 46, "block-length": 108, "stacked": 1, "counts": 1},
-	"packages/compiler/src/rewriter/stdlibPrelude.ts": {"sentence-length": 47, "em-dash": 31, "all-caps": 32, "position": 3, "block-length": 16},
 	"packages/compiler/src/simplifier/simplify.ts": {"sentence-length": 102, "em-dash": 77, "all-caps": 53, "history": 1, "position": 7, "block-length": 22},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
