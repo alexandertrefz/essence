@@ -5869,6 +5869,33 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
+			// One export entry publishes the Type and its Namespace, and an
+			// importer would lose whichever half stayed behind.
+			it("should offer nothing for a Type or a Namespace sharing its name with the other", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\ttype Point = { x: Integer }",
+						"",
+						"\tnamespace Point for Point {",
+						"\t\tshifted() -> Point {",
+						"\t\t\t<- { x = @.x::add(1) }",
+						"\t\t}",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tPoint",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				expect(moves(workspace, pathOf("A.es"), 2, "Point")).toEqual([])
+				expect(moves(workspace, pathOf("A.es"), 4, "Point")).toEqual([])
+			})
+
 			// A Variable cannot be exported, so it cannot move. The cursor must be
 			// on the name, or every Statement of a body would offer the move.
 			it("should offer nothing for a Variable, or for a cursor off the name", () => {

@@ -211,6 +211,9 @@ derived for a Choice, such as `is`, needs the Choice too, and derived printing n
 Choice `is Printable`. An import entry such a use reaches travels with the Statement like one it names. A Protocol or
 Choice of this file it reaches must be published, like a name.
 
+A Declaration that shares its name with another of this file, as a `type X` and its `namespace X for X` do, is not
+moved. One export entry publishes both, so an importer would lose whichever half stayed behind.
+
 The destinations are the other Modules in the same directory, plus a new Module named after the Declaration where
 no such file exists. A Module further away is not offered, since the move a reader means is nearly always into a
 file they can see. A Module that forwards the name is not offered either. Moving the Declaration into it would turn

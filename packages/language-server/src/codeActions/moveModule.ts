@@ -197,6 +197,19 @@ function movableAt(
 			continue
 		}
 
+		// A Type and its Namespace share one name and one export entry, so the
+		// half left behind would be lost to every importer.
+		if (
+			program.implementation.nodes.some(
+				(other) =>
+					other !== statement &&
+					declarationOf(other)?.name.content ===
+						declared.name.content,
+			)
+		) {
+			return null
+		}
+
 		let span = {
 			start: (declared.documentation?.position ?? statement.position)
 				.start,
