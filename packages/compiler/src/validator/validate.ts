@@ -57,14 +57,10 @@ type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
 type MatchHandler = common.typed.MatchNode["handlers"][number]
 
-// The Protocol-bounded Type Parameters of every enclosing Function
-// Definition, innermost last — one Set per Function, because a Function
-// literal written inside a bounded one reaches the enclosing hidden
-// conformance Parameter the way any closure reaches what encloses it, so a
-// witness resolves against the whole stack rather than against its top.
-// Module state for the reason the Diagnostic collection is: the alternative is
-// threading it through every `validate…` function, and only one Program is
-// validated at a time.
+// The Protocol-bounded Type Parameters of every enclosing Function, innermost
+// last. A closure reaches an enclosing hidden conformance Parameter, so a
+// witness resolves against the whole stack.
+// See "Compiler invariant rails" in DEVELOPMENT.md.
 let witnessScopes: Array<Set<string>> = []
 
 // The bounds of every enclosing Function Definition's Type Parameters as
@@ -72,35 +68,16 @@ let witnessScopes: Array<Set<string>> = []
 // provided Method's `Self` holds an identity and shows its name.
 let writtenBounds: Array<Map<string, string>> = []
 
-// Whether each enclosing body may write `complete`, innermost last — a
-// body may where it answers a Future, and the top level may outright. Module
-// state for the same reason `witnessScopes` is: the alternative is threading it
-// through every `validate…` function, and only one Program is validated at a
-// time.
-//
-// Read wherever a report is about to offer the word. `complete` written in a body
-// that answers no Future is `complete-outside-future`, so a Help offering it
-// there — and the Quick Fix keyed on the same data, which WRITES it — walked the
-// reader from one refusal into the next.
-//
-// The Enricher answers the same question off the Scope chain, in `bodyCanWait`
-// there, and the two have to agree: the Enricher's barriers — a Parameter's
-// default, a test's name, a benchmark body, a property body — are pushed here
-// too, because a report is offered the word by whichever stage raised it and a
-// reader reads one list.
-// `true` is a body that may; every other entry says WHY it may not, in the
-// Enricher's own vocabulary, because a Help that withholds the word has to name
-// an edit and "declare the enclosing Function '-> Future<…>'" is no edit inside
-// a property body.
+// Whether each enclosing body may write `complete`, innermost last, or why
+// it may not. See "Completing bodies" in DEVELOPMENT.md.
 let waitingBodies: Array<true | enricher.CompletionBarrier | "plain-body"> = []
 
 function bodyCanWait(): boolean {
 	return (waitingBodies.at(-1) ?? true) === true
 }
 
-// Which of the four barriers refused, for the Helps that name the edit it
-// leaves — null for a body that simply answers something other than a Future,
-// whose edit is to its own Declaration.
+// The barrier that refused, for a Help naming the edit it leaves. Null for a
+// body that answers something other than a Future.
 function completionBarrier(): enricher.CompletionBarrier | null {
 	let top = waitingBodies.at(-1)
 
@@ -109,10 +86,7 @@ function completionBarrier(): enricher.CompletionBarrier | null {
 		: top
 }
 
-// Runs `walk` with one more body on the stack, and pops it whatever
-// happens — every push in this file goes through here so that a refusal thrown
-// mid-walk can not leave the stack claiming the wrong answer for the rest of
-// the Program.
+// Runs `walk` with one more body on `waitingBodies`, popped in a `finally`.
 function insideBody(
 	state: true | enricher.CompletionBarrier | "plain-body",
 	walk: () => void,
@@ -126,82 +100,49 @@ function insideBody(
 	}
 }
 
-// Where each top-level Namespace is declared — its index in the top-level
-// statement list, and the Position of its name. A Namespace is emitted as a
-// `class`, whose binding does not exist until the Declaration itself runs, so a
-// use that RUNS above it compiles clean and then fails. Read off the typed
-// statement list rather than out of a Scope: a hoisted Namespace never enters
-// the Enricher's declarations, and its Type carries no Position.
-// Module state for the reason `witnessScopes` is.
+// Each top-level Namespace's index in the Statement list and its name's
+// Position. A Namespace is emitted as a `class`, so a use that runs before its
+// Declaration fails. See "Use before declaration" in DEVELOPMENT.md.
 let topLevelNamespaces: Map<
 	string,
 	{ index: number; position: common.Position }
 > = new Map()
 
-// The index of the top-level statement whose execution is being
-// validated, or null where what is being validated does not run yet — a
-// Function body, which is emitted hoisted and runs whenever it is called. A
-// static Property's initialiser is not such a place: it runs when its
-// Namespace's Declaration does, so it keeps the index it is written under.
+// The index of the top-level Statement being validated, or null inside a
+// Function body, which runs when called. A static Property's initialiser keeps
+// its index, since it runs with its Namespace's Declaration.
 let executingTopLevelIndex: number | null = null
 
-// The static Property initialiser being validated: its Namespace's name,
-// and the Properties of that Namespace which have no value yet where it runs —
-// itself and everything written below it, each with the Position it is declared
-// at. Null anywhere else, including inside a Function literal written in such an
-// initialiser, whose body runs when it is called like any other.
-// Module state for the reason `witnessScopes` is.
+// The static Property initialiser being validated: its Namespace's name and
+// the Properties not yet bound where it runs, itself included. Null elsewhere,
+// including in a Function literal inside it.
 let initialisingProperty: {
 	namespaceName: string
 	unbound: Map<string, common.Position>
 } | null = null
 
-// The lines the Parser abandoned text on — see `parser.Recovery`. A
-// construct written across one of them was not read whole, so what it LACKS
-// says nothing about what the reader wrote: the `<-` that would have made a
-// Function return was dropped out of it, the arm that would have given a
-// `define` its cases was, and reporting the absence is reporting the syntax
-// error again in words that name the wrong mistake.
-// Module state for the reason `witnessScopes` is.
+// The lines the parser abandoned text on. See "After a parse recovery" in
+// DEVELOPMENT.md.
 let abandonedLines: ReadonlySet<number> = new Set()
 
-// The lines of the abandoned runs that could have opened a BODY — see
-// `parser.Recovery.headLines`. Only such a run can leave a `<-` standing
-// outside a Function, so only such a run stands `top-level-return` down.
-// Module state for the reason `witnessScopes` is.
+// The lines of the abandoned runs that could have opened a body. See
+// `parser.Recovery.headLines`.
 let abandonedHeadLines: ReadonlySet<number> = new Set()
 
-// The line the last top-level Statement that is NOT itself a top-level
-// `<-` ended on, advanced as the Statements are walked. A dropped head can only
-// have orphaned a `<-` that stands BELOW everything the Parser did read there,
-// so a head abandoned at or above this line took no body down that this `<-`
-// could have been written inside.
-//
-// The "not itself a `<-`" is what a run of orphaned Returns needs: one dropped
-// head leaves several of them, all from the same missing `{`, and letting the
-// first one advance the floor would report every one after it.
-// Module state for the reason `witnessScopes` is.
+// The line the last top-level Statement other than a `<-` ended on.
+// See "Top-level returns" in DEVELOPMENT.md.
 let topLevelStatementFloor = 0
 
-// Whether anything has already been reported about this Program. The
-// three rails below state invariants the EMITTED JavaScript rests on, and every
-// one of them rests in turn on a Program that parsed and enriched cleanly: a
-// witness that was never built because its Namespace does not conform is a
-// missing conformance Argument, and answering that with an Internal Compiler
-// Error is the Compiler blaming itself for a mistake the reader has already
-// been told about. Nothing is emitted from a Program with an Error in it, so
-// there is nothing left for the rails to protect.
-// Module state for the reason `witnessScopes` is.
+// Whether an earlier stage reported an Error about this Program, which
+// stands the invariant rails down. See "Compiler invariant rails" in
+// DEVELOPMENT.md.
 let alreadyReported = false
 
 export type ValidateOptions = {
-	// What the Parser abandoned on its way to this Program — see
-	// `parser.Recovery`. The typed Program does not carry it: it is the PARSER's
-	// record, and the one caller that runs both stages has it in hand.
+	// What the parser abandoned on its way to this Program. The typed Program
+	// does not carry it.
 	recovery?: parser.Recovery
-	// Whether the Parser or the Enricher reported an Error about this
-	// Program — see `alreadyReported`. Left off by a caller that knows there was
-	// none, which is every spec that validates a Program it just asserted clean.
+	// Whether the parser or the enricher reported an Error about this Program.
 	reported?: boolean
 }
 
@@ -209,9 +150,7 @@ export const validate = (
 	program: common.typed.Program,
 	options: ValidateOptions = {},
 ): Array<common.Diagnostic> => {
-	// A fresh stack per run. Each frame is popped in a `finally`, so this
-	// is the guarantee rather than the mechanism: no Program is ever checked
-	// against a Type Parameter that another Program declared.
+	// Fresh state per run. See "Module state" in DEVELOPMENT.md.
 	witnessScopes = []
 	writtenBounds = []
 	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
@@ -226,11 +165,8 @@ export const validate = (
 		for (let [index, node] of program.implementation.nodes.entries()) {
 			executingTopLevelIndex = index
 
-			// Expected errors are reported as Diagnostics and recovered
-			// from in place — anything thrown past this point is a Compiler
-			// bug. It is reported as a Diagnostic as well, so that a single
-			// broken statement can not take down the validation of the
-			// remaining Program.
+			// A throw here is a compiler bug, reported at the Statement so the
+			// rest of the Program is still validated.
 			try {
 				validateImplementationNode(node, null)
 			} catch (error) {
@@ -240,11 +176,9 @@ export const validate = (
 			raiseTopLevelStatementFloor(node)
 		}
 
-		// Only a compile that ASKED for the tests carries a section here
-		// — a build leaves the block parsed and never enriches it. A test's
-		// body is checked exactly as the implementation's Statements are: it is
-		// a block standing in no Function, so a `<-` in it is the
-		// `top-level-return` it would be anywhere else outside one.
+		// Only a compile that asked for the tests carries a section here. A
+		// test's body stands in no Function, so a `<-` there is a
+		// `top-level-return`.
 		for (let node of program.tests?.nodes ?? []) {
 			try {
 				validateTestsNode(node)
@@ -259,10 +193,7 @@ export const validate = (
 	return diagnostics
 }
 
-// One top-level Statement has been walked — see `topLevelStatementFloor`.
-// A `<-` written at the top level does not move the floor: it is exactly the
-// Statement a dropped head orphans, and a head drops ONE `{` however many
-// Returns end up standing outside it.
+// Raises `topLevelStatementFloor` past a walked Statement other than a `<-`.
 function raiseTopLevelStatementFloor(
 	node: common.typed.ImplementationNode | common.typed.TestsNode,
 ): void {
@@ -276,15 +207,9 @@ function raiseTopLevelStatementFloor(
 	)
 }
 
-// Whether the Parser abandoned text on any line this construct is written
-// across — see `abandonedLines`. Lines rather than spans, because a Statement
-// dropped out of a body leaves a hole the body's own span no longer reaches:
-// `<- item:isGreaterThan(2)` keeps the `<- item` and drops the rest of the line,
-// and the Return Statement that survives ends before the text that went.
-//
-// Asked by every check whose verdict is about a construct being WHOLE. A check
-// that judges what IS written — a Condition that is not a Boolean, a Rational
-// over zero — is none of its business and does not ask.
+// Whether the parser abandoned text on any line the construct spans. Asked
+// by every check about a construct being whole. See "After a parse recovery" in
+// DEVELOPMENT.md.
 function partiallyRead(position: common.Position): boolean {
 	if (abandonedLines.size === 0) {
 		return false
@@ -315,10 +240,8 @@ function reportInternalError(error: unknown, position: common.Position): void {
 
 function validateTestsNode(node: common.typed.TestsNode): void {
 	if (node.nodeType === "Test") {
-		// The rows and what a Pattern Parameter binds off them are
-		// Expressions and Statements of the test like any other. Walking only
-		// the body would let a non-exhaustive `match` in a row compile in
-		// silence while the identical one a line below is refused.
+		// The rows and what a Pattern Parameter binds off them are part of
+		// the test like its body.
 		for (let row of node.table?.rows ?? []) {
 			validateExpression(row)
 		}
@@ -327,21 +250,14 @@ function validateTestsNode(node: common.typed.TestsNode): void {
 			validateImplementationNode(binding, null)
 		}
 
-		// And a generator's own Expressions, for the same reason: a
-		// refinement's check and a `Generatable` call are Expressions the
-		// Compiler wrote, but they are emitted into this Module and run in this
-		// test, so whatever the Validator says about an Expression it says
-		// about these.
+		// A generator's own Expressions are emitted into this test too,
+		// though the compiler wrote them.
 		for (let parameter of node.properties?.parameters ?? []) {
 			validateGenerator(parameter.generator)
 		}
 
-		// A `test` body is run once and awaited, so it may wait; a
-		// property body runs once per generated value and a benchmark body is
-		// timed over many runs, and neither can. The same three answers the
-		// Enricher's barriers give, said here so that a report the Validator
-		// raises in one of these bodies does not offer a word the Enricher
-		// would refuse two lines up.
+		// A `test` body may wait. A property body and a benchmark body may
+		// not, as the enricher's barriers say.
 		insideBody(
 			node.form === "benchmark"
 				? "benchmark-body"
@@ -420,9 +336,8 @@ function collectTopLevelNamespaces(
 	>()
 
 	for (let [index, node] of nodes.entries()) {
-		// The FIRST Declaration of a name is the one recorded — a name
-		// declared twice is the Enricher's report to make, and until the second
-		// one is removed it is the first that a use between them reaches.
+		// The first Declaration of a name is recorded. The enricher reports
+		// the second.
 		if (
 			node.nodeType === "NamespaceDefinitionStatement" &&
 			!namespaces.has(node.name.content)
@@ -462,17 +377,10 @@ function validateImplementationNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
-		// Never reached — the Validator runs on a Program the Enricher
-		// reported nothing about, and a refused value only ever stands in one
-		// it did. Named all the same, so the switch stays total and nothing has
-		// to guess what a Node kind left out of it would have done.
+		// Only in a Program the parser already reported on.
 		case "RefusedValue":
-			// The one position where what an Expression ANSWERS with
-			// decides whether it may stand at all — a Statement drops the
-			// value, and for work that is the whole of what went wrong. Asked
-			// here rather than in `validateExpression`, because this is the
-			// reading that knows the value goes nowhere: the same Expression
-			// inside another one is fine.
+			// A Statement drops its Expression's value, which is a mistake for
+			// work. The same Expression inside another one is fine.
 			reportDiscardedWork(node)
 
 			return validateExpression(node)
@@ -537,19 +445,14 @@ function validateExpression(
 		case "IntegerValue":
 		case "BooleanValue":
 		case "Self":
-		// Never reached, for the reason the Statement walk gives — and
-		// there would be nothing to validate either way: what stands here was
-		// refused where it was written.
+		// Refused where it was written, so there is nothing to validate.
 		case "RefusedValue":
-			// these nodes dont need any validation
 			return node
 	}
 }
 
-// A Union of work is work. `complete` and `start` unwrap such a Union
-// member by member, because the runtime answers each member on its own, and a
-// Statement holding one drops exactly as much as a Statement holding a single
-// Future does. One level, for the reason `unwrapWork` gives in the Enricher.
+// A Union holding work is work, one level deep, as `unwrapWork` in the
+// enricher reads it.
 function holdsWork(type: common.Type, kind: "Future" | "Started"): boolean {
 	return (
 		type.type === kind ||
@@ -558,19 +461,9 @@ function holdsWork(type: common.Type, kind: "Future" | "Started"): boolean {
 	)
 }
 
-// An Expression written in a Statement position — its value goes nowhere
-// — and the two answers that makes a mistake of.
-//
-// A `Future` is a DESCRIPTION of work: dropping one runs nothing at all, which
-// is never what somebody writing it down meant, so it is an Error. A `Started`
-// is work that IS running, and dropping it is fire-and-forget — a real thing to
-// write, and a thing to be told about, so it is an Information rather than a
-// complaint.
-//
-// Asked of every Expression Statement rather than only of the two
-// Keywords, because the Type is what decides it: a plain call answering a
-// Future — `headline(url)` on its own line — is exactly the mistake this is for,
-// and the call says nothing about asynchrony on its face.
+// An Expression Statement whose value is work. A dropped `Future` runs
+// nothing, so it is an Error. A dropped `Started` runs unobserved, which may be
+// meant, so it is an Information. The Type decides, not the Keywords.
 function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	let type = node.type
 
@@ -586,11 +479,8 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 			notes: [
 				"A Future describes work. Building one runs none of it — 'start' puts it in flight and 'complete' waits for what it answers with.",
 			],
-			// And the second help, because a call that merely HANDS a
-			// Future on is the same Statement to this rule and a different
-			// mistake to whoever wrote it: `Terminal.inspect(work)` printed
-			// what it was asked to print, and what goes nowhere is the value
-			// it answered with. Neither Keyword is the edit there — a name is.
+			// A call written for its effect, such as `Terminal.inspect(work)`,
+			// wants a name rather than a Keyword.
 			helps: [
 				"Did you mean 'complete', to wait for it — or 'start', to put it in flight and carry on?",
 				"Or, where the call was written for what it does rather than for what it answers, hold its answer in a Constant.",
@@ -601,11 +491,7 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 
 	if (holdsWork(type, "Started")) {
-		// A `start` is a run this Statement put in flight; anything else
-		// of this Type is a call that ANSWERED with one, which may have been
-		// written for what it did rather than for the run it handed back. The
-		// label says which, so the reader is told about the Statement they
-		// wrote rather than about the one this rule is named for.
+		// The label tells a `start` from a call that answered a Started.
 		let started = node.nodeType === "Start"
 
 		reportInformation("Nothing waits for this", node.position, {
@@ -628,17 +514,11 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 }
 
-// A value whose Type is a Function with Protocol-bounded Type
-// Parameters can not travel — its hidden conformance parameters only exist
-// at direct invocations, where the Enricher resolves them from the concrete
-// bindings. A stored bounded Function would later be invoked without its
-// conformances, so every value position rejects it.
+// A Function with Protocol-bounded Type Parameters can not be a value: its
+// hidden conformance Parameters exist only at a direct call.
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
-	// An overloaded Function is a SET of signatures, not one Function value
-	// — a bare reference (`constant f = someOverloadedFn`) names every overload
-	// at once, and nothing downstream can pick which one a later invocation
-	// meant. Refused in every value position, exactly like a bounded Function,
-	// and for the same reason: resolution only happens at a direct call.
+	// An overloaded Function names every overload at once, and only a direct
+	// call picks one.
 	if (
 		node.type.type === "OverloadedMethod" ||
 		node.type.type === "OverloadedStaticMethod"
@@ -680,14 +560,8 @@ function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
 				notes: [
 					"A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.",
 				],
-				// The wrap is the clause that keeps the VALUE, and it is
-				// what a reader who wrote this wanted: `(_ items: List<Integer>)
-				// -> Optional<Integer> { <- largest(of items) }` is a Function
-				// value, and the call inside it is direct, so the hidden
-				// Parameters are solved where they can be. "Call it directly"
-				// alone answered by throwing the value away, which is not an
-				// edit anybody who reached for one can make — the same pairing
-				// `overloaded-function-value` right above already offers.
+				// Wrapping the call in a literal keeps a value, and the call
+				// inside it is direct.
 				helps: [
 					"Invoke it, or wrap the call in a Function literal written for the Types you mean.",
 				],
@@ -717,39 +591,14 @@ function isBoundFunctionType(type: common.Type): boolean {
 	return false
 }
 
-// The two checks below are about the COMPILER, not about the Program:
-// each states an invariant the emitted JavaScript rests on, and each throws
-// where it does not hold, which `validate` turns into the `internal-error`
-// Diagnostic. They are safety nets — every hole they were written for is fixed
-// — and what they buy is that the next one shows up as a Diagnostic naming the
-// call it is about, rather than as a `ReferenceError` or a wrong answer out of
-// the emitted Program.
-//
-// And every one of them stands down on a Program that has ALREADY been
-// reported on — see `alreadyReported`. The invariants are about what the
-// emitter will be handed, and nothing is emitted from such a Program; what they
-// answer there is the recovery rather than a bug. `boxes::sort()` beside a
-// Namespace that failed to conform resolved no witness, and the arity rail
-// called that a Compiler bug in a file whose real mistake was two lines up.
-//
-// Which means they are quiet on EXACTLY the Programs this stage newly
-// walks. Before the Validator ran over a Program the stages in front of it had
-// reported on, `alreadyReported` was false for every Program it ever saw and
-// the rails watched all of them; now it is true for every broken one, and the
-// rails watch only the files that were clean to begin with. Nothing stands
-// behind them on a broken Program, and nothing is meant to: what does the
-// watching there is `analysisFuzz.spec`, which breaks real sources at hundreds
-// of sites and holds the whole walk to "never throws, never blames itself, and
-// never answers about a hole".
+// Whether the invariant rails stand down. See "Compiler invariant rails" in
+// DEVELOPMENT.md.
 function railsStandDown(): boolean {
 	return alreadyReported
 }
 
-// The Type Parameters of the Signature an Invocation resolved to — one
-// entry per Overload, so a Method that has several is asked about the one the
-// Arguments picked. Null where there is no Signature to count: a callee that is
-// not a Function at all, or an overloaded one no index was settled on, both of
-// which the Enricher has already reported.
+// The Type Parameters of the Signature an Invocation resolved to, or null
+// where there is none, which the enricher has already reported.
 function invokedSignatureGenerics(
 	calleeType: common.Type,
 	overloadedMethodIndex: number | null,
@@ -774,27 +623,8 @@ function invokedSignatureGenerics(
 	return null
 }
 
-// A bounded Type Parameter appends one hidden trailing Parameter to the
-// emitted Function and one hidden trailing Argument to every call of it, so a
-// call site that resolved a different NUMBER of witnesses than its callee
-// declares bounds emits a call whose Arguments are shifted — the witness lands
-// in a Parameter that expected a value, and the Program fails somewhere else
-// entirely.
-//
-// The callee Type is read BY REFERENCE at validation time, which is the
-// point of the check rather than an implementation detail: a conditional
-// conformance's bounds are woven into a Namespace's Method Types while the
-// Namespace hoists, so a call enriched BEFORE the weave — a use site written
-// above the Namespace — resolved its witnesses against a Signature that had no
-// bounds yet, and only the finally-woven Type says so.
-//
-// An Error anywhere in what the Invocation was resolved FROM is why a
-// witness would be missing — a Type Parameter bound to an Error is skipped on
-// purpose, so that the one mistake is reported once, where it was made — and
-// the count says nothing then. A witness can go missing without an Error to
-// show for it, though — a conformance that was refused leaves the Signature's
-// bound standing and no Argument to answer it — which is what
-// `railsStandDown` is for.
+// INVARIANT: a call passes one witness per bounded Type Parameter of its
+// callee. See "Compiler invariant rails" in DEVELOPMENT.md.
 function checkConformanceArity(
 	node:
 		| common.typed.MethodInvocationNode
@@ -834,13 +664,8 @@ function checkConformanceArity(
 		(generic) => generic.constraint != null,
 	).length
 
-	// A RECORD that routes a declared member is the one call whose hidden
-	// Arguments the Signature does not count. A Record's members are not Type
-	// Parameters, so the builtin Namespace declares no bound for them — what the
-	// call carries is one witness per ROUTED member, and `derivedMembers` is the
-	// very list the emission curries the helper with. The two are checked against
-	// each other here for the reason everything else in this Function is: a
-	// mismatch shifts every Argument of the emitted call.
+	// A Record routing declared members passes one witness per member in
+	// `derivedMembers`, which the Signature does not count.
 	let expected =
 		node.nodeType === "MethodInvocation" &&
 		node.derivedMembers !== undefined
@@ -856,20 +681,8 @@ function checkConformanceArity(
 	)
 }
 
-// WHICH Overload a call resolved to is settled once, by the Enricher, and
-// the Validator only checks that the Signature it settled on still accepts the
-// Arguments — it is a consumer of `overloadedMethodIndex`, never a second
-// selector. Selecting again here would ask the question without what the
-// Enricher had to answer it: an unannotated Function literal reads its
-// Parameter Types off the Overload it is matched against, and a Protocol bound
-// is solved against the bindings that Overload inferred, neither of which a
-// typed Node carries. A different answer would not be a Diagnostic either — the
-// Simplifier mangles the callee from this index, so the call would be EMITTED
-// against an Overload the Program was never type-checked against.
-//
-// The same Error rails as the checks above, and for the same reason: what
-// the Arguments were matched with is what a missing index or an Error-tainted
-// Argument says nothing about.
+// INVARIANT: the Overload the enricher committed to accepts the call's
+// Arguments. See "Compiler invariant rails" in DEVELOPMENT.md.
 function checkCommittedOverload(
 	node: common.typed.FunctionInvocationNode,
 	functionType:
@@ -909,17 +722,8 @@ function checkCommittedOverload(
 		)
 	}
 
-	// WHICH Parameters were left out is settled by the Enricher exactly as
-	// which Overload was, and for the same reason: the Simplifier builds the
-	// emitted Argument list from this list, so a re-match answering differently
-	// would emit the Arguments into the wrong positions. Re-matching reads only
-	// labels and `hasDefault`, so agreeing is not a coincidence — it is the
-	// invariant, and the same Error rail says so where it does not hold.
-	//
-	// `defaultMembers` does not enter into it. A Parameter carrying one is
-	// answered by an Argument that is WRITTEN, whole or partial, so nothing it
-	// says can move a position in this list — which is exactly why a partial
-	// default leaves `hasDefault` unset instead of widening what it means.
+	// The omitted Parameters must agree too, since the simplifier places the
+	// emitted Arguments by them. `defaultMembers` moves no position.
 	if (
 		matched.omittedParameterIndices.join() !==
 		node.omittedParameterIndices.join()
@@ -930,19 +734,9 @@ function checkCommittedOverload(
 	}
 }
 
-// A `parameter` source forwards the enclosing bounded Function's own
-// hidden conformance Parameter, which the Simplifier emits from that Function's
-// constrained Generics — so the name has to be one of those, from this Function
-// or from one it is written inside. Where it is not, the emitted call reads a
-// binding nothing declares: a `ReferenceError` at run time out of a Program
-// that compiled without a word. The names compared are the EMITTED ones on both
-// sides, which is what keeps the check about the JavaScript rather than about
-// the Type Parameter each side happens to call its own.
-//
-// Conditions are walked alongside the conformance that carries them — a
-// conditional conformance curries one witness per `where` condition, each
-// solved the same way, so each can forward a Parameter just as the outer one
-// can.
+// INVARIANT: a `parameter` witness names a hidden conformance Parameter of an
+// enclosing Function, by its emitted name. See "Compiler invariant rails" in
+// DEVELOPMENT.md.
 function checkWitnessScope(
 	conformances: Array<common.Conformance>,
 	describeSite: () => string,
@@ -971,27 +765,16 @@ function checkWitnessScope(
 	}
 }
 
-// The conditions of a witness and of every witness built together with
-// it, each spelled into the same Argument list.
+// The conditions of a witness and of every witness built together with it.
 function witnessConditionsOf(
 	source: Extract<common.ConformanceSource, { kind: "namespace" }>,
 ): Array<common.Conformance> {
 	return [...source.conditions, ...(source.groupConditions ?? [])]
 }
 
-// A `namespace` source is spelled into the Argument list of the CALL, not
-// of the Declaration it comes from — `things::sort()` emits `{ compare:
-// Thing.compare }` — so a call that RUNS above the conforming Namespace reads
-// a `class` binding that holds nothing yet. The Namespace's name appears
-// nowhere in the source, which is why the rails that check the names a call
-// does spell walk straight past it; it is the same fault they report, one
-// indirection further in.
-//
-// Conditions are walked alongside the conformance that carries them, for
-// the reason `checkWitnessScope` walks them: a conditional conformance names
-// one more Namespace per `where` condition, and every one of them is spelled
-// into the same Argument list. Each name is reported once, so a Signature that
-// bounds two Type Parameters through the same Namespace does not say it twice.
+// A `namespace` witness is spelled into the call, as `things::sort()` emits
+// `{ compare: Thing.compare }`, so the call must not run before that Namespace
+// is declared. Each Namespace is reported once.
 function checkWitnessNamespacesAreDeclared(
 	conformances: Array<common.Conformance>,
 	position: common.Position,

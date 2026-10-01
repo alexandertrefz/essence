@@ -275,7 +275,7 @@
 	"packages/compiler/src/tests/unknownNarrowing.spec.ts": {"sentence-length": 20, "em-dash": 24, "all-caps": 10, "history": 2, "block-length": 1},
 	"packages/compiler/src/tests/validator.spec.ts": {"sentence-length": 101, "em-dash": 84, "all-caps": 39, "history": 1, "position": 4, "block-length": 5},
 	"packages/compiler/src/tools/generateNatives.ts": {"sentence-length": 30, "em-dash": 35, "all-caps": 16, "position": 5, "block-length": 7, "counts": 1},
-	"packages/compiler/src/validator/validate.ts": {"sentence-length": 258, "em-dash": 184, "all-caps": 133, "history": 2, "position": 21, "block-length": 61, "counts": 2},
+	"packages/compiler/src/validator/validate.ts": {"sentence-length": 193, "em-dash": 140, "all-caps": 101, "history": 2, "position": 18, "block-length": 45, "counts": 1},
 	"packages/compiler/src/valueComments.ts": {"sentence-length": 2, "em-dash": 3, "all-caps": 7, "block-length": 1},
 	"packages/debug-adapter/src/adapter.ts": {"sentence-length": 1, "em-dash": 1},
 	"packages/debug-adapter/src/breakpoints.ts": {"sentence-length": 3, "em-dash": 2},
