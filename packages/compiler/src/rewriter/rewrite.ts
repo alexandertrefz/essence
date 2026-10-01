@@ -1400,47 +1400,17 @@ function renamePooledReferences(
 
 export type PreludeReach = "reached" | "whole"
 
-// Which Essence-implemented Methods the emitted Program actually needs,
-// and the const for each. A const is emitted only where something names it:
-// unlike a native, whose unused `import * as <Name>` esbuild shakes away, an
-// unused const still names the runtime Methods its body reaches, and once a
-// module is in the graph its impure top-level initialisers (`Number.Pi`,
-// `Number.Tau`) can no longer be dropped — so an unconditional const would
-// charge a Program for a numeric tower it never used. The gate is per-Method,
-// finer than the per-Namespace one it replaced.
-//
-// A Method left out costs nothing — nothing references its const and no
-// spread was ever emitted, so the text is exactly what a wholly native standard
-// library would have produced.
-//
-// The search runs to a FIXED POINT over the consts themselves, not just
-// over the user Program: `Boolean.isNot`'s body calls `Boolean.negate` (a
-// native, no const) but could equally call another Essence Method, and a
-// Method's const reached only through another one must still be pulled in.
-// Stopping at the first round would emit a const whose body names one that was
-// never declared.
-//
-// A bodied static Property is searched for on exactly the same footing —
-// its const is emitted only where something reads it, and its own value may be
-// the only thing that reads another one.
-//
-// Exported for the tests. The fixed point is the part of this that can
-// silently be wrong — a Method reached only through another one is exactly what
-// the standard library will produce more of as the conversion goes on.
+// The prelude consts the emitted code needs, found by a fixed point over the
+// candidates' own references. See "Prelude reachability" in DEVELOPMENT.md.
 export function reachableEssenceMethods(
 	prelude: Array<PreludeNamespace>,
 	implementation: Array<estree.ModuleDeclaration | estree.Statement>,
 	freeFunctions: Array<PreludeFreeFunction> = [],
-	// The pooled constants already collected, which are part of what the
-	// emitted Module names even though they are not in its body yet: a pooled
-	// conformance witness holds the `$es_…` reference that used to stand at the
-	// site the witness was hoisted out of, and a search seeded only by the body
-	// would lose that edge and emit a Module naming a const nobody declared.
+	// The pooled constants collected so far, whose values hold `$es_`
+	// references the module's body no longer does.
 	poolRoots: unknown = null,
-	// How much of the prelude to keep. `reached` is the search this
-	// Function is named for and what every bundle is emitted under; `whole`
-	// answers with every candidate and runs no search at all — see the seed
-	// below, and `rewriteModuleGraph` for why a host's build asks for it.
+	// `whole` keeps every candidate, for a host's build. See "Emit targets"
+	// in DEVELOPMENT.md.
 	reach: PreludeReach = "reached",
 ): Map<string, EssenceMember> {
 	let reachable = new Map<string, EssenceMember>()
@@ -1449,17 +1419,13 @@ export function reachableEssenceMethods(
 		return reachable
 	}
 
-	// The Protocol entries and the Namespace entries are two tables, not
-	// one. Their consts are named by different schemes and a call reaches them
-	// by different questions — a Namespace member by name, a Protocol's provided
-	// Method by the Invocation's `providedBy` — so a Protocol spelled like a
-	// Namespace can not draw the other's edge.
+	// Protocols and Namespaces are separate tables, so a Protocol spelled
+	// like a Namespace can not draw the other's edge.
 	let protocols = prelude.filter((entry) => entry.protocol === true)
 	let namespaces = prelude.filter((entry) => entry.protocol !== true)
 	let provided = providedMemberIdentifiers(protocols)
 
-	// The pairs this prelude implements in Essence — an edge is drawn only
-	// to a Method the prelude actually defines a const for.
+	// The bodied Methods, the only Methods an edge can reach.
 	let implemented = new Set(
 		namespaces.flatMap((namespace) =>
 			Object.keys(namespace.node.methods).map(
@@ -1468,19 +1434,12 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// The Essence-bodied free Functions this run can emit, by the bare
-	// `<name>__overload$N` name a call site resolves to — the free-Function
-	// analogue of `implemented`. An edge is drawn to one only when it is in
-	// this set, so a native free Function (reached off `$_`) falls out just as
-	// a native Method does.
+	// The bodied free Functions, by the mangled name a call site resolves to.
 	let implementedFreeFunctions = new Set(
 		freeFunctions.map((freeFunction) => freeFunction.name),
 	)
 
-	// The native Methods this prelude carries a shim for — the table that
-	// is only consulted where a call OMITS an Argument, exactly as
-	// `namespaceMember` only routes to a shim there. A native called at full
-	// arity is a plain member read and draws no edge at all.
+	// The natives with a shim, reached by a call that leaves an Argument out.
 	let shimmed = new Set(
 		namespaces.flatMap((namespace) =>
 			namespace.node.nativeShims.map(
@@ -1489,12 +1448,7 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// And the shims a call at FULL arity names too — the ones whose
-	// default is a Record, which is merged into what the call wrote rather than
-	// standing in for what it left out. `namespaceMember` routes every call of
-	// one through the shim, so the edge has to be drawn from every call of one:
-	// `Http.get` writes `Http.send({ url, method, headers })` and names
-	// `$es_Http_send` though it omits nothing.
+	// The shims that merge a Record default, which every call reaches.
 	let mergingShimmed = new Set(
 		namespaces.flatMap((namespace) =>
 			namespace.node.nativeShims
@@ -1503,10 +1457,8 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// The static Properties this prelude gives a value to, keyed like
-	// `implemented` because a Property read is spelled exactly like a static
-	// Method reference and the two are told apart by which table answers. A
-	// native Property is in neither, so it stays a member read.
+	// The static Properties with a value. A Property read looks like a static
+	// Method reference, so which table answers tells them apart.
 	let implementedProperties = new Set(
 		namespaces.flatMap((namespace) =>
 			Object.keys(namespace.node.properties).map(
@@ -1515,13 +1467,8 @@ export function reachableEssenceMethods(
 		),
 	)
 
-	// Each candidate carries its declaration AND the other Essence Methods
-	// its body calls, read off the TYPED body rather than the emitted const.
-	// That matters: `namespaceMember` decides an emitted call's spelling from the
-	// process-wide prelude, so a const emitted for a DIFFERENT prelude (only the
-	// tests do this) would spell its transitive calls as native member reads and
-	// the fixed point would lose the edge. Reading the typed body keeps the
-	// reachability answer a property of the prelude it was handed.
+	// Each candidate's edges come from its typed body, not its emitted const.
+	// See "Prelude reachability" in DEVELOPMENT.md.
 	let methodCandidates: Array<[string, EssenceMember]> = namespaces.flatMap(
 		(namespace) =>
 			Object.entries(namespace.node.methods).map(
@@ -1547,11 +1494,7 @@ export function reachableEssenceMethods(
 			),
 	)
 
-	// A bodied static Property is a candidate of its own, carrying the KIND
-	// that puts its const in the value band. Its value draws edges like any body
-	// — it is written in Essence, so it reaches Methods, free Functions and other
-	// Properties — and the ones that reach another Property are what order the
-	// band.
+	// A static Property with a value belongs in the value band.
 	let propertyCandidates: Array<[string, EssenceMember]> = namespaces.flatMap(
 		(namespace) =>
 			Object.entries(namespace.node.properties).map(
@@ -1578,12 +1521,8 @@ export function reachableEssenceMethods(
 			),
 	)
 
-	// A free Function is a candidate exactly as a Method is — its own
-	// top-level `function <name>__overload$N(…) {…}` and the edges its body
-	// draws — so the two share ONE fixed point. That unity is the point: a
-	// Method body that calls a free Function, or a free Function body that calls
-	// another one or a Method, must pull the callee in, and only a single search
-	// over both kinds can follow an edge that crosses between them.
+	// A bodied free Function shares the fixed point, since edges cross
+	// between kinds.
 	let freeFunctionCandidates: Array<[string, EssenceMember]> =
 		freeFunctions.map((freeFunction): [string, EssenceMember] => [
 			freeFunction.name,
@@ -1602,12 +1541,7 @@ export function reachableEssenceMethods(
 			},
 		])
 
-	// A native Method that declares a default contributes a candidate of
-	// its own — the frame the default is evaluated in — reached exactly as an
-	// Essence Method's const is, and only from a call site that left an Argument
-	// out. It is Function-valued, so it sits in the same band and needs no
-	// ordering; its own edges are whatever its DEFAULTS reach, which is why the
-	// Parameter list is what is searched rather than a body it does not have.
+	// A native shim, whose edges are whatever its defaults reach.
 	let shimCandidates: Array<[string, EssenceMember]> = namespaces.flatMap(
 		(namespace) =>
 			namespace.node.nativeShims.map((shim): [string, EssenceMember] => [
@@ -1616,9 +1550,7 @@ export function reachableEssenceMethods(
 					kind: "function",
 					declaration: rewriteNativeShim(namespace.name, shim),
 					...essenceMethodReferences(
-						// Both, because a Record default's Expression
-						// moved out of the Parameter list and into the prologue
-						// — the edges a default draws are the same either way.
+						// A Record default stands in the prologue instead.
 						[shim.parameters, shim.prologue],
 						implemented,
 						implementedFreeFunctions,
@@ -1631,9 +1563,7 @@ export function reachableEssenceMethods(
 			]),
 	)
 
-	// A Protocol's provided Methods are candidates on exactly the same
-	// footing — one const each, shaken away where nothing names them — under the
-	// name the table of provided members gives them.
+	// A Protocol's provided Methods, under their names from `provided`.
 	let protocolCandidates: Array<[string, EssenceMember]> = protocols.flatMap(
 		(protocol) =>
 			Object.entries(protocol.node.methods).map(
@@ -1686,13 +1616,8 @@ export function reachableEssenceMethods(
 		}
 	}
 
-	// The seed is what the emitted user Program names — a plain call, a
-	// conformance witness and a `dispatchMethod` target are all bare `$es_…`
-	// Identifiers by now, so `referencedNames` finds them all alike. Seeded with
-	// every candidate instead, the loop below has nothing left to find and the
-	// answer is the whole prelude in candidate order — which is the point: an
-	// order that is a property of the standard library rather than of the graph
-	// that happened to be compiled.
+	// Seeded from the names the emitted code holds, or under `whole` with
+	// every candidate, in candidate order.
 	include(
 		reach === "whole"
 			? new Set(candidates.keys())
@@ -1706,80 +1631,21 @@ export function reachableEssenceMethods(
 	return reachable
 }
 
-// The Essence Methods a typed Method body reaches, restricted to the ones
-// a given prelude implements. This MUST recognise every shape `namespaceMember`
-// turns into a bare `$es_…` Identifier, because those are the emission sites
-// the seed's `referencedNames` will find in the finished tree — if the two
-// disagree, a Method reached only through a shape missing here is named in the
-// emitted body but its const is never pulled in, a `ReferenceError` at run time
-// that compiles green. The shapes this recognises:
-//
-//   MethodInvocation        `@::m(…)`            — base.name, member.name
-//   UnionMethodInvocation    a Union receiver    — each case's namespaceName +
-//                            methodName (the case's conformance Arguments are
-//                            ConformanceValues and its own Arguments are
-//                            ordinary Expressions, both reached by the
-//                            recursion below)
-//   Lookup                   a static call OR a bare static reference —
-//                            namespaceName or a Namespace base's name +
-//                            member.name
-//   Combination              a Dictionary update — `merge` for a Dictionary
-//                            on the right, `set` for written entries
-//   ConformanceValue         a witness `{ m: X.m }` — namespaceName + each
-//                            methodMap value; a conditional one nests more
-//                            ConformanceValues in `conditions`, reached below
-//   dispatch-chain           a compiled Union dispatch — each branch's
-//                            namespaceName + methodName, the same edges the
-//                            Invocation it replaced drew
-//   direct-method            a devirtualised witness — namespaceName +
-//                            memberName, the one Method of the witness it
-//                            stands in for
-//
-// The last two are the Optimiser's, and are here because the Optimiser rewrites
-// the PRELUDE's bodies as well as a Program's: a Method reached only through a
-// shape a pass introduced is a Method this search would otherwise stop drawing
-// an edge to the moment that pass was turned on.
-//
-// One more shape draws a free-Function edge rather than a Method one: a
-// `FunctionInvocation` off a bare Identifier — `loop__overload$2(…)` by the time
-// the Simplifier has mangled it — is an edge to that free Function's own const,
-// filtered by `implementedFreeFunctions` the way the Method shapes are by
-// `implemented`. It is what lets a Method body reach a free Function, and a free
-// Function body reach either kind, inside the one fixed point.
-//
-// A `Lookup` draws one more edge for the same reason it draws the Method one: a
-// read of a static Property the prelude gives a VALUE to is that Property's
-// const, filtered by `implementedProperties`. It is the same Node shape as a
-// static Method reference, so both tables are asked and either may answer.
-//
-// Over-collecting stays safe, as everywhere in the search: a pair neither table
-// implements is filtered out (so a Record field or a native Property read falls
-// away), and one they do only emits a const that is read. Exported for a unit
-// test that feeds it each shape directly.
-//
-// Each shape also answers WHETHER this body evaluates what it names, which
-// is what `essenceMemberBands` orders the value band by — see
-// `EssenceMemberReferences`. A call evaluates its target, a Property read
-// evaluates the Property, and a Function this body only hands on does not.
+// The prelude consts a typed body names, and which of them it evaluates.
+// INVARIANT: it recognises every shape `namespaceMember` emits as a `$es_`
+// Identifier. See "Prelude reachability" in DEVELOPMENT.md.
 export function essenceMethodReferences(
 	root: unknown,
 	implemented: Set<string>,
 	implementedFreeFunctions: Set<string> = new Set(),
 	implementedProperties: Set<string> = new Set(),
-	// The native pairs that have a shim. Consulted only where the call
-	// says it left an Argument out, because that is the only call
-	// `namespaceMember` routes to a shim — a native called at full arity is a
-	// plain member read and draws no edge.
+	// The natives with a shim, asked only where a call left an Argument out.
 	shimmed: Set<string> = new Set(),
-	// The consts of the Methods a Protocol provided a body for. Consulted
-	// only where the Invocation says a Protocol answered it, the question
-	// `namespaceMember` routes on, so no const is named without being pulled in.
+	// The consts of Protocols' provided Methods, asked only where
+	// `providedBy` says a Protocol answered.
 	provided: ProvidedMemberIdentifiers = new Map(),
-	// The native pairs whose shim MERGES a Record default into what the
-	// call wrote. Consulted where the call left nothing out, because that is
-	// exactly where `namespaceMember` routes one to its shim and the set above
-	// does not — the two have to agree, or a const is named in a body and never
-	// pulled in.
+	// The natives whose shim merges a Record default, asked where a call
+	// left nothing out.
 	mergingShims: Set<string> = new Set(),
 ): EssenceMemberReferences {
 	let references = new Set<string>()
@@ -1821,15 +1687,9 @@ export function essenceMethodReferences(
 		}
 	}
 
-	// `isStored` says what a Function-valued reference found HERE would be:
-	// a value this body hands on rather than runs. It holds at the root — a
-	// Property whose value IS `Boolean.isNot`, a Method that returns it, both only
-	// pass the Function along — and is cleared for everything under an invocation,
-	// because a Function given to a call is a Function that call may run at once
-	// (`items::map(Boolean.isNot)`, and every callback the natives take). Calls are
-	// the only shape that can run a body, which is the same closed list the edge
-	// shapes above are, so a Node kind added later inherits the safe answer:
-	// evaluated, which can only over-order the value band, never under-order it.
+	// `isStored` is true where a Function reference is only handed on, and
+	// false under any call, which may run it at once. See "Prelude
+	// reachability" in DEVELOPMENT.md.
 	let visit = (node: unknown, isStored: boolean): void => {
 		if (Array.isArray(node)) {
 			for (let entry of node) {
@@ -1857,10 +1717,7 @@ export function essenceMethodReferences(
 			isUpdatingDictionary ||
 			(record["nodeType"] === "Intrinsic" &&
 				record["kind"] === "dispatch-chain") ||
-			// An inlined loop RUNS the bodies it holds, which is what the
-			// call it replaced did with the closures it was handed — so a
-			// Function-valued reference inside one is evaluated, exactly as it
-			// was when it stood under the call.
+			// An inlined loop runs its bodies, as the call it replaced did.
 			record["kind"] === "inline-loop"
 		) {
 			isStored = false
@@ -1870,9 +1727,7 @@ export function essenceMethodReferences(
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 
-			// A provided Method and a Namespace Method may be spelled
-			// alike, so which table is asked is decided by the Node rather than
-			// by the name — exactly as `namespaceMember` decides it.
+			// The node, not the name, picks the table, as in `namespaceMember`.
 			if (record["providedBy"] !== undefined) {
 				considerProvided(record["providedBy"], member?.["name"])
 			} else {
@@ -1913,16 +1768,9 @@ export function essenceMethodReferences(
 				)
 			}
 		} else if (record["nodeType"] === "Intrinsic") {
-			// The two intrinsics that name a Namespace member — a
-			// compiled dispatch's per-branch call and a devirtualised witness's
-			// Method — both of which the Optimiser writes INTO a prelude body,
-			// where this search is what pulls the const in. They are the same
-			// edges the Nodes they replace drew: `dispatch-chain` for a
-			// `UnionMethodInvocation`'s cases, `direct-method` for the one
-			// Method of the `ConformanceValue` it stood in for. A witness
-			// handed on rather than called keeps `isStored`, so a
-			// devirtualised one — which is a Function reference at a site that
-			// calls it — says evaluated.
+			// The optimiser's intrinsics draw the edges of the nodes they
+			// replaced: `dispatch-chain` a Union dispatch's cases, `direct-method`
+			// a devirtualised witness's Method, which its site calls.
 			if (record["kind"] === "dispatch-chain") {
 				for (let dispatchCase of (record["cases"] as Array<
 					Record<string, unknown>
@@ -1969,10 +1817,8 @@ export function essenceMethodReferences(
 				)
 			}
 		} else if (record["nodeType"] === "Lookup") {
-			// `rewriteLookup` reads a member off a Namespace where the
-			// base's Type is one, or where the Lookup carries the Namespace a
-			// Choice's `cases` is written in. A local named after a Namespace
-			// (`constant Optional = { otherwise = 5 }`) is a Record field read.
+			// A Namespace member only where the base's Type is a Namespace, or
+			// the Lookup names one. A local named like a Namespace is a Record.
 			let base = record["base"] as Record<string, unknown> | undefined
 			let member = record["member"] as Record<string, unknown> | undefined
 			let namespaceName =
@@ -1985,15 +1831,12 @@ export function essenceMethodReferences(
 					: undefined)
 
 			if (namespaceName !== undefined) {
-				// A member a Protocol PROVIDED is a const of its own and
-				// no member of the Namespace it is written on, so the edge goes
-				// where the emission goes.
+				// A provided member is the Protocol's const.
 				if (record["providedBy"] !== undefined) {
 					considerProvided(record["providedBy"], member?.["name"])
 				} else {
-					// A static Method is evaluated where it is CALLED, a
-					// Property wherever it is named at all — reading its const is
-					// what yields the value, so there is no handing it on.
+					// A static Method is evaluated where called; a Property
+					// wherever it is named.
 					consider(
 						namespaceName,
 						member?.["name"],
@@ -2006,10 +1849,7 @@ export function essenceMethodReferences(
 						implementedProperties,
 						true,
 					)
-					// And the shim of a native whose Record default is
-					// merged, for the reason a call of one draws that edge: a
-					// bare reference to it is routed to the shim too, because
-					// the merge is what makes it the whole Method.
+					// A bare reference to a merging native is its shim too.
 					consider(
 						namespaceName,
 						member?.["name"],
@@ -2032,8 +1872,7 @@ export function essenceMethodReferences(
 				| Record<string, unknown>
 				| undefined
 
-			// A witness is called at full arity, so a native whose shim
-			// merges a Record default is named by its shim here as well.
+			// A witness is called at full arity, so a merging shim counts.
 			for (let namespaceMethodName of Object.values(methodMap ?? {})) {
 				consider(
 					record["namespaceName"],
@@ -2049,10 +1888,8 @@ export function essenceMethodReferences(
 				)
 			}
 
-			// A witness names the Protocol's provided Methods too, each
-			// under the Protocol that WROTE it rather than under the conforming
-			// Namespace — so the edge goes to the shared const, exactly as it
-			// does from a call.
+			// A provided Method is the shared const of the Protocol that wrote
+			// it.
 			let providedMethods = record["providedMethods"] as
 				| Record<string, unknown>
 				| undefined
@@ -2063,12 +1900,8 @@ export function essenceMethodReferences(
 				considerProvided(protocolName, memberName)
 			}
 		} else if (record["nodeType"] === "FunctionInvocation") {
-			// A bare free-Function call — `loop__overload$2(…)` by now,
-			// the Simplifier having mangled the overloaded callee — is an edge
-			// to that Function's const when this run implements it in Essence.
-			// A native free Function is a read off `$_` and is not in the set,
-			// so it falls out exactly as a native Method does. The reference key
-			// IS the bare name, which is the free Function's candidate key.
+			// A bare free-Function call, already mangled, names its const by
+			// that name when the Function is bodied.
 			let callee = record["name"] as Record<string, unknown> | undefined
 
 			if (
@@ -2080,9 +1913,8 @@ export function essenceMethodReferences(
 				evaluatedReferences.add(callee["name"])
 			}
 
-			// `Namespace.member(…)` that left an Argument out reaches the
-			// shim rather than the native — a fact the Lookup branch above can
-			// not see, because only the CALL knows what it wrote.
+			// Only the call knows whether it left an Argument out, which sends
+			// it to the shim.
 			if (
 				record["omitsArguments"] === true &&
 				callee?.["nodeType"] === "Lookup"
@@ -2096,17 +1928,8 @@ export function essenceMethodReferences(
 			}
 		}
 
-		// A Node's `type` and `position` are stepped over. Neither holds
-		// a Node this search draws an edge from: a Position is line and column
-		// numbers, and a Type is deliberately written to carry no Expression —
-		// the one exception, a Case payload default, is data the Enricher has
-		// already held to literals (`case-default-not-a-literal`), so it can
-		// name no Method, Function, Property or witness. What they DO hold is
-		// most of the object graph: every Node carries its Type, and a Type
-		// reaches Namespaces, Methods and Parameters with Types of their own.
-		// Walking into them made this search — run over every candidate of the
-		// prelude on every emission — thirty times the cost of the emission
-		// itself, for no edge it would not have found without.
+		// `type` and `position` hold no edge but most of the object graph.
+		// See "Prelude reachability" in DEVELOPMENT.md.
 		for (let [key, value] of Object.entries(record)) {
 			if (key === "type" || key === "position") {
 				continue
@@ -2121,12 +1944,9 @@ export function essenceMethodReferences(
 	return { references, evaluatedReferences }
 }
 
-// Every name the given tree READS. A dotted member and an object
-// literal's key are text rather than references — `{ isNot: Boolean.isNot }`
-// names `Boolean` and nothing else — so an emitted Record member that happens
-// to be spelled like a Namespace does not drag it in. Everything else is
-// collected, bindings included: over-collecting only emits a const that is never
-// read, while under-collecting emits a Program that crashes.
+// Every Identifier in the tree, bindings included, but no non-computed member
+// or key: `{ isNot: Boolean.isNot }` names only `Boolean`. Over-collecting is
+// the safe direction.
 function referencedNames(root: unknown): Set<string> {
 	let names = new Set<string>()
 
@@ -2171,21 +1991,12 @@ function referencedNames(root: unknown): Set<string> {
 	return names
 }
 
-// The last word on the fixed point above, read off the FINISHED tree: a
-// `$es_…` name is emitted only where a standard library Method is called, and
-// every one of them must have had its const pulled in. The two answers are
-// arrived at differently on purpose — the fixed point follows the TYPED bodies,
-// this reads the emitted JavaScript — so a shape `essenceMethodReferences` does
-// not know about shows up here as a Diagnostic instead of as a `ReferenceError`
-// out of a Program that compiled green.
-//
-// Only `$es_…` names can be answered for. A free Function's const is
-// emitted under its bare name, which is indistinguishable from a user's own
-// binding, and the prefix is what makes this sweep safe: `_` is a Symbol to the
-// Lexer, so no name a Program can write ever starts with one.
-//
-// Exported for a unit test, which is the only way to see it fire — while
-// the Rewriter is right, no Program reaches it.
+// Throws when the finished tree names a `$es_` const that was not emitted.
+// It reads the emitted JavaScript, while reachability reads typed bodies, so a
+// shape `essenceMethodReferences` misses fails the compile instead of the run.
+// It answers only for `$es_` names. A bodied free Function's const carries its
+// bare name, which a user's Function may share, so a missed free-Function
+// edge is not caught here.
 export function checkEssenceMethodsAreDeclared(
 	program: estree.Program,
 	declared: ReadonlySet<string>,
@@ -2240,11 +2051,8 @@ function rewriteConditionalStatement(
 	}
 }
 
-// What JavaScript is asked. An Essence Boolean is an object, and every
-// object is true, so the question is the `value` it holds — unless
-// `unbox-conditions` found the question already asked in JavaScript's own
-// terms, in which case the Expression IS the question and reading `.value` off
-// a raw boolean would be `undefined`.
+// An Essence Boolean is an object, so the test reads its `value`, unless
+// `unbox-conditions` left a raw JavaScript boolean.
 function conditionTest(
 	node: common.typedSimple.ConditionalStatementNode,
 ): estree.Expression {
@@ -2269,37 +2077,19 @@ function rewriteFunctionStatement(
 		type: "FunctionDeclaration",
 		id: rewriteIdentifier(node.name),
 		params: node.value.parameters.map((param) => rewriteParameter(param)),
-		// A free Function that completes is wrapped exactly as a Method
-		// or a literal is — it declares a Future and answers with one.
+		// A completing free Function answers with a Future, like a Method.
 		body: completingBodyOf(node.value),
 	}
 }
 
-// An Expression the Program wrote for its effects, and the one shape that
-// may not be emitted as JavaScript writes it. A call and an assignment are what
-// every Statement of this kind actually is, and neither can be taken away by an
-// engine — the call may print and the assignment is the mutation.
-//
-// Anything ELSE here is a value the Program computes and drops, and a
-// value in this language can BE an object literal: `collapse-construction`
-// builds `{ [$type.typeKeySymbol]: "Record", … }`, whose hidden Type key is a
-// computed SYMBOL. An engine that decides such a literal is unused is free to
-// take it away, and Bun's does — while still evaluating the key as a property
-// name, which converts the Symbol to a string and THROWS, out of a Statement
-// that did nothing. So the value is bound to a name in a block of its own: it is
-// computed exactly as it was, and nothing about it is unused any more. The block
-// is what keeps the name from colliding with a sibling's, and the `_` in the
-// name is what keeps it clear of the Program's own: `$` is a legal Essence
-// identifier character and `_` is not, so `$discarded` is a name a Program can
-// write — and one that, bound here around an Expression READING it, would be
-// read before it is initialised.
+// An Expression written for its effects. A call, an assignment or an `await`
+// stands as it is. Any other value is bound in a block of its own. See
+// "Discarded values" in DEVELOPMENT.md.
 function discardedExpressionStatement(
 	expression: estree.Expression,
 ): estree.Statement {
-	// And an `await`, which is what a `complete` written for its effects
-	// is. Nothing about it can be taken away — the wait is the point, and what
-	// it waits for has already been started — and binding it to a name would
-	// only say the same thing with a name nobody reads.
+	// An `await` is a `complete` written for its effects; the wait is the
+	// point.
 	if (
 		expression.type === "CallExpression" ||
 		expression.type === "AssignmentExpression" ||
@@ -2328,24 +2118,10 @@ function discardedExpressionStatement(
 
 const discardedValueName = "$discarded_value"
 
-// An emitted Function that exists only to hold what JavaScript can not say
-// in an Expression position — a Match's Handlers, a compiled dispatch's held
-// values, a Combination's two operands, an inlined walk's block, a compiled
-// Matcher's test — called at once with whatever it needs. None of them is a
-// Function the Program wrote.
-//
-// Where what one holds WAITS, the wrapper has to wait too. An `await` belongs to
-// the nearest enclosing Function, and a wrapper nobody wrote is exactly the kind
-// of Function it must not belong to: the wait would be refused as a syntax error
-// where the wrapper is a plain Function, or silently answer a Promise where it is
-// an arrow returning one. So the wrapper is made `async` and the call is
-// awaited, which puts the wait back at the Statement the source wrote it in.
-//
-// Asked of the emitted JavaScript rather than of the Nodes behind it. That
-// IS the question — an `await` reaches the enclosing Function unless a Function
-// of its own stands in between — and it is one answer for every wrapper here
-// rather than a rule each of them has to remember about the Nodes it was built
-// from.
+// A Function the compiler wraps around what JavaScript can not say in an
+// Expression position, called at once. When its body awaits, the wrapper is
+// made `async` and its call awaited. See "Awaiting through wrappers" in
+// DEVELOPMENT.md.
 function calledWrapper(
 	callee: estree.FunctionExpression | estree.ArrowFunctionExpression,
 	args: Array<estree.Expression>,
@@ -2366,12 +2142,8 @@ function calledWrapper(
 	return { type: "AwaitExpression", argument: call }
 }
 
-// Whether an `await` stands anywhere in this emitted JavaScript WITHOUT a
-// Function of its own around it — which is the span an `await` belongs to. The
-// walk reads every field rather than the ones each Node kind declares, so a
-// shape added to the emission later is walked without anybody remembering to
-// list it: the cost is reading a Position or two on the way, and the alternative
-// is a table that goes quietly stale around a broken Program.
+// Whether an `await` stands in this emitted JavaScript outside any Function
+// of its own. It walks every field, so new node shapes need no listing.
 function holdsAwait(node: unknown): boolean {
 	if (Array.isArray(node)) {
 		return node.some(holdsAwait)
@@ -2484,24 +2256,15 @@ function rewriteExpressionByKind(
 	}
 }
 
-// The Nodes the Optimiser rewrites Expressions into, and the one place
-// they are emitted. Each stands for a shape the runtime's own constructor would
-// have built — so the JavaScript below is what that constructor does, written
-// out at the site instead of called. The switch is exhaustive: an intrinsic kind
-// added without a case here does not compile.
+// The Optimiser's intrinsics, each emitted as the JavaScript a runtime
+// constructor or check would run, written out at the site.
 function rewriteIntrinsic(
 	node: common.typedSimple.IntrinsicNode,
 ): estree.Expression {
 	switch (node.kind) {
-		// The tag as the value carries it — through `renderIdentity`, like
-		// every other place a tag is written, so a Choice declared in a Module
-		// is asked about under the same spelling it was stamped with.
-		//
-		// An OPTIONAL read is `?.[…]`, which answers `undefined` for a
-		// member that is not there — and `undefined` is not a tag, so the
-		// comparison answers false without the read throwing. That is the
-		// `Object.hasOwn` the runtime's own check asks first, folded into the
-		// comparison after it; `compile-record-members` says what it rests on.
+		// The tag goes through `renderIdentity`, like every written tag. An
+		// optional read answers `undefined` for a missing member, which is no
+		// tag, so the test fails without throwing.
 		case "tag-test":
 			return {
 				type: "BinaryExpression",
@@ -2509,10 +2272,8 @@ function rewriteIntrinsic(
 				left: typeKeyRead(rewriteExpression(node.value), node.optional),
 				right: { type: "Literal", value: renderIdentity(node.tag) },
 			}
-		// The general check, byte for byte what a Match Handler emitted
-		// before there was a pass to compile one — the descriptor stands in an
-		// Expression position now, which is what lets it be pooled, and that is
-		// the whole of the difference.
+		// The general check, with the descriptor in an Expression position so
+		// it can be pooled.
 		case "type-test":
 			return {
 				type: "CallExpression",
@@ -2546,16 +2307,13 @@ function rewriteIntrinsic(
 					"falseInstance",
 				),
 			}
-		// The read back off an Essence Boolean — the same `.value` an
-		// emitted condition performs, standing where a raw operand belongs.
+		// The `.value` of an Essence Boolean, where a raw operand belongs.
 		case "raw-boolean":
 			return memberRead(rewriteExpression(node.value), "value")
 		case "raw-boolean-op":
-			// `&&` and `||` do not evaluate their right-hand side when
-			// the left decides, which is a difference from the Method call
-			// they replace — `lower-scalar-operations` is what proves the
-			// right-hand side has nothing to say, and only builds one of these
-			// where it does.
+			// `&&` and `||` may skip their right-hand side, unlike the call
+			// they replace. `lower-scalar-operations` builds one only where
+			// skipping changes nothing.
 			return node.other === null
 				? {
 						type: "UnaryExpression",
@@ -2569,12 +2327,8 @@ function rewriteIntrinsic(
 						left: rewriteExpression(node.operand),
 						right: rewriteExpression(node.other),
 					}
-		// What each Integer holds, compared by JavaScript's own operator.
-		// `<`, `>`, `<=` and `>=` are defined ACROSS a number and a bigint and
-		// decide the mathematical order without converting either side, so one
-		// comparison answers for all four pairings of the hybrid Integer's two
-		// representations — which is why this site needs nothing from the
-		// canonical invariant and no guard.
+		// JavaScript's `<`, `>`, `<=` and `>=` order a number against a bigint
+		// exactly, so either representation of an Integer compares unguarded.
 		case "raw-compare":
 			return {
 				type: "BinaryExpression",

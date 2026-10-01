@@ -181,6 +181,58 @@ name holds no `#`; `displayChoiceName` splits the same way. An identity with no 
 bare name, such as `Optional`, and passes through unchanged. So does one whose prefix is not absolute. It takes
 the target, so a descriptor written beside a host's Modules agrees with those Modules.
 
+## Prelude reachability
+
+`reachableEssenceMethods` decides which prelude consts a module emits. A const is emitted only where
+something names it. An unused native import costs nothing, since esbuild drops it. An unused const still
+names the runtime Methods its body reaches. Once a runtime module is in the bundle, its top-level
+initialisers, such as `Number.Pi`, can not be dropped. A Method left out leaves no trace in the output.
+
+The candidates are every bodied Method, every Protocol's provided Method, every static Property with a
+value, every bodied free Function and every native shim. They share one fixed point, because an edge may
+cross between kinds. A Method may call a free Function, and a Property's value may call a Method. The search
+starts from the names `referencedNames` finds in the emitted code and the pooled constants. It then follows
+each reached candidate's `references` until nothing new is reached. Stopping after the first round would
+emit a const that names one never declared. Under `whole`, every candidate is reached from the start, so the
+result depends on the standard library alone.
+
+`essenceMethodReferences` draws a candidate's edges from its typed body, not from its emitted const. The
+emitted spelling of a call depends on the process-wide prelude, and a test may hand in another prelude.
+Reading the typed body keeps the answer a property of the prelude it was handed.
+
+It must recognise every shape `namespaceMember` turns into a `$es_` Identifier. A shape it missed would name
+a const in emitted code without pulling the const in, which fails at run time. The shapes are:
+
+- `MethodInvocation`: the base's name and the member's name.
+- `UnionMethodInvocation`: each case's `namespaceName` and `methodName`.
+- `Lookup`: a static call or a bare static reference. It names a Method or a Property, so both tables are
+  asked.
+- `Combination` of a Dictionary: `set` for written entries, `merge` for a Dictionary on the right.
+- `ConformanceValue`: each `methodMap` entry, and each provided Method under the Protocol that wrote it.
+- `FunctionInvocation` of a bare Identifier: an edge to that free Function, when it is bodied.
+- The `dispatch-chain` and `direct-method` intrinsics, which the optimiser writes into prelude bodies too.
+
+A call that leaves an Argument out also draws an edge to the native's shim, if it has one. A call that
+leaves nothing out draws one to a merging shim, since `namespaceMember` routes every call of such a native
+through its shim. A call answered by a Protocol's provided Method draws its edge to the Protocol's const,
+decided by the node's `providedBy` rather than by the name.
+
+Over-collecting is safe. A pair no table implements is filtered out, so a Record field or a native read
+falls away. An extra const is only emitted, never run.
+
+Each edge also says whether the body evaluates what it names, for "Prelude emission order". A call
+evaluates its target, and a Property read evaluates the Property. A Function reference found outside any
+call is only handed on, as in a Property whose value is `Boolean.isNot`. Under a call it counts as evaluated,
+because the call may run it at once, as `items::map(Boolean.isNot)` does. An inlined loop counts as a call.
+A node kind the walk does not list takes its parent's answer, which outside any call is "handed on". A node
+kind added later that runs a Function must join the calls `essenceMethodReferences` lists. Otherwise a
+Property read through it may be ordered too early.
+
+The walk skips each node's `type` and `position`. A Position holds no node, and a Type holds no Expression
+the search could draw an edge from. A Case payload default is the one Expression a Type carries, and the
+Enricher holds it to literals. Types reach most of the object graph, so walking them would be slow for no
+edge.
+
 ## Prelude emission order
 
 `essenceMemberBands` emits the reached prelude members in two bands.
@@ -240,3 +292,29 @@ witness naming a Namespace the Program declares, whose class is not initialised 
 `deferredPoolPositions` moves such a constant directly below the declaring Statement. Every read of it is
 below there too. A top-level read above the declaration is `use-before-declaration`, and a read inside a
 body runs only when the body is called. A constant that reads a deferred constant is deferred with it.
+
+## Discarded values
+
+An Expression Statement is a value the Program computes for its effects. A call, an assignment and an
+`await` stand as JavaScript writes them; none of them can be dropped by an engine. Any other value may be an
+object literal, such as the `{ [$type.typeKeySymbol]: "Record", … }` that `collapse-construction` builds.
+Bun drops such a literal when it is unused but still converts its Symbol key to a string, which throws.
+
+So `discardedExpressionStatement` binds any other value to `$discarded_value` in a block of its own. The
+value is still computed, and is no longer unused. The block keeps the name apart from a sibling's. The
+`_` keeps it apart from the Program's names, since `$` may appear in an Essence identifier and `_` may not.
+
+## Awaiting through wrappers
+
+JavaScript can not say some constructs in an Expression position. The compiler wraps each in a Function
+and calls it at once. Such wrappers hold a Match's Handlers, a compiled dispatch, a Combination's operands,
+an inlined loop's block and a compiled Matcher's test.
+
+An `await` belongs to its nearest enclosing Function, and a wrapper must not capture it. An `await` in a
+wrapper that is not `async` is a syntax error, and an `async` wrapper whose call is not awaited answers a
+Promise. So `calledWrapper` makes the wrapper `async` and awaits its call, which puts the wait back in the
+Statement the source wrote it in.
+
+`holdsAwait` asks this of the emitted JavaScript: whether an `await` stands anywhere in the body without a
+Function of its own around it. It walks every field rather than a list per node kind, so a shape added to
+the emission later is covered without anyone listing it.
