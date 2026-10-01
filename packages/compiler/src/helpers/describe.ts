@@ -344,12 +344,30 @@ export function countOf(count: number, singular: string): string {
 	return count === 1 ? `1 ${singular}` : `${count} ${singular}s`
 }
 
-// For Diagnostics: "an Integer", not "a Integer". It reads the first letter
-// only, so a Type named User reads "an User".
+// For Diagnostics: "an Integer", "a User", "an XMLNode". The article follows the
+// sound of the first word. See "Articles" in DEVELOPMENT.md.
 export function withArticle(description: string): string {
-	return /^[AEIOU]/i.test(description)
-		? `an ${description}`
-		: `a ${description}`
+	return `${articleFor(description)} ${description}`
+}
+
+function articleFor(description: string): "a" | "an" {
+	// A capital with no lowercase letter right after it is read by its name,
+	// as in an acronym or a Type Parameter.
+	if (/^[A-Z](?![a-z])/.test(description)) {
+		return /^[AEFHILMNORSX]/.test(description) ? "an" : "a"
+	}
+
+	let word = (/^[A-Za-z][a-z]*/.exec(description)?.[0] ?? "").toLowerCase()
+
+	if (/^(?:hour|honest|honou?r|heir)/.test(word)) {
+		return "an"
+	}
+
+	if (/^(?:uni|u[^aeioun][aeiou]|eu|one$|once$)/.test(word)) {
+		return "a"
+	}
+
+	return /^[aeiou]/.test(word) ? "an" : "a"
 }
 
 // The container inside `expected` holding the first blank that refused

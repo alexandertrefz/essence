@@ -424,6 +424,25 @@ declared default of a bare `List`'s Type Parameter, and a reflective walk would 
 undecided. It looks where a Type Argument can stand: List items, Dictionary slots, Record members, Union arms,
 a Future's or Started's value, a refinement's base.
 
+## Articles
+
+`withArticle` picks "a" or "an" by how the first word of a Type's spelling sounds, not by its first letter. A
+spelling that opens on a capital with no lowercase letter right after it, such as `XMLNode`, `URL` or a Type
+Parameter `T`, is read letter by letter. It takes "an" where that letter's name opens on a vowel sound: A, E, F, H, I, L,
+M, N, O, R, S and X. So the reports say "an XMLNode", "an S" and "a URL".
+
+Any other spelling is read as a word, its first word ending at the next capital. A vowel letter takes "an" and
+a consonant takes "a", with three exceptions:
+
+- A U that sounds as "you" takes "a": `Uni…`, and a U before one consonant and a vowel, as in `User`, `Usage`
+  and `Utility`. `Un` before anything but `i` is the negating prefix, so `Unknown` and `Unused` take "an".
+- `Eu…`, and a first word that is `One` or `Once`, open on a consonant sound, so they take "a".
+- A silent h takes "an": `Hour…`, `Honest…`, `Honor…`, `Honour…` and `Heir…`.
+
+The rule covers what Type names realistically open with, and stays a rule rather than a word list. A word it
+misreads, such as `Unary`, costs a clumsy article and nothing else. A spelling that opens on no letter at all,
+such as a Record shape `{ … }` or a Function signature, takes "a".
+
 ## Display spellings
 
 `withoutRefinements` takes every proof off a Type, at the positions `typeContainsUnknown` looks into. A Type

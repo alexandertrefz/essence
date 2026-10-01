@@ -33,6 +33,7 @@ import {
 	describeType,
 	displayProtocolName,
 	protocolIdentity,
+	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
@@ -4158,5 +4159,54 @@ describe("closestMatch", () => {
 	it("should offer nothing when there is nothing to offer", () => {
 		expect(closestMatch("undeclaredMethod", [])).toBeNull()
 		expect(closestMatch("", ["length"])).toBeNull()
+	})
+})
+
+describe("withArticle", () => {
+	it("should choose the article a Type name sounds like", () => {
+		for (let [description, expected] of [
+			["Integer", "an Integer"],
+			["Optional<String>", "an Optional<String>"],
+			["Unknown", "an Unknown"],
+			["Unused", "an Unused"],
+			["Update", "an Update"],
+			["User", "a User"],
+			["Usage", "a Usage"],
+			["Union", "a Union"],
+			["Unit", "a Unit"],
+			["EuroAmount", "a EuroAmount"],
+			["OneOf<Integer>", "a OneOf<Integer>"],
+			["Online", "an Online"],
+			["Hour", "an Hour"],
+			["HonestPrice", "an HonestPrice"],
+			["House", "a House"],
+			["String", "a String"],
+		] as const) {
+			expect(withArticle(description)).toBe(expected)
+		}
+	})
+
+	// An acronym and a one-letter Type Parameter are read by letter name.
+	it("should read a run of capitals letter by letter", () => {
+		for (let [description, expected] of [
+			["XMLNode", "an XMLNode"],
+			["HTTPRequest", "an HTTPRequest"],
+			["SQL", "an SQL"],
+			["URL", "a URL"],
+			["UUID", "a UUID"],
+			["IOError", "an IOError"],
+			["T", "a T"],
+			["F", "an F"],
+			["E", "an E"],
+		] as const) {
+			expect(withArticle(description)).toBe(expected)
+		}
+	})
+
+	it("should give a spelling that opens on no letter 'a'", () => {
+		expect(withArticle("{ name: String }")).toBe("a { name: String }")
+		expect(withArticle("(_: Integer) -> Integer")).toBe(
+			"a (_: Integer) -> Integer",
+		)
 	})
 })
