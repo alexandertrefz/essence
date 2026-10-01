@@ -14,10 +14,8 @@ import { parse } from "../parser/index"
 import { printCaseWithPayload, printType } from "../printType"
 import { validate } from "../validator/index"
 
-// These are end-to-end, because each of these bugs only became visible
-// once the Enricher had decided a Type and the Validator had judged it: the
-// Type logic in `src/helpers` answered plausibly on its own and wrongly in
-// concert.
+// End to end, since the Type logic in `src/helpers` must hold once the
+// Enricher decides a Type and the Validator judges it.
 function errorsFor(source: string) {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -28,13 +26,9 @@ function errorsFor(source: string) {
 
 describe("Type matching", () => {
 	describe("Union building", () => {
-		// An empty List Literal is typed `List<Unknown>`, which is a
-		// wildcard in BOTH directions — it accepts `List<Integer>` and is
-		// accepted by it — so Union building saw the two subsume one another
-		// and kept whichever came first. Written `[[], [1]]` the Literal
-		// therefore inferred `List<List<Unknown>>`, a Type that fits EVERY
-		// List Type, and the annotation below was accepted for a List of
-		// Integers while the same Literal spelled `[[1], []]` was rejected.
+		// `List<Unknown>` and `List<Integer>` each accept the other, so Union
+		// building must keep the decided one whatever the order. Otherwise
+		// `[[], [1]]` would infer `List<List<Unknown>>`, which fits every List.
 		it("should not let an empty List Literal erase the Type beside it", () => {
 			let errors = errorsFor(`implementation {
 				constant broken: List<List<String>> = [[], [1]]
@@ -53,9 +47,7 @@ describe("Type matching", () => {
 			expect(errors[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// The placeholder losing the Union costs an empty List Literal
-		// nothing — it still fits every List Type, in a Literal, an annotation
-		// or an Argument.
+		// An empty List Literal still fits every List Type.
 		it("should keep an empty List Literal assignable everywhere", () => {
 			expect(
 				errorsFor(`implementation {
@@ -72,13 +64,9 @@ describe("Type matching", () => {
 		})
 	})
 
-	// A bare `List` demands nothing of the items, so it accepts every
-	// List. The reverse used to hold too, and that direction PROMISES something
-	// a bare `List` never said: a List of Integers arrived where a
-	// `List<String>` was declared, and every String Method then ran on
-	// Integers. An empty List Literal is the case the loose direction was there
-	// for, and it has a rule of its own — an undecided item Type is a slot
-	// nothing has filled, not a claim to hold anything at all.
+	// A bare `List` accepts every List, but does not satisfy `List<String>`,
+	// which promises something a bare `List` never said. An empty List Literal
+	// has a rule of its own.
 	describe("Bare List annotations", () => {
 		it("should accept a List of anything", () => {
 			expect(
@@ -101,10 +89,8 @@ describe("Type matching", () => {
 		})
 	})
 
-	// The same two rules for the two-slot container, and the one they do
-	// not share: a Dictionary is compared SLOT BY SLOT, so two of them agreeing
-	// on their keys and disagreeing on their values are two Types. Every
-	// Dictionary here arrives as a Parameter.
+	// A Dictionary is compared slot by slot, so two that differ only in their
+	// values are two Types. Each Dictionary here arrives as a Parameter.
 	describe("Dictionary annotations", () => {
 		it("should accept a Dictionary of the same two slots", () => {
 			expect(
@@ -194,13 +180,9 @@ describe("Type matching", () => {
 	})
 
 	describe("Union member inference", () => {
-		// Matching the Argument against the first member binds
-		// `T := String` off `left` and THEN fails on `right`. That binding is
-		// worth no more than the member that made it, but it used to survive
-		// the failure, so the second member — which matches on its own with
-		// `T := Integer` — was checked against the leftover `T := String` and
-		// wrongly rejected. Which of the two spellings compiled came down to
-		// the order the Union was written in.
+		// The first member binds `T := String` off `left` and then fails on
+		// `right`. That binding must not survive into the second member, which
+		// matches with `T := Integer`, so the Union's order does not matter.
 		it("should try each Union member from a clean set of bindings", () => {
 			expect(
 				errorsFor(`implementation {
@@ -240,12 +222,9 @@ describe("Type matching", () => {
 	})
 
 	describe("Argument matching order", () => {
-		// An unannotated Function literal is typed FROM the Parameter it
-		// is passed to. Matched while `T` was still open it echoed `T` itself
-		// back, which pinned the Generic to its own name — from then on it was
-		// opaque, `to 5` could no longer bind it, and this valid Program was
-		// rejected with `argument-type-mismatch` while `result` was recorded
-		// as a `T` that exists in no scope the caller can see.
+		// An unannotated Function literal is typed from its Parameter. Matched
+		// while `T` is open, it would echo `T` back and pin the Generic, so
+		// `to 5` could no longer bind it. The literal is matched afterwards.
 		it("should infer a Generic from the Argument that follows a callback", () => {
 			expect(
 				errorsFor(`implementation {
@@ -259,9 +238,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// The callback is resolved against the BOUND signature, so its
-		// Parameter carries the Type the Argument named — which is what lets
-		// the body call an Integer Method on it at all.
+		// The callback is resolved against the bound signature, so its body can
+		// call an Integer Method on its Parameter.
 		it("should hand the callback the Type the other Argument bound", () => {
 			expect(
 				errorsFor(`implementation {
@@ -275,10 +253,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// Resolved against the bound `(_: Integer) -> Integer`, a body
-		// answering with a String is a return-Type mismatch INSIDE the lambda
-		// — the Diagnostic points at the answer that does not fit rather than
-		// at the whole Argument.
+		// Against the bound `(_: Integer) -> Integer`, a body answering a String
+		// is a return-Type mismatch inside the literal, at the answer.
 		it("should still reject a callback that disagrees with the binding", () => {
 			let errors = errorsFor(`implementation {
 				function apply <infer T>(transform fn: (_: T) -> T, to value: T) -> T {
@@ -292,9 +268,8 @@ describe("Type matching", () => {
 			expect(errors[0].code).toBe("return-type-mismatch")
 		})
 
-		// A callback that is the ONLY source of a binding still binds it
-		// — `map`'s transform names `Result` in its return Type and nowhere
-		// else, and deferring it changes nothing about that.
+		// A callback that is the only source of a binding still binds it, as
+		// `map`'s transform names `Result` only in its return Type.
 		it("should still bind a Generic a callback alone can name", () => {
 			expect(
 				errorsFor(`implementation {
@@ -306,13 +281,9 @@ describe("Type matching", () => {
 	})
 
 	describe("Methods read as values", () => {
-		// `Reader.readsBase` names a Method without calling it, and a
-		// named Method is typed `StaticMethod`/`SimpleMethod` rather than
-		// `Function` — a tag saying where the signature was written, not a
-		// different kind of value. Matched by tag alone, EVERY Function
-		// annotation refused one: `constant`, `variable`, static Property,
-		// Argument and List item alike, while the identical unannotated
-		// binding was accepted and ran fine.
+		// A Method read as a value is typed `StaticMethod` or `SimpleMethod`, a
+		// tag for where the signature was written, not a different kind of value.
+		// So it fits a Function annotation of the same signature.
 		it("should let a static Method stand in a Function-typed Constant", () => {
 			expect(
 				errorsFor(`implementation {
@@ -328,9 +299,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// An instance Method carries its receiver as the first Parameter
-		// of its Type, and is emitted taking it there — so it fits the
-		// Function Type that spells the receiver out.
+		// An instance Method takes its receiver as its first Parameter, so it
+		// fits a Function Type that spells the receiver out.
 		it("should let an instance Method stand in a Function that takes its receiver", () => {
 			expect(
 				errorsFor(`implementation {
@@ -346,10 +316,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// A Method taken as a VALUE keeps every Parameter and loses every
-		// default: a default is filled in by the callee's own frame, and only a
-		// direct call reaches that frame. So the Type says what the emission
-		// does, and a call through the value has to write every Argument.
+		// A Method taken as a value loses its defaults, which only a direct
+		// call fills in. A call through the value writes every Argument.
 		it("should require every Argument of a defaulted Method read as a value", () => {
 			expect(
 				errorsFor(`implementation {
@@ -380,10 +348,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// The receiver Parameter is the whole reason the Method below
-		// does not fit, so both sides of the Diagnostic spell their signature
-		// out. Both used to read the bare word "Function", which named the tag
-		// and said nothing about why the two did not meet.
+		// The receiver Parameter is why the Method does not fit, so the
+		// Diagnostic spells out both signatures.
 		it("should name both signatures where a Method does not fit", () => {
 			let errors = errorsFor(`implementation {
 				namespace Doubler for Integer {
@@ -443,11 +409,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// The tag travels: an unannotated binding initialised from a
-		// Method is DECLARED `StaticMethod`, and every later assignment is
-		// measured against that. Both directions have to wave the tag through,
-		// or the mirrored Program — `variable read = <literal>` taking a
-		// Method — would be the only one of the two that compiles.
+		// A binding initialised from a Method is declared `StaticMethod`, so
+		// the tag must be ignored in both directions of an assignment.
 		it("should let a Function literal stand where a Method decided the Type", () => {
 			expect(
 				errorsFor(`implementation {
@@ -464,9 +427,8 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// `SimpleMethod` and `StaticMethod` say where the signature was
-		// written down, not what the value is — of one signature, either
-		// stands for the other.
+		// Of one signature, a `SimpleMethod` and a `StaticMethod` stand for
+		// each other.
 		it("should let a static and an instance Method stand for one another", () => {
 			expect(
 				errorsFor(`implementation {
@@ -489,8 +451,7 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
-		// Only the tag is waved through — the signature is judged
-		// exactly as one Function against another.
+		// Only the tag is ignored. The signatures are compared as Functions.
 		it("should still reject a Method whose signature disagrees", () => {
 			let errors = errorsFor(`implementation {
 				namespace Reader {
@@ -522,8 +483,8 @@ describe("Type matching", () => {
 			expect(errors[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// An overloaded Method is a SET of signatures and is refused in
-		// every value position by the Validator, annotation or not.
+		// An overloaded Method is a set of signatures, which the Validator
+		// refuses in every value position.
 		it("should still refuse an overloaded Method as a value", () => {
 			let errors = errorsFor(`implementation {
 				namespace Reader {
@@ -548,13 +509,9 @@ describe("Type matching", () => {
 		})
 	})
 
-	// A Case is nominal by `(choice, name)`, and with Modules the Choice's
-	// written name is no longer unique in a Program: two files each declaring
-	// `choice Outcome` used to make interchangeable Types AND the same runtime
-	// tag, so `is` and `match` confused them with no Diagnostic anywhere. The
-	// identity is the declaring Module's canonical path and the name, and a
-	// Program that is no Module keeps the bare name — which is why every Program
-	// in every other spec, `__golden__` file and snapshot is untouched.
+	// Two Modules may each declare `choice Outcome`, so a Choice's identity is
+	// the declaring Module's canonical path and its name. A Program that is no
+	// Module keeps the bare name.
 	describe("Module-qualified Choice identity", () => {
 		const OUTCOME = `implementation {
 			choice Outcome {
@@ -572,8 +529,7 @@ describe("Type matching", () => {
 		}`
 
 		// The Choice a Program declares, enriched as the Module at
-		// `modulePath` — or, for null, as no Module at all, which is what a single
-		// file compile does.
+		// `modulePath`, or as no Module for null, as a single-file compile is.
 		function choiceDeclaredIn(
 			modulePath: string | null,
 			source: string = OUTCOME,
@@ -596,10 +552,9 @@ describe("Type matching", () => {
 			return declaration
 		}
 
-		// The Type of the Program's last Constant, which is how the applied
-		// spelling of a generic Choice is asked for: `applyGenericBindings` builds
-		// a fresh Case for every instantiation, and the identity has to survive
-		// that as much as the declaration does.
+		// The Type of the Program's last Constant, an applied generic Choice.
+		// `applyGenericBindings` builds a fresh Case per instantiation, which must
+		// keep the identity.
 		function lastConstantTypeIn(
 			modulePath: string,
 			source: string,
@@ -731,16 +686,10 @@ describe("Type matching", () => {
 		})
 	})
 
-	// These build the refinement Types directly, which is the only way to
-	// state the rules on their own, away from whatever a Declaration will
-	// decide about them.
-	//
-	// The direction is the whole of it. A refinement flows into its base
-	// for free, because forgetting evidence loses nothing; the base does NOT
-	// flow into the refinement, because that is the mistake the Type exists to
-	// name. Everything else here follows from those two, including the union
-	// collapse — which is not a rule of its own but what `buildUnion`'s
-	// subsumption order already does once assignability answers this way.
+	// These build refinement Types directly, so the rules stand apart from any
+	// Declaration. A refinement flows into its base, since forgetting evidence
+	// loses nothing, and the base does not flow into the refinement. The Union
+	// collapse follows from `buildUnion`'s subsumption.
 	describe("Checked refinements", () => {
 		const integer: common.Type = { type: "Integer" }
 		const string: common.Type = { type: "String" }
@@ -784,8 +733,7 @@ describe("Type matching", () => {
 			expect(matchesType(nonZero, nonZero)).toBe(true)
 		})
 
-		// Proving more than was asked is proof enough — a value known to
-		// be non-zero AND positive is a value known to be non-zero.
+		// A value known to be non-zero and positive is known to be non-zero.
 		it("should accept a refinement proving a superset of the conjuncts", () => {
 			expect(matchesType(nonZero, positiveNonZero)).toBe(true)
 		})
@@ -794,10 +742,9 @@ describe("Type matching", () => {
 			expect(matchesType(positiveNonZero, nonZero)).toBe(false)
 		})
 
-		// And what a leaf IMPLIES is proven by it. Below, above and equal
-		// to one bound exclude each other and cover everything, so a value above
-		// zero has been proven not to be zero and not to be below it — and
-		// reaches the two Types declared by exactly those.
+		// What a leaf implies is proven by it. Less than, greater than and equal
+		// to one bound exclude each other and cover everything. So a value above
+		// zero is proven neither zero nor below it.
 		describe("what one comparison says about the others", () => {
 			const above = refinement("PositiveInteger", integer, [
 				conjunct("isGreaterThan", ["0"]),
@@ -821,9 +768,8 @@ describe("Type matching", () => {
 				expect(matchesType(above, notBelow)).toBe(false)
 			})
 
-			// Two exclusions leave the third standing, which is the same
-			// law read backwards — and the pair has to be read TOGETHER, since
-			// neither half says anything about direction on its own.
+			// Two exclusions leave the third standing. The pair is read together,
+			// since neither half alone says anything about direction.
 			it("should accept the leaf two exclusions leave standing", () => {
 				let neither = refinement("Neither", integer, [
 					{ ...conjunct("is", ["0"]), negated: true },
@@ -834,10 +780,8 @@ describe("Type matching", () => {
 				expect(matchesType(above, notZero)).toBe(false)
 			})
 
-			// `isBetween` excludes the comparison outside each of its two
-			// bounds, and the two bounds name the same range in either order —
-			// so a pair written backwards excludes exactly what the same pair
-			// written forwards does.
+			// `isBetween` excludes what lies outside its bounds, and the bounds
+			// name the same range in either order.
 			it("should read a pair of bounds either way round", () => {
 				let within = refinement("Digit", integer, [
 					conjunct("isBetween", ["0", "9"]),
@@ -850,9 +794,8 @@ describe("Type matching", () => {
 				expect(matchesType(notBelow, backwards)).toBe(true)
 			})
 
-			// The bound is part of the question. Nothing is read across
-			// two literals, which is what keeps the closure a leaf carries from
-			// growing with the Program.
+			// The bound is part of the question. Nothing is read across two
+			// literals, so the closure a leaf carries stays small.
 			it("should read nothing across two bounds", () => {
 				let aboveOne = refinement("AboveOne", integer, [
 					conjunct("isGreaterThan", ["1"]),
@@ -862,9 +805,8 @@ describe("Type matching", () => {
 			})
 		})
 
-		// The conjunct set is compared by KEY, so the same predicate
-		// written the other way round is the same Type. Which is why the
-		// canonical form exists, and why nothing here relies on the order.
+		// The conjunct set is compared by key, so the order of the conjuncts
+		// does not matter.
 		it("should ignore the order the conjuncts stand in", () => {
 			let reversed = refinement("PositiveNonZeroInteger", integer, [
 				conjunct("isPositive"),
@@ -875,9 +817,8 @@ describe("Type matching", () => {
 			expect(matchesType(reversed, positiveNonZero)).toBe(true)
 		})
 
-		// A conjunct is the QUESTION, not the name of an alias — two
-		// aliases proving the same thing are the same Type, and two proving
-		// different things are not, whatever they are called.
+		// A conjunct is the question asked, not the alias' name. Two aliases
+		// proving the same thing are one Type, whatever they are called.
 		it("should decide by the conjuncts rather than by the alias name", () => {
 			let sameQuestion = refinement("NotZero", integer, [
 				conjunct("isNot", ["0"]),
@@ -913,11 +854,9 @@ describe("Type matching", () => {
 			expect(matchesType(numberish, nonZero)).toBe(true)
 		})
 
-		// The expected Union decomposes BEFORE the refinement is
-		// unwrapped. Stripping the evidence first would leave the Union's own
-		// refinement member facing a bare Integer — so `NonZeroInteger | String`
-		// refused the very `NonZeroInteger` it names, while accepting it
-		// through an `Integer` member it did not have.
+		// The expected Union decomposes before the refinement is unwrapped, so
+		// its `NonZeroInteger` member meets the refinement rather than a bare
+		// Integer.
 		it("should let a Union holding the refinement accept it", () => {
 			let refined: common.Type = {
 				type: "UnionType",
@@ -926,22 +865,17 @@ describe("Type matching", () => {
 
 			expect(matchesType(refined, nonZero)).toBe(true)
 
-			// Proving more than the member asks is proof enough — the
-			// same subset rule that answers the bare-refinement case.
+			// Proving more than the member asks is enough, by the same subset
+			// rule.
 			expect(matchesType(refined, positiveNonZero)).toBe(true)
 
-			// And the Union stays as demanding as its member: a bare
-			// Integer still has no evidence to offer it.
+			// A bare Integer has no evidence to offer the member.
 			expect(matchesType(refined, integer)).toBe(false)
 		})
 
-		// A refinement hoists with `conjuncts: null` while the Namespace
-		// answering its predicate is still on its way, and NOTHING may be
-		// decided about a predicate nobody has read — the throw is what the
-		// hoisting rounds read as "not this round". Except the widening
-		// direction, which forgets the evidence rather than reading it: a
-		// refinement flows into its base whatever its predicate turns out to
-		// say, so that answer needs no conjuncts at all.
+		// A refinement hoists with `conjuncts: null` until its predicate is
+		// read, and nothing may be decided about it before. Hoisting reads the
+		// throw as "not this round". Widening into the base needs no conjuncts.
 		it("should refuse to decide about a pending refinement by throwing", () => {
 			let pending: common.Type = {
 				type: "Refinement",
@@ -960,9 +894,8 @@ describe("Type matching", () => {
 			expect(matchesType(integer, pending)).toBe(true)
 		})
 
-		// An Error is a poison value and matches in both directions, so
-		// that one mistake does not cascade. A refinement is not an exception to
-		// that, which is what the rules being placed BEHIND the Error guard says.
+		// An Error matches in both directions so one mistake does not cascade,
+		// and the refinement rules stand behind that guard.
 		it("should let an Error match a refinement in both directions", () => {
 			let error: common.Type = { type: "Error" }
 
@@ -970,13 +903,10 @@ describe("Type matching", () => {
 			expect(matchesType(error, nonZero)).toBe(true)
 		})
 
-		// The widening rule sits ahead of Generic binding on purpose at the
-		// OUTERMOST position — the whole of what an Argument or a Declaration
-		// asks. A Type Parameter inferred from a refined Argument binds the
-		// BASE, so a Generic standing for a value the call threads is never
-		// pinned to evidence the thread does not carry: a walk seeded with a
-		// `NonZeroInteger` whose step answers an ordinary Integer still
-		// compiles. The rule one level in is the opposite one, pinned below.
+		// At the outermost position, a Type Parameter inferred from a refined
+		// Argument binds the base. So a walk seeded with a `NonZeroInteger` whose
+		// step answers a plain Integer compiles. One level in, the rule is the
+		// opposite.
 		it("should bind a Type Parameter to the base rather than the refinement", () => {
 			let context = createInferenceContext([
 				{ name: "T", infer: true, defaultType: null },
@@ -992,13 +922,9 @@ describe("Type matching", () => {
 			expect(context.bindings.get("T")).toEqual(integer)
 		})
 
-		// Both insertion orders, because Union building is where a
-		// directional rule most easily reads as an order-dependent one:
-		// `subsumesForUnion` asks assignability in one direction and then asks
-		// whether the two subsume each ANOTHER, and only the base does here. So
-		// the refinement is dropped whichever side it was collected from, and
-		// `isLessSpecific` is deliberately left alone — nothing about a
-		// refinement is meant to win a Union.
+		// Both orders, since `subsumesForUnion` asks assignability one way and
+		// then the other, and only the base subsumes here. `isLessSpecific` gives
+		// a refinement no precedence in a Union.
 		it("should collapse a Union of a refinement and its base, either order", () => {
 			expect(buildUnion([integer, nonZero])).toEqual(integer)
 			expect(buildUnion([nonZero, integer])).toEqual(integer)
@@ -1011,12 +937,9 @@ describe("Type matching", () => {
 			})
 		})
 
-		// And the same collapse one step in: every value proving both
-		// conjuncts is a value proving one of them, so the WIDER refinement
-		// covers the narrower and the narrower goes — again from either side,
-		// since one of the two evicts and the other declines to be collected.
-		// Nothing here is a most-specific-refinement order; it is the same
-		// subsumption asking the same question.
+		// A value proving both conjuncts proves one of them, so the wider
+		// refinement covers the narrower, in either order. This is the same
+		// subsumption, not an order of refinements.
 		it("should collapse two refinements into the wider one, either order", () => {
 			expect(buildUnion([nonZero, positiveNonZero])).toEqual(nonZero)
 			expect(buildUnion([positiveNonZero, nonZero])).toEqual(nonZero)
@@ -1033,11 +956,9 @@ describe("Type matching", () => {
 			)
 		})
 
-		// A GENERIC refinement needs no rule of its own, which is the whole
-		// design finding: its conjuncts say nothing about the items, so two
-		// instantiations of one Alias differ by their BASES — which `matchTypes`
-		// has always compared. Everything below is the ordinary refinement rule
-		// answering a question about `List<String>` versus `List<Integer>`.
+		// A generic refinement needs no rule of its own. Its conjuncts say
+		// nothing about the items, so two instantiations differ only by their
+		// bases, which the ordinary rule compares.
 		describe("applied to a generic Alias", () => {
 			function nonEmptyOf(itemType: common.Type): common.Type {
 				return {
@@ -1065,9 +986,7 @@ describe("Type matching", () => {
 				expect(matchesType(nonEmptyStrings, strings)).toBe(false)
 			})
 
-			// The applied spelling is display-only, exactly as a Union's
-			// name is — two refinements proving the same thing about the same base
-			// are one Type however they were spelled.
+			// The applied spelling is only for display, as a Union's name is.
 			it("should decide by the base and the conjuncts, never by the spelling", () => {
 				let unstamped: common.Type = {
 					type: "Refinement",
@@ -1080,9 +999,8 @@ describe("Type matching", () => {
 				expect(matchesType(unstamped, nonEmptyStrings)).toBe(true)
 			})
 
-			// A Type Parameter binds the BASE here too — a `T` inferred from
-			// a NonEmptyList Argument is `List<String>`, for the reason the
-			// non-generic case above gives.
+			// A `T` inferred from a NonEmptyList Argument binds the base,
+			// `List<String>`, as in the non-generic case.
 			it("should bind a Type Parameter to the instantiated base", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -1098,12 +1016,9 @@ describe("Type matching", () => {
 				expect(context.bindings.get("T")).toEqual(strings)
 			})
 
-			// And the rule one level IN, which is the opposite one. A
-			// refinement standing as a Type Argument was not inferred there:
-			// something wrote `List<NonEmptyList<String>>` down or a Method
-			// promised it, and the item Type is not a place a later value can
-			// widen. So the Parameter binds the refinement itself and
-			// `groups::firstItem()` answers the proof back.
+			// One level in the rule is the opposite. A refinement as a Type
+			// Argument was written or promised, and no later value widens an item
+			// Type. So `T` binds the refinement, and `groups::firstItem()` keeps it.
 			it("should bind a Type Parameter inside a Type to the refinement", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -1122,9 +1037,8 @@ describe("Type matching", () => {
 				expect(context.bindings.get("T")).toEqual(nonEmptyStrings)
 			})
 
-			// The binding is then measured against as itself, in both
-			// directions — the flipped one is what a lambda Parameter typed off
-			// the binding meets when the signature is compared back.
+			// The bound refinement then matches itself both ways. A literal's
+			// Parameter typed off the binding meets the flipped direction.
 			it("should measure a bound refinement against itself either way round", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -1149,12 +1063,9 @@ describe("Type matching", () => {
 				)
 			})
 
-			// And the ARGUMENT side of that binding, which is what a
-			// Method taking its own item Type meets: `groups::append(proven)`
-			// hands a `NonEmptyList<String>` to an `ItemType` bound to one.
-			// Widening the actual to its base first — which is what an unbound
-			// Parameter does — would refuse a proof for being proven. A value
-			// carrying no proof is refused there as it always was.
+			// `groups::append(proven)` hands a `NonEmptyList<String>` to an
+			// `ItemType` bound to one, so the proven Argument must not be widened
+			// first. A value without the proof is refused.
 			it("should accept a proven Argument where a bound refinement stands", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -1176,10 +1087,8 @@ describe("Type matching", () => {
 				)
 			})
 
-			// An UNBOUND Type Parameter still gets nothing from a
-			// refinement on the actual side of a signature — the outermost rule
-			// read in the mirror, and what keeps the fall-through above from
-			// becoming a second inference route.
+			// An unbound Type Parameter on the actual side gets nothing from a
+			// refinement, so this is no second inference route.
 			it("should refuse a refinement against an unbound Type Parameter", () => {
 				let context = createInferenceContext([
 					{ name: "T", infer: true, defaultType: null },
@@ -1199,8 +1108,7 @@ describe("Type matching", () => {
 				expect(buildUnion([nonEmptyStrings, strings])).toEqual(strings)
 			})
 
-			// And two instantiations of one Alias cover nothing of each
-			// other, because their bases do not — the Union keeps both.
+			// Their bases cover nothing of each other, so the Union keeps both.
 			it("should keep two instantiations a Union does not cover", () => {
 				expect(buildUnion([nonEmptyStrings, nonEmptyIntegers])).toEqual(
 					{
@@ -1219,9 +1127,8 @@ describe("Type matching", () => {
 					"NonEmptyList<NonZeroInteger>",
 				)
 
-				// An instantiation that bound every Parameter to a Parameter
-				// — a generic Namespace's own target — reads terse, because
-				// `NonEmptyList<Item>` would only echo the header it is written under.
+				// An instantiation over Type Parameters alone, as in a generic
+				// Namespace's target, prints tersely rather than echo its header.
 				expect(
 					printType(nonEmptyOf({ type: "GenericUse", name: "Item" })),
 				).toBe("NonEmptyList")
