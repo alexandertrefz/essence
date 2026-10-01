@@ -24,11 +24,8 @@ function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	return enrichSource(source).diagnostics
 }
 
-// The characters a Diagnostic's Position covers — which is the text a
-// Quick Fix replaces with the suggestion the same Diagnostic carries. Spelling
-// them out is the only way to assert that a `#Case` span stops short of the
-// sigil without counting columns by hand. Single line spans only; every
-// Diagnostic asked this reports on one name.
+// The single-line text a Diagnostic's Position covers, which its Quick Fix
+// replaces, so a test can check where a span starts without counting columns.
 function underlinedText(source: string, diagnostic: common.Diagnostic): string {
 	let position = diagnostic.position
 
@@ -44,8 +41,8 @@ function underlinedText(source: string, diagnostic: common.Diagnostic): string {
 		)
 }
 
-// The characters one Position covers, for a test that means to say WHERE
-// a synthesized Node stands rather than which columns it happens to have.
+// The characters one Position covers, so a test can say where a synthesized
+// Node stands.
 function spanOf(source: string, position: common.Position): string {
 	return source
 		.split("\n")
@@ -55,11 +52,9 @@ function spanOf(source: string, position: common.Position): string {
 		)
 }
 
-// The typed Expression a Program's LAST Constant was declared from —
-// which is how a test asks what a call resolved to: which Namespace won, which
-// Overload, which dispatch branches, and what the Arguments were typed as. The
-// Program is required to enrich cleanly, so a test that means to assert on a
-// resolution can not silently assert on a failed one instead.
+// The typed Expression the Program's last Constant was declared from, to ask
+// what a call resolved to. The Program must enrich cleanly, so no test
+// asserts on a failed resolution.
 function lastConstantValue(source: string): common.typed.ExpressionNode {
 	let { program, diagnostics } = enrichSource(source)
 
@@ -100,12 +95,9 @@ function lastConstantFunctionInvocation(
 	return value
 }
 
-// The Type an applied `Optional<ItemType>` enriches to. It is no longer
-// the Union `ItemType | Nothing` an Alias expanded to, but the Union of the two
-// Cases the `Optional` Choice declares — each carrying the Type Arguments the
-// application bound, under the applied spelling as the display alias. Written
-// once here because the shape is long and says nothing a test is about; what a
-// test is about is the item Type threaded through it.
+// The Type an applied `Optional<ItemType>` enriches to: the Union of its two
+// Cases, each carrying the bound Type Arguments. Its display alias is the
+// applied spelling.
 function optionalOf(itemType: common.Type): common.Type {
 	return {
 		type: "UnionType",
@@ -129,13 +121,9 @@ function optionalOf(itemType: common.Type): common.Type {
 	}
 }
 
-// The LIVE Namespace of that name — the one read from `packages/standard-library/sources/*.es`
-// and handed to every Program's top level Scope. Asserting against this rather
-// than against a declaration read straight out of a source file is the point:
-// a test about which Namespace declares a Method has to ask what a Program can
-// actually reach. Throws rather than returning `undefined`, so a renamed or
-// dropped Namespace fails as a missing Namespace instead of as a missing
-// Method.
+// The live Namespace of that name, as every Program's top level Scope holds
+// it, so a test asks what a Program can reach. Throws for a missing Namespace,
+// so the failure names it.
 function builtinNamespace(name: string): common.NamespaceType {
 	let namespace = builtinNamespaces().find(
 		(candidate) => candidate.name === name,
@@ -148,10 +136,9 @@ function builtinNamespace(name: string): common.NamespaceType {
 	return namespace
 }
 
-// Every Case construction in a typed subtree, in the order it was built —
-// how a test asks what a Case a Program never spelled the Type Arguments of was
-// finally decided as. A `GenericUse` left in `typeArguments` is a Type Parameter
-// nothing decided, which is exactly what such an assertion is about.
+// Every Case construction in a typed subtree, in build order, to ask what
+// unwritten Type Arguments were decided as. A `GenericUse` left in
+// `typeArguments` is a Type Parameter nothing decided.
 function collectCaseTypes(value: unknown): Array<common.Type> {
 	let found: Array<common.Type> = []
 
@@ -188,9 +175,7 @@ function collectCaseTypes(value: unknown): Array<common.Type> {
 	return found
 }
 
-// Walks the typed Program collecting every resolved Conformance —
-// wherever a bounded Type Parameter was satisfied, an Invocation carries the
-// `{ genericName, protocolName, source }` shape. Used to assert which Namespace
+// Every resolved Conformance in the typed Program, to assert which Namespace
 // a bound resolved to at a call site.
 function collectConformances(value: unknown): Array<common.Conformance> {
 	let found: Array<common.Conformance> = []
@@ -304,10 +289,7 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("unknown-method")
 		})
 
-		// The Help and the `data` must name the same thing — the Help is
-		// what the reader is told and the `data` is what a Quick Fix writes,
-		// and a fix that inserts a different name than the Diagnostic offered
-		// is worse than no fix at all.
+		// The Help and the `data` a Quick Fix writes must name the same thing.
 		it("should carry a near miss as data as well as a Help", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = "value"::lenth()
@@ -330,8 +312,8 @@ describe("Enricher", () => {
 			expect(diagnostics[0].data).toBeUndefined()
 		})
 
-		// The bare name, so the Case Quick Fix replaces exactly what the
-		// Diagnostic underlines — the `#` belongs to the Help's rendering.
+		// The bare name, so the Quick Fix replaces exactly what the Diagnostic
+		// underlines. The `#` belongs to the Help's rendering.
 		it("should carry an unknown Case's near miss without its sigil", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				choice Operation { Add, Subtract }
@@ -346,10 +328,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// The bare form is the spelling this codebase prefers, so it is
-		// the one a near miss matters most for — and it is reported from its
-		// own site, which once offered nothing while the documentation
-		// promised a Quick Fix for every unknown Case.
+		// The bare form is the preferred spelling, reported from a site of its
+		// own, which must carry the near miss too.
 		it("should carry a bare Case reference's near miss", () => {
 			let source = `implementation {
 				choice Operation { Add, Subtract }
@@ -462,10 +442,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// A Partial is judged by ASSIGNABILITY, not identity — an update
-		// sets a member to a value, and a value of one arm is enough for a
-		// Union-typed member, exactly as it is at the Declaration. Deep
-		// equality refused every one of these.
+		// A Partial is judged by assignability, not identity, so one arm's
+		// value fits a Union-typed member, as at the Declaration.
 		it("should accept an update setting one arm of a Union-typed member", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -485,10 +463,9 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// `{ config with server.port = 1 }` IS
-		// `{ config with server = { config.server with port = 1 } }`, and the
-		// Enricher is where the one becomes the other — so the Type it answers
-		// is the Type the value updated already had.
+		// The Enricher rewrites `{ config with server.port = 1 }` as
+		// `{ config with server = { config.server with port = 1 } }`. See "Path
+		// keys" in packages/compiler/src/enricher/DEVELOPMENT.md.
 		describe("path keys", () => {
 			const config = `type Tls = { enabled: Boolean }
 				type Server = { host: String, port: Integer, tls: Tls }
@@ -545,11 +522,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// Every level keeps the Alias it was reached under. An update
-			// may only write members the original already declares, so what
-			// comes back is the very Record that went in — a `Config` whose
-			// `port` is 8080 is a Config, and that is what a Diagnostic about
-			// it goes on to name.
+			// Every level keeps the Alias it was reached under, since an update
+			// writes only members the original declares.
 			it("should answer the Type of the value updated", () => {
 				let value = lastConstantValue(`implementation {
 					${config}
@@ -578,10 +552,9 @@ describe("Enricher", () => {
 				})
 			})
 
-			// The invariant the Language Server is built on: the member
-			// Identifier of every synthesized Lookup stands where the step that
-			// spelled it stands, so a rename, a Hover and a semantic token all
-			// answer for a step with no code of their own.
+			// INVARIANT: a synthesized Lookup's member Identifier stands at the
+			// step that spelled it, which renames, Hovers and semantic tokens rely
+			// on.
 			it("should stand each synthesized Lookup at the step that spelled it", () => {
 				let source = `implementation {
 					${config}
@@ -729,9 +702,8 @@ describe("Enricher", () => {
 				expect(diagnostics[0].code).toBe("path-key-outside-combination")
 			})
 
-			// A Record Type standing over a Literal is not a value under
-			// it — a Declaration writes its members from nothing exactly as an
-			// unannotated Literal does.
+			// A Record annotation is no value under the Literal, which writes
+			// its members from nothing.
 			it("should refuse a path key under a Record annotation", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					${config}
@@ -743,12 +715,9 @@ describe("Enricher", () => {
 			})
 		})
 
-		// An Argument written for a defaulted Record Parameter and a Case
-		// payload written for a defaulting Case are Literals MERGED into a value
-		// that is already there — the default's — so they carry path keys on the
-		// terms a `with` does. `{ default with argument }` is what the merge is,
-		// and this is the follow-up that made it one rule for every right-hand
-		// side of one.
+		// An Argument for a defaulted Record Parameter, or a payload for a
+		// defaulting Case, merges into the default as `{ default with argument }`.
+		// So it carries path keys as a `with` does.
 		describe("path keys in a Literal merged into a default", () => {
 			const options = `type Server = { host: String, port: Integer }
 				type Options = { retries: Integer, server: Server }
@@ -786,9 +755,7 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// The one Argument reads as the whole of the merge, so a plain
-			// key and a path key stand side by side exactly as they do after a
-			// `with`.
+			// A plain key and a path key stand side by side, as after a `with`.
 			it("should admit a path key beside a plain one", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -799,11 +766,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// The Node keeps the Type it WROTE — a partial of the member
-			// it merges into — and the merge is what the position measures it
-			// by. An Argument whose Type claimed the whole member would claim it
-			// to the Optimiser and the emission too, where only the members
-			// really written are there.
+			// The Node keeps the partial Type it wrote, since later stages see
+			// only the members really written.
 			it("should leave the written Argument its own Type", () => {
 				let value = lastConstantValue(`implementation {
 					${options}
@@ -842,9 +806,8 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
-			// A path key inside a member's OWN Literal reaches into
-			// nothing — only the Literal that is merged is merged, and a member
-			// of it writes its value from nothing like any other.
+			// Only the merged Literal merges, so a path key inside a member's own
+			// Literal reaches into nothing.
 			it("should refuse a path key one level inside an Argument", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					${options}
@@ -926,10 +889,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// Regression test — the expected-members map was a plain object,
-		// so a member named after one of `Object.prototype`'s found the
-		// JavaScript builtin where `??=` expected a missing entry, and the
-		// Enricher died with an Internal Compiler Error instead of enriching.
+		// A member named after an `Object.prototype` member must not find the
+		// JavaScript builtin.
 		it("should enrich a literal against a member named after Object.prototype's", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -950,11 +911,9 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// `toString` is a Method the standard library really declares over a
-		// Record, so a Lookup of it meets the separator rule rather than a member
-		// that is not there — the inherited member this was written about is
-		// refused by the same walk either way. A prototype member that is no
-		// Method of anything still reports `unknown-member`.
+		// The standard library declares `toString` over a Record, so a Lookup
+		// of it meets the separator rule. Any other prototype member reports
+		// `unknown-member`.
 		it("should report a Lookup of a member only Object.prototype has", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -971,9 +930,8 @@ describe("Enricher", () => {
 			).toEqual(["unknown-member"])
 		})
 
-		// A bare member name is read as well as written, and a reader who
-		// did not know the spelling was a shorthand would otherwise be told
-		// that a name they never meant to read is not declared.
+		// A bare member name is read as well as written, so the report says it
+		// is a shorthand.
 		it("should say a bare member name is read as its own value", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant point = { x }
@@ -1055,13 +1013,7 @@ describe("Enricher", () => {
 			}
 		})
 
-		// A Function is the hole this reaches for because the answer of a
-		// fallible call is no longer one. `3::squareRoot()` used to be an
-		// `Integer | Algebraic | Nothing`, a bare Union belonging to no
-		// Namespace and so conforming to nothing; `Optional<ItemType>` is a
-		// Choice with a Namespace that conforms to `Printable` exactly when its
-		// payload does, so the same call interpolates cleanly today. A Function
-		// conforms to nothing at all, whatever it returns.
+		// A Function conforms to nothing, whatever it returns.
 		it("should refuse a hole that is not Printable", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant greet = (subject: String) -> String { <- subject }
@@ -1088,12 +1040,8 @@ describe("Enricher", () => {
 		})
 
 		it("should refuse an Optional hole whose payload is not Printable", () => {
-			// The conditional half of the conformance — the Optional
-			// itself is the same Type as the one accepted above, and it is the
-			// payload that decides. A List of Functions is the shortest way to
-			// hand `firstItem` a payload nothing can print, and the List is
-			// bound to a `List` Type: a written one proves it holds items and
-			// `firstItem` would answer the Function bare.
+			// The Optional's payload decides its conformance. The List is bound
+			// to a `List` Type, or `firstItem` would answer the Function bare.
 			let diagnostics = diagnosticsFor(`implementation {
 				constant greet = (subject: String) -> String { <- subject }
 				constant greeters: List<(subject: String) -> String> = [greet]
@@ -1131,8 +1079,7 @@ describe("Enricher", () => {
 				"redundant-interpolation-to-string",
 			)
 			expect(diagnostics[0].severity).toBe("warning")
-			// The span is the call alone — the receiver stays, and the
-			// greyed-out range is exactly what the Quick Fix deletes.
+			// The span is the call alone, which the Quick Fix deletes.
 			expect(underlinedText(source, diagnostics[0])).toBe("::toString()")
 			expect(diagnostics[0].tags).toEqual(["unnecessary"])
 		})
@@ -1161,8 +1108,8 @@ describe("Enricher", () => {
 		})
 
 		it("should accept a 'toString' that takes an Argument", () => {
-			// `Rational.toString(as:)` picks a form the hole would
-			// not have — dropping the call would change the String.
+			// `Rational.toString(as:)` picks a form the hole would not, so the
+			// call is needed.
 			expect(
 				diagnosticsFor(`implementation {
 					constant message = "half: {1/2::toString(as NumberFormat#Decimal)}"
@@ -1171,9 +1118,8 @@ describe("Enricher", () => {
 		})
 
 		it("should accept a 'toString' on a receiver that is not Printable itself", () => {
-			// A bare structural Union belongs to no Namespace, so nothing
-			// makes it conform — the Method resolves per member and the explicit
-			// call is the only spelling that works.
+			// A structural Union conforms to nothing, so only the explicit call,
+			// resolved per member, works.
 			expect(
 				diagnosticsFor(`implementation {
 					constant value: Integer | String = 1
@@ -1504,9 +1450,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// `Five` is read through the body of `fitsFive`, which can only be
-		// read once `Small` is filled, so a round that only fills `Small` still
-		// has to be followed by one that reads the body again.
+		// `fitsFive`'s body can be read only once `Small` is filled, so another
+		// round must read it again for `Five`.
 		it("should hoist a declaration waiting on a predicate read through a Method body that waits on another", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -1651,10 +1596,8 @@ describe("Enricher", () => {
 			throw new Error("No ConstantDeclarationStatement found.")
 		}
 
-		// The answer is the item Type BARE. A written List proves it
-		// holds an item, so the receiver reaches `namespace NonEmptyList`,
-		// whose `firstItem` is total — and the inference under test is the
-		// same one either way, since `ItemType` is decided by the receiver.
+		// A written List reaches `NonEmptyList::firstItem`, which answers the
+		// item bare. The receiver decides `ItemType` either way.
 		it("should infer List item Types through Method Invocations", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
@@ -1664,12 +1607,9 @@ describe("Enricher", () => {
 		})
 
 		it("should infer map's result Type from the callback's return", () => {
-			// `Result` occurs only in the callback's return position and
-			// in `map`'s own return. The callback is contextually typed, so `n`
-			// needs no annotation.
-			// Printed rather than compared whole, because a written
-			// receiver proves it holds items and `NonEmptyList::map` carries
-			// that proof onto the answer — the item Type is what this is about.
+			// `Result` occurs only in the callback's return and `map`'s. The
+			// callback is contextually typed, so `n` needs no annotation. Printed,
+			// since `NonEmptyList::map` carries the receiver's proof.
 			expect(
 				printType(
 					typeOfFirstConstant(`implementation {
@@ -1721,12 +1661,8 @@ describe("Enricher", () => {
 		})
 
 		it("should infer Namespace Generics from the receiver", () => {
-			// `firstAgain` hands `firstItem`'s answer straight back, so
-			// its return Type is written as the `Optional<Item>` that answer IS
-			// — the Choice does not widen into an `Item | Nothing` the way the
-			// Alias used to expand into one. What is asserted is unchanged: the
-			// `Item` the Namespace abstracts over was bound to String by the
-			// receiver alone.
+			// `firstAgain` returns `firstItem`'s `Optional<Item>` answer. The
+			// receiver alone binds `Item` to String.
 			expect(
 				typeOfFirstConstant(`implementation {
 					namespace Wrapper<infer Item> for List<Item> {
@@ -1741,16 +1677,9 @@ describe("Enricher", () => {
 		})
 
 		it("terminates inference for a generic reduce-step folding into an Optional", () => {
-			// The exact shape `List.firstItem(where:)` is written in — a
-			// Namespace generic in `ItemType` folding with `reduce`'s
-			// early-stopping entry into an `Optional<ItemType>` Result. `reduce`'s
-			// own Namespace Generic is ALSO `ItemType`, so binding it off the
-			// receiver records `ItemType := ItemType`; treated as still open to
-			// binding, matching that self-reference against the members of the
-			// bound `Optional<ItemType>` Result — `Optional#Empty`, or the
-			// `ItemType` the `Optional#Value` Case carries as its payload — sent
-			// inference into an endless loop. `isOpenBindable` pins it as opaque,
-			// so this terminates and the fold's Result is `Optional<Integer>`.
+			// The shape of `List.firstItem(where:)`. `reduce`'s own Generic is
+			// also `ItemType`, so the receiver binds `ItemType := ItemType`.
+			// `isOpenBindable` treats that as opaque, so inference terminates.
 			expect(
 				typeOfFirstConstant(`implementation {
 					namespace Finder<infer ItemType> for List<ItemType> {
@@ -1771,14 +1700,10 @@ describe("Enricher", () => {
 		})
 
 		it("freshens callee Generics so a same-named caller Generic can not collide", () => {
-			// `myCount`'s `State` and the general `loop`'s own `State` share a
-			// spelling, and the Record threaded as the loop's State MENTIONS it. By
-			// name alone the callee's bindable `State` and the caller's opaque
-			// `State` are one symbol, so binding `State := { carried: State }` used
-			// to substitute the name into itself until the stack died — a caught
-			// `internal-error`, a crash uncaught. Freshening the callee's Generics
-			// to unique names for the match keeps the two distinct, so this resolves
-			// cleanly with no Diagnostics at all.
+			// The caller's opaque `State` and `loop`'s bindable `State` share a
+			// spelling, and the threaded Record mentions it. The callee's Generics
+			// are freshened for the match, so `State := { carried: State }` does
+			// not substitute into itself.
 			expect(
 				diagnosticsFor(`implementation {
 					function myCount<State>(
@@ -1793,15 +1718,9 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// The same collision one rail over — this time between a CHOICE's
-		// own Type Parameters and the caller's. `Step`'s first Parameter is
-		// spelled `State`, and so is `myCount`'s, and the payload handed to
-		// `#Done` is Typed as the caller's: matched by name, that payload bound
-		// `Step`'s `State` to the whole `{ value: Result }` Record and left
-		// `Result` — the Parameter it was there to decide — bound by nothing at
-		// all. The construction's own match freshens too now, so the `Done`
-		// carries the caller's `State` as its Result and the loop finishes with
-		// it.
+		// `Step`'s first Parameter and `myCount`'s are both `State`. The Case
+		// construction freshens its Choice's Generics, so `#Done` binds `Result`
+		// rather than `Step`'s `State`.
 		it("freshens a Choice's own Generics against a same-named caller Generic", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				function myCount<State>(
@@ -1878,11 +1797,9 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("no-matching-overload")
 		})
 
-		// A Function literal in Argument position may leave its
-		// annotations out and take them from the parameter it is being passed
-		// to. An unannotated Parameter takes its label from there too, which
-		// is why `(item)` and `(_ item)` mean the same thing here and neither
-		// spelling has to know that `removeEvery`'s callback is labelless.
+		// A Function literal Argument may omit annotations and take them from
+		// its Parameter, label included, so `(item)` and `(_ item)` mean the
+		// same here.
 		describe("Contextual Function literals", () => {
 			it("infers a Parameter Type from the expected signature", () => {
 				expect(
@@ -1932,19 +1849,16 @@ describe("Enricher", () => {
 					constant standalone = (x) { <- x }
 				}`)
 
-				// One Diagnostic, not two — the return Type could not be
-				// inferred either, but only because the Parameter it depends
-				// on could not be, which is what the reported message says.
+				// One Diagnostic: the return Type fails only because the
+				// Parameter does.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.message),
 				).toEqual(["The Type of Parameter 'x' could not be inferred"])
 			})
 
 			it("reports an omitted return Type outside Argument position", () => {
-				// The body could answer this one — every Parameter is
-				// written — but a Type read off a body that nothing else
-				// constrains is what makes a Program hard to follow. Only an
-				// Argument, whose Type is written down elsewhere, may omit it.
+				// Only an Argument, whose Type is written elsewhere, may omit
+				// its return Type, even where the body could answer it.
 				expect(
 					diagnosticsFor(`implementation {
 						constant describe = (_ value: Integer) { <- value::toString() }
@@ -1963,11 +1877,8 @@ describe("Enricher", () => {
 			})
 
 			it("binds a Generic from an inferred return Type", () => {
-				// The hard case, and the one `map` needs. `Item` is
-				// bound by the receiver, which types the Parameter; nothing
-				// binds `Target` but this literal's own body, so the body is
-				// what `Target` is read off — String here, which then decides
-				// the Type of the whole invocation.
+				// The case `map` needs. The receiver binds `Item`, and only the
+				// literal's body binds `Target`, which then types the invocation.
 				expect(
 					typeOfFirstConstant(`implementation {
 						namespace Mapper<infer Item> for List<Item> {
@@ -1988,10 +1899,7 @@ describe("Enricher", () => {
 			})
 
 			it("unions the Types of several returns", () => {
-				// Two returns of unrelated Types — an Integer and a
-				// String — is all this needs; what it is about is that the
-				// literal's return Type is read as the Union of every return
-				// its body makes, not off the first one the walk reaches.
+				// The return Type is the Union of every return, not the first.
 				expect(
 					typeOfFirstConstant(`implementation {
 						namespace Mapper<infer Item> for List<Item> {
@@ -2041,13 +1949,10 @@ describe("Enricher", () => {
 				).toEqual({ type: "String" })
 			})
 
-			// Resolution probes EVERY Namespace declaring the Method,
-			// including the ones it goes on to reject — an unannotated literal
-			// matches whatever Parameter Type it is probed against, so each
-			// probe resolves it differently. Only the winning Namespace's
-			// resolution may reach the literal's body: it decides which
-			// Namespace `item::toString()` is looked up in, and the receiver
-			// the Rewriter actually passes is the winner's.
+			// Every declaring Namespace is probed, and each types the
+			// unannotated literal differently. Only the winner's reading reaches
+			// the body. See "Probe recordings" in
+			// packages/compiler/src/enricher/DEVELOPMENT.md.
 			it("types the literal by the Namespace that won, not the last probed", () => {
 				let source = `implementation {
 					namespace IntApplier for Integer {
