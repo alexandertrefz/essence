@@ -9553,9 +9553,6 @@ function inferReturnTypeFromBody(
 // #endregion
 
 // #region Invocation, contextual Function & CaseValue resolution
-// Typing an Invocation, a contextual Function literal, a Case value, Namespace
-// Property values or an Alias predicate enriches Expressions, so it lives here.
-// The enricher imports the resolver, never the other way round.
 
 // A written List, Dictionary or Record literal's Node with the Type a call
 // decided for its Parameter, or null. A Node built from other Nodes keeps their
@@ -9579,12 +9576,9 @@ function decidedLiteralNode(
 	return null
 }
 
-// Enriches each Argument value at most once per invocation resolution.
-// The typed Node is reused for every overload probe and, afterwards, for the
-// final typed Invocation. A Function literal that omitted its annotations is the
-// exception: it reacts to the expected Type, so it is re-resolved against each
-// probe's Parameter Type — its final typed Node is built later from the
-// resolution the winning probe recorded.
+// Enriches each Argument value at most once per Invocation, reusing the typed
+// Node for every overload probe and the final Node. A Function literal without
+// annotations is re-resolved per probe and built from the winner's recording.
 type ArgumentTyper = {
 	getType: (
 		value: parser.ExpressionNode,
@@ -9594,42 +9588,29 @@ type ArgumentTyper = {
 	enrichArgumentNode: (
 		argument: parser.ArgumentNode,
 	) => common.typed.ArgumentNode
-	// The enriched value of one Argument, for a candidate that has to look
-	// at what was WRITTEN rather than only at the Type it came to — a Record
-	// Literal carrying path keys, whose merge is what decides whether it fits.
-	// The very Node `enrichArgumentNode` will commit, from the one cache.
+	// The enriched value of one Argument, from the same cache. A candidate may
+	// need to see what was written, such as a Record Literal with path keys.
 	enrichedArgumentValue: (
 		value: parser.ExpressionNode,
 	) => common.typed.ExpressionNode
-	// Whether any Argument of this Invocation typed as Error, which is
-	// the poison value a Diagnostic already reported. `matchTypes` lets an
-	// Error match anything — including a Type Parameter, which it then leaves
-	// UNBOUND — so an Invocation asks this before reporting that a Type
-	// Parameter could not be inferred. The answer is only meaningful once the
-	// Arguments have been matched, which is where every Type is asked for.
+	// Whether any Argument typed as Error. An Error matches anything and leaves
+	// a Type Parameter unbound, so this is asked before reporting one as
+	// uninferable.
 	hasErrorArgument: () => boolean
-	// Runs `probe` with that answer held aside, and reports what the probe
-	// alone saw. An Argument can type as Error against ONE candidate's Parameter
-	// Types and fine against another's, so the Error belongs to the candidate
-	// until a candidate is committed — `noteErrorArgument` is how the committed
-	// one hands it back to the Invocation.
+	// Runs `probe` with that answer held aside. An Argument may be an Error
+	// under one candidate only; `noteErrorArgument` hands the committed one's
+	// back.
 	probeErrorArguments: <Result>(probe: () => Result) => {
 		result: Result
 		sawErrorArgument: boolean
 	}
 	noteErrorArgument: () => void
-	// Writes the Type a finished call decided for a Parameter onto the
-	// Argument Node standing at it, where that Node is a written container
-	// Literal with a slot nobody had decided. See `decideWrittenArguments`.
+	// Writes the Type a finished call decided onto a written container Literal
+	// at that Parameter; see `decideWrittenArguments`.
 	decideArgument: (value: parser.ExpressionNode, decided: common.Type) => void
-	// What the position AROUND the Invocation asks it to be — a
-	// Declaration's annotation, the enclosing Function's declared return Type —
-	// and null where the position says nothing. Read by `decidedSeedBindings`
-	// alone, which is the one question an Invocation's own Type Parameters can
-	// have an answer to out there: a Parameter bound to a Type with a slot the
-	// Arguments left open (`Answer := List<Unknown>` off a `startingWith []`) is
-	// decided by what the call is written INTO. Every other Expression reads the
-	// expected Type where it is enriched, so it never travels this far.
+	// What the position around the Invocation asks it to be, or null. Read only
+	// by `decidedSeedBindings`, for a Type Parameter the Arguments left open,
+	// such as `List<Unknown>` from `startingWith []`.
 	expectedType: common.Type | null
 }
 
@@ -9644,15 +9625,9 @@ function makeArgumentTyper(
 	>()
 	let sawErrorArgument = false
 
-	// And a Function literal whose BODY was refused counts as one too. It
-	// is typed `(String) -> Error` rather than `Error` — the Parameters read
-	// fine, it is what the body answers that did not — so the gate that keeps
-	// `uninferable-type-parameter` off an already-reported Argument did not
-	// catch it, and `words::map((w) { <- w.length })` was answered three times
-	// about one `.`. Only the RETURN position is read: an Error anywhere else
-	// inside a Type is not a report anybody made about this Argument, and the
-	// `loop` whose callback never answers `#Done` really does leave a Type
-	// Parameter unbound with nothing else said about it.
+	// A Function literal whose body was refused counts too: it is typed with an
+	// Error return Type. Only the return position counts, since an Error
+	// elsewhere was not reported about this Argument.
 	function noteErrors(type: common.Type): common.Type {
 		if (
 			type.type === "Error" ||
@@ -9664,11 +9639,8 @@ function makeArgumentTyper(
 		return type
 	}
 
-	// An Argument written as a Record Literal is a Literal MERGED into
-	// whatever the Parameter's default fills in, which is what lets it carry
-	// path keys. The position is decided here, where the Expression is known to
-	// be an Argument; whether the default reaches the member a path names is the
-	// committed Parameter's business, one stage on.
+	// A Record Literal Argument merges into the Parameter's default, so it may
+	// carry path keys.
 	function enrichOnce(
 		value: parser.ExpressionNode,
 	): common.typed.ExpressionNode {
@@ -9685,20 +9657,12 @@ function makeArgumentTyper(
 		return cached
 	}
 
-	// The Type this written value is admitted at, for the Type its
-	// position demands. Asked again and again — once per Overload candidate, then
-	// once more for the winner as the committed Argument is matched — and a pure
-	// question about a literal, so the answer is kept.
-	//
-	// Keyed by the position's SPELLING, which is its printing identity —
-	// Arguments and all, because a generic refined Alias stands for a different
-	// Type at every one of them: `NonEmptyList<Integer>` and `NonEmptyList<String>` are
-	// one name and two questions about a written List, and keyed by the name alone
-	// the first Overload probed decided both. Two refinements one Argument
-	// position could be matched against under a single SPELLING would have to be
-	// declared in two Modules and added to one Namespace's Overloads from both,
-	// and the Validator asks the whole committed call the same question again
-	// afterwards.
+	// The Type this written value is admitted at, kept per position spelling,
+	// since each candidate asks again. The spelling includes Type Arguments,
+	// because `NonEmptyList<Integer>` and `NonEmptyList<String>` are different
+	// questions. Two refinements spelled alike, from two Modules in one
+	// Overload, would share an answer; the validator asks the committed call
+	// again.
 	function admitted(
 		value: parser.ExpressionNode,
 		expectedType: common.Type,
@@ -9726,45 +9690,9 @@ function makeArgumentTyper(
 		return bySpelling.get(spelling) ?? null
 	}
 
-	// An Argument's position is the Parameter Type of whichever candidate
-	// wins, and that is not known while the candidates are still being probed. A
-	// prefixed Case construction reads its Choice's Type Arguments off exactly
-	// that position, so each probe asks silently and RECORDS the Parameter Type
-	// that decided — the winner's recording is committed, and the one real
-	// enrichment below runs under it and reports what is left to report.
-	//
-	// A probe that decides but whose payload does not FIT what it decided answers
-	// with the DECLARED Case all the same: a Case's members are what an Argument
-	// is matched by, and the mismatch is the Validator's, one stage too late to
-	// keep a candidate from winning on it. `take(Box#Full(5))` against a
-	// `Box<String>` overload beside a `Box<Integer>` one picked the String one
-	// otherwise, and then reported the Integer payload for not being a String. It
-	// is still RECORDED, so a call where no candidate fits commits a decided
-	// context and reports the one Diagnostic it has rather than that one and
-	// `undecided-type-arguments` on top.
-	//
-	// A Parameter Type that still mentions the CALL's own unsolved Type
-	// Parameters is no decision at all, and recording it committed the undecided
-	// state the whole rail exists to refuse: `take(Holder#Full(1))` against
-	// `take<infer Item>(_ h: Holder<Item>)` became a `Holder<Item>#Full` whose
-	// payload was then forbidden from deciding `Item`, so nothing ever did — the
-	// Validator compared the payload against a Type Parameter and codegen emitted
-	// a call forwarding a conformance witness no caller declares. It is refused
-	// here instead, which leaves the construction to report
-	// `undecided-type-arguments` for itself, and answered with an Error so that
-	// the unsolved Parameter does not report a second time as uninferable and the
-	// return Type it appears in does not carry it onward.
-	//
-	// A bare form CARRYING a payload asks here too, though its payload is
-	// what answers when the position says nothing. It used to skip the rail
-	// altogether, on the grounds that its payload decides — but a payload decides
-	// only what it MENTIONS, so `steps::contains(#Done(2))` leaked the `State`
-	// its prefixed twin reads straight off the Parameter Type and was refused
-	// for it. Where the position decides nothing — an unrelated Parameter Type, an
-	// instantiation the payload does not fit, one still mentioning the call's own
-	// unsolved Parameters — `payloadDecidedCaseType` answers instead, and no
-	// recording is left behind: the enrichment pass reads that recording back, and
-	// a position that decided nothing must not be what it reads.
+	// What one candidate's Parameter Type makes of a Case construction,
+	// recording the position it decided. See "Arguments that read their
+	// position" in DEVELOPMENT.md.
 	function probedCaseValueType(
 		node: parser.CaseValueNode,
 		expectedType: common.Type,
@@ -9777,10 +9705,8 @@ function makeArgumentTyper(
 		let payloadDecides = node.choice === null && node.value !== null
 
 		if (result.type === "Case") {
-			// A Case still carrying its Choice's `choiceGenerics` is the
-			// DECLARED one — the bare scan's answer where the position named no
-			// such Case at all, and the one shape that reaches here undecided
-			// without mentioning an unsolved Parameter of the call.
+			// A Case still carrying `choiceGenerics` is the declared one, which
+			// the position did not decide.
 			if (
 				mentionsUnsolvedTypeParameter(result) ||
 				result.choiceGenerics !== undefined
@@ -9790,24 +9716,16 @@ function makeArgumentTyper(
 					: { type: "Error" }
 			}
 
-			// Read under what this candidate decided, which is the Type
-			// the real enrichment will read it under too — a nested construction
-			// is only itself once its own position is decided. Where arm
-			// selection already read it under this very Case, that reading
-			// answers.
+			// Read under what this candidate decided, as the real enrichment
+			// will. Arm selection may already have read it.
 			let payloadType = payload.typeUnder(result)
 			let fits =
 				payloadType === null ||
 				payloadFitsCase(result, payloadType, payload.valueUnder(result))
 
-			// The prefixed form is recorded even where its payload does
-			// not fit — the paragraph above says why. The bare one is not: it
-			// falls back on reading its payload from here, and the enrichment
-			// pass reads this recording back, so a recording left behind is the
-			// position the fallback was made FOR deciding the construction
-			// anyway. `1::take(#Full(5))` between a `Box<String>` overload and a
-			// `Box<Integer>` one became a `Box<String>#Full` that way, off the
-			// candidate it does not fit and never picked.
+			// A prefixed form is recorded even where its payload does not fit.
+			// A bare form is not, since the enrichment would read the recording
+			// back and let a candidate it does not fit decide it.
 			if (fits || !payloadDecides) {
 				recordContextualCaseValueType(node, { expectedType, bindings })
 			}
@@ -9830,19 +9748,8 @@ function makeArgumentTyper(
 		return declared
 	}
 
-	// What one candidate's Parameter Type makes of a member path. The
-	// position is RECORDED wherever it names a Function of one Parameter, even
-	// where the steps do not read against it — the enrichment pass reads the
-	// recording back to report, and a path left with no recording at all would
-	// be told it stands where no Function is expected, which would be a message
-	// about the wrong thing. The same reason a prefixed Case construction
-	// records a position its payload does not fit.
-	//
-	// A path whose steps do not read answers Error rather than a Function with
-	// an Error inside it: an Error matches every Parameter there is, so the
-	// candidate is decided by the Arguments that ARE readable, and the one
-	// Diagnostic reported is the path's own rather than a cascade about the call
-	// it stood in.
+	// What one candidate's Parameter Type makes of a member path. See
+	// "Arguments that read their position" in DEVELOPMENT.md.
 	function probedMemberPathType(
 		node: parser.MemberPathNode,
 		expectedType: common.Type,
@@ -9868,22 +9775,9 @@ function makeArgumentTyper(
 		return memberPathSignature(rootType, returnType)
 	}
 
-	// What the payload ALONE makes of a bare construction — the fallback for
-	// the candidate whose position decided nothing. Read here, silently and kept
-	// nowhere, rather than by enriching the construction for real: that enrichment
-	// is the one the committed Argument Node is built from and it happens exactly
-	// once, so a probe that ran it early reported from a position no candidate
-	// committed to and handed its answer to every candidate after. A `take(_:
-	// String)` Overload declared ahead of a `take(_: Pair<Integer, Integer>)` one
-	// refused `#Left({ a = 1 })` for the `B` its payload leaves standing that way,
-	// while the very Overload that decides both went on to win — a call that
-	// resolved or not by the order the Overloads were written in.
-	//
-	// A Parameter the payload left standing is answered as an Error, which is what
-	// the prefixed rail answers an undecided position with and for the same reason:
-	// the candidate must not win on a reading nothing decided, and the unsolved
-	// Parameter must not report a second time as uninferable. The refusal itself is
-	// the enrichment pass's, under whatever the committed call decided.
+	// What the payload alone makes of a bare construction, read silently and
+	// kept nowhere, so no probe enriches the committed Node early. A Type
+	// Parameter it leaves open answers an Error.
 	function payloadDecidedCaseType(
 		node: parser.CaseValueNode,
 		payload: PayloadReadings,
@@ -9917,13 +9811,9 @@ function makeArgumentTyper(
 	return {
 		expectedType,
 		getType(value, expectedType, bindings = null) {
-			// A Function literal with omitted annotations reacts to the
-			// expected Type, and it may resolve differently per probe, so it is
-			// resolved fresh here rather than enriched once.
-			// `resolveFunctionValueType` records the resolution AND the position
-			// it was resolved against, which the final enriched Node reads back
-			// as the finished call decided it. An Expression that reacts to
-			// nothing is enriched once, and its one Type serves every probe.
+			// A Function literal without annotations is resolved fresh per
+			// probe. `resolveFunctionValueType` records the resolution and its
+			// position for the final Node.
 			if (
 				value.nodeType === "FunctionValue" &&
 				needsContext(value.value)
@@ -9938,23 +9828,16 @@ function makeArgumentTyper(
 				)
 			}
 
-			// A Case construction reacts too, whichever way it is
-			// spelled. The prefixed form and the bare unit sigil have nothing
-			// of their own to read their Choice's Type Arguments off and take
-			// the position's answer whatever it is; the bare form carrying a
-			// payload asks the position first and reads its payload where the
-			// position decided nothing.
+			// A Case construction reads its position too. See "Arguments that
+			// read their position" in DEVELOPMENT.md.
 			if (value.nodeType === "CaseValue") {
 				return noteErrors(
 					probedCaseValueType(value, expectedType, bindings),
 				)
 			}
 
-			// So does a member path, which is the Function the position
-			// asks for, so the position is the only thing that says what it
-			// reads its members off. Asked silently: the enrichment pass reads
-			// the very recording this leaves behind and reports there, once,
-			// under whichever candidate the call committed to.
+			// So does a member path. Asked silently; the enrichment reports
+			// under the committed candidate.
 			if (value.nodeType === "MemberPath") {
 				return noteErrors(
 					probedMemberPathType(value, expectedType, bindings),

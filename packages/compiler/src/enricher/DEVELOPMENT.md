@@ -4,6 +4,11 @@ The enricher turns parser Nodes into typed Nodes. Where it sits in the pipeline,
 is in `packages/compiler/DEVELOPMENT.md`. This page holds the reasoning behind the code in this directory. Paths
 are relative to `packages/compiler/src/enricher` unless they name another directory.
 
+`enrichers.ts` enriches Nodes, and `resolvers.ts` resolves written Types and looks names up. Typing an
+Invocation, a contextual Function literal, a Case value, Property values or an Alias predicate enriches
+Expressions, so that code lives in `enrichers.ts`. The enricher imports the resolver, never the
+other way round.
+
 ## Case construction
 
 A Case construction such as `Box#Full(1)` resolves its Case before it reads its payload, in `enrichCaseValue`.
@@ -426,3 +431,39 @@ caller then stays silent about the return Type, so one mistake is not reported t
 out of that test (`undecidedWithoutAReturnType`): `ambiguous-case` and `undecided-type-arguments`. This pass
 causes them by reading without an expected Type, and the real pass silences them through `positionWasRefused`.
 Counting them would leave a body like `((value) { <- #Value(value) })` with no report at all.
+
+## Invocation and overload selection
+
+### Arguments that read their position
+
+`makeArgumentTyper` enriches each Argument once per Invocation and reuses the typed Node for every overload
+probe and for the final Node. Three kinds of Argument read the position they stand in, which is the Parameter
+Type of whichever candidate wins. They are re-read against each candidate, silently, and each probe records the
+Parameter Type it read them under. The enrichment of the committed call then reads the winner's recording back
+and reports once.
+
+- A Function literal without annotations is resolved against each candidate's Parameter Type
+  (`resolveFunctionValueType`).
+- A Case construction reads its Choice's Type Arguments off the position (`probedCaseValueType`).
+- A member path reads its first member off the Parameter of the Function the position expects
+  (`probedMemberPathType`).
+
+A prefixed construction, or a bare one without a payload, takes the position's answer. A recording is kept even
+where the payload does not fit, because a Case's members are what an Argument is matched by. That way
+`take(Box#Full(5))` picks the `Box<Integer>` Overload over a `Box<String>` one. Where no candidate fits, the
+committed recording still decides the Case, so the call reports one mismatch rather than an undecided Case too.
+
+A Parameter Type that still mentions the call's own unsolved Type Parameters is no decision. Recording it would
+build a `Holder<Item>#Full` whose payload could not decide `Item`. The probe answers an Error instead and
+records nothing, so the construction reports `undecided-type-arguments` for itself. The Error also keeps the
+Type Parameter from being reported a second time as uninferable.
+
+A bare construction with a payload asks the position first, since a payload decides only the Type Parameters it
+mentions. Where the position decides nothing, `payloadDecidedCaseType` reads the payload alone, silently, and
+answers an Error for a Type Parameter it leaves open. No recording is left behind then, so the enrichment does
+not read a position that decided nothing. A bare construction whose payload does not fit a candidate leaves no
+recording either. So a candidate it does not fit can not decide it.
+
+A member path records any position that names a Function of one Parameter, even where its steps do not read
+there. The enrichment then reports about the steps rather than about a missing context. A path whose steps do not read
+answers an Error, which matches every Parameter, so the readable Arguments decide the candidate.
