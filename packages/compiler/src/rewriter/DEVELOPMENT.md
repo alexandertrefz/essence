@@ -369,3 +369,58 @@ such as a Boolean's value, a List's count and a counted walk's bounds.
 the box apart again without building it. It must be by identity, not by shape. `Integer.createInteger` also
 boxes a counted walk's index, which may be a bigint holding a safe value, and stripping that call would skip
 its canonicalisation.
+
+## Naming a Namespace member
+
+Every emitted reference to a Namespace member goes through `namespaceMember`: a call, a dispatch branch, a
+witness entry and a devirtualised Method. It answers, in this order:
+
+1. A Method a Protocol provided, when the caller passes `providedBy`, is the Protocol's const. It is asked
+   first, because a Namespace may have the same name and every later question is asked by name.
+2. A Record Method that routes members through their own conformances becomes `$helpers.boundRecordIs` or
+   `$helpers.boundRecordToString`, curried with the member names. `Record.es` writes no `isNot`; Equatable's
+   provided `isNot` reads `is` off the witness, so routing needs no negation of its own.
+3. A Choice's derived equality names a Namespace that exists nowhere, so it becomes `$helpers.choiceIs` or
+   `$helpers.choiceIsNot`. A generic Choice has a descriptor and becomes `boundChoiceIs` or
+   `boundChoiceIsNot`, curried with it.
+4. A derived `Enumerable` becomes `$helpers.choiceCases`, curried with the Case tags, since a static Method
+   has no receiver to read them off.
+5. A derived `Printable` becomes `$helpers.choiceName`.
+6. A bodied standard library member becomes its `$es_` const.
+7. A native with a shim becomes the shim: any shim when the call leaves an Argument out, and only a merging
+   shim otherwise.
+8. Anything else is a read off the Namespace's import or class.
+
+Steps 2, 6 and 7 are skipped when a user Namespace shadows the standard library's name. A user's
+`namespace List for Integer { contains(…) }` must reach its own class, not `$es_List_contains`. The same
+lexical scope decides how the Namespace's Identifier is spelled.
+
+Literal constructors such as `String.createString` do not go through `namespaceMember`. They are not
+declared in the standard library's sources, so they can never have a body there.
+
+A witness always calls at the requirement's full arity, so it never asks for a shim that fills in left-out
+Arguments.
+
+## Record and Dictionary updates
+
+`rewriteCombination` emits `{ base with … }` as it stands when `collapse-combinations` is off. The base's
+Type decides between a Record and a Dictionary update. A Refinement is erased first, as `enrichCombination`
+does: `[base with "a" = 1]` standing where a `NonEmptyDictionary` is wanted is still a Dictionary update.
+
+A Record update whose right-hand side is a Record Literal carries exactly the members its Type names, so it
+becomes `Object.assign({}, lhs, rhs)`. Writing the members out one by one is the optimiser's work.
+
+Any other right-hand side is projected by `projectedCombination`: a spread of the base, then one read per
+member the right-hand side's Type declares. Record assignability is width subtyping, so a value of
+`{ port: Integer }` may carry other members. Spreading it whole could overwrite a member of the result with
+a value of the wrong Type. Projection is a matter of meaning, so it happens with every pass off too.
+The spread of the base carries the result's Type key. A right-hand side that is a bare name is read once
+per member. Anything else is computed once, through an arrow whose Parameters `_lhs` and `_rhs` hold both
+operands in written order. The `_` keeps them apart from every Essence name.
+
+A Dictionary is a store with an order, so `rewriteDictionaryCombination` adds to one by calling it.
+`[ages with "kim" = 7, "sam" = 9]` becomes `set` over `set`, and `[ages with other]` becomes the first `merge`
+Overload. Each call receives the base's key witness, since each `set` compares against the keys the store
+already holds. The witness is rewritten once per call, so no two positions share a node; `pool-constants`
+turns it into a reference to one const. A `null` witness stands for an update over a Dictionary whose key
+Type is not yet decided, which holds no key to compare.

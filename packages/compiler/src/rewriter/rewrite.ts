@@ -2917,29 +2917,11 @@ function rewriteCaseValue(
 	}
 }
 
-// Whether this witness names a Namespace whose `is` is the STRUCTURAL
-// one, and is the EQUATABLE one — a Namespace conforms to several Protocols and
-// only the Equatable witness is ever handed to a Dictionary. `Equatable`
-// declares exactly `is` and `isNot`, so the two names it fulfils, wherever they
-// come from, are what identify it.
-//
-// The two lists live in `helpers/conformance.ts`, beside the Enricher's routing
-// rule that reads them too: a member left unrouted because its conformance is
-// structural and a Dictionary key encoded because it is are the same claim, and
-// two copies of the list would be two places that can disagree about it.
-//
-// A conditional conformance is refused unless its Namespace is on the second
-// list, where the brand means "structural if the conditions are". Nothing else
-// conditional may carry it: `boundConformance` walks a witness's entries and
-// curries each as a FUNCTION, so a brand it does not know to lift out would be
-// called.
-//
-// A user Namespace SHADOWING a name on either list is excluded by the same
-// lexical answer every member read is decided by: `namespace String for
-// NonEmptyString is Equatable { is … }` declared inside a Function arrives here
-// as `String`, and branding it would hand the Dictionary an encoding that
-// ignores the very `is` the Program wrote. The derived name carries a `_` no
-// Essence source can spell, so it can not be shadowed.
+// Whether this is an `Equatable` witness, fulfilling exactly `is` and
+// `isNot`, of a Namespace on the structural lists in `helpers/conformance.ts`.
+// A conditional one needs the conditional list: `boundConformance` keeps the
+// brand wherever every condition is structural, which is right only for those
+// Namespaces. A shadowing user Namespace never counts.
 function isStructurallyEquatable(
 	node: common.typedSimple.ConformanceValueNode,
 ): boolean {
@@ -2960,18 +2942,13 @@ function isStructurallyEquatable(
 	return fulfilled.size === 2 && fulfilled.has("is") && fulfilled.has("isNot")
 }
 
-// Every read of a witness entry spells the name by `namespaceMemberName`:
-// a call through `namespaceMember`, and a static read in `rewriteLookup`. The
-// key a witness is built with is spelled the same way.
+// A witness key, spelled by `namespaceMemberName` like every read of one.
 function witnessKey(methodName: string): estree.Identifier | estree.Literal {
 	return memberKey(namespaceMemberName(methodName))
 }
 
-// A conformance value is an object literal that maps each Protocol
-// Method's emitted name onto the conforming Namespace's fulfilling Method —
-// `{ compare: Integer.compare, … }`. This works uniformly for user
-// Namespaces (classes with static Methods) and builtin runtime modules, and
-// decouples the Protocol's method names from the Namespace's layout.
+// A witness maps each Protocol Method's name onto the conformer's Method,
+// as in `{ compare: Integer.compare, … }`.
 function rewriteConformanceValue(
 	node: common.typedSimple.ConformanceValueNode,
 ): estree.ObjectExpression | estree.CallExpression {
@@ -2986,10 +2963,8 @@ function rewriteConformanceValue(
 		return witness
 	}
 
-	// OUTSIDE `boundConformance`, never inside it: a provided const takes
-	// the witness of `Self` alone, and the conditions belong to the Methods the
-	// Namespace WROTE. Wrapping the other way round would curry a `where`
-	// condition's witness onto a body that never declared one.
+	// Outside `boundConformance`: a provided const takes only `Self`'s
+	// witness, while the conditions belong to the Methods the Namespace wrote.
 	return {
 		type: "CallExpression",
 		optional: false,
@@ -3162,9 +3137,8 @@ function rewriteWitnessMethods(
 ): estree.ObjectExpression | estree.CallExpression {
 	let methodMap = witnessMethodMap(node)
 
-	// An unconditional witness is the plain method-map literal, so its
-	// emission stays byte-identical. A conditional one is
-	// `$type.boundConformance(<map>, [<witnesses>])`, which curries each on.
+	// A conditional witness is `$type.boundConformance(<map>, [<witnesses>])`,
+	// which curries each condition on.
 	if (node.conditions.length === 0) {
 		return methodMap
 	}
@@ -3219,18 +3193,9 @@ function witnessMethodMap(
 		),
 	}
 
-	// The brand a Dictionary reads. Its runtime encodes a key of an
-	// encodable kind into one Map lookup, and that shortcut is only sound while
-	// the key Type's `is` is the structural one this witness fulfils — so the
-	// witness says so, rather than the runtime guessing from a tag it can not
-	// tell an override by. A witness without the brand sends every lookup down
-	// the scan path, which asks `conformance.is` and is right for any `is` at
-	// all. See `encodeKey` in `packages/runtime/src/keyEncoding.ts`.
-	//
-	// It rides on the method map so it survives `providedConformance`, which
-	// spreads this object into the witness it builds — and so that
-	// `boundConformance` below can read it off a CONDITIONAL map and put it on
-	// the bound witness only where the conditions carry it too.
+	// The `structural` brand lets a Dictionary encode keys into one Map lookup,
+	// as `encodeKey` does; without it every lookup scans with `is`. It rides on
+	// the map so `providedConformance` and `boundConformance` carry it.
 	if (isStructurallyEquatable(node)) {
 		methodMap.properties.push({
 			type: "Property",
@@ -3257,9 +3222,8 @@ function rewriteVariableAssignmentStatement(
 	}
 }
 
-// A read off the runtime `functions` module (`$_.<name>`) — the one place
-// a free Function bound to the runtime is reached. The `$_` import is emitted
-// unconditionally at the top of every Program.
+// A native free Function, read off the runtime `functions` module as
+// `$_.<name>`.
 function functionsModuleMember(name: string): estree.MemberExpression {
 	return {
 		type: "MemberExpression",
@@ -3279,12 +3243,7 @@ function functionsModuleMember(name: string): estree.MemberExpression {
 function rewriteFunctionInvocation(
 	node: common.typedSimple.FunctionInvocationNode,
 ): estree.CallExpression {
-	// A native free Function is a read off the runtime `functions` module,
-	// exactly as a native Method is a read off its Namespace import. Its callee is
-	// a bare Identifier — already `__overload$N`-mangled by the Simplifier when it
-	// was overloaded — so the native set is consulted by that emitted name. Every
-	// other callee (a user Function, an Essence-bodied one, a Function-valued
-	// Expression) stays whatever `rewriteExpression` makes of it.
+	// A native free Function's callee is a bare, already mangled Identifier.
 	let callee: estree.Expression =
 		node.name.nodeType === "Identifier" &&
 		nativeFreeFunctionNames().has(node.name.name)
@@ -3299,11 +3258,8 @@ function rewriteFunctionInvocation(
 	}
 }
 
-// `Namespace.member(…)` — a static Method, or an instance one reached
-// through its Namespace — is a Lookup, and a Lookup on its own has no call to
-// read. So the one thing a call knows and a Lookup does not is handed over
-// here: whether this call left an Argument out, which is what decides between
-// the native read and the shim holding its defaults.
+// The callee of `Namespace.member(…)`. Only the call knows whether it left an
+// Argument out, which decides between the native and its shim.
 function calleeExpression(
 	node: common.typedSimple.FunctionInvocationNode,
 ): estree.Expression {
@@ -3319,12 +3275,8 @@ function calleeExpression(
 			undefined,
 			true,
 		)
-		// The Position `rewriteExpression` would have attached, put back
-		// by hand — this is the one callee built without going through it, and
-		// the source map's segment for the head of the call is what it carries.
-		// Without it a `Namespace.member(…)` that omits an Argument emits a
-		// statement whose first column maps to nothing, and a debugger stepping
-		// into the entry runs straight past the line the author wrote.
+		// Built outside `rewriteExpression`, so its `loc` is attached here, or
+		// a debugger would step past the call.
 		let loc = locOf(node.name.position)
 
 		if (loc !== undefined) {
@@ -3337,54 +3289,31 @@ function calleeExpression(
 	return rewriteExpression(node.name)
 }
 
-// The runtime helper each routed Record Method answers to. Two names
-// rather than three: `Record.es` writes `is` and `toString` and no `isNot`, so
-// the negation is `Equatable`'s own PROVIDED body, which reads `is` off the
-// very witness it is curried with — a routed one included. That is why nothing
-// here has to negate anything, and why the two answers can not drift apart.
+// The runtime helper each routed Record Method answers to. `isNot` is
+// `Equatable`'s provided body, which reads the routed `is`.
 const recordRoutingHelperNames: Record<string, string> = {
 	is: "boundRecordIs",
 	toString: "boundRecordToString",
 }
 
-// One reference to a member of a standard library Namespace, in the one
-// place every emission site routes through. A native member — Method or static
-// Property — stays a read off the plain `import * as <Namespace>`, which esbuild
-// rewrites to a direct symbol reference and can therefore tree-shake, while an
-// Essence-implemented one is not a member of anything: it is its own top-level
-// const, reached by a bare `$es_<Namespace>_<member>` Identifier, so nothing has
-// to materialise the module namespace object to get at it. The literal constructors
-// (`String.createString`, `List.createList`, …) do NOT come through here: they
-// name their Namespace directly and are not declared in `packages/standard-library/sources`, so they
-// can never be Essence-implemented.
+// One reference to a Namespace member, for every emission site. See "Naming
+// a Namespace member" in DEVELOPMENT.md.
 function namespaceMember(
 	namespaceName: string,
 	memberName: string,
 	derivedDescriptor?: common.DerivedEquatableDescriptor,
-	// Set only where the CALL left an Argument out. A native Method that
-	// declares a default has a shim beside the prelude holding that default, and
-	// this is the one question that routes to it — so a call writing every
-	// Argument still emits the plain member read it always did, tree-shakeable
-	// exactly as before, and only the call that needs the frame pays for one.
-	// A conformance witness passes nothing here on purpose: a witness is called
-	// at the requirement's full arity, always.
+	// Set only where the call left an Argument out, which routes a native to
+	// its shim.
 	omitsArguments: boolean = false,
-	// The Protocol that PROVIDED this Method, when one did. It is the
-	// same string as `namespaceName` — and that is exactly why it is passed:
-	// a Namespace may be spelled like a Protocol, and only the caller knows
-	// which of the two answered.
+	// The Protocol that provided this Method, since a Namespace may share its
+	// name.
 	providedBy?: string,
-	// The Case tags a derived `Enumerable::cases` is curried with. Set by
-	// the two sites that reach that derive — a Lookup and a conformance witness
-	// — and by nothing else.
+	// The Case tags a derived `Enumerable::cases` is curried with.
 	derivedCases?: Array<string>,
-	// The DECLARED member names a Record routes, in declaration order. Set
-	// by the same two kinds of site the descriptor is, and by nothing else.
+	// The declared member names a Record routes, in declaration order.
 	derivedMembers?: Array<string>,
 ): estree.Expression {
-	// A Protocol's provided Method, whose const is named out of the
-	// Namespace scheme's way. Asked first, because a Namespace of the same name
-	// may well be in the prelude and every question below is asked by name.
+	// Asked first, because every later question is asked by name.
 	if (providedBy !== undefined) {
 		return {
 			type: "Identifier",
@@ -3392,17 +3321,9 @@ function namespaceMember(
 		}
 	}
 
-	// A Record that routes a declared member through that member's own
-	// conformance. The Namespace is still the builtin `Record` — a Record
-	// conforms conditionally on its members exactly as a List conforms
-	// conditionally on its items — so the routing is named by the member list
-	// rather than by a Namespace nobody declared, and a Record that routes
-	// NOTHING never arrives here at all and emits the native it always did.
-	//
-	// Curried with the member names, so the member witnesses arrive as the
-	// helper's trailing Parameters — appended directly at a plain call, or
-	// curried on by `boundConformance` at a bounded one. That is the same shape
-	// the widened `boundChoiceIs` takes its descriptor in.
+	// A Record routing members through their own conformances. The helper
+	// is curried with the member names, and the member witnesses arrive as its
+	// trailing Parameters.
 	if (
 		derivedMembers !== undefined &&
 		namespaceName === "Record" &&
@@ -3425,17 +3346,10 @@ function namespaceMember(
 		}
 	}
 
-	// A Choice's derived equality names a Namespace that exists nowhere —
-	// the Enricher fabricates it per receiver and nothing is ever emitted for
-	// it — so the one reference to it becomes the runtime helper directly.
-	// Every emission site (a plain call, a dispatch branch, a conformance
-	// witness) routes through here, so this one redirect covers all three.
+	// A Choice's derived equality names a Namespace that exists nowhere.
 	if (namespaceName === derivedEquatableNamespaceName) {
-		// A *generic* Choice widens to the descriptor-driven helper, curried
-		// with the plan its payloads follow — the hidden conformance Arguments
-		// then arrive as its trailing Parameters. A non-generic Choice carries no
-		// descriptor and stays the byte-identical flat helper, so its emission
-		// never churns.
+		// A generic Choice's helper is curried with the descriptor its
+		// payloads follow; the witnesses arrive as trailing Parameters.
 		if (derivedDescriptor !== undefined) {
 			return {
 				type: "CallExpression",
@@ -3469,9 +3383,7 @@ function namespaceMember(
 		}
 	}
 
-	// And the Case-listing derive, which is the redirect the equality one
-	// is when it widens: the helper is curried with the tags, because a static
-	// Method has no receiver for the Choice to be read off at run time.
+	// Curried with the tags, since a static Method has no receiver.
 	if (namespaceName === derivedEnumerableNamespaceName) {
 		return {
 			type: "CallExpression",
@@ -3487,9 +3399,7 @@ function namespaceMember(
 		}
 	}
 
-	// And the printing derive, which is the same redirect with nothing to
-	// widen: every Case of the Choice carries no payload, so one helper reading
-	// the tag answers for all of them and no descriptor is ever curried on.
+	// Every Case of such a Choice is payload-free, so the tag answers.
 	if (namespaceName === derivedPrintableNamespaceName) {
 		return {
 			type: "MemberExpression",
@@ -3500,12 +3410,8 @@ function namespaceMember(
 		}
 	}
 
-	// The `$es_<Namespace>_<member>` const belongs to the STANDARD LIBRARY's
-	// Namespace of that name, so a user Namespace shadowing it must not be routed
-	// to one: `namespace List for Integer { contains(…) }` emitted
-	// `$es_List_contains(5, 5)` — the library's List.contains, run against an
-	// Integer — where the user's own class Method was written. The same lexical
-	// answer decides it as decides the Identifier below.
+	// A `$es_` const belongs to the standard library's Namespace, never to a
+	// user Namespace that shadows its name.
 	let essenceName = isShadowingUserNamespace(namespaceName)
 		? null
 		: (essenceMethodName(namespaceName, memberName) ??
@@ -3515,12 +3421,8 @@ function namespaceMember(
 		return { type: "Identifier", name: essenceName }
 	}
 
-	// A call that LEAVES an Argument out needs the frame the default is
-	// evaluated in, and a call that wrote every Argument does not — unless the
-	// default is a RECORD, which is merged into what the call wrote rather than
-	// standing in for it. `Http.send({ url = "…" })` writes its Argument and
-	// still needs the four members the default fills in, so a shim that merges
-	// one is named whatever the call left out. See `mergingNativeShimName`.
+	// A call that left an Argument out needs the shim, and so does every call
+	// of a native whose shim merges a Record default.
 	if (!isShadowingUserNamespace(namespaceName)) {
 		let shimName = omitsArguments
 			? nativeShimName(namespaceName, memberName)
@@ -3558,16 +3460,10 @@ function rewriteMethodInvocation(
 	}
 }
 
-// A Method Invocation on a Union-typed receiver — emitted as
-// `$type.dispatchMethod(receiver, [args…], [[descriptor, Namespace.method,
-// [conformances…], [[index, argument], …]], …])`. The helper evaluates receiver
-// and Arguments once and runs the first case whose member Type descriptor
-// accepts the receiver; the Enricher ordered the cases most specific first and
-// guarantees one matches.
-//
-// The fourth element is omitted where a branch has no Argument of its own
-// — which is every dispatch that passes no contextually typed Function literal
-// — so what such a call emits is unchanged, byte for byte.
+// A Method Invocation on a Union-typed receiver, as `$type.dispatchMethod(
+// receiver, [args…], [[descriptor, Namespace.method, [conformances…],
+// [[index, argument], …]], …])`. It runs the first case whose descriptor
+// accepts the receiver; the Enricher orders them most specific first.
 function rewriteUnionMethodInvocation(
 	node: common.typedSimple.UnionMethodInvocationNode,
 ): estree.CallExpression {
@@ -3620,14 +3516,8 @@ function rewriteUnionMethodInvocation(
 											dispatchCase.contextualArguments,
 										),
 									]),
-							// The Parameters THIS branch leaves out, as
-							// the runtime takes them — a fifth case element,
-							// emitted only where there are any, so a dispatch
-							// that omits nothing emits exactly what it always
-							// did. The fourth element has to stand for the
-							// fifth to be reachable, which is why an omission
-							// forces an (often empty) override array in front
-							// of it.
+							// The Parameters this branch leaves out, as a
+							// fifth element, which needs the fourth in front.
 							...(dispatchCase.omittedParameterIndices.length ===
 							0
 								? []
@@ -3653,10 +3543,8 @@ function rewriteUnionMethodInvocation(
 	}
 }
 
-// The Arguments one dispatch branch is given in place of the shared ones,
-// as the runtime takes them: a pair per Argument, naming the position it stands
-// in for. The position is the Argument's own index in the Invocation, which the
-// receiver — passed separately — is not part of.
+// A dispatch branch's own Arguments, as `[index, argument]` pairs. The index
+// does not count the receiver.
 function contextualArgumentOverrides(
 	contextualArguments: common.typedSimple.UnionMethodDispatchCase["contextualArguments"],
 ): estree.ArrayExpression {
@@ -3674,29 +3562,13 @@ function contextualArgumentOverrides(
 	}
 }
 
-// The un-optimised emission of `{ base with … }` — what a Program built
-// with `collapse-combinations` off, or with the whole Optimiser off, runs.
-//
-// A right-hand side written as a Record literal is exactly the members its Type
-// names, so `Object.assign({}, lhs, rhs)` copies the update and nothing else,
-// and it stays: writing the literal out member by member here would be
-// `collapse-combinations` performed by a stage that is not allowed to optimise.
-// Any OTHER right-hand side is projected, because that is not an optimisation —
-// spreading it whole is unsound, for the reason `projectedCombination` gives,
-// and a pass being off may not change what a Program means.
+// `{ base with … }` as written, for when `collapse-combinations` is off. See
+// "Record and Dictionary updates" in DEVELOPMENT.md.
 function rewriteCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
-	// The BASE is what says which of the two updates this is, read through
-	// the same erasure `enrichCombination` reads it through — that is where the
-	// two were told apart in the first place, and asking the same question the
-	// same way here is what keeps the two answers from ever disagreeing.
-	//
-	// The Combination's OWN Type would be one erasure short of it. A written
-	// receiver carries the proof it made of itself, and `[base with "a" = 1]`
-	// standing where a `NonEmptyDictionary` is wanted is exactly that: a
-	// Dictionary update wearing a Refinement, which reads as no Dictionary at
-	// all and would be `Object.assign`ed as though it were a Record.
+	// The base's Type, without its Refinement, decides which update this is,
+	// as in `enrichCombination`.
 	if (isDictionaryUpdate(node.lhs.type)) {
 		return rewriteDictionaryCombination(node)
 	}
@@ -3737,8 +3609,7 @@ function rewriteCombination(
 }
 
 // Whether a Combination with a base of this Type is a Dictionary update.
-// `essenceMethodReferences` asks it too, so the edges it draws follow the calls
-// emitted here.
+// `essenceMethodReferences` asks it too, so its edges follow these calls.
 function isDictionaryUpdate(lhsType: common.Type | undefined): boolean {
 	let baseType = lhsType?.type === "Refinement" ? lhsType.base : lhsType
 
@@ -3750,27 +3621,13 @@ function isDictionaryUpdate(lhsType: common.Type | undefined): boolean {
 const dictionaryMergeName = "merge__overload$1"
 const dictionarySetName = "set"
 
-// A Dictionary update, emitted as the calls an author could have written
-// by hand: `[ages with "kim" = 7, "sam" = 9]` is `set` over `set`, and
-// `[ages with other]` is `merge(with other)`. Neither is a merge of two objects
-// the way a Record's is — a Dictionary is a store with an order and a
-// generation, so the only way to add to one is to ask it to.
-//
-// The witness is the BASE's, carried on the Combination, and every call in the
-// chain is handed the same one: what each `set` compares its key against is the
-// keys the store already holds.
+// A Dictionary update as calls: `set` over `set` for written entries, or
+// `merge`. See "Record and Dictionary updates" in DEVELOPMENT.md.
 function rewriteDictionaryCombination(
 	node: common.typedSimple.CombinationNode,
 ): estree.Expression {
-	// A witness is written on every Dictionary update whose key Type is
-	// decided, which is every update a valid Program writes. `null` stands for
-	// the one that is not — an update over a Dictionary nothing has yet said
-	// the key Type of, which holds no key for a comparison to reach.
-	//
-	// Rewritten once per call rather than once and shared, so no two
-	// positions of the emitted tree hold the same Node. `pool-constants` is
-	// what keeps that from being a method map written out per entry: the
-	// witness it reaches is a reference to the one const by then.
+	// The base's key witness, rewritten per call so no two positions share a
+	// node. `null` where the key Type is not yet decided.
 	let witness = (): estree.Expression =>
 		node.keyConformance === undefined
 			? { type: "Literal", value: null }
@@ -3808,11 +3665,8 @@ function rewriteDictionaryCombination(
 	return built
 }
 
-// A Record literal, in either of the two spellings a Combination's
-// right-hand side can reach emission in — the Simplifier's own `RecordValue`
-// and the `direct-record` `collapse-construction` leaves. The same pair
-// `collapse-combinations` recognises, asked here for the opposite reason: there
-// to write the members out, here to leave them alone.
+// A Record Literal, as a `RecordValue` or the `direct-record` that
+// `collapse-construction` leaves.
 function isRecordLiteral(node: common.typedSimple.ExpressionNode): boolean {
 	return (
 		node.nodeType === "RecordValue" ||
@@ -3820,25 +3674,9 @@ function isRecordLiteral(node: common.typedSimple.ExpressionNode): boolean {
 	)
 }
 
-// `{ base with update }`, where `update` is not a literal — one member
-// read per member the right-hand side's TYPE declares, over a spread of the
-// left-hand side, which is where the answer's hidden Type key comes from.
-//
-// Projected rather than spread whole because Record assignability is
-// width subtyping: `constant partial: { port: Integer } = { port = 8080, tls =
-// "nope" }` is a legal Declaration, and `{ server with partial }` spread whole
-// copied that `tls` over the Boolean the answer's Type declares — a String in a
-// Boolean member, out of a Program that compiled clean. The Type says which
-// members an update carries; nothing says it carries no others.
-//
-// A bare name — a Constant, a Parameter, or `_self`, which is what `@`
-// lowers to — is read once per member and no temporary is needed. Anything else
-// is a value that has to be COMPUTED, and computing it once per member would
-// call a call as many times as the update has members, so it is bound by an
-// arrow whose Arguments evaluate both operands exactly once, in written order.
-// The arrow has precedent in `inlineLoopExpression`, and its two names hold `_`,
-// which the Lexer reads as a Symbol — so neither can be an Essence identifier,
-// and neither can be the name of anything the operands read.
+// `{ base with update }` for a non-literal update: the base spread, then one
+// read per member the update's Type declares. See "Record and Dictionary
+// updates" in DEVELOPMENT.md.
 function projectedCombination(
 	lhs: common.typedSimple.ExpressionNode,
 	rhs: common.typedSimple.ExpressionNode,
