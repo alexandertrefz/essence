@@ -43,7 +43,8 @@ Some fixes scaffold code the reader still has to complete. They write an `otherw
 Match, the members a Record Literal lacks, or a Protocol's Methods. Where a value or a body belongs, they write
 `{}`. A blank would not parse, and a buffer that does not parse loses every other report with it. `{}` is the unit
 value. It parses and is visibly not an answer, and where a Type is expected it is refused with a Diagnostic the
-reader can act on.
+reader can act on. For a missing Record member, a shorthand `{ port }` would parse too, but it means `port = port`
+and would silently pick up a Constant of that name.
 
 ## Reading a Help
 
