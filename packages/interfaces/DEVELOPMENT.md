@@ -318,3 +318,177 @@ Coverage reads the flags, so a report can ask whether both the guarded path and 
 testing reads them too. Every stage after the enricher sees a conditional as bodies with no evidence in
 them. Swapping two bodies or moving an arm's answer could then run a value against a refinement nobody
 proved. The flags say where that is safe.
+
+## Lowered tests
+
+The simplifier lowers a typed `tests { … }` block into a `common.typedSimple.TestsSectionNode`. It has two
+parts. `tests` is a flat manifest of `TestManifestEntry` records, which says what a runner can know about each
+test without running it. `nodes` is a tree of setup Statements and test items, which runs the tests.
+
+No node stands for a suite. What it added to a test's identity and Modifiers is folded into
+the manifest entry, and what it declared lives in a `TestScopeNode`. A Scope is emitted as a closure, so a
+suite's declarations stay inside it and may shadow the section's.
+
+The rewriter emits `nodes` as one Function that takes the per-test context, and a run executes one test.
+Setup Statements stand where they were written. So a run evaluates exactly the setup its test can see,
+afresh each time, and shares nothing with another run. A `TestScopeNode` holds the half-open run of manifest
+indices from `first` to `last`. A Scope that holds no part of the selected test is not evaluated at all. So
+a suite's printed output is never attributed to a test beside it.
+
+A table test is one `TestRowsNode` with one body and one name, and one manifest entry per row. Row N is entry
+`first + N`. A property test is one entry whose body runs once per generated case, as a closure the runtime
+calls with the values it drew. Its name is worked out in the Scope the test was written in, since each case
+draws different values.
+
+An item carries its name as an Expression only where the name interpolates. A plain name is already in the
+manifest.
+
+## Intrinsics
+
+An `IntrinsicNode` is what an optimiser pass rewrites an Expression into. It is a shape the rewriter emits
+directly, where the simplifier's own node would have gone through a runtime call. Intrinsics exist only between
+`optimise` and `rewrite`. The simplifier never makes one, so the stages before the optimiser never meet them.
+The rewriter's `rewriteIntrinsic` switches over every `kind` and returns from each, so a kind added without
+an emission fails the type check.
+
+Each intrinsic carries the `type` and `position` of the node it replaced. The rewriter maps Statements and
+outermost Expressions to the source through `position`. A pass that dropped it would unmap the line a
+debugger stops on.
+
+### Raw values
+
+Some intrinsics answer a raw JavaScript value rather than an Essence one, because lowered JavaScript has to
+say `if (…)` and `? :` in JavaScript's terms. A `tag-test` answers a JavaScript boolean, not a `Boolean`
+object, although its `type` is `Boolean`. A raw value belongs only in a test position or as the operand of
+another raw operation. `essence-boolean` turns a raw boolean back into an Essence `Boolean`, and
+`raw-boolean` reads the raw boolean out of one. Nothing may put a raw intrinsic where the Program expects a
+value.
+
+### Tag tests
+
+A `tag-test` asks whether a value is a Case carrying one tag, as `value[<Type key>] === "Ordering#Less"`.
+`negated` asks the opposite question with `!==`, so `isNot` costs what `is` does.
+
+`optional` reads the value through `?.`, for a member that may be missing. A Record Matcher is open, so a
+value can reach the test without that member. `value?.[<Type key>] === "…"` then answers false for a missing
+member and for one found on `Object.prototype`, as the runtime's own `Object.hasOwn` check does.
+`compile-record-members` sets `optional` where it can not prove the member is there. With `negated`, the
+test answers true for a missing member, which is what "is not this tag" means for one.
+
+### Pooled constants
+
+A `pooled-reference` reads a value the Program builds once, in a const band of its own, instead of at each
+site. `key` is a canonical spelling of the value, so the same literal written in many places is one object.
+The name is chosen per emitted Module, where the standard library's pooled constants and the Program's own
+meet. Pooling is sound for the reason interning is: every Essence value is immutable, and no operator asks
+whether two values are the same object.
+
+### Omitted Arguments
+
+An `omitted-argument` is the hole a call leaves for a defaulted Parameter when something follows it. That may
+be a later Argument or a hidden conformance Argument. It emits as `undefined`, which is what a JavaScript default
+parameter fires on, and is the one place emitted code introduces `undefined` on purpose. The callee's
+parameter binding consumes it before the body runs, so it never becomes a value. An omission with nothing
+after it is not passed at all.
+
+### Dispatch chains
+
+Without the optimiser, a Method call on a Union-typed receiver goes through `$type.dispatchMethod`. It takes
+the receiver, the shared Arguments, and per member Type a descriptor, a Method and its Arguments. Then it asks
+`isValueOfType` of each descriptor until one accepts. The compiler knows every part of that, so
+`compile-union-dispatch` writes it out as a `dispatch-chain`. Each branch keeps only the test it turns on,
+which `residual.ts` works out.
+
+The receiver and the shared Arguments are evaluated once, before any branch is tried, as building the array
+did. `temporaries` binds those that need a name, in evaluation order. `receiver` and `arguments` are what
+the branches read: those names, or the Expression itself where it already is a name.
+
+A branch's own Arguments, its conformance witnesses and the Function literals typed against its Method, are
+built inside that branch. `dispatchMethod` built every branch's before choosing one. The change in timing is
+invisible only because both are pure, which `compile-union-dispatch` proves per branch. Where it can not, it
+leaves the call alone.
+
+### Inlined loops
+
+Essence has no loop Statement. A walk is a driver Function handed callbacks, such as `loop(startingWith:…)`
+or `List.reduce`, so each turn calls closures and builds the values they pass along. `inline-loops` looks for a
+call whose driver it can see and whose callbacks are Function literals. It writes such a walk out as an
+`inline-loop`, a `while` or a `for` with the callbacks' bodies inside. A Function-valued name
+stays a call, since it is whatever was bound to it.
+
+`InlineLoopDriver` names the driver, and each kind mirrors its Essence driver exactly, evaluating the call's
+Arguments in the order the call did. The `counted` driver is a `for` over the bigints the Integers hold, with
+no Record threaded through it.
+
+`name` is the prefix of every name the loop binds, such as `$loop_0_state`, and of the label `$loop_0` it
+leaves through. It is numbered across the whole Program, so a loop inlined in another loop's body can not
+reuse the outer loop's names. No Essence name contains `_`, so no Program can spell one.
+
+The callbacks' Parameters are not renamed. Each is bound as a `const` of a block around its body, the Scope the
+closure gave it. A Parameter therefore shadows an outer binding for exactly as long as it did.
+
+`build-lists-in-place` sets `build` where the walk threads a List that nothing else can reach. That is a
+proof, so the walk may push onto one Array instead of building a new List each turn. `ListBuild` names the
+step callback's Parameter the List arrives under. Every answer that wrote the List becomes a `list-build`,
+the items this turn adds. A `list-build` may stand only where the walk's answer is written. The rewriter
+refuses it anywhere else, since no Expression means the Array so far without saying whether the walk is
+done with it.
+
+### Record spreads
+
+A `spread-combination` builds `{ ...lhs, member: … }` in one allocation, where `Object.assign` built an empty
+object and copied both sides in. A Record literal on the right is written out member by member. Any other
+right side is projected to the members its static Type names, one read each.
+
+A whole spread would be unsound. Record assignability is width subtyping, so a value typed `{ port: Integer }`
+may carry more members than its Type names. Spread whole, such a value could copy a member over one the
+answer's Type declares with another Type. `rhsMembers` fixes the projected names when the pass runs, because
+a later pass such as `pool-constants` may replace the right side Expression.
+
+### Record defaults at the callee
+
+A callee rebuilds a Parameter with a Record default member by member, as `member-or-default` reads such as
+`options.retries ?? 3`. The fallback is evaluated only where the caller left that member out, which is the
+per-call semantics the language promises a default. `??` is a sound test for absence, because `undefined`
+is never an Essence value. `Optional` is a Choice, and the only `undefined` emitted code writes is an
+`omitted-argument`.
+
+`optional` reads the base through `?.`. It is set exactly for a complete default, whose whole Argument may be
+omitted and then arrives as `undefined`. A partial default makes the Argument required, so the base is
+always a Record. A `path` longer than one step reaches a member the default writes as a Record literal of
+its own. A path key in the Argument then merges into it.
+
+### Statement intrinsics
+
+JavaScript can say some things only in a Statement. A `match` is an Expression in Essence, but its Handlers
+hold Statements. In an Expression position the rewriter therefore wraps it in a Function and calls it. A compiled
+Union dispatch that holds values under names needs an arrow for the same reason, since `let` is no
+Expression. Where such an Expression stands in a Statement position, the Statements can be written directly.
+`lower-matches-to-statements` and `inline-loops` then produce an `IntrinsicStatementNode` instead, and
+nothing may move one back into an Expression position.
+
+`result` says where the answer goes. A `return` result keeps a Handler's Return as the enclosing Function's
+Return. A `declaration` result declares the name as an uninitialised `let` before the block, because the name
+has to outlive the block that computes it. An `assignment` result assigns a name already bound. A `discard`
+result drops the answer.
+
+A `statement-match` binds the matched value to `_self`, the name every Handler reads it under. Where the
+value already is `_self`, nothing is bound. Otherwise a block declares `const _self`, which shadows an
+enclosing `_self` as the wrapper's Parameter did. A value that itself reads `_self`, such as
+`match @.item -> …`, is first held under another name in a Scope of its own. A `const _self` is in scope
+over its own initialiser, so reading the enclosing one from the same block would throw a `ReferenceError`.
+For every result but `return`, a Handler leaves the chain by breaking out of the block `label` names.
+
+### Self tail calls
+
+`loop-self-tail-calls` turns a Return whose answer calls the Function it stands in into a
+`TailCallStatement`, which goes back to the head of the Function instead. The Function's `tailLoop` names a
+label, and the rewriter wraps the whole body in `<label>: while (true) { … }`. The wrap includes the body's
+prologue. A Parameter Pattern's bindings and a Record default's merge run on every fresh call, so every turn
+runs them too.
+
+A tail call evaluates its `bindings` first, in the order the Arguments were written, then makes its
+`assignments`. That makes the rebinding simultaneous, so `<- swap(b, a)` swaps rather than writing `a` over
+`b`. Only an Argument that could read a Parameter assigned later is bound first. A tail call names its label
+rather than letting the emission find it. One that ended up inside another Function's loop is then a
+JavaScript syntax error rather than a jump to the wrong loop.
