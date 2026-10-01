@@ -2228,14 +2228,15 @@ function samePosition(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// A call's answer and a member read are worth a point. A literal or a bare
-// name shows nothing a report does not.
+// A call's answer, a completed one included, and a member read are worth a
+// point. A literal or a bare name shows nothing a report does not.
 function isTraceable(node: common.typedSimple.ExpressionNode): boolean {
 	return (
 		node.nodeType === "MethodInvocation" ||
 		node.nodeType === "UnionMethodInvocation" ||
 		node.nodeType === "FunctionInvocation" ||
-		node.nodeType === "Lookup"
+		node.nodeType === "Lookup" ||
+		node.nodeType === "Complete"
 	)
 }
 
@@ -2310,6 +2311,14 @@ function instrumentChildren(
 						? { ...segment, expression: walk(segment.expression) }
 						: segment,
 				),
+			}
+		// The operand answers a Future, which a report can not show, so only
+		// what it is built from is traced.
+		case "Start":
+		case "Complete":
+			return {
+				...node,
+				expression: instrumentChildren(node.expression, walk),
 			}
 		default:
 			return node

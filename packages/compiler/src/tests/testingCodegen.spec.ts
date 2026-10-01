@@ -931,6 +931,39 @@ describe("Test codegen — a test that completes", () => {
 		expect(eventsOf(events, "expect").length).toBe(1)
 	})
 
+	// The operand's own answer is a Future, so the parts it is built from and
+	// the completed value are what a failure shows.
+	it("explains a failure out of what a completed call was built from", async () => {
+		let { events } = await run(`implementation {
+			function later(_ value: Integer) -> Future<Integer> {
+				<- complete Async.deferred(() { <- value })
+			}
+		}
+
+		tests {
+			test "one" {
+				constant x = 2
+
+				expect [complete later(x::negate())]::is([4])
+			}
+		}`)
+		let failure = eventsOf(events, "test-fail")[0]
+
+		expect(
+			failure?.kind === "test-fail"
+				? failure.failures[0]?.values.map((value) => [
+						value.span?.source,
+						value.value,
+					])
+				: null,
+		).toEqual([
+			["x::negate()", "-2"],
+			["complete later(x::negate())", "-2"],
+			["[complete later(x::negate())]", "[ -2 ]"],
+			["[4]", "[ 4 ]"],
+		])
+	})
+
 	it("keeps the output a test writes after a wait", async () => {
 		let { events } = await run(`implementation {}
 

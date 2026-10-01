@@ -115,6 +115,9 @@ both values, and one of them is often a literal Record. The diff then costs no s
 `instrumentChildren` reaches only positions the assertion evaluates. A Function literal's body is a closure
 that does not run, a Handler's body is Statements, and a witness only refers to Methods.
 
+The operand of `start` or `complete` answers a Future, which a report can not show, so only what it is built
+from is traced. A `complete` gets a point of its own, since what it answers is the call's answer.
+
 A `define` is Expressions throughout, so its Conditions and answers are traced, and an arm that was not
 taken records nothing. A `match` is left whole, subject included. A reader wants to know which arm ran and
 what it answered, and both are Statements this walker can not reach. Tracing only the subject would show
