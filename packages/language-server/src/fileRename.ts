@@ -3,14 +3,9 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { relativeSpecifier } from "./autoImport"
 import type { Workspace } from "./workspace"
 
-// What moving a file does to the Modules around it. A specifier is a path
-// written in the source, so a file that moves takes every entry naming it out of
-// step — and a file that moves takes its OWN entries out of step too, since they
-// are written from where it used to be.
-//
-// Answered BEFORE the rename happens, which is what makes it one edit rather
-// than a repair: the client applies these to the files as they still are and
-// then moves the file, so nothing is ever on disk in the broken state.
+// The import edits a move needs, both in the Modules naming the moved file and
+// in its own entries. Answered before the move, so nothing is ever on disk
+// broken.
 
 const SOURCE_EXTENSION = ".es"
 
@@ -34,10 +29,8 @@ export function importRewrites(
 		return []
 	}
 
-	// The files that move, and every file that reaches one of them. A
-	// Module that never named any of them writes no specifier that could have
-	// gone stale — and the ones that did are asked entry by entry below, since
-	// reaching a Module through a third is not naming it.
+	// The moved files and every file reaching them. Only the files that name one
+	// directly are rewritten.
 	let reached = new Set<string>()
 
 	for (let oldPath of moves.keys()) {
@@ -59,21 +52,9 @@ export function importRewrites(
 	return rewrites
 }
 
-// One rename is one file, or — when the client renamed a directory — every
-// `.es` file under it. Which of the two it is is not something the request says:
-// it hands over two paths, and what stands at the old one is a file this
-// workspace already knows or a directory whose files it knows. A path that is
-// neither moves nothing, which is what a rename of something that is not Essence
-// should do.
-//
-// And a source renamed OUT of the language moves nothing either. `Shared.txt`
-// is not a specifier the Compiler will take — `missing-extension` refuses it —
-// so rewriting every dependent to name it would be the Server volunteering
-// text that can not compile, and putting it in the reader's undo stack. The
-// import was going to dangle whatever happened; answering nothing leaves the
-// reader with the one Diagnostic that says so. A DIRECTORY rename is not one of
-// these: its new path is a directory, and the `.es` files under it keep their
-// own names.
+// One rename is one known file or every `.es` file under a directory. A file
+// renamed out of the language, such as `Shared.txt`, moves nothing: the
+// Compiler refuses that specifier (`missing-extension`).
 function movesOf(
 	workspace: Workspace,
 	renames: Array<FileRename>,
@@ -105,11 +86,8 @@ function movesOf(
 	return moves
 }
 
-// Every group of both blocks, written from where the file will be to where
-// what it names will be. A group whose specifier comes out the same is left
-// alone — a file and its dependency moving together is the ordinary case of a
-// directory rename, and rewriting a specifier to itself would put every file of
-// that directory in the Editor's undo stack for nothing.
+// Every group of both blocks, rewritten from the new location. A group whose
+// specifier stays the same is left alone.
 function rewritesIn(
 	workspace: Workspace,
 	moves: Map<string, string>,
@@ -140,9 +118,7 @@ function rewritesIn(
 
 		if (specifier !== group.source.path) {
 			edits.push({
-				// The String Literal with its quotes, which is what the
-				// Lexer's Position spans — the specifier written back is written
-				// back whole, so nothing depends on where the quotes ended up.
+				// The String Literal with its quotes, as the Lexer spans it, replaced whole.
 				range: group.source.position,
 				newText: `"${specifier}"`,
 			})

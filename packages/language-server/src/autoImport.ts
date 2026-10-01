@@ -2,21 +2,13 @@ import * as path from "node:path"
 
 import type { common, parser } from "@essence-lang/interfaces"
 
-// One edit builder for every feature that adds an `import { … }` entry —
-// the Quick Fixes off an unknown name, and a Completion of something the file
-// has not imported yet. All of them insert the SAME spelling in the SAME place,
-// because a reader who accepts two of them in a row must not be shown a block
-// that reshuffles itself between the two.
-//
-// The name goes in at its canonical position — into the group of its Module,
-// sorted by name, or into a new group sorted by specifier — which is the order
-// dispatch is defined over and the order `esfmt` writes the block in.
+// One edit builder for every feature that adds an import entry, so all write
+// the same spelling in the same place. That is where `esfmt` would write it: in
+// its Module's group sorted by name, or in a new group sorted by specifier.
 
 export type ImportEdit = {
-	// An insertion is a zero-width Range — `start` and `end` at the same
-	// Cursor — so this is the same shape a Code Action's edits already are. The
-	// one edit that is not an insertion replaces a group written flat with the
-	// same group written out.
+	// An insertion is a zero-width Range. The one replacement rewrites a group
+	// written flat as the same group written out.
 	range: common.Position
 	newText: string
 }
@@ -28,23 +20,18 @@ type ImportEntry = {
 	specifier: string
 }
 
-// An entry of an `export { … }` block, which holds two shapes where an
-// import block holds one: a bare name is something this Module declares, and a
-// name written under a `from` is one it forwards without ever binding.
-// `specifier` is what tells them apart — the Module the name comes FROM, and
-// null for the ordinary entry.
+// An export entry: a bare name this Module declares, or one it forwards from
+// `specifier`, which is null for a bare entry.
 type ExportEntry = {
-	// The name as it is written at home, which is what the block is
-	// ordered by — an `as` renames what the entry PUBLISHES and leaves where it
-	// stands alone.
+	// The name as written at home, which orders the block; an `as` renames only
+	// what the entry publishes.
 	name: string
 	alias: string | null
 	specifier: string | null
 }
 
-// The relative path an entry in `fromPath` would write for `toPath`,
-// spelled with forward slashes on every platform — a specifier is a path in the
-// source text rather than a path of the machine that reads it.
+// The relative specifier from `fromPath` to `toPath`, with forward slashes on
+// every platform.
 export function relativeSpecifier(fromPath: string, toPath: string): string {
 	let relative = path
 		.relative(path.dirname(fromPath), toPath)
@@ -54,10 +41,9 @@ export function relativeSpecifier(fromPath: string, toPath: string): string {
 	return relative.startsWith("../") ? relative : `./${relative}`
 }
 
-// The canonical order of the names inside a group and of the groups of
-// a block, matching `compareEntries` and `compareGroups` in the Formatter and
-// the seeding order in the Compiler's linker. Compared by code unit rather
-// than by locale, so every machine agrees on it.
+// The canonical order of names and groups, as `compareEntries` and
+// `compareGroups` in the Formatter and the Compiler's linker order them. By code
+// unit, so every machine agrees.
 function compareStrings(left: string, right: string): number {
 	if (left === right) {
 		return 0
@@ -77,14 +63,13 @@ function spellName(entry: ImportEntry): string {
 	return entry.alias === null ? entry.name : `${entry.name} as ${entry.alias}`
 }
 
-// A group of one name, which is how the Formatter writes one.
+// A group of one name, as the Formatter writes one.
 function spellGroup(entry: ImportEntry): string {
 	return `from "${entry.specifier}" { ${spellName(entry)} }`
 }
 
-// The specifier is handed in rather than read off the entry, because the
-// entry of an export group carries the same one its group does and an entry
-// written bare carries none at all.
+// The specifier is handed in: an export group's entry carries its group's, and
+// a bare entry none.
 function entryOf(
 	node: parser.ImportNode | parser.ExportNode,
 	specifier: string,
@@ -110,17 +95,14 @@ function insertionAt(
 	return { range: { start: cursor, end: cursor }, newText }
 }
 
-// Whether anything but whitespace is written on `line` before `column`
-// — which is what says a line of its own can not be opened there, and the
-// text has to go inline instead.
+// Whether anything but whitespace precedes `column` on `line`, so the text
+// must go inline.
 function sharesLine(lines: Array<string>, line: number, column: number) {
 	return /[^ \t]/.test((lines[line - 1] ?? "").slice(0, column - 1))
 }
 
-// `spelling` placed among the members of a block or a group: on a line
-// of its own above `successor`, or inline in front of it where it shares its
-// line with the brace that opened the block; below `last` otherwise, and
-// inline after it where the closing brace shares its line.
+// `spelling` placed before `successor`, inline where `successor` shares its
+// line with other text, else after `last`.
 function insertAmong(
 	lines: Array<string>,
 	spelling: string,
@@ -147,13 +129,9 @@ function insertAmong(
 	return insertionAt(line + 1, `${indentationOf(lines, line)}${spelling}\n`)
 }
 
-// Null when the entry is already there — a Quick Fix that inserts a
-// duplicate is worse than no Quick Fix, and the caller has no other way to know:
-// a name may be imported under an alias, or through a second entry the reader
-// wrote by hand while the Diagnostic it answers was still on screen.
-//
-// The name joins the group already written for its Module where there is one,
-// and opens a group of its own otherwise, at the group's canonical position.
+// Null when the entry exists already, perhaps under an alias or in a second
+// entry, since a duplicate is worse than no fix. The name joins its Module's
+// group, or opens one at the canonical position.
 export function insertImportEdit(
 	sourceText: string,
 	program: parser.Program,
@@ -163,11 +141,8 @@ export function insertImportEdit(
 	let section = program.imports
 
 	if (section === null) {
-		// Above the implementation, with a blank line after it, since
-		// that is where the Parser accepts it and where every Module writes it.
-		// The implementation's own line is what the block is measured against —
-		// a Program may open with Comments, and inserting above those would put
-		// the block before what documents it.
+		// Above the implementation, followed by a blank line, measured from the
+		// implementation's own line so leading comments stay above the block.
 		let line = program.implementation.position.start.line
 		let indentation = indentationOf(lines, line)
 
@@ -214,15 +189,9 @@ export function insertImportEdit(
 	)
 }
 
-// SEVERAL names taken from ONE Module, written in as one edit. A
-// Declaration moved into another Module takes with it every name it reads that
-// the Module it left publishes, and the target has to import all of them — one
-// call per name would compute each insertion against a text none of the others
-// had landed in, and two names sorting into the same slot would be two edits at
-// one Cursor.
-//
-// Names already imported from that Module are left out, as `insertImportEdit`
-// leaves them out: an entry written twice is `duplicate-import`.
+// Several names from one Module, in one edit, as when a moved Declaration
+// takes along the names it reads. Separate edits would each be computed against
+// text the others had not landed in. Names imported already are left out.
 export function insertImportsEdit(
 	sourceText: string,
 	program: parser.Program,
@@ -302,37 +271,27 @@ export function insertImportsEdit(
 	)
 }
 
-// The group a run of names is written as, on one line. The Formatter
-// writes a group of two or more names one to a line, so a group of several
-// written here is one it rewrites.
+// A run of names written as a group on one line; the Formatter rewrites a
+// group of several.
 export function spellNames(names: Array<string>, specifier: string): string {
 	return `from "${specifier}" { ${names.join(" ")} }`
 }
 
-// The `export { … }` block's side of the same builder, and null for the
-// same reason: a name this Module already publishes must not be published a
-// second time, whichever of the two shapes carries it.
-//
-// The canonical order is the Formatter's — what the Module declares itself
-// first, by name, then what it forwards, by specifier — because a reader who
-// accepts this and then formats the file has to be shown the same block twice.
+// The export block's side of the builder, null when the name is published
+// already. Ordered as the Formatter orders it: bare names by name first, then
+// forwarded ones by specifier.
 export function insertExportEdit(
 	sourceText: string,
 	program: parser.Program,
 	entry: ExportEntry,
-	// An entry the caller takes away in the same breath — the one shape in
-	// which a name the block already publishes is no collision, because the edit
-	// that publishes it a second time is paired with the edit that removes the
-	// first. Its place in the block is left standing all the same: what follows
-	// it is where the new member goes, and the two edits then meet end to end
-	// rather than overlapping.
+	// An entry the caller removes in the same edit, so publishing its name again
+	// is no collision. Its place still counts, so the two edits meet end to end.
 	replacing: parser.ExportNode | null = null,
 ): ImportEdit | null {
 	let lines = sourceText.split("\n")
 	let section = program.exports
-	// The same shape an import entry has, so that one comparison orders
-	// both blocks — a bare entry carries no specifier and never needs the empty
-	// one this gives it, since nothing spells a bare entry with its Module.
+	// The shape of an import entry, so one comparison orders both blocks. A bare
+	// entry's empty specifier is never written.
 	let sorted: ImportEntry = {
 		name: entry.name,
 		alias: entry.alias,
@@ -345,9 +304,7 @@ export function insertExportEdit(
 		return openExportBlock(lines, program, spelling)
 	}
 
-	// Matched on the name the block PUBLISHES — an entry's alias where it
-	// carries one — since that is the name a second entry would collide with,
-	// whether it forwards the same thing or something else entirely.
+	// Matched on the published name, an entry's alias where it has one.
 	if (
 		section.entries.some(
 			(candidate) =>
@@ -373,10 +330,8 @@ export function insertExportEdit(
 		})
 	}
 
-	// A bare name goes among the bare names and in front of every group;
-	// a forwarded one goes among the groups, which stand after all of them. So
-	// the member the block ends on is the last group where there is one, and
-	// that is what either shape falls back to when nothing follows it.
+	// Bare names stand before every group, so the block ends on its last group
+	// where it has one, which either shape falls back to.
 	let bare = section.entries.filter((candidate) => candidate.source === null)
 	let successor =
 		entry.specifier === null
@@ -404,9 +359,8 @@ export function insertExportEdit(
 	)
 }
 
-// The first group of the block a new one for `specifier` belongs in front
-// of. Written out rather than inlined because the search reads `specifier` in a
-// closure, where its being a String rather than null is no longer in hand.
+// The first group a new one for `specifier` goes before. A function, since a
+// closure would lose that `specifier` is a String.
 function laterGroup(
 	groups: Array<parser.ExportGroupNode>,
 	specifier: string,
@@ -416,12 +370,9 @@ function laterGroup(
 	)
 }
 
-// Below the implementation, with a blank line between them, since that is
-// where the Parser reads the block and where the Formatter writes it. The
-// insertion goes at the END of the implementation's last line rather than at the
-// start of the line under it: a file whose last line is that closing brace has
-// no line under it to insert at, and a `tests { … }` block that does stand there
-// belongs below the export block rather than above it.
+// Below the implementation, after a blank line. Inserted at the end of the
+// implementation's last line, which may be the file's last line, and before
+// any `tests` block.
 function openExportBlock(
 	lines: Array<string>,
 	program: parser.Program,
@@ -440,9 +391,7 @@ function openExportBlock(
 	)
 }
 
-// A block with no members of its own, which is the one shape that has
-// nowhere to insert BESIDE — the member goes inside the braces rather than
-// beside anything, and where the braces stand decides how.
+// A block without members, where the member goes inside the braces.
 function insertIntoEmptyBlock(
 	lines: Array<string>,
 	section: parser.ImportSectionNode | parser.ExportSectionNode,
@@ -450,9 +399,8 @@ function insertIntoEmptyBlock(
 ): ImportEdit {
 	let line = section.position.start.line
 
-	// A one-line `import {}` takes the member INSIDE its braces — an
-	// insertion on the line after the statement lands outside the block, and
-	// the file no longer parses.
+	// A one-line `import {}` takes the member inside its braces; a new line after
+	// it would land outside the block.
 	if (section.position.end.line === line) {
 		let column = section.position.end.column - 1
 		let separator = (lines[line - 1] ?? "")[column - 2] === "{" ? " " : ""
@@ -460,22 +408,13 @@ function insertIntoEmptyBlock(
 		return insertionAt(line, `${separator}${spelling} `, column)
 	}
 
-	// An empty block still owns two lines, so the member goes on the one
-	// after the brace rather than replacing anything.
+	// An empty block spans two lines; the member goes on the one after the brace.
 	return insertionAt(line + 1, `${indentationOf(lines, line)}\t${spelling}\n`)
 }
 
-// A group written flat holds one name, and gaining a second is what
-// writes it out — so the whole of it is replaced with the two names one to a
-// line, in order, which is what the Formatter would make of it. A group
-// already written out takes the name on a line of its own at its canonical
-// position, and keeps every Comment it holds.
-// `spelling` is what actually goes in, and it is the entry's own name
-// unless the caller is writing SEVERAL at once — a Declaration moved into
-// another Module may take more than one name from the one it left, and each
-// placed on its own would be several edits computed against a text none of the
-// others had landed in. They go in as one run, sorted where the caller sorted
-// them and placed by the first of them.
+// A flat group of one name gaining a second is rewritten with one name to a
+// line, as the Formatter would. A written-out group takes the name on its own
+// line and keeps its comments. `spelling` may be a sorted run of names.
 function insertIntoGroup(
 	lines: Array<string>,
 	group: parser.ImportGroupNode | parser.ExportGroupNode,

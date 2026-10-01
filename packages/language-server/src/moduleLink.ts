@@ -16,46 +16,25 @@ import {
 	parseDocument,
 } from "./compilation"
 
-// What a document that is a MODULE is analysed against — everything a
-// probe of it needs beyond its own text. A probe enriches a document with a
-// synthetic member written into it, and enrichment seeds a Scope from the
-// builtins and the file's own declarations alone: linking is what seeds an
-// import block. So every name a Module takes from another was unknown to every
-// probe, the base of `Colour.` typed as an Error, and `red::` offered the
-// Methods of every Namespace there is — an Error receiver matches them all.
-//
-// The dependencies are held LINKED, because a Completion fires on every
-// keystroke and one of them enriches several readings: re-reading and
-// re-linking the graph per reading is the whole of what made linking too
-// expensive to probe through. What is kept is the surfaces and the name lists,
-// not the graph — see `LinkContext`.
+// What a Module's probe is linked against. Enrichment alone seeds no import
+// block, so imported names would be unknown. The graph's surfaces are kept
+// linked, so a probe per keystroke need not read the graph again.
 export type ModuleView = {
 	entryPath: string
-	// What the import block bound, which is what a listing built from the
-	// document's own declarations would otherwise miss: an imported Namespace,
-	// an imported Protocol used as a bound, an imported Choice named in front
-	// of a `.`.
+	// What the import block bound, such as an imported Namespace or Protocol.
 	imported: ImportedNames
-	// The specifier as written to the Module it named, and the paths
-	// those spell out. A probe writes the same import block the document does —
-	// it is the text above the cursor, and the cursor is below the block — so
-	// what it resolves to is what the document resolved to, and resolving it
-	// again is a `realpath` per specifier per keystroke.
+	// Each specifier's resolution. The probe writes the same import block, so
+	// the answers carry over without a `realpath` per keystroke.
 	resolutions: Map<string, string>
-	// The Modules those specifiers named, in the order the entries name
-	// them — what the graph recorded for this file, so that the probe standing
-	// in for it depends on exactly what it depends on.
+	// The Modules those specifiers named, in entry order, as the graph recorded.
 	dependencies: Array<string>
-	// Everything the graph published, as linking left it: the export
-	// surface of every Module in it and what each declares. This is the half
-	// that is expensive to build and cheap to keep, and keeping it is what
-	// makes a probe of a Module affordable at all.
+	// The graph's export surfaces and declarations, as linking left them:
+	// expensive to build, cheap to keep.
 	context: LinkContext
 }
 
-// One view per Module of the graph, sharing ONE context: a Module of a
-// linked graph is linked against the same surfaces whichever of them the graph
-// was loaded from, so the cursor's file needs no graph of its own.
+// One view per Module of the graph, sharing one context, since every Module
+// links against the same surfaces.
 export function moduleViewsOf(linked: LinkedGraph): Map<string, ModuleView> {
 	let context = linkContextOf(linked)
 	let views = new Map<string, ModuleView>()
@@ -73,9 +52,8 @@ export function moduleViewsOf(linked: LinkedGraph): Map<string, ModuleView> {
 	return views
 }
 
-// The document for a caller that holds no analysis of it, derived once
-// per request so that no listing enriches it again. An enrichment throw goes to
-// `onInternalError` and the document answers untyped.
+// The document's analysis for a caller holding none, derived once per
+// request. A throw goes to `onInternalError`, and the document stays untyped.
 export function documentAnalysisOf(
 	documentText: string,
 	documentPath: string | undefined,
@@ -108,10 +86,8 @@ export function documentAnalysisOf(
 	return { program, enrichedProgram, index: null, module: null }
 }
 
-// Null wherever there is nothing to link against: a document that writes
-// neither Module section is a Program of its own, a standard library source is
-// analysed as the declaration space its loader made it, and a caller with no
-// path for the document can not name a Module at all.
+// Null where there is nothing to link against: a file writing neither Module
+// section, a standard library source, or a document without a path.
 function linkedDocumentOf(
 	program: parser.Program,
 	documentText: string,
@@ -141,28 +117,20 @@ function linkedDocumentOf(
 		return {
 			program,
 			enrichedProgram: linked.modules.get(entryPath)?.program ?? null,
-			// Rebuilt by the one listing that reads it, exactly as it is
-			// for every other caller that holds no Workspace.
+			// Rebuilt by the one listing that reads it.
 			index: null,
 			module: view,
 		}
 	} catch {
-		// A document whose graph can not be read — a specifier naming a
-		// file nobody has written yet — is answered the way it always was:
-		// enriched on its own, with every imported name unknown. Degrading is
-		// the point; a Completion list that throws is a Completion list that
-		// stops appearing.
+		// A graph that cannot be read, such as one naming a file not yet written,
+		// leaves the document enriched alone, with imported names unknown.
 		return null
 	}
 }
 
-// One probe source, typed. A probe of a Module is LINKED against the
-// document's dependencies rather than enriched alone, which is what puts the
-// names the import block brought in into the Scope the probe is read in.
-// Everything else enriches exactly as it did.
-//
-// Null where the source does not parse or the link threw: a reading that does
-// not explain the cursor is simply not the reading — the next one is tried.
+// One probe source, typed. A Module's probe links against the document's
+// dependencies, so imported names are in Scope. Null where it does not parse or
+// the link threw, and the next reading runs.
 export function enrichProbe(
 	probeSource: string,
 	documentPath: string | undefined,
@@ -179,11 +147,8 @@ export function enrichProbe(
 	}
 }
 
-// The probe stands in for the document, under the document's own path and
-// with the document's own resolutions — so what it links against is what the
-// document links against, and the surfaces are read back rather than rebuilt.
-// It carries no Diagnostics of its own: a probe is a text nobody wrote, and
-// nothing it could say belongs in front of a reader.
+// The probe stands in for the document, with its path and resolutions. Its
+// Diagnostics are dropped: nobody wrote its text.
 function linkProbe(
 	program: parser.Program,
 	probeSource: string,
