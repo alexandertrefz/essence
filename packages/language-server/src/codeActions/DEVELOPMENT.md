@@ -96,3 +96,20 @@ takes its Type from the enclosing Function or Match.
 
 The arms of a written `define` stand one to a line, one indent inside the block. The column the formatter aligns
 their `if`s on is left to the formatter, since it depends on the room left on the page.
+
+## Extracting a Function
+
+`extractFunctionActions` lifts whole Statements out of a Function into a new Function written after it. The names
+the Statements read become its Parameters, typed by what the Enricher inferred and printed back as source. So it is
+offered only where the file enriched.
+
+There are two shapes. A selection ending in a Return becomes a Function answering that Return's Type, called as
+`<- extracted(…)`. Any other selection becomes a Function answering `{}`, called as a Statement.
+
+A selection that assigns a Variable declared outside it is turned away, whether or not the Variable is read
+afterwards. Where it is, the new Function would have to declare it again under a name not clashing with the
+Parameter that carries its value. Inventing that name would hand the reader a name they never chose.
+
+Methods are turned away too, since only a Function Statement's body is offered. A Method extracted beside a Method
+must decide whether `@` becomes a Parameter or a Method call on the receiver. That decision changes what the code
+means, so it would be a refactoring of its own.

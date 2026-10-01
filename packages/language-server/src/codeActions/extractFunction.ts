@@ -18,26 +18,9 @@ import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 import { typedExpressionAt } from "./typedLookups"
 
-// Whole Statements lifted out of a Function and written as a Function
-// beside it, with the names they read turned into its Parameters. The Types
-// those Parameters carry are the Enricher's, printed back as source — which is
-// the one thing this can not do without and the reason it is offered only where
-// the file enriched.
-//
-// Two shapes, and no third: a selection ENDING in a Return becomes a Function
-// answering that Type, called as `<- extracted(…)`; anything else becomes a
-// Function answering `{}`, called as a Statement. What is deliberately left out
-// is the third shape — a selection that ASSIGNS a Variable declared above it
-// and is read afterwards. The Function would have to declare that Variable
-// again, under a name that does not clash with the Parameter carrying its
-// incoming value, and inventing that name is a rename in disguise: the reader
-// would be handed source with a name in it they never chose and no way to see
-// why. Such a selection is turned away instead.
-//
-// NAMESPACES are turned away too. A Method extracted beside a Method has to
-// decide what `@` becomes — a Parameter, or a Method call on the receiver —
-// and that decision changes what the extracted code MEANS. It is a refactoring
-// of its own rather than a branch of this one.
+// Lifts whole Statements out of a Function into a new Function after it,
+// with the names they read as Parameters typed by the Enricher. See
+// "Extracting a Function" in DEVELOPMENT.md.
 
 export function extractFunctionActions(
 	program: parser.Program,
@@ -49,8 +32,7 @@ export function extractFunctionActions(
 ): Array<CodeActionEntry> {
 	let selection = trimmedRange(lines, range)
 
-	// Without the typed Program there are no Types to write, and a
-	// Parameter list is the whole of what makes this an extraction.
+	// The Parameters need the typed Program's Types.
 	if (selection === null || enrichedProgram === null) {
 		return []
 	}
@@ -58,9 +40,7 @@ export function extractFunctionActions(
 	let from = enclosingStatementOf(program, at(selection.start))
 	let to = enclosingStatementOf(program, at(selection.end))
 
-	// Both ends have to be in ONE body. A selection running from inside a
-	// Match Handler out past its closing brace covers half of two things, and
-	// there is no list of Statements that is what it covers.
+	// Both ends must lie in one body.
 	if (
 		from === null ||
 		to === null ||
@@ -85,9 +65,8 @@ export function extractFunctionActions(
 	let last = selected[selected.length - 1] as parser.ImplementationNode
 	let span = { start: first.position.start, end: last.position.end }
 
-	// Whole lines move, and a whole line is what is written back — both
-	// ends of the selection and the end of the Function it is lifted out of have
-	// to be their lines' own, or the edit would take a neighbour with it.
+	// Whole lines move, so the selection's ends and the enclosing Function's
+	// end must own their lines.
 	if (
 		!opensItsLine(lines, first.position.start) ||
 		!closesItsLine(lines, last.position.end) ||
@@ -96,29 +75,21 @@ export function extractFunctionActions(
 		return []
 	}
 
-	// A provided Method's body can name nothing the Program declares, so
-	// the Function written beside the enclosing one is out of its reach.
+	// A Protocol's provided Method cannot reach the new Function.
 	if (liesInProtocol(enclosing.statement, span)) {
 		return []
 	}
 
-	// `@` is the value the Method or the Match Handler around it is
-	// about, and a Function written beside them is about nothing.
-	//
-	// An assertion is refused by the Enricher inside a Function literal for the
-	// same reason it would be wrong here: `expect` records against the test that
-	// is running and `require` ends it, and neither is something a Function
-	// called from a test body can do.
+	// The new Function has no `@`, and an assertion belongs to the running
+	// test, which a called Function cannot record against or end.
 	if (selected.some(readsSelf) || selected.some(holdsAssertion)) {
 		return []
 	}
 
 	let answers = last.nodeType === "ReturnStatement"
 
-	// A Return anywhere but at the very end returns from the FUNCTION,
-	// and inside the extracted one it would return from that instead. A `<-`
-	// written in a Match Handler is the arm's value rather than a return, which
-	// is why `holdsReturn` stops at one.
+	// A Return before the end would return from the new Function instead of
+	// the old one. `holdsReturn` skips a Handler's `<-`, which is its value.
 	if ((answers ? selected.slice(0, -1) : selected).some(holdsReturn)) {
 		return []
 	}
@@ -131,9 +102,7 @@ export function extractFunctionActions(
 	}
 
 	let written: Array<{ name: string; type: string }> = []
-	// Where the extracted Function lands — the end of the Statement the
-	// selection was lifted out of — which is the Scope its annotations are read
-	// in.
+	// Where the new Function lands, whose Scope reads its annotations.
 	let spelledAt: SpellingScope = {
 		program: enrichedProgram,
 		cursor: enclosing.statement.position.end,
@@ -149,8 +118,8 @@ export function extractFunctionActions(
 		written.push({ name: parameter.name, type })
 	}
 
-	// `{}` is the unit Type, and a Function answering it is called as a
-	// Statement — which is what a selection that answers nothing becomes.
+	// A selection answering nothing becomes a Function answering `{}`, called
+	// as a Statement.
 	let returnType = answers
 		? typeAt(
 				enrichedProgram,
@@ -175,10 +144,8 @@ export function extractFunctionActions(
 	let signature = written
 		.map((parameter) => `_ ${parameter.name}: ${parameter.type}`)
 		.join(", ")
-	// The body moves BYTE FOR BYTE — a Comment, a blank line, the
-	// spelling of a Literal — and is shifted by the difference between the
-	// depth it was written at and the depth it lands at, which is the only
-	// change made to it.
+	// The body moves as written, Comments and all, changed only by its
+	// indentation.
 	let moved = reindent(
 		sliceOf(lines, span),
 		indentationOf(lines, first.position.start.line),
@@ -202,10 +169,8 @@ export function extractFunctionActions(
 					newText: `\n\n${indentation}function ${name}(${signature}) -> ${returnType} {\n${moved}\n${indentation}}`,
 				},
 			],
-			// Where the new name will stand once BOTH edits have landed.
-			// The call site collapses the selection onto one line, so the
-			// Function written after it moves up by every line the selection
-			// spanned beyond its first.
+			// Where the new name stands after both edits. The call collapses
+			// the selection to one line, moving the new Function up.
 			command: renameCommand(documentPath, {
 				line:
 					enclosing.statement.position.end.line -
@@ -223,14 +188,9 @@ function at(cursor: common.Cursor): common.Position {
 
 type FreeName = { name: string; position: common.Position }
 
-// The names the selection reads that are declared outside it, in the
-// order they are first read — which is the order the Parameters are written in,
-// so that a call reads as the code it replaced did.
-//
-// Null means the selection can not be lifted at all, for one of three reasons:
-// it WRITES a name from outside, it declares a name that is read after it, or
-// it reads something declared inside the enclosing Function that a Function
-// beside that one could not see.
+// The outside names the selection reads, in first-read order, which the
+// Parameters follow. Null when the selection writes an outside name, declares
+// one read after it, or reads a local declaration the new Function cannot see.
 function freeNamesOf(
 	index: ProgramIndex["index"],
 	span: common.Position,
@@ -253,8 +213,8 @@ function freeNamesOf(
 		let declaredInside = containsRange(span, definition)
 		let readInside = containsRange(span, occurrence.position)
 
-		// A name the selection declares travels with it, so nothing below
-		// may still be reading it.
+		// A name the selection declares moves with it, so nothing after the
+		// selection may read it.
 		if (declaredInside && !readInside) {
 			return null
 		}
@@ -263,16 +223,13 @@ function freeNamesOf(
 			continue
 		}
 
-		// An assignment to a Variable declared above — the shape this
-		// deliberately does not handle. See the note at the top.
+		// An assignment to an outside Variable is not handled.
 		if (occurrence.access === "write") {
 			return null
 		}
 
-		// A Function, a Type or a Namespace declared at the top level is
-		// in reach of the extracted Function too; one declared INSIDE the
-		// Function being extracted from is not, and there is no Parameter that
-		// could carry it.
+		// A top-level declaration is in reach of the new Function; one inside
+		// the enclosing Function is not, and no Parameter can carry it.
 		if (!isLocal(declaration.kind)) {
 			if (containsRange(enclosing, definition)) {
 				return null
@@ -299,9 +256,8 @@ function freeNamesOf(
 	)
 }
 
-// The kinds that name a BINDING rather than a member of a Type. A Record
-// member and a Method resolve against the value they are written on, so neither
-// is a name a Parameter could carry or a Scope could shadow.
+// The kinds that name a binding rather than a member, which resolves against
+// the value it is written on.
 function isBound(kind: DeclarationKind): boolean {
 	switch (kind) {
 		case "member":
@@ -315,20 +271,14 @@ function isBound(kind: DeclarationKind): boolean {
 	}
 }
 
-// And of those, the ones a value can be handed for — which is what a
-// Parameter is. Everything else is a declaration the extracted Function reaches
-// by name or does not reach at all.
+// The bindings a Parameter can carry a value for.
 function isLocal(kind: DeclarationKind): boolean {
 	return kind === "constant" || kind === "variable" || kind === "parameter"
 }
 
-// Spelled where the Function is going to be WRITTEN rather than where the
-// value stands, which for an Alias is the difference between a name in reach
-// and an `unknown-type`: the extracted Function is written beside the one it
-// came out of, and a name declared inside that body is out of reach there.
-// Where the position can not read the name, the shape underneath it is written
-// instead, and a Type with no spelling at all turns the whole extraction away,
-// exactly as it always did.
+// The Type spelled where the new Function is written, where an Alias from
+// inside the old body is out of reach. `spellTypeAt` then writes its shape; a
+// Type with no spelling turns the extraction away.
 function typeAt(
 	program: common.typed.Program,
 	position: common.Position,
@@ -384,9 +334,8 @@ function holdsAssertion(node: parser.ImplementationNode): boolean {
 	return found
 }
 
-// A Return that answers the FUNCTION. The walk descends into an If, whose
-// body is part of the Function's, and stops at a Match Handler and a Function
-// literal — a `<-` written in either of those answers that instead.
+// A Return that answers the Function. It descends into an `if`, but not into
+// a Match Handler or Function literal, whose `<-` answers them.
 function holdsReturn(node: parser.ImplementationNode): boolean {
 	switch (node.nodeType) {
 		case "ReturnStatement":
@@ -403,11 +352,9 @@ function holdsReturn(node: parser.ImplementationNode): boolean {
 	}
 }
 
-// The moved text shifted from the depth it was written at to the depth it
-// lands at. The first line carries no indentation of its own — the slice starts
-// at the Statement — so it is given the new one outright; every other line had
-// the old one in front of it and trades it for the new. A blank line is emptied
-// rather than indented, which is what the Formatter would do with it anyway.
+// The moved text re-indented. The slice starts at the Statement, so the first
+// line gets the new indentation outright, and other lines trade old for new.
+// Blank lines are emptied, as the formatter does.
 function reindent(text: string, from: string, to: string): string {
 	return text
 		.split("\n")
