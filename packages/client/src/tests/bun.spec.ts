@@ -14,11 +14,9 @@ import { pathToFileURL } from "node:url"
 import { essenceBun } from "../bun-plugin"
 import { REPOSITORY } from "./typecheck"
 
-// The Bun plugin under both of its hosts. `Bun.build` is driven in this
-// process, the way the esbuild plugin's tests drive esbuild; the RUNTIME is a
-// process of its own — `bun` started on a project whose `bunfig.toml` preloads
-// the plugin — because a runtime plugin is registered for a whole process and
-// this one is running the tests.
+// The Bun plugin under both hosts. `Bun.build` runs in this process. The
+// runtime gets a process of its own, whose `bunfig.toml` preloads the plugin,
+// since a runtime plugin is registered for a whole process.
 
 const MATH_MODULE = (body: string) => `implementation {
 
@@ -61,9 +59,8 @@ afterAll(() => {
 	rmSync(workspace, { recursive: true, force: true })
 })
 
-// A project with this package installed in it — see `project` in
-// `plugin.spec.ts` for why — and, for the runtime, a `bunfig.toml` that
-// preloads the plugin, which is how a project uses it.
+// A project with this package installed, as `project` in `plugin.spec.ts`
+// makes one, and a `bunfig.toml` that preloads the plugin.
 function project(files: Record<string, string>): string {
 	let directory = realpathSync.native(
 		mkdtempSync(path.join(workspace, "project-")),
@@ -130,9 +127,8 @@ async function built(
 	}
 }
 
-// A Bun process on the project, its output read line by line as it
-// arrives — so that a test can wait for the line an edit should produce rather
-// than for a fixed time. Killed when the test is done with it.
+// A Bun process on the project, read line by line. A test waits for the line
+// an edit produces rather than for a fixed time.
 function running(
 	directory: string,
 	...args: Array<string>
@@ -234,16 +230,12 @@ export const pi = PI.toString()
 
 		expect(module.squared).toBe(144n)
 		expect(module.pi).toBe("157/50")
-		// A build carries no watch imports — those are the runtime's,
-		// and a bundle has no watcher to answer to.
+		// A build carries no watch imports.
 		expect(text).not.toContain("?source")
 	})
 
-	// The plugin door builds its bridge out of IMPORTS rather than out of
-	// an injected Module, so this is where the two names a Dictionary crosses
-	// through are proven end to end: a `Map` built in the host's own realm goes
-	// in, the Module writes to what it was handed, and what comes back holds
-	// the entries in the order the box holds them.
+	// The plugin's bridge imports the Dictionary door, so a `Map` goes in, the
+	// Module adds to it, and the entries come back in order.
 	it("carries a Dictionary across the marshalled door", async () => {
 		let directory = project({
 			"Ledger.es": `implementation {
@@ -270,10 +262,8 @@ export const entries = [...ages(new Map([["alex", 39n]]))]
 		])
 	})
 
-	// And the asynchrony door end to end through the same plugin: the
-	// entry awaits what a call answers with, which is a run the wrapper started
-	// under `Future.ts` — the very copy the built Module waits on, since both
-	// import it by name and the build resolves one.
+	// The asynchrony door: the wrapper and the Module import one `Future.ts`,
+	// so the entry awaits the run the wrapper started.
 	it("answers a call with a promise the build awaits", async () => {
 		let directory = project({
 			"Async.es": `implementation {
@@ -297,9 +287,8 @@ export const doubling = doubled(21n)
 		expect(await (module.doubling as Promise<bigint>)).toBe(42n)
 	})
 
-	// The raw door and the wrapper, in one build, holding one Module: a
-	// value built through the runtime the build resolved is a value the
-	// marshalled door's Functions were compiled against.
+	// The raw door and the wrapper hold one Module, so a value built through
+	// the build's runtime is one the Module accepts.
 	it("holds one Module behind the marshalled door and the raw one", async () => {
 		let directory = project({
 			"Math.es": MATH_MODULE("value::multiply(with value)"),
@@ -376,12 +365,8 @@ console.log("answer", answer, "square", square(4n))
 		}
 	})
 
-	// THE reason for the runtime door: `bun --hot`. Bun reloads a module
-	// when a file it read changes, and it read the `.es` sources because the
-	// plugin had it — so an edit to a sibling reloads the entry's Module, the
-	// wrapper and the script, and what the script prints is the edit. And a
-	// value built BEFORE the reload is still a value after it: one runtime for
-	// the process, one Type key.
+	// Under `bun --hot` an edit to a sibling reloads the Module, the wrapper and
+	// the script. A value built before the reload still crosses after it.
 	it("reloads under `bun --hot` when a source changes", async () => {
 		let directory = project({
 			"src/Math.es": MATH_MODULE("value::multiply(with value)"),
@@ -411,8 +396,8 @@ console.log("answer", answer, "square", square(4n), "kept", rawSquare(globalThis
 				"answer 10n square 17n kept 17",
 			)
 
-			// An edit that does not compile is reported and the process
-			// stays up; the edit that fixes it is the next thing it prints.
+			// An edit that does not compile is reported, and the fix is
+			// printed next.
 			writeFileSync(
 				path.join(directory, "src", "Math.es"),
 				MATH_MODULE('"not an Integer"'),

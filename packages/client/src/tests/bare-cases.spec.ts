@@ -3,12 +3,8 @@ import { describe, expect, it } from "bun:test"
 import { bareCaseCollision } from "../bare-cases"
 import type { CaseDescriptor, Descriptor, Members } from "../descriptor"
 
-// Hand-written Descriptors rather than described Types, because what is
-// under test is the RULE and not the describing — every shape below is one a
-// Union can be in, and half of them are shapes a fixture would have to be
-// contorted into to produce. The Descriptors a Compiler writes are checked
-// against the same rule by `descriptor.spec.ts`'s snapshot, which is where a
-// disagreement between the two sides would show.
+// Hand-written Descriptors, since the rule is under test and not the
+// describing. `descriptor.spec.ts` checks what the compiler writes.
 
 function caseOf(
 	choice: string,
@@ -71,59 +67,48 @@ const SHAPE = [
 ]
 
 describe("A Union holding a bare Case", () => {
-	// The collision the whole rule exists for. `"Up"` is a Direction and
-	// `"Up"` is a String, and nothing in the value says which — so a round trip
-	// through this position would have to guess, and guessing wrong loses the
-	// value it was handed.
+	// `"Up"` could be a Direction or a String, and nothing in the value says
+	// which.
 	it("collides with a String", () => {
 		expect(bareCaseCollision(union(...DIRECTION, TEXT))).toBe(
 			'a Direction#Up crosses as the string "Up", which a String is too',
 		)
 	})
 
-	// Either way round. Which arm was written first decides nothing —
-	// there is no order in which the position becomes spellable.
+	// Arm order decides nothing.
 	it("collides with a String written before it", () => {
 		expect(bareCaseCollision(union(TEXT, ...DIRECTION))).toBe(
 			'a Direction#Up crosses as the string "Up", which a String is too',
 		)
 	})
 
-	// And with another unit Choice's Case of the same name, which is the
-	// same collision without a String in it.
+	// Another unit Choice's Case of the same name collides the same way.
 	it("collides with another Choice's Case of the same name", () => {
 		expect(bareCaseCollision(union(...DIRECTION, ...VERTICAL))).toBe(
 			'a Direction#Up and a Vertical#Up both cross as the string "Up"',
 		)
 	})
 
-	// Per Case NAME. Two unit Choices in one position are not the
-	// problem; two Cases spelled alike are, and Choices that share no name have
-	// none.
+	// The rule is per Case name, so Choices sharing no name are fine.
 	it("stands beside a unit Choice sharing no Case name", () => {
 		expect(bareCaseCollision(union(...DIRECTION, ...SIGN))).toBeNull()
 	})
 
-	// And per bare Case. A Choice with payloads crosses as a `$case`
-	// object whatever its payload-less Cases are called, and an object is not a
-	// string — so `Shape#Blank` beside `Direction#Up` is two spellings, not one.
+	// A Choice with payloads crosses as `$case` objects, even for a Case
+	// without one, and no object is a string.
 	it("stands beside a Choice that keeps the object form", () => {
 		expect(bareCaseCollision(union(...DIRECTION, ...SHAPE))).toBeNull()
 	})
 
-	// A Case reached twice through a Union that mentions its Choice twice
-	// is one Case, not two — which is why the comparison is by tag.
+	// One Case reached twice is one Case, since Cases compare by tag.
 	it("does not collide with itself", () => {
 		expect(
 			bareCaseCollision(union(...DIRECTION, caseOf("Direction", "Up"))),
 		).toBeNull()
 	})
 
-	// But two Modules' `choice Direction` are two Choices spelled one
-	// way, and their `#Up`s are two Cases spelling one string. `choice` is a
-	// display name and can not tell them apart; the tag can — and so the
-	// sentence names them by their tags, because "a Direction#Up and a
-	// Direction#Up" would leave a reader with nothing to act on.
+	// Two Modules' `choice Direction` are two Choices, so their `#Up`s collide
+	// and the sentence names them by tag.
 	it("collides with another Module's Choice of the same name", () => {
 		expect(
 			bareCaseCollision(
@@ -137,26 +122,22 @@ describe("A Union holding a bare Case", () => {
 		)
 	})
 
-	// Anything that is not a String and not a bare Case is decided by its
-	// own JavaScript shape and can not be one of these strings.
+	// Any other shape is told apart by its JavaScript kind.
 	it("stands beside every other shape", () => {
 		expect(bareCaseCollision(union(...DIRECTION, INTEGER))).toBeNull()
 	})
 })
 
 describe("The arms a collision is looked for among", () => {
-	// A nested Union's arms stand in the outer position unchanged, so the
-	// rule is asked of the flattened list — a Union of Unions hides nothing.
+	// A nested Union's arms stand in the outer position.
 	it("are flattened through a nested Union", () => {
 		expect(bareCaseCollision(union(union(...DIRECTION), union(TEXT)))).toBe(
 			'a Direction#Up crosses as the string "Up", which a String is too',
 		)
 	})
 
-	// An `Optional` is spelled by absence, so what it holds stands in the
-	// position beside everything else — `Optional<String> | Direction` is a
-	// position where `"Up"` is a String or a Direction and `undefined` is
-	// neither.
+	// An `Optional` is spelled by absence, so its item stands beside the other
+	// arms.
 	it("are flattened through an Optional node", () => {
 		expect(
 			bareCaseCollision(
@@ -170,10 +151,8 @@ describe("The arms a collision is looked for among", () => {
 		)
 	})
 
-	// And through the pair of Cases the same Optional reaches a Union as
-	// when there are other arms beside it — three arms or more never collapse
-	// into an `optional` node, so this is the shape the refusal above is
-	// actually met in.
+	// With other arms beside them, `Optional`'s Cases never collapse into an
+	// `optional` node, which is the usual shape.
 	it("are flattened through Optional's own Cases", () => {
 		expect(
 			bareCaseCollision(
@@ -188,9 +167,7 @@ describe("The arms a collision is looked for among", () => {
 		)
 	})
 
-	// `#Empty` carries nothing, so it takes nothing into the position —
-	// an `Optional<Direction>` is a Direction or it is `undefined`, and those
-	// are two spellings.
+	// `#Empty` carries nothing into the position.
 	it("take nothing from an absence", () => {
 		expect(
 			bareCaseCollision(union(optionalCase("Empty"), ...DIRECTION)),
@@ -199,10 +176,8 @@ describe("The arms a collision is looked for among", () => {
 })
 
 describe("A shape that is not a Union", () => {
-	// There is nothing for a lone Case to collide with, and every
-	// position that could hold two shapes at once is a Union asked about where
-	// it is reached — so asking about the shapes that CONTAIN one would report
-	// the same collision at every level above it.
+	// Only a Union is asked, so a collision is reported once, where it is
+	// reached, and not at every level containing it.
 	it("has no collision to report", () => {
 		expect(bareCaseCollision(caseOf("Direction", "Up"))).toBeNull()
 		expect(bareCaseCollision(TEXT)).toBeNull()

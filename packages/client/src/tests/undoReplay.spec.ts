@@ -15,29 +15,16 @@ import {
 import { backRunSeenBy as marshallerReplay } from "../marshal-runtime"
 import { backRunSeenBy as benchReplay } from "../tools/bench"
 
-// THE UNDO REPLAY EXISTS FOUR TIMES, and nothing held the copies
-// together. A positional write changes a run Array in place and counts a
-// version up, so a box left behind on that run has to undo the writes made
-// since it looked before its items can be read — `runtime/src/listWrites.ts`
-// is the authority, and `caughtUp` there is the original. This boundary
-// carries one, the hand-built door in `tools/bench.ts` carries another, and
-// the debugger's renderer carries two more (guarded in
-// `packages/debug-adapter/src/tests/undoReplay.spec.ts`, which is this same
-// idea pointed at those).
-//
-// Neither copy imports the runtime's `caughtUp`, which writes the
-// caught-up Array back into the box where each copy here only reads it. What
-// ties the copies together is a guard rather than a refactor, and this is it:
-// random boxes left behind in every way a chain can leave one behind, read
-// through each copy, and compared against what the runtime itself answers.
+// The interpreter and `tools/bench.ts` each copy the runtime's `caughtUp`,
+// read-only. This spec reads random stale boxes through each copy and compares
+// the runtime's answer. See "List boxes" in DEVELOPMENT.md.
 const integer = (value: number) => createInteger(BigInt(value))
 
 const integers = (values: Array<number>): ListType<IntegerType> =>
 	createList(values.map(integer))
 
-// A counted generator rather than `Math.random`, so a seed names one
-// schedule for good — the same shape `positionalWrites.spec.ts` uses, and for
-// the same reason.
+// A seeded generator, as in `positionalWrites.spec.ts`, so a seed names one
+// schedule for good.
 const generatorFrom = (seed: number): (() => number) => {
 	let state = seed * 2654435761 + 1
 
@@ -51,15 +38,12 @@ const generatorFrom = (seed: number): (() => number) => {
 	}
 }
 
-// What the runtime says the box holds — through `materialise`, which
-// catches a stale box up and hands back an Array whose whole length is the
-// box's view. This is the answer both copies are measured against.
+// What the runtime says the box holds, through `materialise`.
 const runtimeItems = (box: ListType<IntegerType>): Array<number> =>
 	materialise(box).map((each) => Number(each.value))
 
-// What a COPY says. Each answers the BACK run as this box sees it, so the
-// front run — which no positional write ever lands in — is walked here the way
-// each copy's own caller walks it: reversed, and then the back.
+// What a copy says. It answers the back run, so the front run, which no
+// positional write touches, is walked here as each caller walks it.
 const itemsThrough = (
 	replay: (box: never) => Array<unknown>,
 	box: ListType<IntegerType>,
@@ -81,10 +65,8 @@ const itemsThrough = (
 	return items
 }
 
-// EVERY WAY A CHAIN CAN LEAVE A BOX BEHIND, built at random and kept:
-// several versions of one written run, windows of a written run, boxes with a
-// front run the writes never touch, and siblings made by a tip push. What every
-// one of them has in common is that the Array it holds has moved on without it.
+// Stale boxes built at random. They include versions and windows of one
+// written run, boxes with a front run, and siblings made by a push.
 const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 	let next = generatorFrom(seed)
 	let size = 6 + Math.floor(next() * 10)
@@ -92,8 +74,7 @@ const staleBoxesFrom = (seed: number): Array<ListType<IntegerType>> => {
 	let kept: Array<ListType<IntegerType>> = []
 	let latest = integers(items)
 
-	// The first write copies and attaches the log to the COPY, so every
-	// box kept from here on shares one written Array.
+	// The first write copies, so every box kept from here shares one Array.
 	latest = replace(latest, integer(items[0]!), integer(0))
 	kept.push(latest)
 
@@ -133,17 +114,12 @@ const copies: Array<[string, (box: never) => Array<unknown>]> = [
 
 describe("the client's copies of the undo replay", () => {
 	for (let [name, replay] of copies) {
-		// Twelve seeds, which is a few milliseconds and covers every
-		// shape above many times over. Written out rather than counted, so a
-		// failing one can be pulled while it is being fixed without
+		// Seeds written out, so a failing one can be pulled without
 		// renumbering the rest.
 		for (let seed of [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]) {
 			it(`${name} answers what the runtime answers, seed ${seed}`, () => {
-				// The copy is asked FIRST and the runtime second,
-				// because reading a box through the runtime REPAIRS it — ask
-				// the runtime first and every box handed to the copy is
-				// already current, which is the one state a broken replay
-				// would survive.
+				// The copy first, since the runtime repairs a box it reads,
+				// and a broken replay would pass on a current box.
 				for (let box of staleBoxesFrom(seed)) {
 					let shown = itemsThrough(replay, box)
 
@@ -152,9 +128,7 @@ describe("the client's copies of the undo replay", () => {
 			})
 		}
 
-		// And the shape the arithmetic is really about, written out
-		// rather than drawn from a seed: one run, three versions of it, every
-		// version still held.
+		// One run with three versions, every version still held.
 		it(`${name} answers each version of one written run`, () => {
 			let first = replace(
 				integers([0, 1, 2, 3, 4]),
@@ -169,10 +143,7 @@ describe("the client's copies of the undo replay", () => {
 			expect(itemsThrough(replay, first)).toEqual([0, 1, 2, 3, 4])
 		})
 
-		// THE OTHER HALF OF WHAT A COPY OWES: it reads, and the runtime
-		// repairs. A box either of these has read must still be stale, so that
-		// the Module on the other side of the boundary finds it exactly as it
-		// left it.
+		// A copy only reads, so a box it read is still stale for the Module.
 		it(`${name} leaves the box it read exactly as stale as it found it`, () => {
 			let first = replace(
 				integers([0, 1, 2, 3, 4]),
