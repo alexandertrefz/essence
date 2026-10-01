@@ -2,7 +2,7 @@
 
 The rewriter turns simplified Programs into JavaScript. `packages/compiler/DEVELOPMENT.md` places it in the
 pipeline and lists its module state. This page holds the reasoning behind `rewrite.ts`, `stdlibPrelude.ts`,
-`emitTarget.ts` and `names.ts`.
+`providedMethods.ts`, `emitTarget.ts` and `names.ts`.
 
 ## Emit targets
 
@@ -139,7 +139,8 @@ Every emitted module has the same order:
 
 1. The runtime imports, then the prelude import and the imports of other Modules, for a Module of a graph.
 2. The coverage counters, when the compile asked for coverage, so a top-level Statement's counter finds its
-   name bound.
+   name bound. A Module whose provided Methods sit in the prelude imports its counter from there instead. See
+   "Counting provided Methods".
 3. The Function-valued prelude members, the pooled constants, then the static Property values. A lone
    Program holds all three. In a graph the prelude Module holds the members, and each Module holds its own
    pooled constants. See "Prelude emission order".
@@ -152,6 +153,16 @@ such as a Type Alias, a Choice or a Protocol, binds nothing. Its Module must sti
 dependency left without any binding gets a bare `import "…"`. A re-export is a dependency too.
 `moduleExports` forwards a re-export straight from the Module it names, and an erased entry publishes
 nothing.
+
+### Counting provided Methods
+
+A provided Method's coverage points are numbered in its declaring Module's table. Its const lives in the
+prelude, where that Module's `$cover` is not in scope. So `graphProtocolNamespaces` gives each instrumented
+Module that declares one a counter of its own, `$cover_` and the Module's spelled path as `mangleName` encodes
+it. A host's build then names it alike from every entry. The prelude binds it with the Module's whole
+table and exports it, and the Module imports it as `$cover`. `countingInto` makes the provided Method's body
+call that name. The prelude is evaluated before any Module that imports it, so the counter is bound before any
+point counts. A lone Program needs none of this, since its prelude and its counter share one file.
 
 ## Source maps
 

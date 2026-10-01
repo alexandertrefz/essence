@@ -792,6 +792,92 @@ export {
 			})
 		})
 
+		// A provided Method counts into its Module's table from the prelude,
+		// and the Module imports that counter by name. The name must not
+		// depend on where in a graph the Module stood.
+		it("names a shared Module's coverage counter the same however it was reached", async () => {
+			let sizing = `implementation {
+	protocol Sized {
+		size() -> Integer
+
+		doubled() -> Integer {
+			if @::size()::isZero() {
+				<- 0
+			} else {
+				<- @::size()::multiply(with 2)
+			}
+		}
+	}
+}
+
+export {
+	Sized
+}
+`
+			let user = (imports: string, answer: string) => `import {
+${imports}
+}
+
+implementation {
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is Sized {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	constant box: Box = { count = 2 }
+	constant answer = ${answer}
+}
+
+export {
+	answer
+}
+`
+
+			await withProject(
+				{
+					"lib/Sized.es": sizing,
+					"lib/Extra.es":
+						"implementation {\n\tconstant extra = 1\n}\n\nexport {\n\textra\n}\n",
+					"One.es": user(
+						'\tfrom "./lib/Sized.es" { Sized }',
+						"box::doubled()",
+					),
+					// `Extra.es` stands before `Sized.es` in this graph.
+					"Two.es": user(
+						'\tfrom "./lib/Extra.es" { extra }\n\tfrom "./lib/Sized.es" { Sized }',
+						"box::doubled()::add(extra)",
+					),
+				},
+				async (root) => {
+					let options = {
+						emit: { mode: "host", root } as const,
+						optimisation: {
+							...defaultOptimiserOptions,
+							coverage: true,
+						},
+					}
+					let one = await emitToMemory(
+						path.join(root, "One.es"),
+						options,
+					)
+					let two = await emitToMemory(
+						path.join(root, "Two.es"),
+						options,
+					)
+					let sized = (result: MemoryEmitResult): string =>
+						result.sources.sources.get("essence:./lib/Sized.es")!
+
+					expect(one.diagnostics).toEqual([])
+					expect(two.diagnostics).toEqual([])
+					expect(sized(one)).toContain("as $cover }")
+					expect(sized(one)).toBe(sized(two))
+				},
+			)
+		})
+
 		// A bundle, the default, spells the same file against the entry. The
 		// host mode exists because of this.
 		it("spells a shared Module against the entry when it emits a bundle", async () => {

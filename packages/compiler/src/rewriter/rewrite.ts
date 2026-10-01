@@ -35,8 +35,17 @@ import {
 	compilerOwnedNames,
 	escapeName,
 	isJavaScriptIdentifierName,
+	mangledNamePrefix,
 	mangleName,
 } from "./names"
+import {
+	graphProtocolNamespaces,
+	type PreludeCounter,
+	protocolEntryIdentity,
+	protocolPreludeNamespaces,
+	type ProvidedMemberIdentifiers,
+	providedMemberIdentifiers,
+} from "./providedMethods"
 import { runtimeNamespaceNames } from "./runtimeNamespaces"
 import {
 	ESSENCE_METHOD_PREFIX,
@@ -272,8 +281,9 @@ function rewriteModuleGraph(
 
 	// One table for the whole graph, so a Protocol's provided Method is one
 	// const in the shared prelude Module.
-	let protocolMembers = protocolPreludeNamespaces(
-		modules.map((module) => module.program),
+	let { namespaces: protocolMembers, counters } = graphProtocolNamespaces(
+		modules,
+		(filePath) => preludeCounterName(spellings.get(filePath)!),
 	)
 	let prelude = [...stdlibPrelude(), ...protocolMembers]
 	let providedMembers = providedMemberIdentifiers(prelude)
@@ -314,7 +324,11 @@ function rewriteModuleGraph(
 
 		let declared = new Set(essenceMembers.keys())
 		let sources = new Map<string, string>()
-		let preludeProgram = preludeModule(essenceMembers, preludePool)
+		let preludeProgram = preludeModule(
+			essenceMembers,
+			preludePool,
+			counters,
+		)
 
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
@@ -334,10 +348,20 @@ function rewriteModuleGraph(
 			]
 			// Built before `referencedNames`, because the coverage head names
 			// `$testing`.
+			let counter = counters.find(
+				(entry) => entry.modulePath === module.filePath,
+			)
 			let head =
-				module.program.coverage === null
-					? []
-					: coverageHead(module.program.coverage, module.filePath)
+				counter !== undefined
+					? [
+							namedImport(
+								[[counter.name, COVERAGE_COUNTER]],
+								PRELUDE_SPECIFIER,
+							),
+						]
+					: module.program.coverage === null
+						? []
+						: coverageHead(module.program.coverage, module.filePath)
 			let names = referencedNames([body, pool, published, head])
 			let preludeNames = [...essenceMembers.keys()].filter((name) =>
 				names.has(name),
@@ -391,18 +415,28 @@ function rewriteModuleGraph(
 function preludeModule(
 	members: Map<string, EssenceMember>,
 	pool: Map<string, PooledConstant>,
+	counters: Array<PreludeCounter>,
 ): estree.Program {
 	let bands = essenceMemberBands(members)
 	let constantPool = constantPoolBand(pool, [bands.functions, bands.values])
-	let names = [...members.keys()]
+	let heads = counters.flatMap((counter) =>
+		coverageHead(counter.section, counter.modulePath, counter.name),
+	)
+	let names = [...members.keys(), ...counters.map((counter) => counter.name)]
 
 	return {
 		type: "Program",
 		sourceType: "module",
 		body: [
 			...runtimeImports(
-				referencedNames([bands.functions, constantPool, bands.values]),
+				referencedNames([
+					heads,
+					bands.functions,
+					constantPool,
+					bands.values,
+				]),
 			),
+			...heads,
 			...bands.functions,
 			...constantPool,
 			...bands.values,
@@ -1579,11 +1613,13 @@ export function reachableEssenceMethods(
 						.get(memberName)!,
 					{
 						kind: "function",
-						declaration: rewriteEssenceMember(
-							provided
-								.get(protocolEntryIdentity(protocol))!
-								.get(memberName)!,
-							method,
+						declaration: countingInto(protocol.counter, () =>
+							rewriteEssenceMember(
+								provided
+									.get(protocolEntryIdentity(protocol))!
+									.get(memberName)!,
+								method,
+							),
 						),
 						...essenceMethodReferences(
 							method.method.value,
@@ -4135,161 +4171,6 @@ function withNamespaceScope<Value>(rewriteScope: () => Value): Value {
 	} finally {
 		shadowingNamespaceScopes.pop()
 	}
-}
-
-// The Programs' Protocols with provided Methods, as prelude entries, so one
-// const answers for every conformer.
-function protocolPreludeNamespaces(
-	programs: Array<common.typedSimple.Program>,
-): Array<PreludeNamespace> {
-	let found: Array<PreludeNamespace> = []
-	let visited = new Set<unknown>()
-
-	let visit = (value: unknown): void => {
-		if (value === null || typeof value !== "object" || visited.has(value)) {
-			return
-		}
-
-		visited.add(value)
-
-		if (Array.isArray(value)) {
-			for (let entry of value) {
-				visit(entry)
-			}
-
-			return
-		}
-
-		let node = value as Record<string, unknown>
-
-		if (node["nodeType"] === "ProtocolDeclarationStatement") {
-			let protocol =
-				value as common.typedSimple.ProtocolDeclarationStatementNode
-
-			if (Object.keys(protocol.methods).length > 0) {
-				found.push({
-					name: protocol.name.name,
-					protocol: true,
-					identity: protocol.identity,
-					node: {
-						nodeType: "NamespaceDefinitionStatement",
-						name: protocol.name,
-						properties: {},
-						methods: protocol.methods,
-						nativeShims: [],
-						type: {
-							type: "Namespace",
-							name: protocol.name.name,
-							targetType: null,
-							generics: [],
-							properties: {},
-							methods: {},
-						},
-						position: protocol.position,
-					},
-				})
-			}
-		}
-
-		// A Type holds no Statements, so `type` and `returnType` are skipped.
-		for (let [key, entry] of Object.entries(node)) {
-			if (key !== "type" && key !== "returnType") {
-				visit(entry)
-			}
-		}
-	}
-
-	// A `tests` block may declare a Protocol too.
-	for (let program of programs) {
-		visit(program.implementation.nodes)
-		visit(program.tests?.nodes ?? [])
-	}
-
-	return found
-}
-
-// Each provided Method's const name, by Protocol identity and Method name.
-// See "Const names" in DEVELOPMENT.md.
-export type ProvidedMemberIdentifiers = ReadonlyMap<
-	string,
-	ReadonlyMap<string, string>
->
-
-// Names every provided Method's const, claiming in an order every entry of a
-// graph agrees on. See "Const names" in DEVELOPMENT.md.
-function providedMemberIdentifiers(
-	prelude: Array<PreludeNamespace>,
-): ProvidedMemberIdentifiers {
-	let protocols = prelude.filter((entry) => entry.protocol === true)
-	let isBare = (entry: PreludeNamespace): boolean =>
-		!/[#@]/.test(protocolEntryIdentity(entry))
-	let claimOrder = [
-		...protocols.filter(isBare),
-		...protocols
-			.filter((entry) => !isBare(entry))
-			.map((entry) => ({ entry, key: declarationKey(entry) }))
-			.sort((left, right) => compareKeys(left.key, right.key))
-			.map(({ entry }) => entry),
-	]
-	let claims = new Map<string, number>()
-	let table = new Map<string, Map<string, string>>()
-
-	for (let entry of claimOrder) {
-		let identity = protocolEntryIdentity(entry)
-		let members = table.get(identity) ?? new Map<string, string>()
-
-		table.set(identity, members)
-
-		for (let memberName of Object.keys(entry.node.methods)) {
-			// One identity is one declaration, so this never holds.
-			if (members.has(memberName)) {
-				throw new Error(
-					`Two Protocols named '${entry.name}' of one identity provide a Method named '${memberName}'`,
-				)
-			}
-
-			let pair = `${entry.name} ${memberName}`
-			let claim = (claims.get(pair) ?? 0) + 1
-
-			claims.set(pair, claim)
-			members.set(
-				memberName,
-				protocolMemberIdentifier(
-					claim === 1 ? entry.name : `${entry.name}_${claim}`,
-					memberName,
-				),
-			)
-		}
-	}
-
-	return table
-}
-
-function protocolEntryIdentity(entry: PreludeNamespace): string {
-	return entry.identity ?? entry.name
-}
-
-function declarationKey(entry: PreludeNamespace): [string, number, number] {
-	let identity = protocolEntryIdentity(entry)
-	let separator = identity.lastIndexOf("#")
-	let start = entry.node.position?.start
-
-	return [
-		separator === -1 ? "" : identity.slice(0, separator),
-		start?.line ?? 0,
-		start?.column ?? 0,
-	]
-}
-
-function compareKeys(
-	left: [string, number, number],
-	right: [string, number, number],
-): number {
-	if (left[0] !== right[0]) {
-		return left[0] < right[0] ? -1 : 1
-	}
-
-	return left[1] - right[1] || left[2] - right[2]
 }
 
 // Outside an emission the table is empty, and the first claimant's name
@@ -7592,8 +7473,35 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 // counts that every counter in the body calls.
 const COVERAGE_COUNTER = "$cover"
 
+// A counter the prelude binds, named after its Module's spelled path, so every
+// entry of a host's build names it alike. Encoded as `mangleName` encodes.
+function preludeCounterName(spelling: string): string {
+	let encoded = mangleName(spelling).slice(mangledNamePrefix.length)
+
+	return `${COVERAGE_COUNTER}_${encoded}`
+}
+
+// The counter the body being emitted calls, which for a provided Method in the
+// prelude is its declaring Module's.
+let currentCoverageCounter = COVERAGE_COUNTER
+
+function countingInto<Value>(
+	counter: string | undefined,
+	emit: () => Value,
+): Value {
+	let outer = currentCoverageCounter
+
+	currentCoverageCounter = counter ?? COVERAGE_COUNTER
+
+	try {
+		return emit()
+	} finally {
+		currentCoverageCounter = outer
+	}
+}
+
 function coverageCounter(): estree.Identifier {
-	return { type: "Identifier", name: COVERAGE_COUNTER }
+	return { type: "Identifier", name: currentCoverageCounter }
 }
 
 // Binds the counter by registering the Module's table of points, which says
@@ -7601,6 +7509,7 @@ function coverageCounter(): estree.Identifier {
 function coverageHead(
 	section: common.typedSimple.CoverageSectionNode,
 	modulePath: string | null,
+	name: string = COVERAGE_COUNTER,
 ): Array<estree.Statement> {
 	return [
 		{
@@ -7609,7 +7518,7 @@ function coverageHead(
 			declarations: [
 				{
 					type: "VariableDeclarator",
-					id: coverageCounter(),
+					id: { type: "Identifier", name },
 					init: testingCall("counters", [
 						{
 							type: "ObjectExpression",

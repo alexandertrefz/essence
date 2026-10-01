@@ -1755,6 +1755,51 @@ const covered = [
 	"",
 ].join("\n")
 
+// A Protocol whose provided Method a test calls, and whose `if` it never enters.
+const provided = [
+	"implementation {",
+	"\tprotocol Sized {",
+	"\t\tsize() -> Integer",
+	"",
+	"\t\tdescribeSize() -> String {",
+	"\t\t\tif @::size()::isZero() {",
+	'\t\t\t\t<- "empty"',
+	"\t\t\t} else {",
+	'\t\t\t\t<- "full"',
+	"\t\t\t}",
+	"\t\t}",
+	"\t}",
+	"",
+	"\ttype Box = { count: Integer }",
+	"",
+	"\tnamespace Boxes for Box is Sized {",
+	"\t\tsize() -> Integer {",
+	"\t\t\t<- @.count",
+	"\t\t}",
+	"\t}",
+	"}",
+	"",
+	"tests {",
+	'\ttest "describes a full box" {',
+	"\t\tconstant box: Box = { count = 1 }",
+	"",
+	'\t\texpect box::describeSize()::is("full")',
+	"\t}",
+	"}",
+	"",
+].join("\n")
+
+// What `--coverage-report json` wrote: each file's missed points.
+type MissedPoints = {
+	files: Array<{
+		missed: Array<{
+			scope: string
+			label: string
+			position: { start: { line: number } }
+		}>
+	}>
+}
+
 describe("essence test --coverage", () => {
 	it("reports nothing about coverage unless it was asked", async () => {
 		await withFiles({ "Fixture.es": covered }, async (directory) => {
@@ -1784,6 +1829,31 @@ describe("essence test --coverage", () => {
 
 			expect(out).toContain("points › case #Postponed")
 			expect(out).toContain("share › if")
+		})
+	})
+
+	it("counts a provided Method into its own file from the shared prelude", async () => {
+		await withFiles({ "Sized.es": provided }, async (directory) => {
+			let out = path.join(directory, "reports")
+			let { code } = await runTests(directory, [
+				"--coverage-report",
+				"json",
+				"--coverage-out",
+				out,
+			])
+			let written = JSON.parse(
+				readFileSync(path.join(out, "coverage.json"), "utf8"),
+			) as MissedPoints
+
+			expect(code).toBe(EXIT_SUCCESS)
+			expect(
+				written.files.flatMap((file) =>
+					file.missed.map((missed) => [
+						missed.label,
+						missed.position.start.line,
+					]),
+				),
+			).toEqual([["if", 7]])
 		})
 	})
 

@@ -29,6 +29,9 @@ export type PreludeNamespace = {
 	protocol?: true
 	// The Protocol identity an Invocation's `providedBy` names.
 	identity?: string
+	// The coverage counter a provided Method's points call, bound by the
+	// prelude. See "Counting provided Methods" in DEVELOPMENT.md.
+	counter?: string
 }
 
 export type PreludeFreeFunction = {
