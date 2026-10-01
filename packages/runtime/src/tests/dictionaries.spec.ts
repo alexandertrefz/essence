@@ -1559,21 +1559,24 @@ describe("repacking", () => {
 		let box = dictionary([text("a"), integer(1)], [text("b"), integer(2)])
 		let chain = [{ box, text: `["a" = 1, "b" = 2]` }]
 
-		// A removal counts two dead versions, which a two-slot store holds
-		// without passing its limit, so each re-add here repacks by the re-add
-		// rule.
+		// A removal leaves two dead versions and an overwrite one, which puts a
+		// two-slot store past its limit. The next write comes from the tip to a
+		// live key, so only the dead-versions rule repacks it.
 		let next = removeAt(box, text("a"), equality)
 
 		chain.push({ box: next, text: `["b" = 2]` })
 
-		next = setAt(next, text("a"), integer(3), equality)
-		chain.push({ box: next, text: `["b" = 2, "a" = 3]` })
+		next = setAt(next, text("b"), integer(3), equality)
+		chain.push({ box: next, text: `["b" = 3]` })
 
-		next = removeAt(next, text("b"), equality)
-		chain.push({ box: next, text: `["a" = 3]` })
+		let overloaded = next.store
+
+		expect(overloaded.dead).toBeGreaterThan(overloaded.slots.length)
 
 		next = setAt(next, text("b"), integer(4), equality)
-		chain.push({ box: next, text: `["a" = 3, "b" = 4]` })
+		chain.push({ box: next, text: `["b" = 4]` })
+
+		expect(next.store).not.toBe(overloaded)
 
 		for (let step of chain) {
 			expect(writtenForm(step.box)).toBe(step.text)
