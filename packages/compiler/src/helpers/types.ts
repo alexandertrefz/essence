@@ -2832,81 +2832,39 @@ function matchTypes(
 	return false
 }
 
-// The Argument Type is provided lazily — resolving an Argument's Type
-// in the Enricher can report Diagnostics, so `getType` is only invoked for
-// Arguments whose label already matched, exactly like the previous inline
-// checks did.
-// `expectedType` is the parameter's Type with whatever has been inferred so
-// far substituted in. A Function literal that omitted its annotations reads
-// them off it; every other Argument ignores it entirely.
-// `bindings` is the very Map that substitution came from, still being filled —
-// what an Argument matched BEFORE the Type Parameters it mentions were decided
-// needs, to read its position as it finally stands rather than as it stood the
-// moment it was matched. `null` where nothing is being inferred at all.
+// An Argument as `matchArguments` reads it. `getType` is asked only after the
+// label matched, since enriching can report. `bindings` is the Map still being
+// filled, for an Argument matched before its Type Parameters were decided.
 export type MatchableArgument = {
 	name: string | null
 	getType: (
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
 	) => common.Type
-	// Set on an Argument that can bind no Type Parameter of the call it
-	// stands in — a prefixed Case construction with no Type Arguments of its own,
-	// which is DECIDED by the Parameter it is matched against and decides nothing
-	// itself. Said by the Argument rather than read off the Parameter, because a
-	// `Box<Item>` Parameter is a Parameter like any other: what can not decide is
-	// this way of writing the value, not the place it is written in.
+	// Set on an Argument that binds no Type Parameter, a prefixed Case construction
+	// with no Type Arguments, which its Parameter decides.
 	bindsNothing?: boolean
-	// The Argument's enriched value where there is one, so a Record
-	// Literal that wrote a path key can be measured by what the merge makes of
-	// it rather than by what it says on its own. Answered lazily: an Argument is
-	// enriched at most once per Invocation, and this is asked once per candidate.
+	// The enriched value, so a Literal with a path key is measured by its merge.
+	// Asked lazily, since it enriches.
 	mergedValue?: () => common.typed.ExpressionNode | null
-	// Fills the Unknown slots of this Argument's own Type from the Type the
-	// finished call decided for the Parameter it stands at — the brackets of a
-	// written `[]` taking what the call worked out for them. Absent everywhere the
-	// Argument has no Node to write onto: the Validator matches typed Nodes, and
-	// what it reads there is a decision the Enricher has already made.
+	// Fills the Argument's own `Unknown` slots from the Type the finished call
+	// decided. Absent where there is no Node to write onto.
 	decide?: (decided: common.Type) => void
-	// Set on an Argument written as a Record LITERAL, whose emitted value
-	// therefore carries exactly the members its Type names and no others.
-	//
-	// Which is what a PARTIAL Argument has to promise, and why only a
-	// literal may be one. Record assignability is width subtyping, so a value
-	// typed `{ host: String }` may carry a `retries` of any Type at all — and a
-	// callee filling in the members a caller left out reads
-	// `options.retries ?? 3`, which would take that foreign value for the member
-	// it is missing, exactly as spreading a `with`'s right-hand side whole did.
-	// A literal has nothing to hide: its Type is its text. Every OTHER
-	// expression still passes a WHOLE Record, where every member the callee
-	// reads is one the Type declares and the fallback can not fire at all.
+	// Set on an Argument written as a Record Literal, the only kind that may be
+	// partial. See "Partial Record Arguments" in DEVELOPMENT.md.
 	spellsItsMembers?: boolean
 }
 
-// Which Argument each Parameter was given. `forParameter[i]` is the
-// Argument index paired with Parameter `i`, or null when the Parameter took its
-// default; `omittedParameterIndices` is the same fact the other way round, and
-// is what rides out to the emission side. Both are indexed over the FULL
-// signature, receiver Parameter included, which is the list the Simplifier
-// emits an Argument list against.
+// Which Argument each Parameter was given, or null for a default, and the
+// omitted Parameters, both indexed over the full signature, receiver included.
 export type ArgumentPairing = {
 	forParameter: Array<number | null>
 	omittedParameterIndices: Array<number>
 }
 
-// What ONE refused Argument was refused for, for a report that has to
-// name the Argument rather than only the signature it was held to. Collected
-// only where a caller hands `matchArguments` somewhere to put it, which is the
-// Diagnostic path alone: a match that is only asked whether it matches pays one
-// comparison against `undefined` per refusal and nothing else.
-//
-// `argumentType` is null where the LABEL is what disagreed — matching an
-// Argument reads its label before its Type, so there is no Type to report when
-// the label is already wrong, and asking for one would type an Argument nothing
-// else typed.
-//
-// `matchedParameters` is how many Parameters this candidate answered before it
-// refused one, which is what "closest" is measured in: two candidates a call
-// misses are ordered by how far into the signature the call got.
+// What one refused Argument was refused for, collected only for a report.
+// `argumentType` is null where the label disagreed. `matchedParameters` orders
+// candidates by how far the call got.
 export type ArgumentMismatchDetail = {
 	argumentIndex: number
 	parameterIndex: number
@@ -2921,22 +2879,12 @@ export type ArgumentMatchResult =
 	| {
 			type: "ArgumentMismatch"
 			mismatchedArgumentIndices: Array<number>
-			// For Argument `i`, the Parameter it was paired with — which
-			// is `i` itself for every call that omits nothing, and is not once
-			// a default has been skipped. The Validator reports one Diagnostic
-			// per mismatching Argument and names the Parameter it was held to,
-			// so it needs both halves of the pair.
+			// For Argument `i`, the Parameter it was paired with, for the Validator.
 			parameterForArgument: Array<number>
 	  }
 
-// Collects every Type Parameter of THIS invocation that `type` mentions
-// — a structural walk, so a Generic buried in a Record member, a List's items
-// or a nested signature counts as much as one written at the top. Generics of
-// an enclosing definition are opaque symbols here and are not collected: they
-// are not what an Argument could bind.
-//
-// Asked as a search that never finds anything, so that the whole Type is walked
-// — collecting is what it is here for, and answering would stop it early.
+// Collects every Type Parameter of this call that `type` mentions. Opaque
+// Generics of an enclosing definition are not collected.
 function collectBindableGenerics(
 	type: common.Type,
 	context: GenericInferenceContext,
@@ -2955,12 +2903,8 @@ function collectBindableGenerics(
 	})
 }
 
-// Whether a callback Parameter's own PARAMETERS mention a Type Parameter
-// nothing has bound yet — the Types an unannotated Function literal would have
-// to read off them. Its return Type is deliberately not asked about: an omitted
-// `-> Type` is read off the literal's BODY, so a Generic standing there is one
-// the callback BINDS rather than one it waits for, and holding the callback
-// back for it would wait for something only it can provide.
+// Whether a callback's Parameters mention an unbound Type Parameter. Its return
+// Type is one the callback binds, so it is not asked.
 function callbackWaitsOnUnboundGeneric(
 	callback: common.FunctionType,
 	boundSoFar: ReadonlySet<common.GenericName>,
@@ -2981,10 +2925,7 @@ function callbackWaitsOnUnboundGeneric(
 	return false
 }
 
-// Whether a Parameter Type mentions a Type Parameter of this call that
-// nothing has bound yet — asked of the Parameter an Argument that binds nothing
-// stands at, where the whole Type is what the Argument reads, not just the
-// Parameters of a callback.
+// Whether a Parameter Type mentions an unbound Type Parameter of this call.
 function parameterWaitsOnUnboundGeneric(
 	parameterType: common.Type,
 	boundSoFar: ReadonlySet<common.GenericName>,
@@ -3003,41 +2944,14 @@ function parameterWaitsOnUnboundGeneric(
 	return false
 }
 
-// The order the Arguments are matched in — their own, except that a
-// callback Parameter still waiting on an unbound `infer` Generic is held back
-// to the end. An unannotated Function literal is typed FROM the Parameter it
-// is passed to, so matching it while that Generic is open makes it echo the
-// Generic straight back: the Generic binds to a use of ITSELF, is opaque from
-// then on, and every later Argument that could have named a real Type is
-// turned away — `apply(transform (x) { <- x }, to 5)` pinned `T` on the
-// callback and then refused `5`, its own inferred Type. Matching the Arguments
-// that can actually name a Type first means the callback is resolved against
-// `(_: Integer) -> Integer` and the invocation reads a real Type throughout.
-// Which is why inference must not depend on the order the Parameters happen to
-// be written in: the same call with `to 5` first always compiled.
-//
-// Nothing is deferred without a Generic to wait for, and deferred Arguments
-// keep their order among themselves — so a callback is held back behind ANY
-// Argument that can still name a Type, another callback (one whose own
-// Parameters are already concrete) included.
-//
-// `null` means "the order they were written in", which is the answer for every
-// invocation whose callbacks already come last — every one in the stdlib,
-// where `map`'s transform is the final Parameter — so the overwhelmingly
-// common case allocates nothing and the loop counts as it always did.
-// A prefixed Case construction waits for the same reason and is held back the
-// same way: it reads its Choice's Type Arguments off the Parameter it is matched
-// against, so a Parameter still mentioning an unbound Generic hands it nothing to
-// read and it has to refuse. `unwrap(Box#Empty, 7)` said as much while `7` named
-// the very Type one Parameter over — the same order-dependence, on the other kind
-// of Argument that is typed BY its position rather than binding it.
+// The order to match Arguments in, or null for written order. A callback or a
+// prefixed Case construction waiting on an unbound Generic goes last. See
+// "Argument order" in DEVELOPMENT.md.
 function deferredArgumentOrder(
 	parameters: common.BaseFunction["parameterTypes"],
 	context: GenericInferenceContext | null,
 	matchableArguments: Array<MatchableArgument>,
-	// Read through the pairing rather than by Parameter index. An omitted
-	// Parameter has no Argument at all, so it can neither bind nor wait — it is
-	// treated exactly like a Parameter whose Argument names nothing.
+	// Read through the pairing, so an omitted Parameter neither binds nor waits.
 	pairing: ArgumentPairing,
 ): Array<number> | null {
 	if (context === null || parameters.length < 2) {
@@ -3052,10 +2966,7 @@ function deferredArgumentOrder(
 			: matchableArguments[argumentIndex]
 	}
 
-	// Only a Parameter that FOLLOWS one that waits has anything to gain
-	// from being matched first, so an invocation whose waiting Arguments already
-	// come last — every Method in the stdlib, `map`'s transform being its final
-	// Parameter — is answered here, by a walk that allocates nothing.
+	// Nothing to reorder where the first waiting Parameter is the last.
 	let firstWaiting = parameters.findIndex(
 		(parameter, index) =>
 			parameter.type.type === "Function" ||
@@ -3098,9 +3009,7 @@ function deferredArgumentOrder(
 
 		immediate.push(index)
 
-		// What this Parameter can name is counted as bound for the
-		// Parameters after it — a callback waits for the Argument that names its
-		// Types, not for one that waits alongside it.
+		// What this Parameter can name counts as bound for the ones after it.
 		collectBindableGenerics(parameter.type, context, boundSoFar)
 	}
 
@@ -3113,24 +3022,8 @@ function deferredArgumentOrder(
 	return order
 }
 
-// Whether one Argument answers one Parameter — assignability, or, for a
-// Record Parameter carrying a Record default, the partial reading that default
-// buys: an Argument that writes SOME of the members and leaves the rest to the
-// default. Two things have to hold for that, and `matchesType` answers neither
-// on its own — every member written has to be one the Parameter declares and to
-// fit it, which is `isPartialOf`, and every member the default does NOT fill in
-// has to be written, which is what makes the merged value complete.
-//
-// Asked of the SUBSTITUTED Parameter Type, unlike the assignability check
-// beside it: `matchTypes` is handed the unsubstituted Type so that a Generic's
-// first occurrence binds off the Argument, and by the time this is reached that
-// has either happened or the Generic is still open — in which case the member
-// comparisons bind it, through the very inference context they are given.
-//
-// Extras are not refused here, because Record assignability is width
-// subtyping and refusing them would make a partial Argument stricter than a
-// whole one. `{ port = 1, extra = 2 }` fails `isPartialOf` all the same, since
-// `extra` is not a member the Parameter declares.
+// Whether one Argument answers one Parameter: assignable, or a partial Record
+// the default completes. See "Partial Record Arguments" in DEVELOPMENT.md.
 function argumentFits(
 	parameter: common.Parameter,
 	expectedType: common.Type | common.GenericUse,
@@ -3138,16 +3031,8 @@ function argumentFits(
 	argumentType: common.Type,
 	inferenceContext: GenericInferenceContext | null,
 ): boolean {
-	// A path key writes SOME of a member the default fills in, and the
-	// merge makes the whole of it — so the Argument is measured by what it will
-	// be, not by what it wrote. Asked before assignability rather than after it:
-	// a Literal carrying one is never assignable as it stands, and asking twice
-	// would bind a Generic off a partial member on the way past.
-	//
-	// Asked only where a path key could possibly stand — a Parameter whose
-	// default reaches into something, given an Argument written as a Record
-	// Literal. `mergedValue` ENRICHES, and an Argument that reacts to the
-	// position it stands in must not be enriched by a candidate merely probing.
+	// A Literal with a path key is measured by its merge, and only where the
+	// default reaches into a member, since `mergedValue` enriches.
 	let effectiveType =
 		(parameter.defaultNesting !== undefined &&
 		argument.spellsItsMembers === true
@@ -3179,10 +3064,8 @@ function argumentFits(
 	)
 }
 
-// The members a Record Argument had to write and did not — the ones its
-// Parameter declares, the default does not fill in, and the Argument does not
-// carry. The Validator reports them by name, which is why this answers a list
-// rather than a boolean.
+// The members a Record Argument had to write and did not, by name for the
+// Validator.
 export function missingRecordMembers(
 	parameterType: common.RecordType,
 	defaultMembers: ReadonlyArray<string>,
@@ -3196,29 +3079,15 @@ export function missingRecordMembers(
 	)
 }
 
-// Checks whether passed Arguments match a parameter list — arity,
-// labels (matched by name equality; a labelless Argument only matches a
-// labelless parameter), and per-Argument `matchesType`.
-// By default the check stops at the first mismatching Argument, which callers
-// that only need a boolean "does this overload match" rely on to avoid
-// resolving further Argument Types. With `collectAllMismatches` every
-// mismatching Argument index is collected, which the Validator uses to report
-// one Diagnostic per mismatching Argument — in Argument order, whatever order
-// they were matched in.
-// With `inference` the Arguments are matched against a Generic signature in
-// the order `deferredArgumentOrder` gives — the first occurrence of a bindable
-// Generic binds the Argument's Type, later occurrences check against the
-// binding. Callers pass a fresh context per overload candidate, so bindings
-// can not leak between candidates.
+// Whether Arguments match a parameter list: arity, labels, then Types. See
+// "Matching Arguments" in DEVELOPMENT.md.
 export function matchArguments(
 	parameters: common.BaseFunction["parameterTypes"],
 	matchableArguments: Array<MatchableArgument>,
 	options: {
 		collectAllMismatches?: boolean
 		inference?: GenericInferenceContext
-		// Where to put what each refusal was ABOUT, in the order the
-		// Arguments were matched in — see `ArgumentMismatchDetail`. Passed by the
-		// reports that name the Argument a candidate refused, and by nothing else.
+		// Where to put what each refusal was about, for the reports naming it.
 		explain?: Array<ArgumentMismatchDetail>
 	} = {},
 ): ArgumentMatchResult {
@@ -3243,24 +3112,15 @@ export function matchArguments(
 		let parameter = parameters[i]
 		let argumentIndex = pairing.forParameter[i]
 
-		// A Parameter nobody wrote an Argument for takes its default,
-		// which was checked against this Parameter's Type where it was written.
-		// It binds nothing either — there is no Argument to read a Type off, so
-		// a Type Parameter bound ONLY by an omitted Parameter stays unbound and
-		// is reported as `uninferable-type-parameter`, which is the honest
-		// answer: the writer either passes the Argument or writes the Type
-		// Argument.
+		// A Parameter without an Argument takes its default, checked where it was
+		// written, and binds nothing.
 		if (argumentIndex === null) {
 			continue
 		}
 
 		let argument = matchableArguments[argumentIndex]
 
-		// A callback is matched after the Arguments that bind, so the
-		// Generics its Parameters mention have been bound by then —
-		// substituting them is what turns `map`'s declared
-		// `(_ item: ItemType) -> Result` into the `(_ item: Integer) ->
-		// Result` the literal is actually resolved against.
+		// Substituting the bindings so far gives a deferred callback its real Types.
 		let expectedType =
 			inferenceContext === null
 				? parameter.type
@@ -3269,10 +3129,8 @@ export function matchArguments(
 						inferenceContext.bindings,
 					)
 
-		// The label is compared before the Type is asked for, and the two
-		// branches stay apart so that it still is: a labelless Argument standing
-		// at a labelled Parameter is refused without typing anything, which is
-		// what keeps an Argument nothing committed to from being enriched.
+		// The label is compared first, so an Argument at the wrong label is never
+		// typed.
 		if (parameter.name === argument.name) {
 			let argumentType = argument.getType(
 				expectedType,
@@ -3320,9 +3178,7 @@ export function matchArguments(
 	}
 
 	if (mismatchedArgumentIndices.length > 0) {
-		// Sorted, because a deferred callback may have been matched out
-		// of turn — the Validator reports one Diagnostic per index and they
-		// must still arrive in the order the Arguments were written.
+		// Sorted back into written order for the Validator.
 		return {
 			type: "ArgumentMismatch",
 			mismatchedArgumentIndices: mismatchedArgumentIndices.sort(

@@ -520,3 +520,47 @@ A Record matches by width: every expected member must be present at a matching T
 `SimpleMethod` and a `StaticMethod` are one kind of value here, compared by `signatureMatches`, in both
 directions. A Method named rather than called already holds its receiver as its first Parameter, and an
 unannotated `variable read = Reader.readsBase` is declared with that tag.
+
+## Matching Arguments
+
+`matchArguments` checks a call's Arguments against a parameter list: arity, labels, then Types. A labelless
+Argument matches only a labelless Parameter. It stops at the first mismatch unless asked to collect all of them,
+which the Validator does to report one Diagnostic per Argument. An Argument's Type is asked for lazily, after its
+label matched, since enriching an Argument can report Diagnostics. A candidate merely probing must not enrich an
+Argument that no label committed to.
+
+With an inference context, a bindable Generic binds on its first occurrence and later ones are checked. Each
+Overload candidate gets a fresh context. A Parameter that took its default binds nothing, so a Type Parameter only
+it mentions stays unbound and is reported as `uninferable-type-parameter`.
+
+### Argument order
+
+An unannotated Function literal is typed from the Parameter it is passed to. Matched while that Parameter's
+Generic is open, it echoes the Generic back. The Generic binds to a use of itself and turns away every later
+Argument that names a real Type. `deferredArgumentOrder` therefore matches such a callback after the Arguments
+that can name its Types. So `apply(transform (x) { <- x }, to 5)` resolves the callback against
+`(_: Integer) -> Integer`, as it would with `to 5` written first.
+
+A callback waits only on Generics in its Parameters. An omitted `-> Type` is read off the literal's body, so a
+Generic in its return Type is one the callback binds. A prefixed Case construction with no Type Arguments,
+marked `bindsNothing`, waits the same way. It reads its Choice's Type Arguments off its Parameter, which must be
+decided first. Deferred Arguments keep their order among themselves. Mismatches are sorted back into written order.
+Where every waiting Argument already comes last, as in every standard library Method, the order is null and costs
+nothing.
+
+### Partial Record Arguments
+
+`argumentFits` accepts a Record Argument that writes only some members where the Parameter's default fills in
+the rest. Every member written must be declared and fit, which `isPartialOf` checks. Every member the default does
+not fill in must be written, which `missingRecordMembers` checks. Extra members fail `isPartialOf`, since the
+Parameter does not declare them. The partial check reads the substituted Parameter Type, while assignability
+reads the declared one, so a Generic binds off the Argument first.
+
+Only an Argument written as a Record Literal may be partial, which `spellsItsMembers` marks. Record assignability
+is width subtyping, so a value typed `{ host: String }` may carry a `retries` of any Type. The callee fills a
+missing member with `options.retries ?? 3`, which would take that foreign value. A Literal's Type is its text, so
+it carries no member its Type hides.
+
+A Literal with a path key is measured by the Record the merge makes, from `mergedRecordType`, before
+assignability. As written it is never assignable, and asking first would bind a Generic off a partial member.
+This is asked only where the Parameter's default reaches into a member, since `mergedValue` enriches.
