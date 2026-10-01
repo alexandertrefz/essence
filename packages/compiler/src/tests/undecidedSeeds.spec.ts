@@ -13,10 +13,9 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// End to end, because a decision made here is judged everywhere else: the
-// Enricher decides what a call carries, the Validator measures the Declaration
-// it is written into against it, and a body typed under the decision is what
-// reports a misread accumulator.
+// End to end. The Enricher decides what a call carries, the Validator
+// measures the Declaration against it, and a body typed under it reports a
+// misread accumulator.
 function errorsFor(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -29,11 +28,9 @@ function codesFor(source: string): Array<string> {
 	return errorsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// Writes the emitted Program to a throwaway module and imports it so its
-// top-level `Terminal.inspect` calls run, capturing `console.log`. Every
-// Program here sorts what it built: a sort is handed the witness the decided
-// item Type picks, so what the Program PRINTS is where a slot decided wrongly
-// shows up — and a slot left undecided does not compile the sort at all.
+// Imports the emitted Program from a throwaway module. Every Program sorts
+// what it built with the witness the decided item Type picks. A wrong decision
+// prints wrongly, and an undecided slot does not compile.
 async function run(source: string): Promise<Array<string>> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -67,8 +64,7 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// The Type a top-level Declaration came to, for the decisions that are
-// about a Type rather than about what a Program answers.
+// The Type a top-level Declaration came to.
 function typeOfDeclaration(source: string, name: string): common.Type {
 	let { program } = enrich(parse(source))
 
@@ -85,8 +81,7 @@ function typeOfDeclaration(source: string, name: string): common.Type {
 	throw new Error(`no Declaration named '${name}'`)
 }
 
-// The Type the seed's own Node carries, found by the one Argument of the
-// Declaration's Invocation that is written as a List Literal.
+// The Type of the seed, the Declaration's List Literal Argument.
 function typeOfSeedNode(source: string, name: string): common.Type {
 	let { program } = enrich(parse(source))
 
@@ -115,14 +110,9 @@ function typeOfSeedNode(source: string, name: string): common.Type {
 	throw new Error(`no List Literal Argument under '${name}'`)
 }
 
-// An empty `[]` seed is typed `List<Unknown>`, and a Type Parameter bound
-// to one carries a slot nobody decided. `Unknown` is bottom as an Argument and
-// top as a Parameter, so every later occurrence of that Parameter was waved
-// through against it: `words::reduce(startingWith [], (kept, word) { <-
-// kept::append(word) })` answered `List<Unknown>`, and the `kept` its own
-// combiner read was a `List<Unknown>` too — so a body reading Integers out of a
-// List of Strings compiled clean and answered wrongly. The Arguments of one call
-// are read together here, and what they say between them decides the slot.
+// An empty `[]` seed binds a Type Parameter to a Type with an undecided slot,
+// which the call's other Arguments decide. See "Seeds an Invocation decides" in
+// packages/compiler/src/enricher/DEVELOPMENT.md.
 describe("Undecided Seeds", () => {
 	describe("a fold seeded with an empty List Literal", () => {
 		it("decides what it carries from what the combiner answers", async () => {
@@ -138,10 +128,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a", "bb", "ccc" ]'])
 		})
 
-		// The laundering the undecided answer used to allow. Nothing was
-		// reported at either end: the call answered a List that promised nothing
-		// about its items, and a Type that promises nothing fits every
-		// annotation.
+		// An undecided answer would fit every annotation.
 		it("refuses the annotation that would launder what it carries", () => {
 			let errors = errorsFor(`implementation {
 				constant gathered = [1, 2, 3]::reduce(startingWith [], (carry, item) {
@@ -167,10 +154,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// The other half of the same hole, and the half an annotation can
-		// not close: the accumulator the combiner's BODY reads is the Type the
-		// call decided, so the body is checked against the decision rather than
-		// against the seed that started it.
+		// The combiner's body reads the accumulator as the decided Type, not
+		// as the seed.
 		it("refuses a combiner body that misreads the accumulator", () => {
 			expect(
 				codesFor(`implementation {
@@ -184,10 +169,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// A combiner that answers the seed untouched decides nothing, and
-		// nothing else here does either — so the fold really does answer an empty
-		// List, and the Type that says so is the honest one. No Diagnostic of its
-		// own: there is nothing wrong with a Program that builds nothing.
+		// Nothing decides the slot, and the fold does answer an empty List, so
+		// the undecided Type is honest and nothing is reported.
 		it("leaves the seed undecided where the combiner answers it unchanged", () => {
 			expect(
 				codesFor(`implementation {
@@ -200,12 +183,8 @@ describe("Undecided Seeds", () => {
 			).toEqual([])
 		})
 
-		// The Node as well as the answer. Every stage after the Enricher
-		// reads a call off its Nodes — the Validator re-matches the committed
-		// signature against exactly these Types — so a seed still typed
-		// `List<Unknown>` beside a combiner typed `(_: List<String>, _: String)
-		// -> List<String>` would be a call nothing downstream could make sense
-		// of.
+		// The Validator re-matches the committed signature against the
+		// Argument Nodes' Types, so the seed's Node must carry the decision.
 		it("writes the decision onto the seed's own Node", () => {
 			let source = `implementation {
 				constant words = ["a", "bb"]
@@ -221,14 +200,9 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// The combiner an author actually writes. A filter keeps the
-	// accumulator in one branch and writes into it in the other, so the body
-	// answers `NonEmptyList<Integer> | List<Unknown>` — one branch saying what it
-	// holds and one saying nothing at all. Read as one Type that decides nothing,
-	// and every one of these was refused for returning a decided List where the
-	// Function returns `List<Unknown>`. Read branch by branch, the branch that
-	// writes decides the slot and the branch that hands the seed back is silent,
-	// which is what it is.
+	// A filter keeps the accumulator in one branch and writes into it in the
+	// other, so the body answers `NonEmptyList<Integer> | List<Unknown>`. Read
+	// branch by branch, the writing branch decides the slot.
 	describe("a combiner that writes in only some of its branches", () => {
 		it("decides from the branch that writes, after an early return", async () => {
 			expect(
@@ -262,9 +236,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// Which branch writes is nothing to the rule — a slot takes what
-		// the branches that fill it agree on, and the order they are written in
-		// is not one of them.
+		// A slot takes what the branches that fill it agree on, in whatever
+		// order they are written.
 		it("decides it with the branches the other way round", async () => {
 			expect(
 				await run(`implementation {
@@ -296,9 +269,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// A `step` body answers a Choice rather than the accumulator, so
-		// the branches are two instantiations of one Choice and the slot is a
-		// Case's payload member. Same rule, one level in.
+		// A `step` body answers a Choice, so the slot is a Case's payload. The
+		// same rule holds one level in.
 		it("decides it through a step body answering a Case", async () => {
 			expect(
 				await run(`implementation {
@@ -315,10 +287,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]"])
 		})
 
-		// Two Parameters, and the second decided only once the first is.
-		// `#Done` hands back the accumulator, so what the loop ANSWERS is what
-		// the accumulator came to — which the arm that appends says and the arm
-		// that answers can only repeat.
+		// The answer's Type Parameter is decided only once the accumulator's
+		// is, from what `#Continue` wrote.
 		it("decides what a step body's #Done answers from what #Continue wrote", async () => {
 			expect(
 				await run(`implementation {
@@ -351,9 +321,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 1, 3, 5 ]"])
 		})
 
-		// One accumulator per member, each written by its own branch —
-		// so neither branch decides the Record and the two together decide
-		// every member of it.
+		// Each branch writes one member, and together they decide the Record.
 		it("decides a Record seed one member per branch", async () => {
 			expect(
 				await run(`implementation {
@@ -371,8 +339,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 4 ]", "[ 1, 3 ]"])
 		})
 
-		// A branch answering the seed itself decides nothing and refuses
-		// nothing either — what the OTHER branch writes is still the answer.
+		// A branch answering an empty List decides nothing and refuses nothing,
+		// so the other branch decides.
 		it("decides it where a branch answers an empty List of its own", async () => {
 			expect(
 				await run(`implementation {
@@ -413,11 +381,8 @@ describe("Undecided Seeds", () => {
 			).toEqual([])
 		})
 
-		// Branches that disagree decide nothing. There is no one Type the
-		// accumulator holds, and taking the branch that happens to be written
-		// first would be inventing one — so the slot stays open and every write
-		// into it is refused, which is the same answer a fold nothing writes
-		// into at all gets.
+		// Branches that disagree decide nothing, so the slot stays open and
+		// every write into it is refused.
 		it("refuses a combiner whose branches write different Types", () => {
 			expect(
 				codesFor(`implementation {
@@ -436,8 +401,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["return-type-mismatch", "return-type-mismatch"])
 		})
 
-		// A branch that decides the accumulator WHOLE is not made worse by
-		// the branch beside it that decides one member of it.
+		// A branch that decides one member does not spoil the branch that
+		// decides the whole accumulator.
 		it("decides a member one branch leaves alone", async () => {
 			expect(
 				await run(`implementation {
@@ -456,11 +421,8 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("the position a fold is written in", () => {
-		// The Declaration's annotation is a decision somebody wrote down,
-		// and it is read BEFORE anything is inferred from the call's own
-		// Arguments — which is what decides a fold whose combiner says nothing,
-		// and what makes the combiner below answer to the annotation rather than
-		// the other way round.
+		// An annotation is read before anything is inferred from the
+		// Arguments, so it decides a fold whose combiner says nothing.
 		it("decides the accumulator from the Declaration's annotation", async () => {
 			expect(
 				await run(`implementation {
@@ -503,9 +465,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// The annotation wins, and the combiner is then measured against
-		// it: appending an Integer to a List of Strings is refused where the
-		// undecided accumulator used to accept both and promise neither.
+		// The annotation wins, and the combiner is measured against it.
 		it("refuses a combiner that disagrees with the annotation", () => {
 			expect(
 				codesFor(`implementation {
@@ -518,8 +478,7 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("the other empty seeds", () => {
-		// Two slots, decided independently — the keys off what the update
-		// writes and the values off what it stores.
+		// The keys and the values are decided independently.
 		it("decides both slots of an empty Dictionary Literal", async () => {
 			expect(
 				await run(`implementation {
@@ -545,11 +504,9 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ [], [ 2 ], [ 1 ] ]"])
 		})
 
-		// A Record seed, whose open slot is a member rather than the whole
-		// accumulator — decided from the member the combiner answers, and decided
-		// to the BASE of the `NonEmptyList` that answer carries, because the seed
-		// wrote `[]` into that member and an empty List is not a proof of
-		// anything.
+		// The open slot is a member of the Record seed. It is decided to the
+		// base of the `NonEmptyList` the combiner answers, since the seed wrote
+		// `[]` there.
 		it("decides a slot inside a Record seed", async () => {
 			expect(
 				await run(`implementation {
@@ -566,11 +523,9 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a", "ccc" ]', '"2"'])
 		})
 
-		// The decision a slot takes carries no proof, which is what keeps
-		// the idiom that BUILT the Dictionary writable against it. Deciding the
-		// values `NonEmptyList<String>` off the `[]::append(word)` one turn
-		// answers refuses the `defaultingTo []` of the very next turn — a
-		// Dictionary of non-empty Lists has no empty List to fall back to.
+		// A decided slot carries no proof. Values decided as
+		// `NonEmptyList<String>` would refuse the `defaultingTo []` that reads
+		// the Dictionary back.
 		it("decides a Dictionary's values without the proof one write carried", async () => {
 			expect(
 				await run(`implementation {
@@ -599,10 +554,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 2, 5, 7 ]"])
 		})
 
-		// And at every depth, because a proof one level in refuses the
-		// next write just as surely: `rows::append(["a"]::append("b"))` decides
-		// a List of Lists of Strings, never a List of NON-EMPTY ones, so the
-		// empty List written after it still fits.
+		// At every depth: `rows::append(["a"]::append("b"))` decides a List of
+		// Lists of Strings, so a later empty List still fits.
 		it("decides a slot inside a slot without its proof", async () => {
 			expect(
 				await run(`implementation {
@@ -616,9 +569,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ [ "a", "b" ], [] ]'])
 		})
 
-		// The other direction, unchanged and worth saying beside them: a
-		// slot the fold DECIDED still reads an empty List as bottom, so clearing
-		// what was built is not a write that has to decide anything.
+		// A decided slot still reads an empty List as bottom, so clearing it
+		// decides nothing.
 		it("still takes an empty List into a slot the fold decided", async () => {
 			expect(
 				await run(`implementation {
@@ -633,12 +585,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[]"])
 		})
 
-		// A Type Parameter the RECEIVER bound, which is the order every
-		// Method is matched in: `rows::append(["a"])` binds the item Type to
-		// `List<Unknown>` off the receiver and then had nothing left to do with
-		// the `List<String>` that followed but agree with it. The decision is
-		// made once the whole call is in hand, so the order the match bound
-		// things in does not decide what it could work out.
+		// The receiver binds the item Type to `List<Unknown>` first, and the
+		// `List<String>` Argument decides it once the whole call is in hand.
 		it("decides a Type Parameter the receiver bound before the Argument was read", () => {
 			expect(
 				typeOfDeclaration(
@@ -657,10 +605,8 @@ describe("Undecided Seeds", () => {
 			})
 		})
 
-		// The other end of that decision. What the call answers is what the
-		// assignment pins the Variable to, so the write that decided the item
-		// Type is also the write every later one is held to — an undecided slot
-		// laundered a second write of another Type through the same name.
+		// The first write decides the Variable's item Type, and every later
+		// write is held to it.
 		it("refuses a second write that disagrees with the decided one", () => {
 			expect(
 				codesFor(`implementation {
@@ -674,11 +620,8 @@ describe("Undecided Seeds", () => {
 	})
 
 	describe("a generic Function rather than a Method", () => {
-		// Two callbacks, one decision. `loop` is an Overloaded Function
-		// whose entries each carry their own `State`, and the seed is the
-		// Argument every one of them binds it from — so the `while` condition and
-		// the body are both resolved against the State the loop was decided to
-		// carry.
+		// Each `loop` entry binds `State` from the seed, so the `while`
+		// condition and the body both read the decided State.
 		it("decides a loop's State for every callback it hands it", async () => {
 			expect(
 				await run(`implementation {
@@ -722,9 +665,7 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 3 ]"])
 		})
 
-		// One Parameter open beside one the Arguments decided — the
-		// callback's own Parameter Types are read from both, and only the open
-		// one is filled in.
+		// Only the open Type Parameter is filled in.
 		it("decides one Type Parameter where a second is already decided", async () => {
 			expect(
 				await run(`implementation {
@@ -746,20 +687,12 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// A decision the call makes but writes onto no Node. The seed's own
-	// brackets take the decided Type where the seed is WRITTEN as a Literal, and
-	// a name standing in the same place keeps the undecided Type its Declaration
-	// gave it — so everything downstream that re-derives the call from its Nodes
-	// has to reach the decision another way. The Validator re-matches the
-	// committed Signature, and where the plain re-match binds the Parameter to
-	// the blank again it asks a second time, seeded from the Type the call itself
-	// carries.
+	// A name keeps the undecided Type its Declaration gave it, so no Node
+	// carries the decision. Where its plain re-match binds the blank again, the
+	// Validator re-matches seeded from the call's own Type.
 	describe("a seed written as a name rather than as a Literal", () => {
-		// Reported as an Internal Compiler Error before the Validator read
-		// the call's own Type: the combiner it re-matched was recorded as
-		// `(_: Integer, _: List<Integer>) -> List<Integer>` and the seed beside
-		// it still said `List<Unknown>`, which is a call no re-match of those two
-		// can make sense of.
+		// The combiner says `List<Integer>` while the seed's Node still says
+		// `List<Unknown>`, so only the call's own Type explains the match.
 		it("hands the decided State to a loop seeded with a name", async () => {
 			expect(
 				await run(`implementation {
@@ -773,9 +706,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[ 1, 2 ]"])
 		})
 
-		// The whole accumulator bound to a Type Parameter rather than a slot
-		// inside one, which is the case a later Argument decides: `T := List<Unknown>`
-		// off the name, then `["a"]` says what the List holds.
+		// `T` binds to `List<Unknown>` off the name, and the later `["a"]` says
+		// what the List holds.
 		it("decides a Type Parameter a name bound to an undecided slot", async () => {
 			expect(
 				await run(`implementation {
@@ -791,11 +723,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(['[ "a" ]'])
 		})
 
-		// One mistake, one report. An Argument carrying a blank binds no
-		// Type Parameter, so `["a"]` is what decides `T` and the blank is read
-		// against it. Binding `T` to the blank instead made the very Argument
-		// that decides it a write into one, and the call was refused twice: for
-		// the `["a"]` that is right, and for the `"two"` that is wrong.
+		// An Argument carrying a blank binds no Type Parameter, so `["a"]`
+		// decides `T` and only the wrong `"two"` is reported.
 		it("reports only the Argument that is wrong beside a blank", () => {
 			expect(
 				codesFor(`implementation {
@@ -809,10 +738,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["argument-type-mismatch"])
 		})
 
-		// Every Argument a blank. The deferred ones are matched in the
-		// order they were written, so the first binds the Type Parameter and the
-		// rest are read against it — to a blank, which is the honest answer for a
-		// call that was handed nothing that says anything.
+		// With every Argument a blank, the first binds the Type Parameter to a
+		// blank, which is honest for a call handed nothing that decides it.
 		it("binds the first of several blanks and reads the rest against it", async () => {
 			expect(
 				await run(`implementation {
@@ -829,9 +756,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["[]"])
 		})
 
-		// The seeded re-match rescues nothing it cannot explain. An
-		// Argument that disagrees with a Parameter the decision never touched is
-		// reported exactly as it is in a call that writes no empty seed at all.
+		// An Argument that disagrees with a Parameter the decision never
+		// touched is reported as in any call.
 		it("still reports an Argument the decision does not explain", () => {
 			expect(
 				codesFor(`implementation {
@@ -846,12 +772,10 @@ describe("Undecided Seeds", () => {
 		})
 	})
 
-	// The first match stops at its first mismatch, and where a blank seed
-	// bound the Type Parameter that mismatch is the very Argument that decides it
-	// — so an Argument written AFTER it is read for the first time by the second
-	// match. An Argument is enriched once and its Node kept, so a Diagnostic the
-	// second match held would be held for good, and each of these checked clean
-	// and emitted the member, the Method call and the body that are not there.
+	// The first match stops at the Argument that decides a blank. A later
+	// Argument is read first by the second match, whose Diagnostics must be
+	// reported. See "Seeds an Invocation decides" in
+	// packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("an Argument the first match never reached", () => {
 		it("reports a member the Record does not have", () => {
 			expect(
@@ -880,9 +804,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// An ANNOTATED Function literal, which is enriched once like any
-		// other Argument rather than re-resolved per position — so its body is
-		// read here, and read nowhere else.
+		// An annotated Function literal is enriched once like any other
+		// Argument, so its body is read only here.
 		it("reports what a written callback's body gets wrong", () => {
 			expect(
 				codesFor(`implementation {
@@ -898,9 +821,8 @@ describe("Undecided Seeds", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// And once only. With no blank to decide there is no second match
-		// at all; with one, both matches read the same Argument and say the same
-		// thing about it, which `report` counts as said.
+		// With no blank there is no second match. With one, both matches read
+		// the Argument, and it is still reported once.
 		it("reports it once where the first match reached it too", () => {
 			let withoutABlank = `implementation {
 				function triple <infer T>(_ a: T, _ b: T, _ c: Boolean) -> T {

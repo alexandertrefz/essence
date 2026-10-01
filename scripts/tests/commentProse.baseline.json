@@ -42,7 +42,6 @@
 	"packages/compiler/src/tests/testingProperties.spec.ts": {"sentence-length": 33, "em-dash": 27, "all-caps": 29, "position": 7, "block-length": 4},
 	"packages/compiler/src/tests/typeHelps.spec.ts": {"sentence-length": 22, "em-dash": 19, "all-caps": 17, "history": 1, "position": 1},
 	"packages/compiler/src/tests/typeMatching.spec.ts": {"sentence-length": 41, "em-dash": 35, "all-caps": 33, "history": 4, "position": 7, "block-length": 9},
-	"packages/compiler/src/tests/undecidedSeeds.spec.ts": {"sentence-length": 34, "em-dash": 21, "all-caps": 14, "history": 2, "block-length": 3},
 	"packages/compiler/src/tests/unknownNarrowing.spec.ts": {"sentence-length": 20, "em-dash": 24, "all-caps": 10, "history": 2, "block-length": 1},
 	"packages/compiler/src/tests/validator.spec.ts": {"sentence-length": 101, "em-dash": 84, "all-caps": 39, "history": 1, "position": 4, "block-length": 5}
 }
