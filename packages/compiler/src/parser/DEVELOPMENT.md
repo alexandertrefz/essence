@@ -309,3 +309,26 @@ reports an assertion outside it.
 A snapshot is inline or stored. An inline one carries its recorded text as a String Literal, written there by the
 first run, so `matches snapshot` alone has never run. A stored one names an entry of `__snapshots__/<File>.es.snap`
 after `from`, which keeps the two apart.
+
+## Another language's syntax
+
+The parser recognises habits from other languages, such as `const`, `a + b`, `primes[0]` or `;`. It answers each
+with one `foreign-syntax` Diagnostic or a code of its own. Left alone, each would
+cascade into reports about undeclared names and stray Tokens.
+
+Where the rest of the Statement is complete and correct, the parser reports the habit and reads past it, keeping
+the Statement. A thrown refusal would drop the Statement, and a dropped `const price = 12` leaves `price`
+undeclared at every line that reads it. So `parseForeignDeclarationStatement` reads `const` as `constant`.
+`swallowForeignTail` steps over a trailing `;` or Comment. `refuseIndexBrackets` reads `primes[0]` into a
+`RefusedValue`, which the enricher types as `Error`.
+
+Where the habit is not read past, the parser throws a coded `ParseError`, which survives speculation. A habit is
+read past only where it is the whole of what is left. That is a `;` Token, a `//` with the rest of its line, or a
+`/* … */` that closes. A block or bracket that never closes is not skipped. Skipping would swallow the rest of the
+file, and the unclosed bracket is the mistake to report.
+
+An operator habit after an Expression is answered only on the Expression's own line. Nothing continues an
+Expression across a line break, so a `-` opening the next line is a negative Number.
+
+Most of these reports carry `essence-spelling` data for a Quick Fix. A habit whose fix depends on a Type, such as
+which Method reads an item, offers Helps instead, because the parser knows no Types.

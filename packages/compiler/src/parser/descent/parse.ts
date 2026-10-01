@@ -3893,11 +3893,9 @@ class DescentParser {
 
 	// #region Expressions
 
-	// `endsBeforeBlockParameters` is set for the one Expression that is
-	// followed by a parameter list — the rows of a table test, written
-	// `across [ … ] (row: Row) { … }`. A `(` there would otherwise be read as a
-	// call of what stands in front of it, and `[ … ](row: Row)` is a call
-	// nobody wrote. See `stopsBeforeParameterList`.
+	// `endsBeforeBlockParameters` is set for the rows of a table test,
+	// `across [ … ] (row: Row) { … }`, where a `(` opens a Parameter list rather
+	// than a call. See `stopsBeforeParameterList`.
 	protected parseExpression(
 		endsBeforeBlockParameters = false,
 	): parser.ExpressionNode {
@@ -3927,9 +3925,7 @@ class DescentParser {
 				break
 			}
 
-			// The two ':' of a Method call are one lexeme — only written
-			// flush against each other do they read as '::', the same adjacency
-			// rule every other multi-Token lexeme gets.
+			// The two ':' of a Method call read as '::' only when flush.
 			if (
 				token?.type === TokenType.SymbolColon &&
 				following?.type === TokenType.SymbolColon &&
@@ -3985,20 +3981,12 @@ class DescentParser {
 				token?.type === TokenType.SymbolLeftBracket &&
 				isAdjacent(expression.position, token.position)
 			) {
-				// `primes[0]` — the postfix form every other language
-				// reads an item with, and the one Token that can stand here
-				// without ending the Expression in this one. ADJACENCY is the
-				// whole rule, and it is the rule a label is already read by:
-				// `append(contentsOf [1, 2])` passes a List under a label and
-				// `normalize(as #ComposedCanonical)` a bare Case, both with the
-				// space that says the bracket or the sigil opens a value of its
-				// own. Written flush, neither does.
+				// `primes[0]`: a `[` written flush after a value is an index.
+				// With a space it opens a List, as in `append(contentsOf [1, 2])`.
 				let refused = this.refuseIndexBrackets(expression)
 
-				// A `[` whose `]` never arrives is left where it is.
-				// Reading past it would swallow the rest of the file to answer
-				// a habit, and what wants reporting there is the List Literal
-				// that was never closed.
+				// A `[` whose `]` never arrives is left for the unclosed List
+				// to be reported.
 				if (refused === null) {
 					break
 				}
@@ -4009,17 +3997,9 @@ class DescentParser {
 			}
 		}
 
-		// What stands where the Expression ENDED, when it is another
-		// language's way of carrying one on. The Expression reading is complete
-		// and correct — `1` really is the Expression in `1 + 2` — so this is the
-		// one place that can see the `+` at all: the Statement loop would read it
-		// as an Expression of its own and report an undeclared name.
-		//
-		// The LINE is the whole of the narrowing, and it is what keeps two
-		// Statements two: nothing carries an Expression on across a line break, so
-		// a `-` opening the next line is a negative Number and not a subtraction
-		// anybody wrote. Every habit answered here is written flush behind its
-		// left operand or one blank away from it.
+		// Another language's way of continuing an Expression, such as the `+`
+		// of `1 + 2`, answered on the Expression's own line.
+		// See "Another language's syntax" in DEVELOPMENT.md.
 		let foreign = this.foreignTextAhead(expression)
 
 		if (
@@ -4038,19 +4018,8 @@ class DescentParser {
 		return expression
 	}
 
-	// The habits that stand BEHIND a whole Statement rather than inside
-	// one — a `;` closing it and a `//` or `/* … */` Comment written after it.
-	// The Expression in front of them is complete and correct, so they are read
-	// past and the Statement is kept, which is the recovery
-	// `parseForeignDeclarationStatement` makes for `const` and for the same
-	// reason: a thrown refusal takes the Declaration with it, and a Constant
-	// nothing declared is reported again at every line that reads it. One
-	// mistake was answered with one Diagnostic per reader.
-	//
-	// Only where the habit is the WHOLE of what is left to read of it: a
-	// `;` that is a Token of its own, a `//` and the line behind it, and a
-	// `/* … */` that closes. A `*/` that never arrives is refused as it was —
-	// what a reading past it would swallow is the rest of the file.
+	// Steps over a `;`, `//` or `/* … */` after a complete Statement, so the
+	// Statement is kept. See "Another language's syntax" in DEVELOPMENT.md.
 	protected swallowForeignTail(): boolean {
 		let lexeme = this.foreignLexeme()
 
@@ -4095,11 +4064,8 @@ class DescentParser {
 		return true
 	}
 
-	// How many Tokens the `/* … */` at the cursor was written across,
-	// or null where it never closes. The Lexer ends no name on a `*` and the
-	// `/` is a Symbol, so the closing `*/` arrives as a Token ending in `*`
-	// with a `/` written flush behind it — `*/` on its own, and `word*/` where
-	// nothing separated them.
+	// How many Tokens the `/* … */` at the cursor spans, or null. The closing
+	// `*/` arrives as a Token ending in `*`, such as `word*`, with a `/` flush.
 	protected blockCommentLength(): number | null {
 		for (let offset = 1; ; offset++) {
 			let token = this.tokens.peek(offset)
@@ -4124,16 +4090,8 @@ class DescentParser {
 		}
 	}
 
-	// `primes[0]` — reported at the brackets and READ PAST, which is the
-	// recovery `parseForeignDeclarationStatement` makes for a `const` and for
-	// the same reason: a thrown refusal takes the Declaration with it, and a
-	// Constant nothing declares is reported again at every line that reads it.
-	// What is handed back stands for a value that has been refused, and the
-	// Enricher types it `Error` so that nothing downstream says a second thing
-	// about a mistake that has been answered.
-	//
-	// Null where the brackets never close, which is the one shape this leaves
-	// alone — see the caller.
+	// `primes[0]`, reported and read past into a `RefusedValue`. Null where the
+	// brackets never close. See "Another language's syntax" in DEVELOPMENT.md.
 	protected refuseIndexBrackets(
 		expression: parser.ExpressionNode,
 	): parser.RefusedValueNode | null {
@@ -4147,10 +4105,8 @@ class DescentParser {
 		let key = this.writtenIndexKey(length)
 		let end = expression.position.end
 
-		// `matrix[0][1]` is one habit written twice over, so the whole run
-		// of brackets is read past and answered once. Each of them stands flush
-		// against the one in front of it, which is the rule that made the first
-		// of them an index at all.
+		// `matrix[0][1]` is one habit, so the whole run of flush brackets is
+		// read past and answered once.
 		while (true) {
 			let bracket = this.tokens.peek()
 
@@ -4175,15 +4131,9 @@ class DescentParser {
 
 		let written = { start: opening.position.start, end }
 
-		// An `=` behind the brackets is a WRITE, which is a different
-		// mistake with different Methods behind it — and the one shape here that
-		// is refused rather than read past: what follows the `=` is the value
-		// the reader meant to store, and reading on would answer it as a
-		// Statement of its own. The throw takes the whole Statement, which is
-		// what `refuseMemberAssignment` does about `user.name = "Ada"`.
-		//
-		// `==` is left alone: it is two Tokens, the lexeme is not an `=`, and
-		// what it says is answered by the operator table a line further on.
+		// An `=` after the brackets is a write, refused with the whole
+		// Statement as `refuseMemberAssignment` does. A `==` is left to the
+		// operator habits.
 		if (this.foreignLexeme()?.text === "=") {
 			this.refuseForeignText(
 				indexWriteRefusal(
@@ -4205,11 +4155,8 @@ class DescentParser {
 		})
 	}
 
-	// How many Tokens the bracket group at the cursor was written across,
-	// counting its own two, or null where its `]` never arrives. Only brackets
-	// are counted: they nest inside each other in every text this is asked
-	// about, and a `]` written inside a String is one Token rather than a
-	// bracket.
+	// How many Tokens the bracket group at the cursor spans, its own two
+	// included, or null where its `]` never arrives.
 	protected balancedBracketLength(): number | null {
 		let depth = 0
 
@@ -4232,16 +4179,9 @@ class DescentParser {
 		}
 	}
 
-	// What was written between the brackets, where that is ONE value a
-	// Help can put back in front of the reader — `primes[0]`, `ages["ada"]`,
-	// `items[i]`. Read off the Token rather than parsed, because a parse would
-	// report on what it read and the whole point of the refusal is that the
-	// brackets are not read at all.
-	//
-	// `keyed` says a String was written, which is what tells a Dictionary's key
-	// from a List's position — and a String is only spelled back out where it
-	// holds neither a quote nor an escape, since what the Lexer hands over is
-	// the decoded text and quoting it again would print something else.
+	// The one Token written between the brackets, for a Help, read rather
+	// than parsed. `keyed` marks a String, which a Dictionary keys by. A String
+	// holding a quote or a backslash can not be spelled back from its value.
 	protected writtenIndexKey(
 		length: number,
 	): { text: string; keyed: boolean } | null {
@@ -4269,15 +4209,8 @@ class DescentParser {
 		return { text: `"${written.value}"`, keyed: true }
 	}
 
-	// And what was written to the RIGHT of the `=`, on the same terms: one
-	// Token, read rather than parsed, and only where it is the whole of what is
-	// left of the Statement — the next Token stands on another line. Anything
-	// longer is an Expression of the reader's own, and a Help that quoted half of
-	// it would print something they never wrote; `…` says "yours goes here".
-	//
-	// Asked with the cursor standing ON the `=`, which is where the brackets left
-	// it — `at` is how far behind the cursor the value stands, which a compound
-	// assignment moves along by the Tokens its operator was glued out of.
+	// The one Token after the `=`, where it is the rest of its line, as
+	// `writtenIndexKey` reads one. `at` is its offset from the cursor on the `=`.
 	protected writtenAssignedValue(at = 1): string | null {
 		let written = this.tokens.peek(at)
 		let following = this.tokens.peek(at + 1)
@@ -4307,9 +4240,8 @@ class DescentParser {
 		return `"${written.value}"`
 	}
 
-	// The refusal made as a Diagnostic rather than thrown, for the sites
-	// that read past what they are reporting. Suppressed exactly where every
-	// other report is — inside a speculation that is thrown away.
+	// The refusal reported rather than thrown, for the sites that read past
+	// what they report.
 	protected reportForeignText(refusal: ForeignRefusal): void {
 		if (this.suppressDiagnostics) {
 			return
@@ -4324,10 +4256,8 @@ class DescentParser {
 		})
 	}
 
-	// `identity<Integer>(1)` — a `<` behind a name that closes on a `>`
-	// with a `(` flush behind it, which is the one shape a comparison can not
-	// take. Asked before the operator table, which would read the `<` as a
-	// comparison and offer the reader `isLessThan` for a call they wrote.
+	// `identity<Integer>(1)`: Type Arguments on a call. Asked before the
+	// operator table, which would read the `<` as a comparison.
 	protected refuseCallTypeArguments(expression: parser.ExpressionNode): void {
 		if (
 			expression.nodeType !== "Identifier" ||
@@ -4338,9 +4268,7 @@ class DescentParser {
 
 		let depth = 0
 
-		// Bounded, and to the LINE: what is being looked for is a spelling
-		// somebody wrote on purpose, and an unbounded scan over a file whose
-		// angles never balance is a scan of the file per `<` in it.
+		// Bounded and on one line, so unbalanced angles never scan the file.
 		for (let offset = 0; offset < 32; offset++) {
 			let token = this.tokens.peek(offset)
 
@@ -4389,20 +4317,8 @@ class DescentParser {
 					code: "foreign-syntax",
 					notes: [
 						"Every Type Argument is inferred at the call, which is why a Generic Parameter is declared 'infer' — there is no spelling that pins one.",
-						// A NOTE rather than a second Help, because the
-						// Parser can not tell whether it is true here: what the
-						// Arguments decide is read out of a signature the
-						// Declaration carries, and nothing at a call has seen
-						// one. Printed as a Help it was an edit offered to
-						// readers whose Arguments decide perfectly well — and
-						// the edit is in another Declaration besides, which is
-						// not an edit a reader makes where they are standing.
-						//
-						// The annotation on the binding is NOT the other end
-						// either: it does not reach back into the call, and
-						// offering it here answered a reader with
-						// `uninferable-type-parameter` and its own Help pointing
-						// straight back at the brackets they had just taken out.
+						// A Note, not a Help: the parser can not tell whether
+						// the Arguments decide the Type Parameter.
 						"Where the Arguments do not decide one, the Type Parameter wants a place among the Parameters — a call reads it off an Argument or not at all.",
 					],
 					helps: [
