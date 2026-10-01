@@ -14,9 +14,10 @@ function symbolsOf(source: string) {
 	return findDocumentSymbols(program)
 }
 
-function detailedSymbolsOf(source: string) {
+// The server enriches the tests section too, which a build drops unless asked.
+function detailedSymbolsOf(source: string, options: { tests?: boolean } = {}) {
 	let { program } = parseWithDiagnostics(source)
-	let { program: enrichedProgram } = enrich(program)
+	let { program: enrichedProgram } = enrich(program, options)
 
 	return findDocumentSymbols(program, enrichedProgram)
 }
@@ -423,6 +424,29 @@ describe("Document Symbols", () => {
 			)
 
 			expect(detailOf(symbols, "broken")).toBeNull()
+		})
+
+		// A test's own detail is its Modifiers, which the Types leave in place.
+		it("should detail a declaration made inside a test", () => {
+			let symbols = detailedSymbolsOf(
+				[
+					"implementation {",
+					"\tconstant one = 1",
+					"}",
+					"",
+					"tests {",
+					'\ttest "counts" skipped "later" {',
+					"\t\tconstant expected = 3",
+					"",
+					"\t\texpect expected::is(3)",
+					"\t}",
+					"}",
+				].join("\n"),
+				{ tests: true },
+			)
+
+			expect(detailOf(symbols, "expected")).toBe("Integer")
+			expect(detailOf(symbols, "counts")).toBe("skipped")
 		})
 	})
 })

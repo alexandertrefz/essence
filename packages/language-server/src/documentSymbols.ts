@@ -58,7 +58,12 @@ export function findDocumentSymbols(
 	// document does.
 	imported: Record<string, common.ProtocolType> = {},
 ): Array<DocumentSymbolEntry> {
-	let symbols = symbolsOfBody(program.implementation.nodes)
+	// The tests, read off the Parser too. A test or suite is named by a String,
+	// shown as written.
+	let symbols = [
+		...symbolsOfBody(program.implementation.nodes),
+		...testsSymbols(program),
+	]
 
 	if (enrichedProgram !== null) {
 		symbols = withDetails(
@@ -69,10 +74,6 @@ export function findDocumentSymbols(
 			),
 		)
 	}
-
-	// The tests, read off the Parser too. A test or suite is named by a String,
-	// shown as written.
-	symbols = [...symbols, ...testsSymbols(program)]
 
 	// What this Module publishes, last and under one entry. The import block is
 	// absent: nothing it names is in this file.
@@ -575,9 +576,12 @@ function withDetails(
 	symbols: Array<DocumentSymbolEntry>,
 	details: Details,
 ): Array<DocumentSymbolEntry> {
+	// A test or suite keeps its Modifiers, since no Type stands at its name.
 	return symbols.map((symbol) => ({
 		...symbol,
-		detail: details.get(cursorKey(symbol.selectionRange.start)) ?? null,
+		detail:
+			details.get(cursorKey(symbol.selectionRange.start)) ??
+			symbol.detail,
 		children: withDetails(symbol.children, details),
 	}))
 }
