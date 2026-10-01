@@ -1179,3 +1179,66 @@ Each counter also marks the first touch of a point in the current span, which `b
 test. `touchedGround` is the number of points touched, which the guided search asks after every case, and the
 touches are what per-test attribution reads. A span starts with its own test, so what a case reached does not depend
 on which tests ran before it. The span lives in module-level state, which is one reason tests run one at a time.
+
+### What a test keeps beside its file
+
+Three stores live beside a source file: snapshots in `__snapshots__/<File>.es.snap`, benchmark baselines in
+`__benchmarks__/<File>.es.bench`, and counterexamples a property test has failed on. The runtime may run in a
+browser and reads no file, so whoever starts a run reads them and hands them in. They reach a test on its context,
+since a test can only use what it can reach.
+
+Baselines and counterexamples are keyed by a test's key: its identity without the Module path, with a table row as
+its last step. The Compiler spells the key, so its escaping exists in one place. A snapshot is kept under the name
+written after `matches snapshot from`, with the row number behind it for a table test. Every row runs the same body,
+so without the row the rows would overwrite one entry in turn.
+
+A stored counterexample keeps each value under its Parameter's name. If the Parameters are reordered, the entry still
+reads right, and a name the property lacks marks it stale. Every stored counterexample is run again before any case is
+drawn, so a bug found once is caught by every later run. A replay takes no word from the source, so a run with a
+grown corpus still draws what its seed drew. An entry that fails to decode is reported as stale by its index, and
+the runner drops it on its next write. One `Generatable` conformance inside a generator means nothing can be written
+down, and the test keeps no corpus.
+
+A snapshot or a benchmark with nothing recorded, or one an updating run replaced, is `written`, which passes and has
+to be written down. A benchmark that got faster is `improved`: it passes, and its baseline is only replaced when an
+updating run asks.
+
+### Running a property test
+
+A property test runs its body once for each generated case. The runner marks the context's buffers once, and rewinds
+them to that mark before each case. So a report holds the failing case's traces, expectations, snapshots and output,
+and nothing from the cases before it. A failure is shrunk to the smallest case that still fails, within
+`SHRINK_ATTEMPTS` candidates.
+
+Where the bundle counts coverage, which only `essence test --coverage` builds, the search is guided. A case whose run
+reached points no earlier case reached is kept in a pool of `GUIDED_POOL` cases, the oldest dropped first. The first
+`GUIDED_WARMUP` of the run draws blind. After it, a `GUIDED_SHARE` of the cases step to a neighbour of a kept case.
+A property that fails only where several Parameters agree is found that way. A blind draw has to meet every condition
+at once, while a neighbour keeps the ones its case met and moves one.
+
+The search needs no flag of its own. An uninstrumented bundle counts nothing, so the pool never fills, and the run
+draws exactly what a blind search draws. A spec gets its control for free: the same module without counters is the
+same search, blind. What a case reached is measured from the start of its own test's span. So a seed replays the
+same search whatever other tests ran or were filtered out.
+
+### Measuring a benchmark
+
+A benchmark body runs once first. A body that does not hold is reported and never timed, since its number would go
+into a baseline as if it meant something. A coverage run does not measure at all: its counters slow the body, and a
+baseline taken there would fail the first uninstrumented run. It runs the body once, so its lines are covered.
+
+A single run of a fast body is mostly the clock's resolution. So the body runs in batches, doubled until a batch
+takes `BENCHMARK_BATCH_MILLISECONDS` or reaches `BENCHMARK_MAX_ITERATIONS` runs, and the batch is timed. The median
+of the samples answers. A mean is dragged by the one batch the machine was busy through. The fastest batch is the
+one nothing interrupted, which no reader meets. A slow body takes fewer samples: three past
+`BENCHMARK_STEADY_BATCH_MILLISECONDS` and one past `BENCHMARK_SLOW_BATCH_MILLISECONDS`. Its batches barely jitter,
+and the editor's run has a deadline.
+
+Nothing is recorded while the clock runs, so a batch times the body rather than the runner's bookkeeping. A failed
+`require` still ends the run. The answer is the time of one run in whole nanoseconds, and at least one. A baseline of
+zero would make every later run infinitely slower. A stored baseline of zero can only be a damaged file, so it is
+recorded again rather than held to.
+
+A measurement within `REGRESSION_RATIO` and `IMPROVEMENT_RATIO` of its baseline matches. Past them it has regressed,
+which fails, or improved, which passes. An updating run writes either down instead. After the measurement the body
+runs once more, unguarded, and the report is built from that run.
