@@ -3546,6 +3546,8 @@ Error: The branch for Logger can never run
 
 </div>
 
+Two applications of one case ask one erased question too. With `b: Box<Integer> | Box<String>`, `b::is(#Empty)` has a branch for each, and `Box<Integer>#Empty` and `Box<String>#Empty` differ only in their type arguments. The note says so, and the help names the edit that removes the overlap: `Write the receiver's Type as one application of 'Box'.`
+
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
 
 ### `empty-list-overlap`

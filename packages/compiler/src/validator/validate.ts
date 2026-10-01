@@ -19,6 +19,7 @@ import {
 	describeSignature,
 	describeType,
 	displayProtocolName,
+	erasedDispatchEvidence,
 	recordMismatchEvidence,
 	returnAsynchronyHelps,
 	undecidedSlotEvidence,
@@ -893,6 +894,8 @@ function validateDispatchCases(
 			let laterType = dispatchCases[later].memberType
 
 			if (acceptsAllAtRuntime(earlierType, laterType)) {
+				let erased = erasedDispatchEvidence(earlierType, laterType)
+
 				reportError(
 					`The branch for ${describeType(laterType)} can never run`,
 					node.member.position,
@@ -910,13 +913,11 @@ function validateDispatchCases(
 						],
 						notes: [
 							"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
-							"A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.",
+							erased.note,
 						],
 						// A Match would meet the same conflict, so the Help asks
 						// for member Types the runtime can tell apart.
-						helps: [
-							"Tell the two member Types apart by something that survives to runtime — a member whose Type is not a Function.",
-						],
+						helps: [erased.help],
 					},
 				)
 

@@ -190,6 +190,39 @@ describe("Two Cases a Signature can not tell apart", () => {
 	})
 })
 
+describe("Two applications of one Case a dispatch can not tell apart", () => {
+	// They differ only in their Type Arguments, so no Function is to blame.
+	it("should name the Type Arguments the applications differ in", () => {
+		let diagnostic = firstAnalysed(
+			`implementation {
+				choice Box<Value> { Full { value: Value }, Empty }
+
+				function isEmpty(_ b: Box<Integer> | Box<String>) -> Boolean {
+					<- b::is(#Empty)
+				}
+			}`,
+			"erased-case-conflict",
+		)
+
+		expect(diagnostic.notes).toContain(
+			"Box<Integer>#Empty and Box<String>#Empty differ only in their Type Arguments, which do not survive to runtime.",
+		)
+		expect(diagnostic.helps).toEqual([
+			"Write the receiver's Type as one application of 'Box'.",
+		])
+		// The Help followed: the receiver written as `Box<Integer>` alone.
+		expect(
+			compiles(`implementation {
+				choice Box<Value> { Full { value: Value }, Empty }
+
+				function isEmpty(_ b: Box<Integer>) -> Boolean {
+					<- b::is(#Empty)
+				}
+			}`),
+		).toBe(true)
+	})
+})
+
 describe("Two Cases naming Type Parameters", () => {
 	// Types erase before a Match runs, so each Case accepts every value and
 	// neither is narrower. A reorder would only move the report.

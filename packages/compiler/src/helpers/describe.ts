@@ -382,6 +382,30 @@ export function ambiguousCaseWording(
 	}
 }
 
+// Why the runtime can not tell two dispatch branches' member Types apart. Two
+// applications of one Case differ only in their Type Arguments. Any other pair
+// is answered as Functions, whose Signatures do not reach the runtime.
+export function erasedDispatchEvidence(
+	earlier: common.Type,
+	later: common.Type,
+): { note: string; help: string } {
+	if (
+		earlier.type === "Case" &&
+		later.type === "Case" &&
+		earlier.choice === later.choice
+	) {
+		return {
+			note: `${describeType(earlier)} and ${describeType(later)} differ only in their Type Arguments, which do not survive to runtime.`,
+			help: `Write the receiver's Type as one application of '${displayChoiceName(earlier.choice)}'.`,
+		}
+	}
+
+	return {
+		note: "A Function's Signature does not survive to be checked — a member Type naming a callback is only ever asked whether the value is callable, which makes two of them ask the same question.",
+		help: "Tell the two member Types apart by something that survives to runtime — a member whose Type is not a Function.",
+	}
+}
+
 // A function Type as a Type Annotation spells it, `(_: Integer) -> Integer`,
 // with labels but no internal names. A Method named rather than called shows
 // its receiver as the first Parameter.
