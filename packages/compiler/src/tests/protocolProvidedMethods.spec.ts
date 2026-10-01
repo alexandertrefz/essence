@@ -3554,6 +3554,49 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
+		// Each branch types the Function literal anew, so `each::area()` runs
+		// off a different Namespace in each.
+		it("should name every Namespace a Function literal calls in each branch of a Union receiver", () => {
+			expect(
+				labelsOf(
+					[
+						"implementation {",
+						"\ttype Circle = { radius: Integer }",
+						"",
+						"\ttype Square = { side: Integer }",
+						"",
+						"\tnamespace CircleArea for Circle {",
+						"\t\tarea() -> Integer { <- @.radius }",
+						"\t}",
+						"",
+						"\tnamespace SquareArea for Square {",
+						"\t\tarea() -> Integer { <- @.side }",
+						"\t}",
+						"",
+						"\tnamespace CircleTools for Circle {",
+						"\t\tmeasured(by measure: (_ circle: Circle) -> Integer) -> Integer { <- measure(@) }",
+						"\t}",
+						"",
+						"\tnamespace SquareTools for Square {",
+						"\t\tmeasured(by measure: (_ square: Square) -> Integer) -> Integer { <- measure(@) }",
+						"\t}",
+						"",
+						"\tprotocol Shaped {",
+						"\t\toutline() -> Circle | Square",
+						"",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @::outline()::measured(by (each) { <- each::area() })",
+						"\t\t}",
+						"\t}",
+						"}",
+					].join("\n"),
+				),
+			).toEqual([
+				"this calls the 'measured' that 'CircleTools' and 'SquareTools' declare",
+				"this calls the 'area' that 'SquareArea' and 'CircleArea' declare",
+			])
+		})
+
 		it("should refuse a witness a Namespace the Program declares answers", () => {
 			let source = [
 				"implementation {",

@@ -252,7 +252,8 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    token joins the token sets there: a reserved keyword such as `define` joins `expressionStartTokenTypes`,
    and a contextual one such as `start` joins `identifierTokenTypes`.
 5. Enricher: `enricher/enrichers.ts`, and `helpers/providedReads.ts`, which walks parser and typed bodies
-   for the enricher. `refuseSnapshots` in `enricher/enrich.ts` descends through the visitor.
+   for the enricher. `refuseSnapshots` in `enricher/enrich.ts` descends through the visitor, as does
+   `typedBodyNamespaceReaches` in `helpers/providedReach.ts`.
 6. Linker: `isAssignedIn` and `usedNames` in `modules/link.ts` descend through the visitor. `usedNames` needs
    an edit only for a kind that names an import outside a node, in a field it does not read yet.
 7. Validator: `validator/validate.ts`.
