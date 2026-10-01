@@ -9,10 +9,9 @@ import {
 	startSession,
 } from "./lspSession"
 
-// The live test session as an Editor meets it: over the connection,
-// through the debounce, with the real Worker compiling and running behind it.
-// What every other spec in this package asks of a function, this asks of the
-// loop — because what a client is shown is a consequence of the whole of it.
+// The live test session as an Editor meets it: over the connection, through the
+// debounce, with the real Worker behind it. What a client is shown follows from
+// the whole loop.
 
 const failing = [
 	"tests {",
@@ -90,16 +89,9 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// A file writing NEITHER Module section is judged by an entry of its
-	// own rather than by the graph that reaches it — the graph's answer for such
-	// a file is dropped — so the root above it publishes nothing for it, and its
-	// own entry is what carries what a run found there. It has to run for every
-	// batch that reached it, cached analysis or not: an entry that does not run
-	// publishes nothing, and results arriving move nothing about the source.
-	//
-	// The state is the ordinary one for a file whose `export` block is still
-	// being written, which is a file somebody is very likely running the tests
-	// of.
+	// A file writing neither Module section publishes from its own entry, which
+	// must run for every batch that reached the file, cached or not. See "The
+	// analysis loop" in packages/language-server/DEVELOPMENT.md.
 	it("publishes a test-failed Diagnostic for a dependency that writes neither section", async () => {
 		let sectionless = [
 			"implementation {",
@@ -133,11 +125,9 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), passing)
 		await session.waitForTestRuns(2)
-		// For the CLEAR rather than for a length of time. The run's end
-		// crosses the wire before the republish that drops what it found does,
-		// so a test that waits out a fixed settle here is betting that the
-		// analysis between the two fits inside it — a bet this machine wins and
-		// a loaded runner loses. See `waitForCodeToClear`.
+		// For the clear rather than for a length of time. The run's end arrives
+		// before the republish that drops its findings, so a fixed wait races the
+		// analysis. See `waitForCodeToClear`.
 		await session.waitForCodeToClear(
 			pathOf("Season.tests.es"),
 			"test-failed",
@@ -197,12 +187,9 @@ describe("The Server's live test session", () => {
 		await session.waitForTestRuns(1)
 		await session.change(pathOf("Season.tests.es"), failing)
 
-		// For the run that SAW the edit rather than for the second run to
-		// end. Opening a file ends two runs of the same text — the scan's, and
-		// the cycle the overlay asked for, which the scan's own run deferred —
-		// so on a machine slow enough for that deferred window to fire before
-		// the edit lands, "the second run" is a run of the text before it. See
-		// `waitForTestRunWhere`.
+		// For the run that saw the edit, not the second run to end. Opening a
+		// file ends two runs of the same text, and on a slow machine both can end
+		// before the edit lands. See `waitForTestRunWhere`.
 		let run = await session.waitForTestRunWhere(
 			"reporting the edit's failure",
 			(ended) => ended.counts.failed > 0,
@@ -229,26 +216,17 @@ describe("The Server's live test session", () => {
 
 		expect(result.run).not.toBeNull()
 
-		// Waited for by the NUMBER the request answered with rather than
-		// by its ordinal among the runs that have ended. Opening a file ends
-		// two runs of the same text — the scan's, and the cycle the overlay
-		// asked for, which the scan's own run deferred — so "the second run to
-		// end" is a run of the session's own whenever the machine is slow
-		// enough for that deferred window to fire before the request lands, and
-		// the reason asserted below would then be about a batch nobody asked
-		// for.
+		// Waited for by the number the request answered with, not by its place
+		// among ended runs. Opening a file ends two runs of the same text, and on
+		// a slow machine the second to end is the session's own.
 		let ended = await session.waitForTestRun(result.run as number)
 
 		expect(ended).toMatchObject({ reason: "request" })
 	}, 60_000)
 
-	// The ordering a loaded machine falls into, forced: the edit arms a
-	// cycle, and the request goes out once that cycle has STARTED. Such a
-	// request is deferred rather than cancelling the compile in flight — and
-	// what it is answered with has to be the number of the cycle that will run
-	// it, not of the one it landed behind. The number is the whole of what ties
-	// a gesture to what arrives, so answering with the run in flight shows a
-	// reader who asked for one file the batch of a cycle they never asked for.
+	// The ordering a loaded machine falls into, forced: the request goes out
+	// once the edit's cycle has started. It is deferred, and answers with the
+	// number of the cycle that will run it, which ties the gesture to its results.
 	it("answers a request that landed mid-cycle with the cycle that runs it", async () => {
 		let { session, pathOf } = await openWorkspace(
 			{ "Season.tests.es": passing },
@@ -267,16 +245,9 @@ describe("The Server's live test session", () => {
 
 		expect(result.run).not.toBeNull()
 		expect(result.run).not.toBe(flying)
-		// And it really was DEFERRED, which is the whole subject. A
-		// request the session takes STRAIGHT AWAY is started from inside the
-		// request handler — the `start` notification is written to the
-		// connection before the response is — so a number no `start` has
-		// mentioned by the time the answer arrives is a cycle that does not
-		// exist yet, which is what being deferred means. Ordering, not timing:
-		// the two messages travel one stream and arrive in the order they were
-		// written. Without this the test holds just as well on a machine where
-		// the run in flight had already finished, where nothing is deferred and
-		// everything below is about an ordinary request.
+		// The request was deferred. A request run at once writes its `start`
+		// before its response on the same stream. A number no `start` has named
+		// yet belongs to a cycle still to come.
 		expect(
 			session
 				.testRuns()
@@ -292,10 +263,9 @@ describe("The Server's live test session", () => {
 		})
 	}, 60_000)
 
-	// The whole round trip of a structural identity: the lens spells one
-	// off the PARSE, the request carries it back, and the runtime selects by it
-	// off the MANIFEST. Two spellings of an id would silently run nothing, and
-	// nothing else in this suite would notice.
+	// The lens spells a test's identity off the parse, the request carries it
+	// back, and the runtime selects by it off the manifest. Two spellings of an
+	// id would silently run nothing.
 	it("runs the very test a lens names", async () => {
 		let { session, pathOf } = await openWorkspace(
 			{
@@ -329,18 +299,13 @@ describe("The Server's live test session", () => {
 
 			expect(result.run).not.toBeNull()
 
-			// Waited for by the NUMBER the request answered with. The
-			// session runs on its own account too, so a run of its own slipping
-			// in between would make the second run to end somebody else's — and
-			// the assertion below would then be about a batch nobody narrowed.
+			// Waited for by the number the request answered with, since a run the
+			// session starts itself may end in between.
 			return session.waitForTestRun(result.run as number)
 		}
 
-		// Once, however loaded the machine is. A request landing while a
-		// run is in flight used to be folded into it with only its entries
-		// kept, so the batch that ended was the whole file's and this had to
-		// ask a second time — the session now remembers the request whole and
-		// runs the next cycle AS that request.
+		// Once, however loaded the machine is. A request landing mid-run is kept
+		// whole, and the next cycle runs as that request.
 		let ended = await ask()
 
 		expect(ended.ids).toHaveLength(1)
@@ -352,10 +317,8 @@ describe("The Server's live test session", () => {
 		expect(started).toHaveLength(1)
 		expect(started[0]).toMatchObject({ name: "two" })
 
-		// And the OTHER test is still reported as it was — its failure is
-		// still published. A run narrowed to one test may not be read as
-		// "forget the rest", which is what adopting the deselections the batch
-		// also carries would do.
+		// The other test's failure stays published. A run narrowed to one test
+		// leaves the rest of the file's results as they were.
 		await session.settle()
 
 		expect(session.codesFor(pathOf("Season.tests.es"))).toContain(
@@ -363,12 +326,9 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// What a file's tags say is a fact about the WHOLE workspace, so the
-	// list published for one can move while its own text sits still — and a file
-	// writing neither Module section has nothing but its own entry to publish it.
-	// That entry has to run for every batch that reached the file, whether or
-	// not its analysis is still cached, which is the difference between "nothing
-	// has judged this" and "nothing ever judges this".
+	// A file's tags are a fact about the whole workspace, so its list can move
+	// while its text sits still. A section-less file's own entry runs for every
+	// batch that reached it, cached or not.
 	it("re-publishes a section-less dependency when another file's tags move", async () => {
 		let tagged = (tag: string) =>
 			[
@@ -414,9 +374,8 @@ describe("The Server's live test session", () => {
 			"similar-tags",
 		)
 
-		// In the IMPORTER, so nothing about the section-less file moves —
-		// its analysis stays cached, and the only thing that changed about it is
-		// what the workspace's other tags now look like.
+		// In the importer, so the section-less file's analysis stays cached and
+		// only the workspace's other tags move.
 		await session.change(pathOf("Main.es"), main("network"))
 		await session.settle()
 
@@ -448,10 +407,9 @@ describe("The Server's live test session", () => {
 		)
 	}, 60_000)
 
-	// A file is an entry because it has tests, and under a project that
-	// asked for `test.contracts` a file declaring a Namespace HAS them: the
-	// goals its declarations promise, synthesized into a `contracts` suite by
-	// the compile. Nothing here wrote a `tests { … }` block at all.
+	// Under `test.contracts`, a file declaring a Namespace has tests: the goals
+	// its declarations promise, as a synthesized `contracts` suite. Nothing here
+	// writes a `tests { … }` block.
 	const namespaceSource = [
 		"implementation {",
 		"\tnamespace Measures for Integer {",
@@ -482,9 +440,8 @@ describe("The Server's live test session", () => {
 		expect(ended?.counts.passed).toBe(1)
 	}, 60_000)
 
-	// And it is the PROJECT that decides. The same file under a project
-	// that said nothing is no entry at all, so a workspace that never asked for
-	// the goals does not start compiling and running every Namespace it holds.
+	// The project decides. Under a project that said nothing, the same file is
+	// no entry, so no Namespace's goals compile unasked.
 	it("leaves the same Namespace alone where the project did not ask", async () => {
 		let { session, pathOf } = await openWorkspace(
 			{
