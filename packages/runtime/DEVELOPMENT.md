@@ -677,3 +677,111 @@ free. `count` and `everyIndex` are one walk, `eachOccurrence`, which steps over 
 
 The prefix and suffix tests fold only as many of the receiver's characters as the part has. So a test costs the part,
 not the receiver.
+
+## Lists
+
+A List box holds two runs and a view into each. The back run is stored forward in `value`, and the front run is
+stored reversed in `front`. The logical items are `front[frontLen - 1]` down to `front[0]`, then `value[0]` up to
+`value[length - 1]`. So adding at either end can push onto an Array the box already holds instead of copying it. A
+box that never prepended carries no `front`. With `length` absent too, the box is flat and views the whole Array,
+which is the literal the Optimiser's `collapse-construction` pass emits.
+
+The boxes of one chain share their runs, and each box says how much of each run it views. Sharing is unobservable,
+as it is for a Dictionary: values are immutable, and Essence can not ask whether two values are the same object.
+That holds as long as every box answers exactly the items its view holds.
+
+`createList` takes ownership of the Array it is handed, since a later `append` may push onto it. So every caller
+builds a fresh Array for it. `createListFrom` copies instead, for the client bridge, whose host keeps its own Array.
+
+`writes` is the back run's write log and the version of it the box views, as "The List write log" describes. A front
+run never has one: every front Array is built fresh, and no positional write lands in one.
+
+### Sharing a List's runs
+
+A box that views all of its back run is the tip of that run. `append` pushes onto its Array in place, and the answer
+shares the Array. A box that views less has been appended to already, so the answer gets a copy of the box's view.
+`prepend` does the same on the front run. A box with no front run is upgraded: the answer keeps its back run by
+reference and starts a front run of its own.
+
+Before a box hands one of its run Arrays to a second box, both of its counts have to be written down. A box with a
+front run always carries `frontLen`, so only `length` can be absent. `stampClosed` writes the counts for the edits,
+and `append` and `prepend` write `length` inline. An absent count means the whole Array, so a box left that way
+would view whatever the other box pushes later. The stamp comes before the push, so no box with an absent count
+ever holds an item pushed for another.
+
+A box that shares its back run hands on its `writes` with it, the log and the version it views. A box holding a
+logged Array without a version would read whatever the next write in place leaves there. That is the one way this
+scheme could corrupt a value rather than slow it down.
+
+`materialise` is the one place the two runs become one Array. It demotes an upgraded box in place: the box keeps the
+combined Array and forgets its front. So a List read repeatedly pays to combine once. The front run is read
+descending and written forwards into an Array sized once. Swapping the representation under a value is unobservable
+for the reason sharing is.
+
+Every branded List literal in the runtime is written in `List.ts`. What a box owes before it shares a run is then
+paid in one module.
+
+### List windows
+
+Shrinking `frontLen` drops logical items from the front, since the front run is stored reversed. Shrinking the back
+view drops them from the end. So the windows a box can answer without copying are exactly those that contain the
+seam between its runs. A window wholly inside one run is copied. A flat box has its seam at zero, which leaves it
+the prefixes.
+
+`sharedWindowOf` answers such a window as a box over both of the receiver's Arrays that views less of them. Its
+first read trims it under the half rule, copying the window's size rather than the parent's. So a shared window is a
+copy deferred to the read, and no copy at all for a window nothing reads. Until it is read, it keeps its parent's
+Arrays alive.
+
+A box with its seam at zero can share no suffix, so a drain from the front would copy the rest at every turn. Asked
+for a suffix, `upgradedForSuffix` moves the seam to the end. The back run becomes a front run stored reversed, and
+the back becomes a fresh empty Array. Every later suffix is a shared window. `slice` and `remove` upgrade only when
+the prefix they drop is not longer than the suffix they keep. The upgrade copies the whole run, where a plain cut
+copies the window. The empty back is a fresh Array rather than `noItems`, since the box may push onto it later.
+
+A window that contains neither end goes to `upgradedAroundWindow`, which puts the seam in the window's middle. A walk
+that drops an item from both ends, such as a palindrome check, then cuts shared windows until its ends meet. `slice`
+moves the seam only for a window that keeps at least three quarters of the List. The move copies the whole List, and
+nothing promises that a second window repays it. A drain from both ends of eight or more items qualifies on its first
+turn, and every later window contains the seam. A single middle slice of about half takes the plain copy.
+
+Both upgrades build their runs in bulk, with `slice`, an in-place `reverse` and at most one `concat`. Both leave the
+box with runs of its own, so they drop the log the old back run carried.
+
+### Trimming a List's runs
+
+A box whose view is shorter than its run keeps the whole Array alive. `trimUnderHalfRule` trims a run to the view and
+stores the trimmed Array back, but only when the view is less than half of the Array. That keeps a shrink chain
+linear. A recursion on `removeFirst()` trims at a half, a quarter, an eighth of the List. Over the whole walk that
+copies about as many items as the List holds. What the walk holds never exceeds twice what it views.
+
+The rule is asked where a window is read, in `viewOf`, and where one is cut, in `sharedWindowOf`. So a walk costs
+the same whether each turn reads before it cuts or cuts before it reads. The rule is always asked about the box's
+own view. Asked about a window's counts, it would copy a whole run to hand out a window of two items. A trimmed back
+run drops its log, since the log describes the Array the box let go of.
+
+`runsOf` reads without trimming, for whatever asks a List about itself rather than about its items. `length` and the
+edits read through it, and so do the walks that neither shrink nor keep their receiver. The edits reach the trimming
+through their answer, in `sharedWindowOf`.
+
+### Reading a List while user code runs
+
+A native that runs user code while it holds a run fixes the run's count once, in its view or in `materialise`. It
+never asks the run for its length again. A callback may append to the List being walked:
+`list::reduce(startingWith list, (acc, item) { <- acc::append(item) })` pushes onto the Array the walk reads. A push
+only extends an Array, so the walk still covers the items the box viewed at entry.
+
+A callback may also write a position. With `acc::replace(item, at 0)` in that reduction, the first write would land
+in the Array the walk reads. So a native that calls a Function or a witness while it holds a run reads that run
+through `walkOf`, `sealedRunsOf` or `materialise`. Each seals the run's log. A sealed log makes the next write copy,
+and the walk answers the items the List held at entry. The rule covers every run the native holds, not only the
+receiver's. `is`, `compare`, `contains(everyItemOf:)`, `everyItem(alsoIn:)` and `removeEvery(contentsOf:)` seal their
+argument's run too, as does the Choice member walk in `internalHelpers.ts`.
+
+A seal closes the Array to every box that shares it, and lasts for good, as "The List write log" describes.
+
+`viewOf` trims but does not seal. The readers that visit one item, `item(at:)` and `NonEmptyList`'s `firstItem` and
+`lastItem`, read through it. They hand no Array out. A seal there would make a loop that reads one cell and writes
+another copy the whole List every turn. `sealedRunsOf` seals without trimming, for walks that must leave the
+receiver's representation alone. `positionalWrites.spec.ts` holds each sealing walk against a callback that writes
+the List being walked.

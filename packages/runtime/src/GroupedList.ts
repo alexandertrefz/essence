@@ -35,7 +35,7 @@ function gatherItem<Key extends AnyType, ItemType extends AnyType>(
 
 // Groups stand in the order their keys first appear, and each keeps its items'
 // order. The walk seals the runs, since `keyOf` may call back into Essence.
-// See "The List write log" in DEVELOPMENT.md.
+// See "Reading a List while user code runs" in DEVELOPMENT.md.
 export function group<ItemType extends AnyType, Key extends AnyType>(
 	originalList: ListType<ItemType>,
 	keyOf: (item: ItemType) => Key,
