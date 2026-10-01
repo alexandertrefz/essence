@@ -6,29 +6,22 @@ import * as path from "node:path"
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { Server } from "bun"
 
-// The survey is tested where it is written — `Survey.es` and `Page.es`
-// each carry a `tests { … }` section, and the doubles there are
-// `Async.deferred`, so every path through the survey is checked without a host.
-// What is left for this spec is what only a real request can say: that
-// `Http.get` reaches a host at all, that a status and a page's title come back
-// through the boundary as a `$case` object and a string, and that the one
-// `Promise` the command awaits is the whole of the concurrency it writes.
+// The survey's own tests use `Async.deferred` doubles, so they need no host.
+// This spec makes real requests. `Http.get` reaches a host, and a status and
+// title cross the boundary as a `$case` object and a string.
 const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
-// A bundle cache of this run's own, so that a spec compiling the survey
-// neither answers out of the user's cache nor fills it — and a result cache
-// beside it, because this spec runs `essence test` in the example's OWN
-// directory, where an answer left in the user's store would be replayed by the
-// next run a reader does there by hand.
+// Bundle and result caches of this run's own, so the spec neither reads nor
+// fills the user's. It runs `essence test` in the example's directory, where a
+// reader's next run would replay a stored answer.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-site-check-cache-"))
 const results = mkdtempSync(path.join(tmpdir(), "essence-site-check-results-"))
 
-// A host of this spec's own on a free port. Nothing here reaches the
-// network: the three pages below are everything the command is pointed at,
-// and the one address that answers nothing is a port on loopback that nothing
-// binds, which the kernel refuses in a turn.
+// A host of this spec's own on a free port, so nothing reaches the network.
+// The address that answers nothing is an unbound loopback port, which the
+// kernel refuses at once.
 const UNREACHABLE = "http://127.0.0.1:1/"
 
 let server: Server<undefined> | null = null
@@ -41,9 +34,8 @@ function pageAt(title: string | null, body: string): Response {
 	)
 }
 
-// Awaited, because the host the command is pointed at is this process. A
-// synchronous wait would hold the event loop that has to answer it, and every
-// request would time out against a server that is right here.
+// Awaited, since this process is the host: a synchronous wait would block the
+// event loop that must answer the requests.
 async function check(
 	urls: Array<string>,
 ): Promise<{ lines: Array<string>; code: number }> {
@@ -115,9 +107,8 @@ describe("examples/site-check", () => {
 			`${origin}/gone`,
 		])
 
-		// The order is the order the addresses were written, whatever
-		// order the three runs finished in — `all(atMost:)` answers the
-		// receiver's order and nothing else.
+		// The addresses' written order, whatever order the runs finished in,
+		// since `all(atMost:)` keeps the receiver's order.
 		expect(lines).toEqual([
 			`200 Beans, roasted\t${origin}/`,
 			`200 (no title)\t${origin}/plain`,

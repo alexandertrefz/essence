@@ -1,7 +1,4 @@
 {
-	"examples/site-check/check.ts": {"sentence-length": 2, "em-dash": 1},
-	"examples/site-check/essence.ts": {"sentence-length": 1},
-	"examples/site-check/site-check.spec.ts": {"sentence-length": 5, "em-dash": 3, "all-caps": 1},
 	"packages/compiler/src/tests/analysisFuzz.spec.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 18, "history": 2, "position": 3, "block-length": 5},
 	"packages/compiler/src/tests/asynchrony.spec.ts": {"sentence-length": 25, "em-dash": 20, "all-caps": 13, "block-length": 1, "counts": 1},
 	"packages/compiler/src/tests/asynchronyHelps.spec.ts": {"sentence-length": 8, "em-dash": 5, "all-caps": 4, "history": 1},
