@@ -137,3 +137,34 @@ that Type, so the Help repeats what the reader wrote. Elsewhere an example stand
 a Dictionary key. Then the Help says "for instance", so a made-up Type is not read as the answer. A refinement
 is filled in its Type Arguments as well as its base, since `describeType` prints a refinement from its
 Arguments.
+
+## Record mismatches
+
+Two Record shapes printed on two lines leave the reader to diff them by eye. `recordMismatchEvidence` compares the
+members instead, and the report carries the disagreements:
+
+- A Label on each of the first `labelledMembers` disagreeing members that has a written Position. The first of
+  them leads, and the Diagnostic takes its Position, so an editor underlines the member rather than the Literal.
+- A note for each of the next `notedMembers`, then a count for the rest. A long list is usually one mistake that
+  the first members already show.
+- The members nobody wrote, once, as `missingClause` words them. Where nothing else points into the Literal, that
+  clause becomes the leading Label on the Literal itself, and no note repeats it.
+- A Help and the data for a Quick Fix only where exactly one member is misspelled, since two misspellings are two
+  edits.
+
+Members are listed in written order. A member the Record does not declare is measured with `closestMatch` against
+the declared members the value has not written. A member already written is not what an unknown one was meant to
+be, and suggesting it would turn the fix into a `duplicate-member`. A member a misspelling accounts for is not
+listed as missing either.
+
+Where a member is a Record on both sides and the value wrote a Literal there, `nestedDifferences` walks into it.
+So `team.code` is named at the depth it is wrong. The walk goes only as far as the Literals do. A member whose
+nested Literal differs in nothing its members explain is named at its own level.
+
+Where the position holds a Union of Records, the value is compared against the closest arm. That is the arm
+with the fewest differences, or the first one on a tie. A note then names the arm, so the list of differences reads as the
+differences from that one shape.
+
+The evidence is empty for a mismatch that is not between two Records, so a site can spread it without asking. A
+partial position, such as an update or a payload default, leaves no member missing. Nor does a member a default
+fills in, by the rule `missingRecordMembers` applies to an Argument.
