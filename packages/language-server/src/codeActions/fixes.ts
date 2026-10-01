@@ -1584,8 +1584,8 @@ export function binderToScrutineeAction(
 	}
 }
 
-// Where the binder's name is read inside its arm, or null where the body
-// declares the name or a read stands where `@` means something else.
+// Where the binder's name is read inside its arm. Null where the body
+// declares the name, or a read stands where `@` means something else.
 function binderReads(
 	handler: Handler,
 	name: string,
@@ -1635,9 +1635,9 @@ function declaresName(node: parser.ImplementationNode, name: string): boolean {
 		: node.name.content === name
 }
 
-// The spans inside one Node where `@` means something else: a nested Match's
-// arms from each Matcher's end, so its scrutinee still reads the outer `@`, or
-// a Function's whole span.
+// The spans inside one Node where `@` means something else. For a nested
+// Match, each arm from its Matcher's end, so the scrutinee still reads the
+// outer `@`. For a Function, its whole span.
 function reboundRegionsOf(
 	node: parser.ImplementationNode,
 ): Array<common.Position> {
@@ -1781,20 +1781,9 @@ function strandedSeparatorAbove(lines: Array<string>, tagLine: number): number {
 	return above?.trim() === "" && below === null ? tagLine - 1 : tagLine
 }
 
-// `require MATCHER = EXPR matches snapshot` split in two — the require
-// left exactly as it was written, and the snapshot moved onto a line of its own
-// over a name the Matcher introduced. That is what the language has for it: the
-// require takes the value apart, and what there is to record is one of the
-// names that came of it.
-//
-// ONE PER NAME, because a Pattern names as many members as it has and which of
-// them the snapshot meant is not something the Diagnostic can say. The titles
-// name the binding, which is what tells them apart in the list.
-//
-// A Matcher that introduced nothing — `require Integer = value` — is left
-// alone. There is no name to record, and the other answer is to snapshot the
-// value whole, which is a rewrite of the require rather than an edit to the
-// span the Diagnostic underlines.
+// Splits `require MATCHER = EXPR matches snapshot`: the require stays, and an
+// `expect NAME matches snapshot` line records a name the Matcher introduced.
+// One action per name; a Matcher introducing none gets nothing.
 export function splitSnapshotActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -1807,11 +1796,8 @@ export function splitSnapshotActions(
 	let start = diagnostic.position.start
 	let indentation = indentationOf(lines, start.line)
 
-	// Measured against the buffer rather than against the AST, because
-	// there is no AST: the Statement was refused and dropped, so nothing records
-	// where the require ended and the snapshot began. A `require` that does not
-	// open the underlined line is a Statement written over several of them, and
-	// the one line an insertion here can measure is this one.
+	// The Statement was dropped, so the buffer is read: the `require` must
+	// open the underlined line.
 	if (
 		keywordBefore(lines, start, "require") !== indentation.length + 1 ||
 		!/^matches\b/.test(sliceOf(lines, diagnostic.position))
@@ -1819,8 +1805,7 @@ export function splitSnapshotActions(
 		return []
 	}
 
-	// The blanks between the value and the `matches` go with the split —
-	// what is left at the end of the require is the value it was written over.
+	// The blanks before `matches` go with the split.
 	let before = lineAt(lines, start.line).slice(0, start.column - 1)
 	let end = {
 		line: start.line,
@@ -1832,9 +1817,7 @@ export function splitSnapshotActions(
 		kind: "quickfix" as const,
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		// Preferred where the Matcher introduced ONE name, which is the
-		// shape the Help describes. Where it introduced several, choosing one
-		// of them for the reader is exactly what this must not do.
+		// Preferred only for a single name, as the Help describes.
 		isPreferred: names.length === 1,
 		edits: [
 			{
@@ -1845,21 +1828,12 @@ export function splitSnapshotActions(
 	}))
 }
 
-// Where a moved block lands, said in terms of a line that is STAYING put:
-// under the last line of the block it follows, or over the first line of the
-// block it precedes. Which of the two matters, because the blank line the move
-// carries goes on the side facing the block that is already there.
+// Where a moved block lands, relative to a line that stays: after the block
+// it follows, or before the one it precedes. The carried blank line faces it.
 type BlockSlot = { below: number } | { above: number }
 
-// A block moved WHOLE. The lines it stands on are cut and written back at
-// `slot`, byte for byte — the Comments inside it, the layout of its entries, the
-// indentation of every line — because the only thing wrong with the block is
-// where it stands, and retyping it would be this file inventing a layout for
-// text somebody wrote.
-//
-// The blank line around it travels with it: one is taken out with the cut
-// wherever there was one, and one is written back at the destination, so a file
-// spaced the way its author spaced it stays that way.
+// Moves a block's lines to `slot` as written, with the Comment lines before
+// it. One blank line is cut with it and one written at the destination.
 function moveBlockEdits(
 	lines: Array<string>,
 	block: common.Position,
@@ -1870,18 +1844,15 @@ function moveBlockEdits(
 	let cutFirst = first
 	let cutLast = last
 
-	// The blank line BELOW where there is one, since that is the side a
-	// block written at the top of a file has. Only one of the two, or the two
-	// blocks left behind would close up against each other.
+	// The blank line after it, else the one before, but not both, or the
+	// neighbours would close up.
 	if (last < lines.length && lineAt(lines, last + 1).trim() === "") {
 		cutLast = last + 1
 	} else if (first > 1 && lineAt(lines, first - 1).trim() === "") {
 		cutFirst = first - 1
 	}
 
-	// A destination the block already stands at — nothing to move, and an
-	// edit that wrote it back where it came from would overlap its own
-	// deletion.
+	// Already in place: nothing to move.
 	if (
 		"below" in slot
 			? slot.below >= cutFirst - 1 && slot.below <= cutLast
@@ -1903,8 +1874,7 @@ function moveBlockEdits(
 		cursor = { line: slot.below + 1, column: 1 }
 		newText = `${blank}${text}\n`
 	} else {
-		// A document that does not end in a break has no line below its
-		// last for an insertion to start at, so the break is written instead.
+		// At the document's end the line break is written first.
 		cursor = {
 			line: slot.below,
 			column: lineAt(lines, slot.below).length + 1,
@@ -1914,19 +1884,13 @@ function moveBlockEdits(
 
 	let written = { range: { start: cursor, end: cursor }, newText }
 
-	// In document order, which is what an Editor applying a list of edits
-	// against one buffer needs of them.
+	// In document order.
 	return cursor.line < cutFirst ? [written, removal] : [removal, written]
 }
 
-// Where each section belongs, as the file itself says it: a Module reads
-// top to bottom — what it imports, what it does, what it exports, what it
-// proves. Each of the four has exactly one slot, so the destination is worked
-// out from the blocks that ARE in place rather than named by the Diagnostic.
-//
-// A file that is nothing but tests carries an implementation section spanning
-// its tests block, which is what puts the export below the tests there — the
-// same rule the Parser holds such a file to.
+// Where a section belongs in the order import, implementation, export, tests,
+// worked out from the blocks in place. A tests-only file's implementation
+// spans its tests, so its export goes after them.
 function sectionSlot(
 	program: parser.Program,
 	lines: Array<string>,
@@ -1950,11 +1914,9 @@ function sectionSlot(
 	return { below: Math.max(implementation.end.line, exports?.end.line ?? 0) }
 }
 
-// The `import { … }` or `export { … }` block written on the wrong side of
-// the implementation, put back on its own. The Parser DROPS such a block, so
-// what the Program holds is a file missing a whole section — which is why this
-// is preferred: moving it is the only reading, and the Program can not compile
-// as it stands either way.
+// Moves an `import` or `export` block written on the wrong side of the
+// implementation. The Parser drops it, so moving it is the only reading, and
+// the fix is preferred.
 export function moveModuleSectionAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1965,9 +1927,6 @@ export function moveModuleSectionAction(
 	}
 
 	let section = diagnostic.data.section
-	// Read back off the buffer, as every edit here is: a Position from a
-	// stale analysis pointing at anything but the Keyword would cut lines that
-	// are no longer the block.
 	if (sliceOf(lines, diagnostic.position) !== section) {
 		return null
 	}
@@ -1995,15 +1954,8 @@ export function moveModuleSectionAction(
 	}
 }
 
-// The `tests { … }` block written above the implementation or above what
-// the Module hands out, moved to the end where it belongs. The block is KEPT
-// where it stands rather than dropped, so the Program's own span for it says
-// what to cut.
-//
-// The Diagnostic underlines the Keyword in one of the two shapes and the whole
-// block in the other, and both of them START where the block does — which is
-// what ties the one to the other, and what is read back off the buffer before a
-// block is cut out of it.
+// Moves a `tests` block written before the implementation or exports to the
+// end. The Parser keeps the block, and the Diagnostic starts where it does.
 export function moveTestsSectionAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -2041,22 +1993,9 @@ export function moveTestsSectionAction(
 	}
 }
 
-// The top-level Statement a use was written in, moved below the
-// Declaration it reaches for. Both are top-level: what the Diagnostic is about
-// is the order two of them RUN in, and a Statement nested in another runs when
-// that one does — so what has to move is the one the implementation block
-// holds, whatever the use is buried in.
-//
-// NOT preferred, and this is the fix here where that matters most. A Statement
-// moved past the Declarations between it and its destination can no longer see
-// them, and anything below it that reads what IT declares now reads it too
-// early. The Compiler says so on the next analysis; an Editor applying a
-// preferred fix without asking would have made the change before anybody read
-// it.
-//
-// A Property read from another Property's initialiser carries the same code and
-// gets no action: what would move is a member of a Namespace, and the Parser
-// records no span for one.
+// Moves the top-level Statement holding a use after the Namespace it reads.
+// Not preferred: the move can break reads of what the Statement declares. A
+// Property read from another Property gets nothing.
 export function moveDeclarationAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -2071,9 +2010,7 @@ export function moveDeclarationAction(
 	}
 
 	let statements = program.implementation.nodes
-	// Matched on the buffer as well as on the Position, as every edit
-	// here is: a name that no longer reads the way the Node says it does is a
-	// Position from a stale analysis pointing at other text.
+	// The name must still read as the Node says.
 	let declaration = statements.findIndex(
 		(node) =>
 			node.nodeType === "NamespaceDefinitionStatement" &&
