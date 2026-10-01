@@ -149,6 +149,11 @@ function collectFromNode(
 		}
 		case "TypeAliasStatement":
 			addRange(ranges, node.position)
+
+			if (node.predicate !== null) {
+				collectFromNode(node.predicate, ranges)
+			}
+
 			return
 		case "ChoiceDeclarationStatement":
 			addRange(ranges, node.position)

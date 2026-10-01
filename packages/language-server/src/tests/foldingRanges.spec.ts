@@ -366,3 +366,21 @@ describe("Folding Ranges inside a Method's default", () => {
 		expect(ranges).toContainEqual({ startLine: 5, endLine: 7 })
 	})
 })
+
+describe("Folding Ranges inside a refinement predicate", () => {
+	it("should fold a call written across lines", () => {
+		let source = [
+			"implementation {",
+			"\ttype Small = Integer",
+			"\t\twhere @::isGreaterThan(",
+			"\t\t\t0,",
+			"\t\t)",
+			"}",
+		].join("\n")
+
+		expect(foldingRangesOf(source)).toContainEqual({
+			startLine: 3,
+			endLine: 4,
+		})
+	})
+})
