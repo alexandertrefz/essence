@@ -864,3 +864,85 @@ the two goes to the base Type.
 Hover, Completion and rename list the builtin Protocols in the Protocol order. A receiver's provided Methods are
 offered Protocol by Protocol in it as well. It is also the order the Protocols build on each other: `Orderable`
 extends `Comparable`.
+
+## Hoisting
+
+A `function`, `overload function`, `type`, `choice`, `namespace` or `protocol` at the top level of a section is
+hoisted (`isHoistable`). Its Type reaches Scope before the in-order enrichment, so top level declarations may name
+each other in any order. Functions may call each other recursively. Any other Declaration is in scope inside its
+block, from its own position on.
+
+`hoistDeclarations` resolves the hoistable declarations in rounds. A round tries every declaration still pending, each
+inside a collection of its own. A resolution without an Error enters Scope, unless the name is taken already. One with
+an Error, or one that throws `NotHoistedYet`, waits for a later round, by when what it names may have hoisted. The
+rounds stop when one makes no progress: nothing hoisted, no import was seeded and no predicate filled. A declaration
+that never hoists is left to the in-order enrichment, which reports it.
+
+Only an Error keeps a declaration back. A Warning, such as one about its documentation, says nothing about
+whether the Type resolved. The Warnings of a kept resolution are reported then, since a hoisted Type is reused
+and never resolved again.
+
+`enrichPrograms` hoists every Program of a group at once, before any Program's collection is open. A Protocol in
+one file and a Namespace conforming to it in another then hoist in whatever order they resolve. A cycle of Modules
+can only be enriched this way. The hoist hands each Diagnostic to a `HoistDiagnosticSink` together with its Node.
+The Diagnostic is then replayed into the collection of the Program that Node was written in. Otherwise a library
+file's Diagnostic would land in whichever compile first loaded the library.
+
+The hoist writes into the Scope tables directly, so it does what a declaration does itself. It calls
+`countTypeDeclaration`, and `invalidateNamespacesInScope` drops the memo of the Namespaces a Scope sees. Both
+matter during the rounds, because a bodied static Property's value is enriched while its Namespace resolves.
+
+### Seeding imports between rounds
+
+Each round starts with `seedRound`, which binds the imports that became bindable since the last one. An import
+across a cycle of Modules can only be bound once the declaration it names has hoisted. Seeding first means a
+Module has the import in Scope while its own declarations resolve. After the last round, `seedRound(true)` binds
+what the last declarations to hoist made bindable. It is the last moment anything may be written into a Scope
+before the bodies are enriched.
+
+A Namespace conforming to a Protocol that has not hoisted yet waits too (`deferOnPendingConformance`). It has to
+reach Scope with its conditional bounds woven in, or a use site before it would solve against an unbounded Method.
+`settleConformanceClauses` reads every hoisted Namespace's clauses again after the final seeding, so a clause is
+dropped only where its Protocol never arrives. The Namespace memos of every Scope are then dropped, since the
+rounds solved against the unsettled clauses.
+
+### Pending predicates during the hoist
+
+A refined Alias hoists as its skeleton (see "Reading a refined Alias") and joins the pending predicates.
+`fillPendingPredicates` reads them at the top of each round, before the declarations, so whatever reads conjuncts
+in that round finds them written in. A reading with an Error waits for a later round. So does one with a leaf that
+names a Namespace whose predicate aliases are still unread, or a Method of such a Protocol. Conjuncts are written
+once, and such a leaf would keep a name that later asks a different question.
+
+When a predicate is read, every pending copy of the Refinement gets the same conjuncts array. A copy is what a
+signature holds after applying a generic refined Alias whose predicate was still unread. The hoist is the only
+window in which a copy may be taken, which `openPendingRefinementCopies` and `closePendingRefinementCopies`
+bracket.
+
+A reading that checks a value against a refinement still unread throws `NotHoistedYet` naming it, and waits. In
+the final pass the readings still waiting wait on each other, and `reportPredicateCycle` reports each cycle as a
+`recursive-type-declaration`. A predicate that still does not resolve is poisoned. Signatures already hold the
+registered object, so `poisonRefinementToBase` turns that object into its base in place, and every copy into its
+own instantiated base. A generic Alias keeps its wrapper over the poisoned object. The Alias is unregistered
+without a report, and the in-order enrichment reports it with the Program's Constants in Scope.
+
+A Namespace or Protocol whose Methods could not all be read as predicate aliases is offered again at the top of a
+later round. That happens only once something it could have waited for has arrived: a Namespace hoisting, an
+import binding or a predicate filling. `hoistGeneration` counts those arrivals.
+
+### Recursive declarations
+
+Before the rounds, `reportRecursiveTypeDeclarations` finds the Type declarations that name themselves, directly or
+through others. A Type declaration is substituted wherever it is named, so a cycle never finishes resolving. Each
+member of a cycle is reported once, and its name is seeded as an Error. The declarations that name it then still
+hoist, and nothing reports it as undeclared. After the rounds each member is resolved once against the seeded
+Errors, which gives a real Type whose recursive members are Error. A generic Choice that names itself in a payload
+is left to `resolveGenericCaseMembers`, which reports `recursive-generic-choice`.
+
+The search runs Tarjan's algorithm over the declarations of one Scope, since two Modules each declaring `type Foo`
+declare two Types. A name the Scope already holds is no node, because the hoist never overwrites an occupied slot.
+Of two declarations of one name only the first counts. The cycles are reported in declaration order.
+
+`reportRecursiveProtocolDeclarations` does the same for a Protocol that extends itself, as `recursive-protocol`.
+Such a Protocol stays in the rounds and resolves to its own surface with its extensions skipped, so its conformers
+are still read against it.
