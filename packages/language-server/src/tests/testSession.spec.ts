@@ -16,18 +16,13 @@ import { canonicalPath } from "@essence-lang/compiler/documents"
 import { TEST_RUN_VERSION, type TestRunNotification } from "../testProtocol"
 import { createTestSession, type TestSession } from "../testSession"
 
-// The live session, driven without an Editor: the Workspace's answers are
-// handed in as functions, so what is under test is the session's own rules —
-// which files a change reaches, what it re-runs, and what it tells a client.
-// The Worker it starts is the real one, because compiling and running is the
-// half that can not be faked and still mean anything.
+// The live session, driven without an Editor. The Workspace's answers are
+// handed in as functions, so the session's own rules are under test, with the
+// real Worker compiling and running.
 
-// What the Server hands the session: the settings of the project
-// governing each entry, read through the same per-directory cache. A fixture
-// that writes an `essence.json` beside its sources is a fixture whose tags the
-// session obeys — which is the whole of how the editor and `essence test` came
-// to run the same thing. One cache per session, since nothing here edits a
-// project file under a session that has already read it.
+// What the Server hands the session: each entry's project settings, through
+// the per-directory cache. One cache per session, since nothing here edits a
+// project file a session has read.
 function projectSettings(): (filePath: string) => {
 	skipTags: Array<string>
 	contracts: boolean
@@ -163,10 +158,8 @@ function harness(
 	}
 }
 
-// The one failure the Worker exists for. A test that loops for ever can
-// not be ended from inside the run — only the Worker can be taken away — and a
-// session that waited on one would never run another test, because a request
-// arriving while a run is in flight is remembered rather than started.
+// A test that loops for ever can be ended only by taking the Worker away. A
+// session waiting on it would never run another test.
 describe("A session whose run never ends", () => {
 	const endless = [
 		"implementation {",
@@ -228,16 +221,9 @@ describe("A session whose run never ends", () => {
 
 			expect(problems.join("\n")).toContain("did not finish")
 
-			// And the session is still a session. Nothing about the run
-			// that was stopped is held against the next one.
-			//
-			// The deadline is raised first, and the recovery run is why
-			// the session has a movable one. 3 s is what stops the endless run
-			// in a test's worth of time; the run after it is the more expensive
-			// of the two — the deadline handler terminated the Worker, so this
-			// one pays a cold Worker start AND a cold compile the endless run
-			// had already paid — and on an oversubscribed host it clamped at
-			// the wall and reported nothing passed.
+			// Nothing about the stopped run is held against the next one. The
+			// deadline is raised first, since the next run pays a cold Worker start
+			// and a cold compile.
 			session.setDeadline(60_000)
 			writeFileSync(file, quick)
 			session.run({ files: [file] })
@@ -257,8 +243,8 @@ describe("A session whose run never ends", () => {
 	}, 60_000)
 })
 
-// Every Worker stages the bundles it imports in a directory of its own,
-// under `stagingRoot` here so that a spec can watch them come and go.
+// Every Worker stages its bundles in a directory of its own, here under
+// `stagingRoot`, so a spec can watch them come and go.
 describe("A session's staging directories", () => {
 	const quick = (value: number): string =>
 		[
@@ -443,17 +429,10 @@ describe("A session's staging directories", () => {
 	})
 })
 
-// A request that lands while a run is in flight is DEFERRED rather than
-// cancelling it — the compile in flight is nearly always about to answer the
-// same question. What the fold used to keep was the request's entries and
-// nothing else: which tests it named, whether it was an accept, and that it was
-// a request at all were all thrown away. So a Run lens ran the whole file, an
-// accepted snapshot rewrote nothing, and a session switched off dropped the
-// click, because the reason had been downgraded to `change`.
-//
-// Each pair of requests below is issued SYNCHRONOUSLY, which is what makes
-// this deterministic rather than a race: `inFlight` is assigned inside `start`
-// before it returns, so the second call of the pair is always the folded one.
+// A request landing while a run is in flight is deferred whole: its tests,
+// whether it accepts snapshots, and its reason. Each pair of requests is issued
+// synchronously, and `start` assigns `inFlight` before it returns, so the
+// second call is always the deferred one.
 describe("A session asked for one test while a run is in flight", () => {
 	const twoTests = [
 		"tests {",
@@ -537,12 +516,9 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
-	// And it is answered with the number of THAT cycle rather than of the
-	// run it landed behind. The number is the whole of what ties a gesture to
-	// what arrives — a Test Explorer registers the run it opened under it — so
-	// answering with the cycle already in flight hands the reader that cycle's
-	// batch: the whole file, narrowed to nothing, while the run they asked for
-	// arrives under a number nobody is listening on.
+	// It is answered with the number of the cycle that runs it, not the one it
+	// landed behind. A Test Explorer registers the run it opened under that
+	// number.
 	it("answers a deferred request with the number of the cycle that runs it", async () => {
 		let file = path.join(root, "DeferredNumber.tests.es")
 
@@ -580,16 +556,9 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
-	// TWO gestures deferred behind one cycle, which is what a reader
-	// produces by clicking Run on a file and then on one test inside it while
-	// the first cycle is still compiling. Both are answered with the number of
-	// the ONE cycle that will carry them, and that cycle runs the SUPERSET: a
-	// whole-file request outranks a narrowing, so the folded cycle runs the file
-	// whole rather than only the test named last. That is the safe fold — a test
-	// nobody asked for runs, which costs time, where narrowing would leave a
-	// test the other gesture asked for untested — and it is worth pinning
-	// because the cycle is answered to a reader who asked for one test and
-	// arrives carrying every test in the file.
+	// Two gestures deferred behind one cycle, as when a reader runs a file and
+	// then one test in it. Both get the one cycle's number, and a whole-file
+	// request outranks a narrowing, so the cycle runs the file whole.
 	it("folds two deferred gestures into one cycle both listen on", async () => {
 		let file = path.join(root, "DeferredPair.tests.es")
 
@@ -623,9 +592,8 @@ describe("A session asked for one test while a run is in flight", () => {
 
 			expect(folded?.run).toBe(3)
 			expect(folded?.reason).toBe("request")
-			// Run whole — no narrowing — which is what makes the number
-			// safe for the reader who asked for the file and for the reader who
-			// asked for one test in it.
+			// Run whole, which serves the reader who asked for the file and the
+			// one who asked for a test in it.
 			expect(folded?.ids).toEqual([])
 			expect(folded?.counts.passed).toBe(2)
 		} finally {
@@ -634,12 +602,9 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
-	// And a promise the session can not keep is ended rather than left
-	// standing. The file a deferred request named stops being a test file while
-	// the run in flight finishes — deleted, or its `tests` block taken out — so
-	// the cycle that was promised the number has nothing to run at all. Nothing
-	// is reported, because nothing ran; but the number was answered with, and a
-	// client waits on it until something ends it.
+	// A promised cycle with nothing left to run still ends, since a client
+	// waits on its number. Here the file stops being a test file while the run
+	// in flight finishes.
 	it("ends a promised cycle that has nothing left to run", async () => {
 		let file = path.join(root, "DeferredGone.tests.es")
 
@@ -685,12 +650,9 @@ describe("A session asked for one test while a run is in flight", () => {
 				files: [],
 				counts: { passed: 0, failed: 0, skipped: 0, deselected: 0 },
 			})
-			// And it carries the session's own Choices rather than an
-			// empty summary. A client REPLACES what it holds for `choices` with
-			// what an end carries — `files` is laid over, `choices` is not — so
-			// a cycle that never ran once wiped every Choice mark a real run had
-			// put there, and the reader watched their coverage disappear because
-			// they clicked Run twice.
+			// It carries the session's own Choices rather than an empty summary. A
+			// client replaces its `choices` with what an end carries, while `files`
+			// is laid over.
 			expect(ended()?.coverage).toEqual({
 				files: [],
 				choices: session.coverage().choices,
@@ -701,9 +663,8 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
-	// And so does a session SWITCHED OFF while it owes one. What the
-	// setting declines is running tests; it does not turn a number somebody was
-	// told to wait for into a number nothing will ever say again.
+	// So does a session switched off while it owes one. The setting declines
+	// running tests, not ending a cycle a client waits on.
 	it("ends a promised cycle when the session is switched off", async () => {
 		let file = path.join(root, "DeferredOffPromise.tests.es")
 
@@ -764,10 +725,9 @@ describe("A session asked for one test while a run is in flight", () => {
 		}
 	}, 60_000)
 
-	// A switched-off session runs nothing by itself and runs what it is
-	// ASKED for — `enabled` declines the automatic half. A deferred request
-	// whose reason was downgraded to `change` met that very guard and was
-	// dropped, so the second click did nothing at all.
+	// A switched-off session runs nothing by itself but runs what it is asked
+	// for. A deferred request keeps its reason, so the guard on `enabled` lets
+	// it through.
 	it("still answers a deferred request while switched off", async () => {
 		let file = path.join(root, "DeferredOff.tests.es")
 
@@ -832,9 +792,8 @@ describe("A session asked to accept a snapshot", () => {
 			expect(rewrites).toHaveLength(1)
 			expect(rewrites[0]?.module).toBe(file)
 			expect(rewrites[0]?.text).toContain('matches snapshot "Lions"')
-			// The SOURCE is answered rather than written: the buffer the
-			// run compiled may never have been saved, and the Server turns this
-			// into an edit.
+			// The source is answered rather than written, since the buffer the
+			// run compiled may be unsaved. The Server turns it into an edit.
 			expect(readFileSync(file, "utf8")).toBe(snapshots)
 		} finally {
 			await session.dispose()
@@ -934,9 +893,8 @@ describe("A session asked for coverage", () => {
 			)
 			let counted = ended[ended.length - 1]?.coverage.files ?? []
 
-			// `Reader.tests.es` is imports and tests — what its counters
-			// counted is `Library.es`, which is the whole point of reporting
-			// coverage per SOURCE file rather than per entry.
+			// `Reader.tests.es` holds only imports and tests, and its counters
+			// counted `Library.es`. Coverage is reported per source file.
 			expect(counted.map((file) => file.module)).toContain(library)
 		} finally {
 			await live.session.dispose()
@@ -1021,7 +979,7 @@ describe("The Language Server's test session", () => {
 				reason: "change",
 				files: [readerFile],
 			})
-			// The library's result is still there — a re-run replaces one
+			// The library's result is still there, since a re-run replaces one
 			// stream rather than the picture.
 			expect(
 				live.session
@@ -1128,9 +1086,8 @@ describe("The Language Server's test session", () => {
 				files: [readerFile],
 				counts: { passed: 1 },
 			})
-			// What the batch was narrowed TO, so that a client merges the
-			// same way the session does rather than adopting the deselection
-			// every other test of that file was reported with.
+			// What the batch was narrowed to, so a client merges as the session
+			// does rather than adopting the other tests' deselection.
 			expect(ended[1]?.ids).toEqual([record!.id])
 		} finally {
 			await live.session.dispose()
@@ -1166,8 +1123,8 @@ describe("The Language Server's test session", () => {
 			// The whole item for a gutter, the keyword alone for a lens.
 			expect(site?.keywordRange.start).toEqual(site!.range.start)
 			expect(site?.range.end.line).toBeGreaterThan(site!.range.start.line)
-			// The same id the events spell, which is what ties the two
-			// halves of a batch together.
+			// The same id the events spell, which ties the two halves of a batch
+			// together.
 			expect(
 				ended?.events.some(
 					(event) => "id" in event && event.id === site?.id,
@@ -1205,9 +1162,8 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 
-	// The tags come out of the project file rather than out of the
-	// editor's settings, which is what makes the live session and `essence
-	// test` leave out the same tests: one list, in the file the project owns.
+	// The tags come from the project file rather than the editor's settings,
+	// so the live session and `essence test` leave out the same tests.
 	it("leaves out the tags the project file skips", async () => {
 		let directory = path.join(root, "skipping")
 		let file = path.join(directory, "Tagged.tests.es")
@@ -1239,10 +1195,8 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 
-	// Per ENTRY, because a workspace is not one project. The Worker runs
-	// the entries one at a time and each carries the answer of the project it
-	// belongs to, so a folder that skips `slow` and a folder that does not are
-	// two different selections inside one cycle.
+	// Per entry, since a workspace is not one project. Each entry carries its
+	// own project's tags, so two folders select differently inside one cycle.
 	it("skips one project's tags and not its neighbour's", async () => {
 		let skipping = path.join(root, "twoProjects", "skipping")
 		let keeping = path.join(root, "twoProjects", "keeping")
@@ -1287,11 +1241,9 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 
-	// A project that asked for the goals its declarations promise gets
-	// them from the live session too, as the `contracts` suite the compile
-	// synthesizes — the same suite `essence test --contracts` reports. The file
-	// wrote no `tests { … }` block at all: what makes it an entry is that it
-	// declares a Namespace under a project that asked.
+	// A project that asked for its declarations' goals gets them from the live
+	// session too, as the synthesized `contracts` suite. The file is an entry
+	// because it declares a Namespace.
 	it("runs the goals a project's declarations promise", async () => {
 		let directory = path.join(root, "contracts")
 		let file = path.join(directory, "Measures.es")
@@ -1355,9 +1307,8 @@ describe("The Language Server's test session", () => {
 		}
 	}, 60_000)
 
-	// What a Test Explorer's Run and Refresh buttons send. Neither is
-	// about a file, and a client that had to name them could only name the ones
-	// it had already been told about.
+	// What a Test Explorer's Run and Refresh buttons send. A client naming the
+	// files could name only those it had been told about.
 	it("runs every test file for a request that names neither", async () => {
 		let live = harness()
 
@@ -1398,8 +1349,8 @@ describe("The Language Server's test session", () => {
 					.recordsFor(readerFile)
 					.map((record) => record.state),
 			).toEqual(["passed"])
-			// And nothing else started because of it — the setting still
-			// declines the automatic half.
+			// Nothing else started, since the setting still declines automatic
+			// runs.
 			live.session.changed([library])
 
 			await new Promise((resolve) => setTimeout(resolve, 200))
@@ -1415,12 +1366,9 @@ describe("The Language Server's test session", () => {
 	}, 60_000)
 })
 
-// The line-level narrowing, driven end to end. Two functions live in one
-// Module, each reached by its own test file, so a change to one function's body
-// reaches one test and not the other — which is the whole reason to re-run a few
-// tests rather than every test of every file that imports what changed. This
-// needs its own graph (the shared `harness` knows only `Library.es`), so the
-// session is built here with the Workspace answers this graph gives.
+// The line-level narrowing, end to end. Two functions in one Module are each
+// reached by their own test file, so a change to one body reaches one test.
+// The shared `harness` knows only `Library.es`, so this builds its own.
 describe("A session narrowing a change to the tests it reached", () => {
 	const mathsSource = [
 		"implementation {",
@@ -1480,10 +1428,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 		writeFileSync(triplesFile, triplesSource)
 	})
 
-	// The real session and Worker, wired for this graph: the two test files
-	// are the entries, and a change to `Maths.es` reaches both. Mirrors `harness`,
-	// which cannot be reused because its `dependentsOf` is spelled for the shared
-	// fixture.
+	// The real session and Worker for this graph. The test files are the
+	// entries, and a change to `Maths.es` reaches both.
 	function mathsHarness(): {
 		session: TestSession
 		notifications: Array<TestRunNotification>
@@ -1535,7 +1481,7 @@ describe("A session narrowing a change to the tests it reached", () => {
 		let live = mathsHarness()
 
 		try {
-			// The overlay is set BEFORE coverage is switched on, so the whole
+			// The overlay is set before coverage is switched on, so the whole
 			// run's snapshot holds the text the attribution's Positions are in.
 			live.overlays[maths] = mathsSource
 			live.session.setCoverage(true)
@@ -1548,8 +1494,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 			expect(doublesId).toBeDefined()
 			expect(triplesId).toBeDefined()
 
-			// An in-line edit to `double`'s body — same line count, a literal
-			// changed — so nothing moved and the change can be mapped.
+			// An in-line edit to `double`'s body keeps the line count, so the
+			// change can be mapped.
 			live.overlays[maths] = mathsSource.replace("with 2", "with 4")
 			live.session.changed([maths])
 
@@ -1579,10 +1525,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 
 			await live.waitForRuns(2)
 
-			// `double` re-ran and now fails (2 doubled by four is eight), the
-			// proof it was reached; `triple` was never touched, so its passing
-			// result from the whole run still stands — the narrowed cycle skipped
-			// it rather than reporting it deselected over its own result.
+			// `double` re-ran and now fails, which proves it was reached. The
+			// narrowed cycle skipped `triple`, so its passing result still stands.
 			expect(
 				live.session
 					.recordsFor(doublesFile)
@@ -1607,9 +1551,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 
 			await live.waitForRuns(1)
 
-			// A line inserted moves every point below it, so the attribution's
-			// coordinates no longer describe the file and there is nothing honest to
-			// narrow across — the reach runs whole.
+			// An inserted line moves every later point, so the attribution no
+			// longer describes the file and the reach runs whole.
 			live.overlays[maths] = mathsSource.replace(
 				"implementation {\n",
 				"implementation {\n\n",
@@ -1645,9 +1588,7 @@ describe("A session narrowing a change to the tests it reached", () => {
 			await live.waitForRuns(2)
 
 			// A narrowed cycle counts only the tests it ran, so it carries no
-			// per-file coverage — repainting the gutter grey on the cheap keystroke
-			// is exactly what must not happen. What the whole run counted still
-			// stands, so the module is still reported.
+			// per-file coverage. What the whole run counted still stands.
 			expect(endNotifications(live)[1]?.coverage.files).toEqual([])
 			expect(
 				live.session.coverage().files.map((file) => file.module),
@@ -1661,9 +1602,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 		let live = mathsHarness()
 
 		try {
-			// No `setCoverage` — the default. Nothing is attributed, so a
-			// line has nothing to map to and the change runs whole. Narrowing rides
-			// entirely on coverage.
+			// Coverage is off by default, so nothing is attributed and the change
+			// runs whole.
 			live.session.runAll("open")
 
 			await live.waitForRuns(1)
@@ -1683,10 +1623,8 @@ describe("A session narrowing a change to the tests it reached", () => {
 	}, 60_000)
 })
 
-// The same double/triple source the narrowing describe uses, reused by the
-// property and focus fixtures below — two functions on different lines, so a
-// change to one is a change the attribution can place on one test's ground and
-// not another's.
+// Two functions on different lines, so the attribution can place a change to
+// one on one test and not another.
 const numbersSource = [
 	"implementation {",
 	"\tfunction double(_ n: Integer) -> Integer {",
@@ -1705,10 +1643,8 @@ const numbersSource = [
 	"",
 ].join("\n")
 
-// The real session and Worker for one source Module and its test entries,
-// with coverage-driven narrowing wired the way this graph's Workspace would
-// answer — a change to the source reaches every entry. Mirrors `harness`, which
-// cannot be reused because its `dependentsOf` is spelled for the shared fixture.
+// The real session and Worker for one source Module and its test entries, with
+// coverage on. A change to the source reaches every entry.
 function coverageSession(
 	sourceModule: string,
 	entries: Array<string>,
@@ -1749,13 +1685,12 @@ function coverageSession(
 	}
 }
 
-// Fix 1 — a property test draws fresh values every run, so its attribution
-// is one run's sample of the lines it COULD touch, not the whole of them.
-// `narrowingFor` unions in every property of the reached entries whatever the
-// change touched, rather than trusting a sample to say a property was untouched.
+// A property test draws fresh values every run, so its attribution is one
+// sample. `narrowingFor` adds every property of the reached entries, whatever
+// the change touched.
 describe("A session re-running a property whatever a change touched", () => {
-	// One entry with a property over `double` and a unit test over `triple`
-	// — two tests of one file, each reaching a different line of the source.
+	// One entry with a property over `double` and a unit test over `triple`,
+	// each reaching a different line of the source.
 	const mixedSource = [
 		"import {",
 		'\tfrom "./PropMaths.es" { double }',
@@ -1804,9 +1739,8 @@ describe("A session re-running a property whatever a change touched", () => {
 			expect(unitId).toBeDefined()
 			expect(propertyId).toBeDefined()
 
-			// An in-line edit to `triple`'s body — the line only the unit
-			// test reached. The property samples `double` and never touched this
-			// line, yet it is re-run anyway.
+			// An in-line edit to `triple`'s body, which only the unit test
+			// reached. The property never touched the line and is re-run anyway.
 			live.overlays[propMaths] = numbersSource.replace("with 3", "with 5")
 			live.session.changed([propMaths])
 
@@ -1825,15 +1759,12 @@ describe("A session re-running a property whatever a change touched", () => {
 	}, 60_000)
 })
 
-// Fix 2 — a cycle that SILENCED a live test with a focus never ran it, so
-// its lines look like dead code in the attribution. `receive` refuses to build
-// attribution from such a cycle (a `test-deselected` with reason "not-focused"),
-// so the entry stays out of the fresh set and the next change runs whole rather
-// than narrowing off the truncated picture.
+// A cycle where a focus silenced a test never ran it, so its lines look dead.
+// `receive` builds no attribution from such a cycle, and the next change runs
+// whole.
 describe("A session that silenced a test with a focus", () => {
 	// A focused test beside a plain sibling. While the focus stands only the
-	// focused test runs, so the sibling's own lines are never counted in the one
-	// cycle that ran.
+	// focused test runs, so the sibling's lines are never counted.
 	const focusedSource = [
 		"import {",
 		'\tfrom "./FocusMaths.es" { double }',
@@ -1870,14 +1801,12 @@ describe("A session that silenced a test with a focus", () => {
 			live.overlays[focusMaths] = numbersSource
 			live.session.setCoverage(true)
 
-			// The whole cycle runs only the focused "doubles" and deselects
-			// "triples" as not-focused, so no attribution is built for this entry.
+			// The cycle runs only the focused "doubles" and deselects "triples",
+			// so no attribution is built for this entry.
 			await live.waitForRuns(1)
 
-			// The focus took effect — "doubles" ran and "triples" was
-			// silenced — which is the very condition that leaves the attribution
-			// truncated. Asserted so this test can not false-pass on a source that
-			// failed to compile or a focus keyword that did nothing.
+			// The focus took effect, so the spec cannot pass on a source that
+			// failed to compile or a focus that did nothing.
 			expect(
 				live.session
 					.recordsFor(focusedFile)
@@ -1887,10 +1816,8 @@ describe("A session that silenced a test with a focus", () => {
 				["triples", "not-focused"],
 			])
 
-			// An in-line edit to the focused test's own covered line. Were the
-			// truncated attribution trusted it would narrow to "doubles" alone; the
-			// fix keeps the entry out of the fresh set, so the change runs WHOLE and
-			// the end notification carries no narrowing.
+			// An in-line edit to the focused test's covered line. A trusted
+			// attribution would narrow to "doubles", but the change runs whole.
 			live.overlays[focusMaths] = numbersSource.replace(
 				"with 2",
 				"with 4",
