@@ -3,7 +3,6 @@
 	"packages/compiler/src/tests/attribution.spec.ts": {"sentence-length": 4, "em-dash": 3, "all-caps": 3},
 	"packages/compiler/src/tests/benchmarkFiles.spec.ts": {"sentence-length": 5, "em-dash": 3, "all-caps": 2, "counts": 1},
 	"packages/compiler/src/tests/builtins.spec.ts": {"sentence-length": 21, "em-dash": 17, "all-caps": 6, "history": 1, "position": 4, "block-length": 3, "counts": 1},
-	"packages/compiler/src/tests/bundleSize.spec.ts": {"sentence-length": 96, "em-dash": 46, "all-caps": 38, "history": 1, "position": 19, "block-length": 9, "counts": 2},
 	"packages/compiler/src/tests/choices.spec.ts": {"sentence-length": 156, "em-dash": 127, "all-caps": 86, "history": 16, "position": 14, "block-length": 18},
 	"packages/compiler/src/tests/codeGeneration.spec.ts": {"sentence-length": 171, "em-dash": 143, "all-caps": 68, "history": 6, "position": 15, "block-length": 19},
 	"packages/compiler/src/tests/codegenNaming.spec.ts": {"sentence-length": 33, "em-dash": 33, "all-caps": 13, "history": 1, "position": 3, "block-length": 2, "counts": 1},
