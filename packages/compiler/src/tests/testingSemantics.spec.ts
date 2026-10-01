@@ -1411,6 +1411,22 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["inline-snapshot-in-table"])
 		})
 
+		it("should refuse an inline snapshot nested in a table test's body", () => {
+			expect(
+				codesOf(
+					`implementation {}
+
+					tests {
+						test "reads {n}" across [1, 2] (n: Integer) {
+							if n::isGreaterThan(0) {
+								expect n::toString() matches snapshot
+							}
+						}
+					}`,
+				),
+			).toEqual(["inline-snapshot-in-table"])
+		})
+
 		it("should take a named snapshot in a table test", () => {
 			expect(
 				codesOf(

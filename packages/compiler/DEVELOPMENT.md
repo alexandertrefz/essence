@@ -252,7 +252,7 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    token joins the token sets there: a reserved keyword such as `define` joins `expressionStartTokenTypes`,
    and a contextual one such as `start` joins `identifierTokenTypes`.
 5. Enricher: `enricher/enrichers.ts`, and `helpers/providedReads.ts`, which walks parser and typed bodies
-   for the enricher.
+   for the enricher. `refuseSnapshots` in `enricher/enrich.ts` descends through the visitor.
 6. Validator: `validator/validate.ts`.
 7. Simplifier: `simplifier/simplify.ts`.
 8. Optimiser: `optimiser/walk.ts` and `optimiser/purity.ts`. Some passes switch on kinds themselves, such

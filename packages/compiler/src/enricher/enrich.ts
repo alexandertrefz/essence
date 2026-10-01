@@ -18,6 +18,7 @@ import {
 	pendingRefinementCopiesOf,
 } from "../helpers/types"
 import { VALUE_COMMENT, valueCommentLines } from "../valueComments"
+import { forEachTypedChild, type TypedNode } from "../visitor/index"
 import { collectAnnotations } from "./annotations"
 import { builtinMembers, builtinProtocols, builtinTypes } from "./builtins"
 import { CONTRACT_SUITE, contractSuite } from "./contracts"
@@ -2001,26 +2002,15 @@ const refuseSnapshots = (
 	nodes: Array<common.typed.ImplementationNode>,
 	form: "table" | "property",
 ): void => {
-	let visit = (value: unknown): void => {
-		if (Array.isArray(value)) {
-			for (let item of value) {
-				visit(item)
-			}
-
-			return
-		}
-
-		if (value === null || typeof value !== "object") {
-			return
-		}
-
-		let node = value as Record<string, unknown>
-		let snapshot = node["snapshot"] as common.typed.SnapshotNode | null
+	let visit = (node: TypedNode): void => {
+		let snapshot =
+			node.nodeType === "ExpectStatement" ||
+			node.nodeType === "RequireStatement"
+				? node.snapshot
+				: null
 
 		if (
-			(node["nodeType"] === "ExpectStatement" ||
-				node["nodeType"] === "RequireStatement") &&
-			snapshot != null &&
+			snapshot !== null &&
 			(form === "property" || snapshot.name === null)
 		) {
 			reportError(
@@ -2062,12 +2052,12 @@ const refuseSnapshots = (
 			)
 		}
 
-		for (let member of Object.values(node)) {
-			visit(member)
-		}
+		forEachTypedChild(node, visit)
 	}
 
-	visit(nodes)
+	for (let node of nodes) {
+		visit(node)
+	}
 }
 
 // The cast holds: a name is a String Literal or an interpolated one, and
