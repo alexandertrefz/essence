@@ -253,8 +253,6 @@
 	"packages/vscode-extension/tests/vscodeStub.ts": {"sentence-length": 9, "em-dash": 11, "all-caps": 5, "citation": 1},
 	"packages/website/astro.config.ts": {"sentence-length": 4, "em-dash": 6, "block-length": 1},
 	"packages/website/scripts/checkLinks.ts": {"sentence-length": 2, "em-dash": 1, "all-caps": 1},
-	"packages/website/scripts/libraryManifest.ts": {"sentence-length": 3, "em-dash": 4, "block-length": 1},
-	"packages/website/scripts/libraryTable.ts": {"sentence-length": 3, "em-dash": 3, "all-caps": 1},
 	"packages/website/src/components/docs/essenceLang.ts": {"sentence-length": 1, "em-dash": 1},
 	"packages/website/src/components/docs/library.ts": {"sentence-length": 1},
 	"packages/website/src/content.config.ts": {"sentence-length": 4, "em-dash": 2},

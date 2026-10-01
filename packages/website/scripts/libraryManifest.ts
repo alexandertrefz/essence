@@ -1,15 +1,10 @@
 /*
- * The shape of `src/content/docs/library/<slug>.json` — everything a library
- * page draws beyond its headings.
+ * The shape of `src/content/docs/library/<slug>.json`: everything a library
+ * page draws beyond its headings. `generateStdlibDocs.ts` writes one beside each
+ * page's `.mdx` in the same run. The page components read it, and
+ * `tests/stdlibMembers.spec.ts` checks it against the standard library.
  *
- * `generateStdlibDocs.ts` writes one beside each page's `.mdx`, from the same
- * run and the same data, so the two cannot disagree. The components that draw
- * a type page read it, and `tests/stdlibMembers.spec.ts` holds it to the
- * standard library: a member the sources declare and no manifest lists, or a
- * manifest listing one the sources no longer declare, fails the build.
- *
- * Types only. The Astro side imports this, and must not pull the Compiler into
- * the page bundle to do it.
+ * Types only, so the Astro side can import it without the Compiler.
  */
 
 export type PageKind =
@@ -42,9 +37,9 @@ export interface ManifestEntry {
 }
 
 /**
- * Where a member comes from. `declared` is written in a Namespace; `provided`
- * is a Protocol's body a conformance brings along; `derived` is answered for a
- * Choice from its Cases; `requirement` is what a Protocol asks a conformer for.
+ * Where a member comes from. `declared` is written in a Namespace. `provided`
+ * comes with a conformance from a Protocol's body. `derived` is answered for a
+ * Choice from its Cases. `requirement` is what a Protocol asks of a conformer.
  */
 export type MemberOrigin = "declared" | "provided" | "derived" | "requirement"
 
@@ -53,7 +48,7 @@ export interface ManifestMember {
 	key: string
 	/** The Namespace, Function family or Protocol it belongs to. */
 	namespace: string
-	/** The name its heading carries — for a `loop` entry, the labels that tell it apart. */
+	/** The name its heading carries; for a `loop` entry, the labels that tell it apart. */
 	name: string
 	/** What the entries are called on: `List<ItemType>`, `Integer`; null for a free Function or a Protocol. */
 	receiver: string | null
@@ -108,14 +103,9 @@ export interface ManifestMode {
 }
 
 /**
- * What the section of a page's hosted Choices is called, in its heading and in
- * the member index.
- *
- * A mode is a Choice whose cases carry nothing, passed to pick how a
- * method works — `Rounding`, `Side`. `Step` is hosted the same way and is not
- * one: its cases carry the State and the answer. A page hosting a Choice like
- * it calls the section what it holds rather than a word the lede under it
- * defines to mean something else.
+ * What the section of a page's hosted Choices is called. A mode, such as
+ * `Rounding`, is a payload-free Choice that picks how a Method works. `Step`
+ * carries payloads, so its section is named for what it holds.
  */
 export function modesTitle(modes: ManifestMode[]): "Modes" | "Choices" {
 	return modes.every((mode) => mode.payloadFree) ? "Modes" : "Choices"
@@ -148,7 +138,7 @@ export interface ManifestProtocol {
 }
 
 export interface PageManifest {
-	/** `list` — the page is `/docs/library/<slug>`. */
+	/** As in `/docs/library/<slug>`. */
 	slug: string
 	title: string
 	kind: PageKind

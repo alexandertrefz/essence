@@ -1,21 +1,12 @@
 /*
- * The reader's side of the standard library reference: which pages exist, in
- * what order, and how each page groups what the placement rules put on it.
+ * The reader's side of the standard library reference: the pages, their order,
+ * and the reader groups on each, such as `Searching`. `libraryPages.ts` decides
+ * by rule which page a declaration goes on.
  *
- * WHERE a declaration goes is not written here. `libraryPages.ts` decides that
- * by rule, from what each declaration is for, and throws on anything the rules
- * leave homeless. What this table holds is what no rule can know: the order a
- * reader meets the pages in, the reader groups inside each one — `Searching`
- * rather than "predicates" — and which group a provided member belongs to.
- *
- * Every member is keyed `Namespace::member`, exactly once. A member the sources
- * gain and this table does not list stops the generator, and a key naming a
- * member the sources no longer declare stops it too, so the table cannot drift
- * from the library in either direction without somebody deciding where the
- * change belongs.
- *
- * `description` and `taughtOn` only seed a page the generator creates. Once a
- * page exists they are its own, and `--sync` keeps them.
+ * Every member is keyed `Namespace::member`, exactly once. A member missing
+ * here or a key the sources lack stops the generator, so the table never drifts
+ * from the library. `description` and `taughtOn` only seed a new page, and
+ * `--sync` keeps them.
  */
 
 export interface GroupDefinition {
@@ -28,7 +19,7 @@ export interface GroupDefinition {
 }
 
 export interface PageDefinition {
-	/** `list` — the page is `/docs/library/<slug>`. */
+	/** As in `/docs/library/<slug>`. */
 	slug: string
 	title: string
 	/** The sidebar's order; the hand-written overview is 10. */
@@ -38,7 +29,7 @@ export interface PageDefinition {
 	/** Seeds the page's "Taught on" line: the Language pages that teach the type. */
 	taughtOn: string[]
 	groups: GroupDefinition[]
-	/** `library/list#group` — the pages or anchors the page ends by pointing to. */
+	/** The pages or anchors the page ends by pointing to, as `library/list#group`. */
 	seeAlso?: string[]
 	/** One hand-written paragraph under the lede, for a fact no declaration states. */
 	note?: string
