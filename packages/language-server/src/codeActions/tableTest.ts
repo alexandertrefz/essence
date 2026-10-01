@@ -14,17 +14,8 @@ import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 import { typedExpressionAt } from "./typedLookups"
 
-// A test that says one thing about several values, written as the table
-// it already is. What makes it mechanical is the narrowness: every line has to
-// be `expect CALL::is(VALUE)` over the SAME Function with the same Arguments
-// written the same way, and every value written in one has to be a Literal or a
-// payload-free Case — something that can be moved into a row and read back out
-// of it unchanged. Anything else is turned away, because anything else is a
-// judgment about what the rows are FOR.
-//
-// The test's NAME is left alone. A table test names each row out of the row's
-// own values, and which of them says what the test is about is the one thing
-// here nobody but the author knows.
+// Rewrites a test of repeated `expect CALL::is(VALUE)` lines as a table test.
+// See "Writing a table test" in DEVELOPMENT.md.
 
 type Expectation = {
 	callee: string
@@ -45,8 +36,7 @@ export function tableTestActions(
 	lines: Array<string>,
 	range: common.Position,
 ): Array<CodeActionEntry> {
-	// The Types of the columns are the Enricher's, printed back as
-	// source — so a file that did not enrich has no table to offer.
+	// The column Types come from the enriched Program.
 	if (program.tests === null || enrichedProgram === null) {
 		return []
 	}
@@ -74,9 +64,7 @@ function tableAction(
 	enrichedProgram: common.typed.Program,
 	lines: Array<string>,
 ): CodeActionEntry | null {
-	// A benchmark is timed rather than judged, a table test already has
-	// its rows, and a property test makes its own values up — none of the three
-	// is a test with expectations to collect.
+	// Not a benchmark, an existing table test, or a property test.
 	if (
 		test.form !== "test" ||
 		test.table !== null ||
@@ -108,9 +96,8 @@ function tableAction(
 	let last = test.body[test.body.length - 1] as parser.ImplementationNode
 	let head = headEnd(test)
 
-	// The rows are written as whole lines under the test's own
-	// indentation, and the body is replaced by one line — so the body has to
-	// own its lines, and the head has to end where the rows can follow it.
+	// The body is replaced whole, so it must own its lines, and the rows
+	// follow the head on its line.
 	if (
 		!opensItsLine(lines, first.position.start) ||
 		!closesItsLine(lines, last.position.end) ||
@@ -148,9 +135,8 @@ function tableAction(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// Never preferred. The one test becomes as many tests as there
-		// are rows, each with an identity of its own — which is a decision
-		// about what the suite REPORTS, not about how a line is spelled.
+		// Each row becomes a test of its own, which changes what the
+		// suite reports.
 		isPreferred: false,
 		edits: [
 			{
@@ -165,9 +151,7 @@ function tableAction(
 	}
 }
 
-// Every test written in the section, nested Suites included. A Suite is
-// a group and never an expectation of its own, so nothing about it is read
-// here but the tests inside it.
+// Every test in the section, including those in nested Suites.
 function testsOf(nodes: Array<parser.TestsNode>): Array<parser.TestNode> {
 	let tests: Array<parser.TestNode> = []
 
@@ -182,10 +166,8 @@ function testsOf(nodes: Array<parser.TestsNode>): Array<parser.TestNode> {
 	return tests
 }
 
-// `expect CALL::is(VALUE)` and nothing else. A Matcher, a snapshot, a
-// Namespace specifier on the `is`, a labelled Argument to it, a callee that is
-// not a plain name — each of those is a shape a row could not carry, and none
-// of them is worth guessing about.
+// Exactly `expect CALL::is(VALUE)`: no Matcher, snapshot, Namespace specifier
+// or labelled `is` Argument, and a plain callee name.
 function readExpectation(
 	statement: parser.ImplementationNode,
 ): Expectation | null {
@@ -231,10 +213,8 @@ function readExpectation(
 	}
 }
 
-// What a row can hold: a value that reads the same wherever it is
-// written. A payload-free Case is one of those — the annotation on the row
-// Parameter is what lets a bare `#Win` stand in a row — and an interpolated
-// String is not, since its holes read names the row knows nothing about.
+// What a row can hold: a Literal or a payload-free Case, which reads the same
+// in a row. An interpolated String's holes read names the row lacks.
 function isWritable(node: parser.ExpressionNode): boolean {
 	switch (node.nodeType) {
 		case "StringValue":
@@ -249,11 +229,8 @@ function isWritable(node: parser.ExpressionNode): boolean {
 	}
 }
 
-// One column per Argument, plus `expected` for what the call answers.
-// Null wherever the rows do not line up: a different callee, a different
-// Argument count, the same Argument labelled in one row and not in the next, or
-// a column whose values are not all of one Type — each of those is a table with
-// a hole in it rather than a table.
+// One column per Argument, plus `expected`. Null where the rows differ in
+// callee, Argument count or labels, or a column mixes Types.
 function columnsOf(
 	rows: Array<Expectation>,
 	program: parser.Program,
@@ -274,12 +251,8 @@ function columnsOf(
 				? null
 				: (head.written[at]?.label ?? null)
 
-		// A column is named as the CALLEE names the Parameter it fills,
-		// where the file declares the callee — the rows then read in the words
-		// the code under test is written in, and `{ conceded = 0 }` says what
-		// `{ b = 0 }` could not. The Argument's label is the next best thing,
-		// since it is at least a word the call site chose, and a letter is what
-		// is left where there is neither.
+		// Named for the callee's Parameter, else the Argument's label, else
+		// a letter. See "Writing a table test" in DEVELOPMENT.md.
 		let name =
 			at === head.written.length
 				? "expected"
@@ -329,10 +302,8 @@ function columnsOf(
 	return columns
 }
 
-// The Type every value in the column has, or null where they disagree.
-// A Case widens to its CHOICE — `#Win` and `#Loss` are one column of
-// `Outcome`, and a column of `Outcome#Win` is neither writable nor what the
-// author meant.
+// The Type every value in the column has, or null. A Case widens to its
+// Choice, so `#Win` and `#Loss` make a column of `Outcome`.
 function columnType(
 	cells: Array<parser.ExpressionNode>,
 	enrichedProgram: common.typed.Program,
@@ -346,9 +317,7 @@ function columnType(
 			return null
 		}
 
-		// Spelled where the table is going to STAND, which is where the
-		// test it replaces stands — a column Type naming an Alias this file
-		// can not resolve is a row Parameter nothing compiles.
+		// Spelled where the table will stand, so the Type resolves there.
 		let at = { program: enrichedProgram, cursor: cell.position.start }
 		let spelling =
 			node.type.type === "Case"
@@ -365,17 +334,12 @@ function columnType(
 	return written
 }
 
-// The Choice a Case widens to, written as a Type. A GENERIC Choice's name
-// is not one on its own — `Optional` where `Optional<Integer>` belongs is
-// `wrong-type-argument-count` — so the Type Arguments the value was applied at
-// are written back with it. A Case that bound none, or one whose Arguments have
-// no spelling, has no column Type to write and the table is not offered: what
-// the rows are of is exactly what a row Parameter has to say.
+// The Choice a Case widens to, written as a Type. A generic Choice is written
+// with the Type Arguments the value was applied at, and without them has no
+// spelling.
 function caseSpelling(type: common.CaseType, at: SpellingScope): string | null {
-	// The name a reader WROTE, never the identity — a Case of a Module's
-	// Choice carries the declaring file's path in front of its name, and that
-	// is no spelling at all. The Choice still has to be the one this position
-	// resolves the word to, which is the rule every written Type follows here.
+	// The written name, not the identity, which carries the declaring file's
+	// path. The name must resolve to this Choice here.
 	let name = displayChoiceName(type.choice)
 
 	if (!namesChoiceAt(name, type, at)) {
@@ -394,18 +358,12 @@ function caseSpelling(type: common.CaseType, at: SpellingScope): string | null {
 			: null
 	}
 
-	// A Case of a generic Choice that bound nothing — a bare `#Empty` no
-	// application ever reached — has no spelling at all, since its Choice's
-	// name alone is a Type short of its Arguments.
+	// A bare `#Empty` of a generic Choice bound no Type Arguments.
 	return (type.choiceGenerics ?? []).length === 0 ? name : null
 }
 
-// Whether the word names THIS Choice where the table is written. The
-// question a Case asks is not the equality every other spelling is held to: the
-// cell holds one Case and the column is written as the whole Choice, so what
-// the name has to resolve to is a Type the Case FITS — the Union standing over
-// it, and never another Module's Choice of the same name, whose Cases are
-// Cases of that one.
+// Whether the word names this Choice where the table is written: a Type the
+// Case fits, never another Module's Choice of the same name.
 function namesChoiceAt(
 	name: string,
 	type: common.CaseType,
@@ -417,26 +375,14 @@ function namesChoiceAt(
 		return false
 	}
 
-	// A GENERIC Choice's name resolves to the DECLARATION rather than to
-	// any application of it — `Optional` names a Generic Alias here, and no
-	// Case of it fits one — so the word naming that Declaration is the whole of
-	// what can be asked. The Arguments written after it are spelled on their
-	// own terms, which is where a Type this file can not read is caught.
+	// A generic Choice's name resolves to its declaration, which no Case
+	// fits. Its Type Arguments are checked when they are spelled.
 	return found.type === "GenericAlias" || matchesType(found, type)
 }
 
-// What the callee calls its own Parameters, one per written Argument and
-// null wherever there is no name to read. The internal name is the one asked
-// for rather than the label: a label is what the CALL writes, so naming a
-// column after one makes the call say it twice — `outcomeOf(a, against
-// against)` — while the internal name is the word the Function's own body uses
-// for the value a row is carrying.
-//
-// Answered only where the file declares EXACTLY ONE Function of that name whose
-// Parameters line up with the call, label for label. A name declared twice, a
-// call that leaves a defaulted Parameter out, a Function this file only imports
-// — each is a callee whose Parameters this can not read off the Program it was
-// handed, and a guess would name a column after the wrong declaration.
+// The callee's internal Parameter names, one per Argument, or null where
+// there is none. Answered only for exactly one Function of that name in this
+// file whose Parameters match the call label for label.
 function parameterNamesOf(
 	program: parser.Program,
 	head: Expectation,
@@ -472,9 +418,8 @@ function parameterNamesOf(
 		return nothing
 	}
 
-	// A Parameter that takes its value apart — `of { width, height }` —
-	// and one that binds nothing at all — `_: Integer` — have no single name
-	// between them, so those columns fall back with the rest.
+	// A Pattern Parameter, or one binding no name, has no single name, so
+	// its column falls back.
 	return parameters.map((parameter) =>
 		parameter.internalName?.nodeType === "Identifier"
 			? parameter.internalName.content
@@ -482,15 +427,12 @@ function parameterNamesOf(
 	)
 }
 
-// `a`, `b`, `c` — the names a column takes when neither the callee nor
-// the Argument carrying it had one to lend. Past the alphabet there is nothing to fall back
-// on, and a call of twenty-seven Arguments is not what this is for.
+// The last-resort column names `a` to `z`.
 function letterAt(at: number): string | null {
 	return at < 26 ? String.fromCharCode("a".charCodeAt(0) + at) : null
 }
 
-// Where `across` goes — after the name and after every Modifier, which is
-// the last thing about the test that is not the test.
+// Where `across` goes: after the name and every Modifier.
 function headEnd(test: parser.TestNode): common.Cursor {
 	let last = test.modifiers[test.modifiers.length - 1]
 

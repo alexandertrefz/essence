@@ -136,3 +136,19 @@ the value reads is then in scope at each read, unless shadowed, which `readsAgre
 
 A read inside a Function literal is refused for the same reason, since it runs once per call of the literal. An
 exported Constant, one with a `§§` block, and one written over several lines are left alone too.
+
+## Writing a table test
+
+`tableTestActions` rewrites a test that says one thing about several values as the table test it already is. What
+keeps it mechanical is how narrow it is. Every line must be `expect CALL::is(VALUE)` over the same Function, with
+the same Arguments written the same way. Every value must be a Literal or a payload-free Case, which reads the same
+when moved into a row. Anything else would need a judgment about what the rows are for, so it is turned away. The
+test's name is left alone too, since only the author knows which values say what the test is about.
+
+A column is named after the Parameter it fills, as the callee's body names it. The rows then read in the words of
+the code under test: `{ conceded = 0 }` rather than `{ b = 0 }`. A label is not used for that, since the call
+would then say it twice, as in `outcomeOf(a, against against)`. Where the callee's Parameters cannot be read, the
+Argument's label names the column, and failing that a letter.
+
+A column's Type is spelled where the table will stand, so it resolves there. A Case widens to its Choice: `#Win`
+and `#Loss` make one column of `Outcome`.
