@@ -310,3 +310,70 @@ The forms differ in where the hidden Type key comes from. `Object.assign` takes 
 while a spread inherits the left-hand side's. That is the same answer only while the left-hand side is a Record,
 which the enricher guarantees by refusing other Combinations as `uncombinable-types`. The pass checks it anyway,
 so that a broken guarantee costs an optimisation rather than a mis-branded value.
+
+### eliminate-dead-code
+
+A Constant nothing reads is a value the Program builds and drops. Earlier passes leave them behind when they fold
+an operation into its answer or inline a loop. Such a Constant goes when two answers allow it:
+
+- Its name is read nowhere in the Program. The whole Program is asked rather than the Constant's Scope, which
+  refuses more than necessary, the safe direction to be wrong in.
+- Its value is pure by `isPureExpression`, so dropping it drops no effect.
+
+Only Constants go. A `variable` can be assigned later, by a Statement this pass does not read.
+
+`namesReadBy` collects every Identifier in an Expression position, Parameter defaults included, and the names lowered
+Statements hold. The walk offers no bindings. A Method's Namespace, a native's Function name and a Lookup's member
+name no binding. So a Program's `Integer` Methods are no reads of a Constant named `Integer`. Every exported name and
+alias is a root, since other Modules read them.
+
+It reads once rather than to a fixed point. A Constant read only by another dropped Constant stays.
+
+### elide-final-match-test
+
+A Match that compiles is exhaustive, and a Guarded Handler never counts toward that. So an unguarded last
+Handler runs whenever every earlier one declined, and its test and the throwing `else` after it are
+unreachable. The pass emits the chain as `if (…) { … } else { <the last Handler's body> }`.
+
+What is given up is the name of a compiler bug. The `noCaseMatched` throw is reached only when a Matcher's
+run-time check disagrees with the Type the enricher gave the value. With the test elided, such a value takes
+the last Handler silently. That trade is why this is a pass, and turning it off is how a compiler developer
+chases one.
+
+The elision is taken only where the last check reduces to a tag comparison or asks nothing, per
+`matcherResidual`. Then the only value it would have answered differently is one whose tag disagrees with its
+Type. A value with the right tag that disagrees deeper passed the comparison before too. A check that reads into
+the value, such as a shared payload, a List's items or two Records' members, is kept with its throw. A
+decision tree from `compile-record-members` is kept for the same reason.
+
+A Guard, a literal Matcher, member literals and `memberTypes` can each make a Handler decline a value its Matcher
+accepts. A last Handler carrying any of them keeps its test. The validator would already refuse such a Match as
+inexhaustive, but the pass states the rule itself.
+
+The pass asks `residual.ts` itself rather than reading what `compile-type-tests` left. It reads a Match both as an
+Expression and as the Statement `lower-matches-to-statements` makes of it.
+
+### compile-record-members
+
+A Record's tag says only that the value is a Record. Where a Match tells Records apart by their members, the
+general check walks a descriptor tree the compiler wrote, member by member. This pass writes out the members that
+decide instead, such as `_self.kind[$type.typeKeySymbol] === "String"`, one property read and one comparison per
+test. `recordMatcherTests` in `residual.ts` makes the plan, and this pass only emits it.
+
+It looks for one shape: an `Intrinsic` `type-test` whose descriptor is a Record Type. `compile-type-tests` leaves
+one for a Handler's check and for a payload requirement, and `compile-union-dispatch` leaves one for a dispatch
+case. Each carries the Type of the value it asks about, which is all the plan needs. With both of those passes
+off there is nothing to do here, and the Program is the same.
+
+The tests are joined with `&&`, and its short circuit is relied on: a test reads a member that the tests before it
+proved present. Every operand is a property read or a walk of the value it is handed. So an operand the chain never
+reaches has nothing to observe. The tested value is read once per test. So it has to be a name or a member read down a
+chain of names, which re-reading can not change.
+
+`testBudget` caps the tests one tree may hold. It is a size rule: a plan is taken whole or refused whole, since a
+truncated conjunction asks less than the walk. The walk is one call against a pooled descriptor, while a tree is
+written out at every site.
+
+The pass does not claim that a tag decides the Matcher. `elide-final-match-test` and the last-case elision of
+`compile-union-dispatch` still decline a Handler whose check this pass compiled, so the throw that names a
+compiler bug stays.
