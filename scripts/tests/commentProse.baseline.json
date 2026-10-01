@@ -8,7 +8,6 @@
 	"packages/compiler/src/tests/conformanceHelps.spec.ts": {"sentence-length": 15, "em-dash": 14, "all-caps": 12, "history": 4, "block-length": 3},
 	"packages/compiler/src/tests/diagnosticFactory.ts": {"sentence-length": 1, "em-dash": 2},
 	"packages/compiler/src/tests/dispatchResolution.spec.ts": {"sentence-length": 60, "em-dash": 45, "all-caps": 25, "history": 5, "position": 4, "block-length": 8},
-	"packages/compiler/src/tests/enricher.spec.ts": {"sentence-length": 5, "em-dash": 6, "all-caps": 2, "position": 2, "block-length": 1},
 	"packages/compiler/src/tests/enricherTermination.spec.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 7, "position": 3},
 	"packages/compiler/src/tests/escapeSet.spec.ts": {"sentence-length": 9, "em-dash": 5, "all-caps": 6},
 	"packages/compiler/src/tests/followedHelps.ts": {"sentence-length": 12, "em-dash": 6, "all-caps": 8, "position": 1, "block-length": 3},

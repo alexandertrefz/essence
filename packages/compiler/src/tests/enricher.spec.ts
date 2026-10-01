@@ -5092,11 +5092,9 @@ describe("Enricher", () => {
 			expect(invocation.namespace.name).toBe("Integer")
 		})
 
-		// An Integer against a Rational is Integer's own rung now:
-		// `Integer::is` holds a Rational entry beside its Integer one, as its
-		// four inequalities do. What still falls to the covering Namespace is
-		// a bound of a kind neither rung names, which is what the second half
-		// asks.
+		// `Integer::is` has a Rational entry beside its Integer one, so Integer's
+		// rung answers. A kind neither rung names falls to the covering
+		// Namespace.
 		it("should resolve an Integer against a Rational on Integer's rung", () => {
 			let invocation = lastConstantMethodInvocation(`implementation {
 				constant same = 1::is(1/1)
@@ -7625,8 +7623,8 @@ describe("Enricher", () => {
 		})
 	})
 
-	// The Types every use of a name is enriched to, in walk order, to ask what
-	// a branch or a `define` arm narrowed a binding to wherever the use sits.
+	// The Types every use of a name is enriched to, in walk order. A test asks
+	// what a branch or a `define` arm narrowed a binding to.
 	function readTypesOf(source: string, name: string): Array<string> {
 		let { program, diagnostics } = enrichSource(source)
 
@@ -8081,7 +8079,7 @@ describe("Enricher", () => {
 				}`
 
 				// The nested condition's receiver, then its branches. Both `else`s
-				// together prove neither zero nor below, which is
+				// together prove the value is above zero, which is
 				// `PositiveInteger`.
 				expect(readTypesOf(source, "d").slice(-3)).toEqual([
 					"NonZeroInteger",
@@ -9635,8 +9633,8 @@ describe("Enricher", () => {
 		})
 
 		// A bare `#Empty` decides no Type, since a Choice's Type Parameters are
-		// never inferred, so these `define`s compile only where the position
-		// hands a Type down.
+		// never inferred. These `define`s compile only where the position hands a
+		// Type down.
 		describe("The answer Type from context", () => {
 			const ARMS = `define {
 					as #Empty if flag
@@ -11347,10 +11345,9 @@ describe("Enricher", () => {
 		})
 	})
 
-	// The Dictionary Type as a Program can reach it — the annotation, the
-	// arity, assignability between two of them, and a user Namespace written for
-	// one. Every Dictionary here arrives as a Parameter, so what is asked is the
-	// Type alone.
+	// The Dictionary Type: its annotation, arity, assignability and user
+	// Namespaces. Each Dictionary arrives as a Parameter, so only the Type is
+	// asked.
 	describe("Dictionary Types", () => {
 		function parameterTypeOf(source: string, methodName: string): string {
 			let { program, diagnostics } = enrichSource(source)
@@ -11377,9 +11374,8 @@ describe("Enricher", () => {
 			throw new Error("No Namespace in the Program")
 		}
 
-		// Every plan a derived `Equatable` left on the tree. The Invocation
-		// carries it, not the Conformance beside it — `collectConformances` above
-		// looks for the other shape — so this is its own walk.
+		// Every plan a derived `Equatable` left on an Invocation, which
+		// `collectConformances` does not walk.
 		function derivedDescriptorsIn(
 			value: unknown,
 		): Array<common.DerivedEquatableDescriptor> {
@@ -11468,9 +11464,8 @@ describe("Enricher", () => {
 			).toBe("Dictionary")
 		})
 
-		// Two Type Arguments exactly, reported the way `List` reports one
-		// — the same code, the same shape, and a Type built out of whatever WAS
-		// written so the Declaration underneath does not cascade.
+		// Two Type Arguments exactly, reported as `List` reports one, with a Type
+		// built from what was written so nothing cascades.
 		it("should report too few Type Arguments", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Ages for Integer {
@@ -11503,11 +11498,8 @@ describe("Enricher", () => {
 			)
 		})
 
-		// The Namespace index buckets both Dictionary spellings under one
-		// key, exactly as it buckets the two List ones — so a Namespace written
-		// `for Dictionary<Key, Value>` is a candidate for a
-		// `Dictionary<String, Integer>` receiver and its Type Parameters bind
-		// off that receiver, slot by slot.
+		// Both Dictionary spellings share one index bucket, so a Namespace for
+		// `Dictionary<Key, Value>` binds its Type Parameters off the receiver.
 		it("should find a Namespace written for a Dictionary", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -11561,13 +11553,9 @@ describe("Enricher", () => {
 			).toBe("(_ Dictionary<String, Integer>) -> Optional<String>")
 		})
 
-		// A Dictionary in a generic Choice's payload — the descriptor its
-		// derived `Equatable` follows at run time. The two slots are described
-		// APART: `String` names no Type Parameter and compares structurally,
-		// while `Value` routes through the witness at its declaration-order
-		// index. Reading the slots together would have compared the whole
-		// Dictionary structurally, which for a box reading through a shared
-		// store is not equality at all.
+		// The two slots of a payload Dictionary are described apart: `String`
+		// compares structurally and `Value` through its witness. Read together,
+		// the box over a shared store would be compared structurally.
 		it("describes each slot of a Dictionary in a generic Choice's payload", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				choice Holder<Value> {
@@ -11597,9 +11585,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A Namespace targeting a Dictionary must not answer for a List,
-		// which is what buckets keyed by kind are for — the two spellings share
-		// one bucket with each other and with nothing else.
+		// The Dictionary bucket holds only the two Dictionary spellings, so it
+		// never answers a List.
 		it("should not offer a Dictionary Namespace to a List receiver", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace Boxes<infer Key, infer Value> for Dictionary<Key, Value> {

@@ -376,8 +376,8 @@ describe("A Case of a Match on values", () => {
 			Terminal.print(describe(1))
 		}`
 
-		// The Match that now has no last Case reports `literal-match-shape`
-		// too, so this report is picked by its message.
+		// The Match without a last Case reports `literal-match-shape` too, so
+		// this report is picked by its message.
 		expect(
 			analysedDiagnosticsFor(noEnd).find(
 				(diagnostic) =>
