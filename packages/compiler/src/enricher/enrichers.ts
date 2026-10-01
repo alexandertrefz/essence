@@ -165,7 +165,6 @@ import {
 	protocolsDeclaringMethod,
 	silentCheckedConformances,
 	solveConformance,
-	specifierWasRefused,
 	typeParameterBoundReport,
 	suggestionData,
 	suggestionHelps,
@@ -186,6 +185,7 @@ import {
 	typeDeclarationCount,
 	unimportedNamespacesOf,
 } from "./scope"
+import { namespaceLookupWording, specifierWasRefused } from "./specifiers"
 
 // Hoisting resolves each order-independent declaration's Type up front, keyed
 // by its Node, and the in-order enrichment reuses it. A Node absent from the
@@ -12533,6 +12533,8 @@ function resolveMethodInvocation(
 				baseType.type !== "Error" &&
 				!isUnwrittenTypeParameter(baseType, scope)
 			) {
+				let wording = namespaceLookupWording(node, baseType)
+
 				reportError(
 					`No Namespace provides Methods for this value`,
 					node.base.position,
@@ -12548,10 +12550,9 @@ function resolveMethodInvocation(
 								`'${node.member.content}' is looked up in its Namespaces`,
 							),
 						],
-						notes: [
-							`No Namespace in scope targets ${describeType(baseType)}.`,
-						],
+						notes: wording.notes,
 						helps: [
+							...wording.helps,
 							...unboundedParameterHelps(
 								baseType,
 								node.member.content,

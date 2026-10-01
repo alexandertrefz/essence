@@ -96,6 +96,10 @@ import {
 	protocolRegistryOf,
 	unimportedNamespacesOf,
 } from "./scope"
+import {
+	reportSpecifierIsNotANamespace,
+	reportSpecifierNamesNoValue,
+} from "./specifiers"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
 // Lookups and Literals from their enriched children, conformance solving, and
@@ -8728,49 +8732,6 @@ function namespaceCacheIsCurrent(
 	return index === cached.versions.length
 }
 
-// The specifiers `reportSpecifierIsNotANamespace` refused, so a caller does
-// not report the empty lookup behind `::<total>append("!")` a second time.
-let refusedSpecifiers = new WeakSet<parser.IdentifierNode>()
-
-export function specifierWasRefused(
-	identifier: parser.IdentifierNode | null | undefined,
-): boolean {
-	return identifier != null && refusedSpecifiers.has(identifier)
-}
-
-// `::<Name>method()` where the nearest `Name` is no Namespace. A Namespace of
-// the name further out would not be what the emitted code reaches.
-function reportSpecifierIsNotANamespace(
-	identifier: parser.IdentifierNode,
-	value: common.Type,
-	declarationPosition: common.Position | null,
-): void {
-	refusedSpecifiers.add(identifier)
-
-	reportError(
-		`'${identifier.content}' is not a Namespace`,
-		identifier.position,
-		{
-			code: "not-a-namespace",
-			labels: [
-				primary(
-					identifier.position,
-					`this is ${withArticle(describeType(value))}`,
-				),
-				...(declarationPosition === null
-					? []
-					: [secondary(declarationPosition, "declared here")]),
-			],
-			notes: [
-				`A Method can only be looked up in a Namespace, and '${identifier.content}' names ${withArticle(describeType(value))} here.`,
-			],
-			helps: [
-				"Drop the Namespace specifier, or rename whatever shadows the Namespace.",
-			],
-		},
-	)
-}
-
 export function getAllNamespacesInScope(
 	scope: enricher.Scope,
 	identifier: parser.IdentifierNode | null,
@@ -8798,11 +8759,13 @@ export function getAllNamespacesInScope(
 					)
 				}
 
-				break
+				return namespaces
 			}
 
 			searchScope = searchScope.parent
 		}
+
+		reportSpecifierNamesNoValue(identifier, scope)
 
 		return namespaces
 	}
@@ -9339,17 +9302,25 @@ export function resolveMethodLookupNamespacesForReceiverType(
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
 
+	// Read whatever the receiver, so a specifier naming no Namespace is
+	// refused where it is written.
+	let named =
+		namespaceSpecifier === null
+			? null
+			: getAllNamespacesInScope(scope, namespaceSpecifier)
+
 	// An Error receiver matches no Namespace, so it raises nothing further.
 	if (baseType.type === "Error") {
 		return matchingNamespaces
 	}
 
 	// A bounded Type Parameter resolves only through its Protocol, emitted
-	// as `Item__conformance.method(item, …)`.
+	// as `Item__conformance.method(item, …)`. A Namespace a specifier names is
+	// no such Protocol.
 	if (baseType.type === "GenericUse" && baseType.constraint !== undefined) {
 		let conformance = conformanceNamespaceFor(baseType, scope)
 
-		if (conformance !== null) {
+		if (conformance !== null && (named === null || named.size === 0)) {
 			matchingNamespaces.set(conformance.name, conformance)
 		}
 
@@ -9365,7 +9336,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	// The memoised answer is shared, so a caller copies it before changing
 	// it.
 	return namespacesTargeting(
-		getAllNamespacesInScope(scope, namespaceSpecifier),
+		named ?? getAllNamespacesInScope(scope, null),
 		baseType,
 	)
 }

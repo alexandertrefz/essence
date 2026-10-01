@@ -3013,6 +3013,99 @@ export {
 		)
 	})
 
+	// The imported Namespace beside it resolves, so only the undeclared name
+	// is reported, and at the specifier rather than the receiver.
+	it("reports a specifier nothing declares where it is written", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shout.es" { Shout }
+}
+
+implementation {
+	Terminal.print(5::<Shout>loud())
+	Terminal.print(5::<Nope>loud())
+}
+`,
+				"Shout.es": `implementation {
+	namespace Shout for Integer {
+		loud() -> String {
+			<- @::toString()::append("!")
+		}
+	}
+}
+
+export {
+	Shout
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(reportsOf(main.diagnostics)).toEqual([
+					["unknown-name", "'Nope' is not declared"],
+				])
+				expect(main.diagnostics[0]?.position?.start).toEqual({
+					line: 7,
+					column: 21,
+				})
+			},
+		)
+	})
+
+	it("offers the import of a Namespace a specifier names but the Module does not import", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shout.es" { quiet }
+}
+
+implementation {
+	Terminal.print(quiet)
+	Terminal.print(5::<Shout>loud())
+}
+`,
+				"Shout.es": `implementation {
+	constant quiet = "shh"
+
+	namespace Shout for Integer {
+		loud() -> String {
+			<- @::toString()::append("!")
+		}
+	}
+}
+
+export {
+	quiet
+	Shout
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(main.diagnostics.map((d) => [d.code, d.helps])).toEqual([
+					[
+						"unknown-name",
+						[
+							"'Shout' in ./Shout.es is a Namespace — import it.",
+							"Or drop the Namespace specifier.",
+						],
+					],
+				])
+			},
+		)
+	})
+
 	// A single file compile has no graph, so no Help names a Namespace to import.
 	it("says nothing about unimported Namespaces where there is no graph", () => {
 		withProject(

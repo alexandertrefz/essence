@@ -1930,6 +1930,42 @@ describe("Workspace", () => {
 			)
 		})
 
+		// The specifier names a Namespace this Module does not import, which is
+		// an unknown name like any other.
+		it("should offer an import for a Namespace specifier", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Geometry.es": geometry,
+				"Main.es": [
+					"import {",
+					'\tfrom "./Geometry.es" { Rectangle }',
+					"}",
+					"",
+					"implementation {",
+					"\tfunction describe(_ shape: Rectangle) -> Integer {",
+					"\t\t<- shape::<RectangleMeasurable>area()",
+					"\t}",
+					"}",
+					"",
+				].join("\n"),
+			})
+
+			let mainPath = pathOf("Main.es")
+			let actions = findCodeActions(
+				workspace.sourceOf(mainPath) ?? "",
+				spanOf(
+					workspace.sourceOf(mainPath) ?? "",
+					7,
+					"RectangleMeasurable",
+				),
+				mainPath,
+				workspace,
+			)
+
+			expect(actions.map((action) => action.title)).toContain(
+				"Import 'RectangleMeasurable' from ./Geometry.es",
+			)
+		})
+
 		it("should offer to remove an unused name, line and all", () => {
 			let { workspace, pathOf } = makeWorkspace({
 				"Geometry.es": geometry,

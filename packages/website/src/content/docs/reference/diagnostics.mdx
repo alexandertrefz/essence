@@ -1369,6 +1369,8 @@ Error: 'nmae' is not declared
 
 Fix the spelling, declare the name, or import it.
 
+A [namespace specifier](/docs/reference/diagnostics#not-a-namespace) that names nothing in scope, the `Name` of `value::<Name>method()`, lands here too, at the specifier. Its label reads `no such Namespace`. Its help offers the import of a namespace another module exports under that name, or else the closest namespace in scope, and dropping the specifier is the other help.
+
 Quick Fix: **Change to 'name'**. A name that a module in the workspace exports also gets a fix that imports it, and one that names a case gets **Write '#Red' instead of 'Red'** above both. A name a namespace reaches gets **Write 'Clock.noon' instead of 'noon'** and no spelling fix: the name is not what went wrong. Where the name is a [record literal's shorthand](/docs/language/records#writing-a-record) it is the member as well as its value, so those fixes spell the member out — **Write 'head = Http.head' instead of 'head'**, **Write 'Red = #Red' instead of 'Red'** — because `{ Http.head }` and `{ #Red }` are not records.
 
 Taught on: [Functions › Scope and hoisting](/docs/language/functions#scope-and-hoisting)
@@ -2683,6 +2685,8 @@ Error: No Namespace provides Methods for this value
 
 Bound the type parameter by a protocol that has the method: `show<infer Item is Printable>(_ item: Item)`.
 
+With a [namespace specifier](/docs/reference/diagnostics#not-a-namespace), the lookup is limited to the namespace it names, and the note says so: `"a"::<Clock>padded()` looks only in `Clock`, which targets no string. Dropping the specifier lets every namespace answer. A type parameter's methods come through its protocol alone, so a specifier naming a namespace finds nothing on one.
+
 Taught on: [Generics › A type parameter is opaque](/docs/language/generics#a-type-parameter-is-opaque)
 
 ### `not-a-namespace`
@@ -2713,6 +2717,8 @@ Error: 'total' is not a Namespace
 </div>
 
 Drop the specifier, as in `"hello"::append("!")`, or name a namespace there. Where a constant shadows the namespace you meant, rename the constant.
+
+A specifier that names a type lands here too, labelled `this names a Type`: a type holds no methods of its own, so the help is to drop the specifier. A protocol's name is a [protocol pick](/docs/reference/syntax-glossary#protocol-pick) instead, and a name nothing declares is [`unknown-name`](/docs/reference/diagnostics#unknown-name).
 
 ### `undispatchable-method`
 

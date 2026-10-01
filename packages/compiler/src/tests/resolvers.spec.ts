@@ -262,6 +262,114 @@ describe("Resolvers", () => {
 			).toContain("not-a-namespace")
 		})
 
+		// The receiver is fine, so nothing is reported about its Namespaces.
+		it("should report a specifier nothing declares where it is written", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				Terminal.print(5::<Nope>toString())
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+			])
+			expect(diagnostics[0]?.message).toBe("'Nope' is not declared")
+			expect(diagnostics[0]?.position?.start).toEqual({
+				line: 2,
+				column: 24,
+			})
+			expect(diagnostics[0]?.helps).toEqual([
+				"Drop the Namespace specifier.",
+			])
+		})
+
+		it("should offer the closest Namespace for a misspelled specifier", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				namespace Shout for Integer {
+					loud() -> String {
+						<- @::toString()::append("!")
+					}
+				}
+
+				Terminal.print(5::<Shuot>loud())
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+			])
+			expect(diagnostics[0]?.helps).toEqual([
+				"Did you mean 'Shout'?",
+				"Or drop the Namespace specifier.",
+			])
+			expect(diagnostics[0]?.data).toEqual({
+				kind: "suggestion",
+				suggestion: "Shout",
+			})
+		})
+
+		// The control: a Protocol's name is a pick, and the call resolves.
+		it("should report a specifier that names a Type", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Click = { x: Integer }
+
+				Terminal.print(5::<Click>toString())
+				Terminal.print("pear"::<Equatable>isNot("plum"))
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.labels[0]?.message,
+				]),
+			).toEqual([["not-a-namespace", "this names a Type"]])
+		})
+
+		// A Type Parameter's Methods come through its Protocol alone, but the
+		// specifier is read all the same.
+		it("should report a specifier on a Type Parameter receiver", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function bounded<infer T is Printable>(_ x: T) -> String {
+					<- x::<Nope>toString()
+				}
+
+				function unbounded<infer T>(_ x: T) -> String {
+					<- x::<Nope>toString()
+				}
+
+				function viaInteger<infer T is Printable>(_ x: T) -> String {
+					<- x::<Integer>toString()
+				}
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.notes,
+				]),
+			).toEqual([
+				["unknown-name", []],
+				["unknown-name", []],
+				[
+					"no-namespace-for-value",
+					[
+						"The specifier limits the lookup to 'Integer', which provides no 'toString' for T.",
+					],
+				],
+			])
+		})
+
+		// The control: a Protocol pick on a bounded receiver reaches the
+		// conformance.
+		it("should keep a Protocol pick on a Type Parameter receiver", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function differs<infer T is Equatable>(_ x: T, _ y: T) -> Boolean {
+						<- x::<Equatable>isNot(y)
+					}
+
+					Terminal.inspect(differs(1, 2))
+				}`),
+			).toEqual([])
+		})
+
 		it("should keep resolving an unshadowed specifier", async () => {
 			expect(
 				await run(`implementation {
