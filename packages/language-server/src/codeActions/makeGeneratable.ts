@@ -5,25 +5,19 @@ import { indentationOf, lineAt, overlaps } from "./geometry"
 import type { CodeActionEntry, FixContext } from "./index"
 import { walk } from "./lookups"
 
-// The `Generatable` conformance a property test wants, written beside the
-// Type it is about. A conformance REPLACES the generator a property test would
-// derive from the Type, which is what a Type whose values carry an invariant no
-// structure can state is for — and the half of it that can be written down here
-// is the drawing: a Record filled member by member, a Choice picked a Case of.
+// Writes the `Generatable` conformance a property test wants after its Type,
+// replacing the derived generator. A Record is drawn member by member, a
+// Choice by picking a Case.
 //
-// Never preferred, and rarely finished: a member this can not draw is left OUT
-// of the value it builds rather than filled with something plausible, so what
-// is left behind is a Diagnostic naming the member and a `§` line saying why.
-// A scaffold that drew the wrong values would be worse than one that stops.
+// Never preferred. A member with no known draw is left out of the value, with
+// a `§` line saying why, rather than drawn wrongly.
 
 const GENERATABLE = "Generatable"
 const SOURCE = "source"
 
-// What the standard library gives a `Randomness` to draw with, as an
-// author would write it. A Type that is not one of these has no draw to spell,
-// and there is deliberately no fallback: `source::drawInteger(…)` for an
-// `Age` that is an Integer under a refinement would draw values the refinement
-// calls impossible.
+// The standard library's draws from a `Randomness`, as an author writes them.
+// There is no fallback: drawing an Integer for a refined `Age` would break the
+// refinement.
 const draws: Readonly<Record<string, string>> = {
 	Boolean: `${SOURCE}::drawBoolean()`,
 	Integer: `${SOURCE}::drawInteger(between 0, and 100)`,
@@ -31,10 +25,8 @@ const draws: Readonly<Record<string, string>> = {
 	String: `${SOURCE}::drawString(upTo 10)`,
 }
 
-// A declaration a value can be BUILT of, which is the whole of what this
-// writes a body for. Read off the parsed source rather than the enriched Type,
-// because what goes into the body is source: the member Types as the author
-// spelled them, and the Cases under the names the author gave them.
+// A declaration a value can be built of, read off the parsed source, since the
+// body spells member Types and Cases as the author did.
 type Buildable = {
 	name: string
 	node: parser.TypeAliasStatementNode | parser.ChoiceDeclarationStatementNode
@@ -51,10 +43,8 @@ export function makeGeneratableAction(
 
 	let typeName = diagnostic.data.typeName
 	let found = generatablesIn(program)
-	// Only a Type THIS file declares. The Namespace is written beside the
-	// declaration, and a Type another Module publishes has no declaration here
-	// to write it beside — nor is a conformance to somebody else's Type
-	// something to offer without being asked.
+	// Only a Type this file declares, since the Namespace goes after its
+	// declaration.
 	let buildable = found.buildables.find(
 		(candidate) => candidate.name === typeName,
 	)
@@ -110,9 +100,8 @@ function entryFor(
 
 	let end = buildable.node.position.end
 
-	// Read back off the buffer, as every edit here is: a Namespace
-	// written after something that is still on the declaration's line would
-	// push that something onto a line of its own.
+	// The declaration must end its line, or the Namespace would push what
+	// follows onto a new line.
 	if (
 		lineAt(lines, end.line)
 			.slice(end.column - 1)
@@ -132,17 +121,13 @@ function entryFor(
 			kind,
 			diagnosticCode: diagnostic?.code ?? null,
 			diagnosticPosition: diagnostic?.position ?? null,
-			// Never preferred — see the header. A body it could not
-			// finish leaves a Diagnostic of its own behind.
+			// A body it could not finish leaves a Diagnostic behind.
 			isPreferred: false,
 			edits: [
 				{
 					range: { start: end, end },
-					// Under the declaration rather than at the end of the
-					// section: a conformance is about ONE Type, and a reader
-					// who asked for it standing on that Type's declaration
-					// looks for it under the declaration. A blank line between
-					// them, which is how every other pair of Statements stands.
+					// After the declaration it is about, a blank line
+					// between them.
 					newText: `\n\n${namespaceFor(buildable, indentation)}`,
 				},
 			],
@@ -174,21 +159,17 @@ function namespaceFor(buildable: Buildable, indentation: string): string {
 		notes,
 		built.text,
 		`${method}}\n`,
-		// No break after the closing brace — the declaration's own line
-		// break is still ahead of whatever followed it, and writing a second
-		// one would leave a blank line nobody asked for at the end.
+		// No line break after the brace: the declaration's own break
+		// follows it.
 		`${indentation}}`,
 	].join("")
 }
 
-// What a body answers with, and what it could not draw. The two travel
-// together because a member left out is exactly what the `§` line above the
-// value has to name.
+// What a body answers with, and the members it could not draw, which the `§`
+// lines name.
 type Built = { text: string; undrawable: Array<string> }
 
-// One Record's members, drawn where they can be and named where they can
-// not. A member left out is what makes the value incomplete, which is the hole
-// the `§` line above it and the Diagnostic under it both point at.
+// One Record's members: drawn where possible, named where not.
 type Members = { written: Array<string>; undrawable: Array<string> }
 
 function drawnMembers(record: parser.RecordTypeDeclarationNode): Members {
@@ -226,10 +207,8 @@ function recordOfMembers(
 	}
 }
 
-// A Case is chosen by `pick`, which is what the standard library gives a
-// draw over a written List — every Case is built, and the source hands one of
-// them back. `drawInteger` and a Match over the number would draw the same
-// Case and need a Handler per Case to say which one it meant.
+// A Case is chosen by `pick` over a List of every Case built, which needs no
+// Match over a drawn number.
 function pickOfCases(
 	name: string,
 	choice: parser.ChoiceDeclarationStatementNode,
@@ -249,9 +228,7 @@ function pickOfCases(
 
 		let payload = drawnMembers(caseNode.type)
 
-		// Named by the Case it belongs to — a Choice may carry the same
-		// member name in more than one payload, and a line saying `radius`
-		// alone would not say which of them is missing.
+		// Named with its Case, since payloads may share member names.
 		undrawable.push(
 			...payload.undrawable.map(
 				(member) => `${caseNode.name.content}.${member}`,
@@ -277,11 +254,8 @@ function pickOfCases(
 	}
 }
 
-// One line where one line fits, and one entry per line where it does not
-// — measured the way the Formatter measures, against its own page width and
-// its own reading of a tab, so that what this writes is what a format would
-// leave. A scaffold laid out differently would be rewritten the moment the file
-// is saved, and every diff of it would show that rewrite instead of the change.
+// One line where it fits, one entry per line otherwise, measured as the
+// formatter measures, so formatting leaves the scaffold as written.
 function laidOut(
 	opening: string,
 	entries: Array<string>,
@@ -305,11 +279,8 @@ function fits(indentation: string, text: string): boolean {
 }
 
 function drawOf(type: parser.TypeDeclarationNode): string | null {
-	// A written NAME and nothing else. An applied Type (`List<Integer>`),
-	// a Record written in place and a Function Type all have shapes a draw
-	// could be composed for, and none of them has one the standard library
-	// spells in a single call — so they are left to the reader rather than
-	// guessed at.
+	// Only a written name. An applied, Record or Function Type has no
+	// single-call draw, so it is left to the reader.
 	if (type.nodeType !== "IdentifierTypeDeclaration") {
 		return null
 	}
@@ -317,24 +288,15 @@ function drawOf(type: parser.TypeDeclarationNode): string | null {
 	return draws[type.type.content] ?? null
 }
 
-// The declarations a value is built of, which is a Record Alias and a
-// Choice — and, in the SAME walk, the Types a `Generatable` Namespace already
-// answers for. The two questions are one pass because they were two: every
-// candidate used to ask "is this one already written?" with a walk of its own,
-// so a whole-document request over a file declaring four hundred Types walked
-// the Program four hundred times. One walk, and the answer is a lookup.
+// The Record Aliases and Choices a value is built of, and in one walk the
+// Types a `Generatable` Namespace already covers.
 //
-// A GENERIC declaration is left out: `generate` is a static taking a source and
-// nothing else, so a call has no Argument for the Type Parameters to be worked
-// out from — which is what `unreachable-conformance` refuses, and offering to
-// write a conformance the Compiler then refuses would be a fix that breaks the
-// file. A refinement is left out too: its predicate is what a drawn value has to
-// satisfy, and nothing here can hold one.
+// A generic declaration is left out: `generate` takes no Argument to infer
+// its Type Parameters from, so `unreachable-conformance` would refuse it. A
+// refinement is left out too, since a draw cannot satisfy its predicate.
 function generatablesIn(program: parser.Program): {
 	buildables: Array<Buildable>
-	// The names there is nothing left to offer for — either because the
-	// Namespace this would write is already there under that name, or because
-	// the Type already conforms and draws through what is written.
+	// Types whose Namespace exists already, or that conform already.
 	covered: Set<string>
 } {
 	let buildables: Array<Buildable> = []
