@@ -2646,11 +2646,8 @@ class DescentParser {
 		})
 	}
 
-	// `user.name = "Ada"` — the one habit that is not a word or a Symbol
-	// but a whole shape, and the only place a Lookup is ever followed by an `=`.
-	// Refused here rather than where the Expression ended, because a lone `=` is
-	// Essence everywhere else it stands behind one: it separates a Dictionary's
-	// key from its value and a Record member's name from its own.
+	// `user.name = "Ada"`: assigning a Record member. Refused at Statement level,
+	// since elsewhere an `=` after an Expression separates a key from its value.
 	protected refuseMemberAssignment(expression: parser.ExpressionNode): void {
 		if (
 			expression.nodeType !== "Lookup" ||
@@ -2680,13 +2677,8 @@ class DescentParser {
 		)
 	}
 
-	// A `§§` block above a Declaration documents whatever the Declaration
-	// holds, so a Function literal written as the value is handed the block —
-	// the Enricher already reads the block's `@param` lines against that
-	// literal's Parameters. It is handed down rather than picked up, because a
-	// literal in expression position owns no block of its own: reading one off
-	// the line above it made this work only where the literal shared the
-	// Declaration's line.
+	// A Function literal written as a Declaration's value gets the
+	// Declaration's `§§` block, since a literal in Expression position owns none.
 	protected handDocumentationDown(
 		value: parser.ExpressionNode,
 		documentation: common.Documentation | null,
@@ -2702,12 +2694,8 @@ class DescentParser {
 		return this.parseDeclaredConstant(keyword.position)
 	}
 
-	// Everything a Constant Declaration is behind its Keyword, with the
-	// Keyword's own span handed in. Split out for the one caller that has stepped
-	// over a Keyword this language does not have — see
-	// `parseForeignDeclarationStatement` — so that a `const` recovers into
-	// exactly the Statement a `constant` would have read, annotation, Pattern,
-	// Documentation and all.
+	// A Constant Declaration after its Keyword. `parseForeignDeclarationStatement`
+	// calls it after a `const`, so that recovers into the same Statement.
 	protected parseDeclaredConstant(
 		keywordPosition: common.Position,
 	): parser.ConstantDeclarationStatementNode {
@@ -2739,7 +2727,7 @@ class DescentParser {
 		return this.parseDeclaredVariable(keyword.position)
 	}
 
-	// The Variable half of the split above, for the same one caller.
+	// A Variable Declaration after its Keyword, as `parseDeclaredConstant`.
 	protected parseDeclaredVariable(
 		keywordPosition: common.Position,
 	): parser.VariableDeclarationStatementNode {
@@ -2765,11 +2753,8 @@ class DescentParser {
 		)
 	}
 
-	// What a Declaration declares — one name, or a Pattern naming the
-	// parts of the value. The Keyword in front is what makes this unambiguous:
-	// a keyword-less `{ a, b } = x` could not be told from the Record Literal
-	// `{ a = 1 }` written as a Statement until its closing brace, which is why
-	// assignment position takes no Pattern.
+	// One name, or a Pattern naming the parts of the value. Assignment takes no
+	// Pattern, since `{ a, b } = x` reads like a Record literal until its `}`.
 	protected parseDeclaredName(): parser.IdentifierNode | parser.PatternNode {
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
 			return this.parsePattern()
@@ -2808,33 +2793,17 @@ class DescentParser {
 			predicate,
 			{
 				start: keyword.position.start,
-				// Out to the predicate, not to the Type — the Statement
-				// stands for the whole of `Integer where @::isNot(0)`. The
-				// formatter reads a declaration's own span to decide which
-				// Comments sit above it and which trail it, so a clause left
-				// outside the Node would put a Comment written after it above
-				// the NEXT declaration.
+				// Out to the predicate. The formatter places Comments by a
+				// Declaration's span.
 				end: predicate?.position.end ?? type.position.end,
 			},
 			this.tokens.documentationAbove(keyword.position.start.line),
 		)
 	}
 
-	// The `where` clause of a checked refinement. `where` is not a
-	// Keyword — it is an ordinary Identifier used as an Argument label
-	// (`removeEvery(where …)`) and as a Namespace's conformance conditions — so
-	// it is recognised by content, exactly as `parseOptionalGuard` does it.
-	//
-	// On the Type's own line, or on the line after it — linebreak Tokens
-	// are discarded, so a `where` opening the NEXT line has to be told apart
-	// from a Statement that begins with the NAME `where`: `type Handler =
-	// Reader` followed by `where = 3` or `where::check()` must not have its
-	// Type read as a refinement of the line above. A Statement that begins
-	// with a name continues it with `=`, `::`, `.`, `(` or `[`, and a
-	// refinement's `where` is followed by the predicate's first Token on the
-	// same line — so a next-line `where` is the clause exactly when what
-	// follows it on its line is none of those. This is what lets the
-	// formatter move a clause too wide for the Type's line down under it.
+	// The `where` clause of a checked refinement, recognised by content as in
+	// `parseOptionalGuard`. On the next line, `where` opens the clause only if
+	// no `STATEMENT_CONTINUATIONS` Token follows it on its line.
 	protected parseOptionalRefinementPredicate(
 		type: parser.TypeDeclarationNode,
 	): parser.ExpressionNode | null {
@@ -2903,11 +2872,9 @@ class DescentParser {
 		)
 	}
 
-	// A payload shape may be followed by `= { … }`, the Record a
-	// construction is filled out of. Nothing else may ever follow a Case, so
-	// the `=` is read unconditionally and refused where there is no payload to
-	// default — which says what is wrong instead of leaving the Expression to
-	// fail as a Case name the list never closed.
+	// A payload shape may be followed by `= { … }`, the Record a construction
+	// is filled from. Nothing else follows a Case, so an `=` is always read and
+	// refused where there is no payload.
 	protected parseChoiceCase(): parser.ChoiceCaseNode {
 		let name = this.parseIdentifier()
 		let type: parser.RecordTypeDeclarationNode | null = null
@@ -2948,11 +2915,8 @@ class DescentParser {
 		return { name, type, defaultValue }
 	}
 
-	// A free `function` always carries a body, in every mode. A native
-	// free Function exists only as an `overload function` entry — the
-	// body-less non-overloaded form left with `__print`, the last declaration
-	// that used it — so a signature with no block gets the plain "Expected
-	// '{'" the missing body is.
+	// A free `function` always carries a body. A native free Function exists
+	// only as an `overload function` entry.
 	protected parseFunctionStatement(): parser.FunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordFunction)
 
@@ -2965,13 +2929,9 @@ class DescentParser {
 		})
 	}
 
-	// An `overload function <name> { … }` block — the free-Function
-	// counterpart of an `overload` Method block, and, like the body-less
-	// signature form, only meaningful in a `declarations { … }` Program. Each
-	// entry is a Function literal or a native signature, mixed freely; the
-	// written order is load-bearing, because the index names the `__overload$N`
-	// export a call site binds to. Outside declarations mode this runs only as
-	// recovery, after `parseImplementationNode` has already refused the form.
+	// An `overload function <name> { … }` block of a `declarations { … }`
+	// Program. Each entry is a Function literal or a native signature, and its
+	// index names the `__overload$N` export a call binds to.
 	protected parseOverloadedFunctionStatement(): parser.OverloadedFunctionStatementNode {
 		let keyword = this.tokens.expect(TokenType.KeywordOverload)
 		let documentation = this.tokens.documentationAbove(
@@ -3054,10 +3014,8 @@ class DescentParser {
 		let body = this.parseStatementList(() => this.parseNamespaceBodyNode())
 		let closingPosition = this.parseClosingBrace(leftBrace.position)
 
-		// Properties and Methods are built into two separate name-keyed
-		// Records, so a Property may share its name with a Method — but not
-		// with another Property, and a Method not with another Method, not
-		// even when one of the two is `static`.
+		// Properties and Methods are keyed apart, so a Property may share a
+		// Method's name. Two Methods may not, even when one is `static`.
 		this.reportDuplicateNames(
 			body.filter((node) => node.nodeType === "NamespacePropertyNode"),
 			"Property",
@@ -3086,10 +3044,8 @@ class DescentParser {
 		)
 	}
 
-	// `is` is contextual, not a keyword — `::is()` Method calls rely on
-	// it lexing as an ordinary Identifier. Each conformance carries its own
-	// `is` (`is Equatable, is Printable`); the comma separates clauses, so a
-	// bare Protocol name after a comma is a mistake with a tailored Diagnostic.
+	// `is` is contextual, since `::is()` is a Method. Each conformance carries
+	// its own `is`, as in `is Equatable, is Printable`.
 	protected parseConformanceClauses(): Array<parser.ConformanceClauseNode> {
 		let clauses: Array<parser.ConformanceClauseNode> = []
 
@@ -3137,10 +3093,8 @@ class DescentParser {
 		})
 	}
 
-	// `where Generic is Protocol (, Generic is Protocol)*`, contextual
-	// `where` (no lexer change — modelled on `parseOptionalGuard`). Written for
-	// reuse: it takes no Namespace-specific input, so a future function-generics
-	// `where` calls it verbatim.
+	// `where Generic is Protocol (, Generic is Protocol)*`, with `where`
+	// recognised by content as in `parseOptionalGuard`.
 	protected parseOptionalWhereClause(): Array<parser.WhereConditionNode> {
 		let token = this.tokens.peek()
 
@@ -3157,10 +3111,8 @@ class DescentParser {
 		]
 
 		while (this.tokens.peek()?.type === TokenType.SymbolComma) {
-			// Comma disambiguation — a comma followed by `is` ends the
-			// condition list, because that comma separates conformance clauses
-			// (`is A where Item is X, is B`), not conditions. It is left
-			// unconsumed for `parseConformanceClauses` to pick up.
+			// A comma followed by `is` separates conformance clauses, as in
+			// `is A where Item is X, is B`, so it ends the condition list.
 			let afterComma = this.tokens.peek(1)
 
 			if (
@@ -3180,9 +3132,8 @@ class DescentParser {
 	protected parseWhereCondition(): parser.WhereConditionNode {
 		let generic = this.parseIdentifier()
 
-		// `is`/`where` name real Identifiers, but a `where` condition
-		// whose LHS is literally one of them is almost certainly a dropped
-		// name rather than a Type Parameter called `is` — diagnosed here.
+		// A condition starting with `is` or `where` has almost certainly
+		// dropped its Type Parameter's name.
 		if (generic.content === "is" || generic.content === "where") {
 			fail(
 				`'${generic.content}' can not name a Type Parameter in a 'where' condition`,
@@ -3216,9 +3167,8 @@ class DescentParser {
 	protected parseNamespaceBodyNode(): NamespaceBodyNode {
 		let token = this.peekOrFail()
 
-		// A Method takes its Documentation from its own signature line,
-		// which is the same line — but an `overload` block and a static
-		// Property own no signature, so theirs is read here.
+		// An `overload` block and a static Property own no signature line to
+		// read Documentation from, so theirs is read here.
 		let documentation = this.tokens.documentationAbove(
 			token.position.start.line,
 		)
@@ -3240,9 +3190,8 @@ class DescentParser {
 			let leftBrace = this.tokens.expect(TokenType.SymbolLeftBrace)
 
 			if (this.mode === "declarations") {
-				// An overload block may MIX bodied and body-less entries in
-				// declarations mode — each is a Function literal or a native
-				// signature, whichever the entry's own body decides.
+				// In declarations mode an overload block may mix bodied and
+				// body-less entries.
 				let methods = this.parseStatementList(() =>
 					this.parseMethodBodyOrSignature(),
 				)
@@ -3329,9 +3278,8 @@ class DescentParser {
 
 			let type = this.parseOptionalDeclarationType()
 
-			// A native static Property — `static Pi: Transcendental` with
-			// no `=` — is legal only in declarations mode. Everywhere else the
-			// missing `=` stays a parse error, produced by the `expect` below.
+			// A native static Property, `static Pi: Transcendental` without an
+			// `=`, is legal only in declarations mode.
 			if (
 				this.mode === "declarations" &&
 				this.tokens.peek()?.type !== TokenType.SymbolEqual
@@ -3385,12 +3333,9 @@ class DescentParser {
 		}
 	}
 
-	// The `declarations`-mode Method form — an optional Generic list, a
-	// Parameter list and a return Type, then either a block (a bodied Method,
-	// implemented in Essence) or nothing (a body-less native signature bound to
-	// the runtime by name). The bodied branch reproduces exactly what
-	// `parseOptionallyGenericFunctionLiteral` builds, so a bodied Method in a
-	// declarations Program parses identically to one anywhere else.
+	// The `declarations`-mode Method form: a signature, then a block or nothing
+	// for a native bound by name. The bodied branch builds what
+	// `parseOptionallyGenericFunctionLiteral` builds.
 	protected parseMethodBodyOrSignature():
 		| parser.FunctionValueNode
 		| parser.NativeMethodSignatureNode {
