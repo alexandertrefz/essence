@@ -18,8 +18,8 @@ function allHintsOf(source: string) {
 	return findInlayHints(enrichedProgram)
 }
 
-// What a Hint SHOWS. The `textEdit` every Hint carries is asserted on
-// its own further down rather than repeated in each expectation here.
+// What a Hint shows. The `textEdit` each Hint carries is asserted in the
+// "Accepting a Hint" specs.
 function hintsOf(source: string) {
 	return allHintsOf(source).map((hint) => ({
 		position: hint.position,
@@ -77,8 +77,8 @@ describe("Inlay Hints", () => {
 	})
 
 	it("should not annotate a Function literal that annotates itself", () => {
-		// The literal already spells the whole signature out on the same
-		// line — repeat it beside the name is noise the width of a Type.
+		// The literal already spells the whole signature out on the same line,
+		// so repeating it beside the name is noise.
 		let source = [
 			"implementation {",
 			"\tconstant halve = (_ value: Integer) -> Integer { <- value }",
@@ -98,9 +98,8 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)[0].label).toBe(": { firstName: String }")
 	})
 
-	// A Hint is offered as an applied EDIT, so what it shows has to parse
-	// back as what it says — `Standing` does, wherever the Alias is in scope,
-	// and it is what a reader would have written.
+	// A Hint is offered as an applied edit, so what it shows must parse back
+	// as what it says. `Standing` does wherever the Alias is in scope.
 	it("should annotate a Record reached through its Alias by name", () => {
 		let source = [
 			"implementation {",
@@ -167,9 +166,8 @@ describe("Inlay Hints", () => {
 		])
 	})
 
-	// Parameter name hints are deliberately absent — a labelled
-	// Parameter requires its label at the call site, and a label-less one has
-	// no name to show, so a hint could only ever repeat what is already there.
+	// Parameter name hints are deliberately absent. A labelled Parameter
+	// requires its label at the call site, and a label-less one has no name.
 	it("should not annotate Arguments of a labelled call", () => {
 		let source = [
 			"implementation {",
@@ -193,9 +191,8 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
-	// A contextually typed Function literal shows neither its Parameter
-	// Types nor its return Type anywhere in the source — they come from the
-	// signature it is passed to — which is exactly what a Hint is for.
+	// A contextually typed Function literal shows its Parameter and return
+	// Types nowhere in the source, which is what a Hint is for.
 	describe("Contextual Function literals", () => {
 		it("should annotate an inferred Parameter and return Type", () => {
 			let source = [
@@ -295,9 +292,8 @@ describe("Inlay Hints", () => {
 			expect(labels).toContain(": Number | String")
 		})
 
-		// A Guard is where a contextually typed literal is hardest to
-		// read back — `@` is narrowed by the Matcher, so the literal's Types
-		// come from a signature the line does not mention.
+		// In a Guard, `@` is narrowed by the Matcher, so the literal's Types come
+		// from a signature the line does not mention.
 		it("should annotate a Function literal inside a Match Guard", () => {
 			let source = [
 				"implementation {",
@@ -349,14 +345,9 @@ describe("Inlay Hints", () => {
 			)
 		})
 
-		// The divisor is COMPUTED, deliberately — a written `2` is its
-		// own proof of not being zero and reaches `divide`'s total entry, whose
-		// Hint is the `NonZeroRational` asserted alongside — neither operand
-		// is zero, so the quotient is not either. It is computed with
-		// a DIFFERENCE, the one operation no refinement of Integer closes
-		// over. The List is bound to a `List` Type for the same reason: a
-		// written one proves it holds an item, and `firstItem` on a proven
-		// receiver answers no Optional.
+		// The divisor is computed, since a written `2` proves it is not zero
+		// and reaches `divide`'s total entry, as `sure` shows. `numbers` is
+		// annotated because a written List proves it holds an item.
 		it("should describe builtin fallible Methods as `Optional`", () => {
 			let source = [
 				"implementation {",
@@ -390,17 +381,9 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should not resolve `value(defaultingTo:)` on a flat spelled-out Union", () => {
-			// `Optional` is a nominal Choice, and `value(defaultingTo:)` is a Method
-			// of that Choice and of nothing else. No SHAPE of Union reaches it:
-			// a Method called on a Union has to be a Method of every member,
-			// and neither `Integer` nor `Rational` has one — so `sure` is left
-			// without a Type and takes no Hint at all. Spelling the same two
-			// Types out used to be a way to write a fallible value, back when
-			// `Optional<X>` was an Alias for a Union; now the Union is only
-			// ever a Union. Wrapping the payload in an `Optional` still
-			// collapses it to `Integer | Rational`, which is the one Hint
-			// expected below: the collapse did not go away, the accidental
-			// Union-shaped spelling of it did.
+			// `value(defaultingTo:)` is a Method of the `Optional` Choice alone, and
+			// a Method called on a Union must be one of every member. So `sure` gets
+			// no Hint, and the wrapped payload collapses to `Integer | Rational`.
 			let source = [
 				"implementation {",
 				"\tconstant flat: Integer | Rational = 1",
@@ -420,18 +403,9 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should not resolve `value(defaultingTo:)` on a named member of a wider Union", () => {
-			// This test used to be about a `Nothing` BURIED inside a
-			// named Alias: `type MaybeInt = Integer | Nothing` as a member of
-			// `MaybeInt | Rational`, where a remainder fallback let the
-			// `Nothing` an `value(defaultingTo:)` expected claim the buried one and typed
-			// the payload as `Integer | Rational`. Neither the Type nor the
-			// fallback exists — there is no Union SHAPE that means "fallible"
-			// any more, only the Choice, and naming a Union does not make it
-			// one. What is left worth pinning is the half that outlived them:
-			// a named Alias keeps its name as a member of a wider Union, and
-			// `value(defaultingTo:)` finds nothing to resolve against there. The one Hint
-			// says both — `mixed` enriches and reads back under its own alias,
-			// while `sure` gets none because the call did not resolve.
+			// A named Alias keeps its name as a member of a wider Union, so
+			// `echoed` reads back under it. Naming a Union does not make it
+			// fallible, so `sure` gets no Hint.
 			let source = [
 				"implementation {",
 				"\ttype MaybeInt = Integer | String",
@@ -451,23 +425,9 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should keep an `Optional` branch whole in a Union inferred from mixed branches", () => {
-			// One branch returns `Optional<Rational>`, the other a bare
-			// Integer, and the inferred Union keeps the two side by side — the
-			// Optional stays ONE nested member. Back when `Optional<X>` was an
-			// Alias for a Union, the two branches dissolved into each other
-			// and the Integer ended up sitting beside the missing case at the
-			// top level; a nominal Choice has no shape to dissolve INTO. That
-			// is what it buys: a Union cannot become fallible by accident, so
-			// `merged` reads back as `Optional<Rational> | Integer` and has no
-			// `value(defaultingTo:)` to call — `sure` gets no Type and no Hint. A value
-			// that is fallible has to say so by being an `Optional` the whole
-			// way out.
-			// The divisor is COMPUTED (`4::subtract(2)`),
-			// deliberately — a written `2` is its own proof of not being zero
-			// and reaches `divide`'s total entry, and this branch has to stay
-			// fallible for the Union to carry an `Optional` at all. A
-			// difference, because a sum of two written Integers is proven
-			// itself.
+			// The inferred Union keeps the `Optional` branch as one member, so a
+			// Union is never fallible by accident and `sure` gets no Hint. The
+			// divisor is computed to keep that branch fallible.
 			let source = [
 				"implementation {",
 				"\tnamespace Picker for Integer {",
@@ -505,15 +465,10 @@ describe("Inlay Hints", () => {
 		})
 
 		it("should keep a compound payload whole — and `value(defaultingTo:)` collapses it", () => {
-			// The stdlib spells mixed fallible results as one nested
-			// payload (`Optional<Integer | Rational>`), which is what lets
-			// `value(defaultingTo:)` bind the payload in one piece.
-			//
-			// The base is COMPUTED, with the difference no refinement of
-			// Integer closes over. A written one proves it is not zero, and a
-			// power is empty only where a zero base meets a negative exponent
-			// — so a written base answers the payload without a wrapper and
-			// leaves nothing to collapse.
+			// The standard library writes a mixed fallible result as one nested
+			// payload, which `value(defaultingTo:)` binds whole. The base is
+			// computed, since a written base proves it is not zero and needs no
+			// wrapper.
 			let source = [
 				"implementation {",
 				"\tconstant two = 3::subtract(1)",
@@ -530,9 +485,8 @@ describe("Inlay Hints", () => {
 		})
 	})
 
-	// A Hint's label is the annotation the source left out, and the Hint
-	// sits where that annotation belongs — which is what makes accepting one a
-	// plain insertion rather than an inference of its own.
+	// A Hint's label is the annotation the source left out, and the Hint sits
+	// where it belongs, so accepting one is a plain insertion.
 	describe("Accepting a Hint", () => {
 		it("should insert its own label at its own position", () => {
 			let source = [
@@ -607,12 +561,10 @@ describe("Inlay Hints", () => {
 	})
 })
 
-// The anchor an inferred-Type Hint sits at is the end of a Parameter's
-// Position, and that Position stops at the TYPE and never covers a default —
-// `codeActions` offers the same span as an APPLIED edit, so a Hint written after
-// `= 1` would produce source that does not parse. The two can not actually meet
-// today, because only a contextually typed Function literal omits a Type and
-// only a named Declaration may carry a default; these pin both halves of that.
+// An inferred-Type Hint sits at the end of a Parameter's Position, which never
+// covers a default. A Hint written after `= 1` would not parse. Only a
+// contextual Function literal omits a Type and only a Declaration carries a
+// default, and these pin both halves.
 describe("Inlay Hints beside a default", () => {
 	it("writes no Parameter Hint where a Type and a default are both written", () => {
 		let source = [
@@ -657,11 +609,9 @@ describe("Inlay Hints beside a default", () => {
 	})
 })
 
-// A Hint IS an applied edit — `codeActions` offers every one of them as
-// "Add explicit Type annotation" — so its text has to parse back as the Type it
-// names. A Method taken as a value has no defaults to print (the Enricher drops
-// them: only a direct call reaches the frame that fills one in) and `printType`
-// writes no `?` in any case, which are the two halves of that guarantee.
+// A Hint is also offered as a refactoring, so its text must parse back as the
+// Type it names. A Method taken as a value has no defaults to print, and
+// `printType` writes no `?`.
 describe("An Inlay Hint for a defaulted signature read as a value", () => {
 	it("writes a Type that parses back as itself", () => {
 		let source = [
@@ -686,9 +636,7 @@ describe("An Inlay Hint for a defaulted signature read as a value", () => {
 			},
 		])
 
-		// Applied where it is offered, and parsed — the one thing a Hint
-		// that is also an edit has to survive. A `?` on `by` would parse as a
-		// Parameter LABELLED `by?` and then fail against the value it annotates.
+		// Applied where it is offered, and parsed.
 		let annotated = source.replace(
 			"constant scaled = ",
 			`constant scaled${hints[0]!.label} = `,
@@ -698,9 +646,8 @@ describe("An Inlay Hint for a defaulted signature read as a value", () => {
 	})
 })
 
-// An arm declares nothing to annotate, but a contextually typed Function
-// literal written as an arm's value shows its Types nowhere in the source —
-// which is exactly the case a Hint answers.
+// An arm declares nothing, but a contextually typed Function literal written
+// as an arm's value shows its Types nowhere in the source.
 describe("Inlay Hints inside a define", () => {
 	it("should annotate a contextual Function literal in an arm's value", () => {
 		let source = [
@@ -719,10 +666,9 @@ describe("Inlay Hints inside a define", () => {
 	})
 })
 
-// What a Constant holding work is — the difference between `Started<…>`
-// and the value it will answer with is the whole reason to read one — and the
-// Function literal written under the Keyword, which shows its Types nowhere in
-// the source and is reached by nothing where the walk has no case for `start`.
+// A Constant holding work reads as `Started<…>`, not as what it will answer.
+// The Function literal under the Keyword is reached only through the walk's
+// case for `start`.
 describe("Inlay Hints around start and complete", () => {
 	let source = [
 		"implementation {",
@@ -751,12 +697,9 @@ describe("Inlay Hints around start and complete", () => {
 	})
 })
 
-// A Hint's LABEL and its EDIT are two different sentences about one Type,
-// and this is where they part company: the label names the Alias the Type was
-// declared under wherever the reader is standing, and the edit may only write a
-// name the position can resolve. Every one of these applies the edit and
-// analyses what it left behind, because "does it parse and link" is the whole
-// of what an applied Hint promises.
+// A Hint's label names the Alias the Type was declared under, and its edit
+// may write only a name the position resolves. Each spec applies the edit and
+// analyses what it left behind.
 describe("Inlay Hints that write a name", () => {
 	let directories: Array<string> = []
 
@@ -784,10 +727,9 @@ describe("Inlay Hints that write a name", () => {
 		return (name: string) => canonicalPath(path.join(root, name))
 	}
 
-	// The Hints of a LINKED Module, which is the only way the import
-	// block's own Types are in the Program at all — a Hint over `origin()`
-	// names a Record another file declares, and whether this file can write
-	// that name is a question about what came across.
+	// The Hints of a linked Module, the only way the import block's Types are
+	// in the Program. Whether this file can write a name another file declares
+	// depends on what it imported.
 	function moduleHints(files: Record<string, string>, entry: string) {
 		let pathOf = makeFiles(files)
 		let filePath = pathOf(entry)
@@ -880,8 +822,8 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// A Union Alias goes the same way and always did — its arms are Types
-	// in their own right, so the pipe list is a spelling this file can read.
+	// A Union Alias goes the same way. Its arms are Types in their own right,
+	// so the pipe list is a spelling this file can read.
 	it("should apply a Union Alias it can not write as its arms", () => {
 		let main = [
 			"import {",
@@ -907,10 +849,8 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// A Choice has no shape underneath it — its arms are Cases, and a
-	// Case is not a Type a Declaration writes — so where its name is out of
-	// reach there is nothing to write at all. The Hint still SHOWS what the
-	// value is, which is the same bargain a Function Type's Hint strikes.
+	// A Choice's arms are Cases, which no Declaration writes as a Type, so with
+	// its name out of reach there is nothing to write. The Hint still shows it.
 	it("should offer no edit for a Choice whose name is out of reach", () => {
 		let main = [
 			"import {",
@@ -933,9 +873,8 @@ describe("Inlay Hints that write a name", () => {
 		expect(hints[0]?.textEdit).toBeNull()
 	})
 
-	// The name that DID come across is written as the reader would write
-	// it. Spelling the shape here instead would answer an Alias this file names
-	// with the members it was declared to stand for.
+	// The name that came across is written as the reader would write it, not
+	// as the members it stands for.
 	it("should write an imported Alias that is in scope", () => {
 		let main = [
 			"import {",
@@ -964,11 +903,8 @@ describe("Inlay Hints that write a name", () => {
 		).toEqual([])
 	})
 
-	// One file, two Declarations, one word: the inner `Box` is what `Box`
-	// names inside that body, so the Hint over a value of the OUTER one has to
-	// write the shape there and the name outside it. A scope check that only
-	// asked whether the word is declared SOMEWHERE would write `Box` in both
-	// places and mean the wrong Type in one.
+	// Inside that body `Box` names the inner Declaration. A Hint over the outer
+	// one writes the shape there and the name outside it.
 	it("should write the shape where the name is shadowed", () => {
 		let source = [
 			"implementation {",
