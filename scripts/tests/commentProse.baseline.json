@@ -56,7 +56,6 @@
 	"packages/cli/src/worker.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 1},
 	"packages/client/src/bun-plugin.ts": {"sentence-length": 14, "em-dash": 20, "all-caps": 11, "position": 2, "block-length": 1, "counts": 3},
 	"packages/client/src/dts.ts": {"sentence-length": 73, "em-dash": 57, "all-caps": 34, "position": 4, "block-length": 13},
-	"packages/client/src/esbuild-plugin.ts": {"sentence-length": 12, "em-dash": 12, "all-caps": 6, "block-length": 2},
 	"packages/client/src/marshal-runtime.ts": {"sentence-length": 279, "em-dash": 205, "all-caps": 159, "history": 4, "position": 28, "block-length": 67, "stacked": 1, "counts": 1},
 	"packages/client/src/tests/bare-cases.spec.ts": {"sentence-length": 8, "em-dash": 11, "all-caps": 3, "position": 2},
 	"packages/client/src/tests/bind.spec.ts": {"sentence-length": 24, "em-dash": 19, "all-caps": 14, "position": 1, "block-length": 2},
