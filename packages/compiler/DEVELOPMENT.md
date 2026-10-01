@@ -261,12 +261,12 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 9. Rewriter: `rewriter/rewrite.ts`.
 10. Formatter: `packages/formatter/src/printer.ts`.
 11. Language server, in `packages/language-server/src`: `argumentContext.ts`, `completion.ts`,
-    `documentSymbols.ts`, `foldingRanges.ts`, `hover.ts`, `rename.ts`, `signatureHelp.ts` and
-    `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts`,
-    `payloads.ts` and `typedLookups.ts`. `callHierarchy.ts`, `inlayHints.ts`, `selectionRanges.ts` and
+    `documentSymbols.ts`, `hover.ts`, `rename.ts`, `signatureHelp.ts` and `snippetContext.ts`; in
+    `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts`, `payloads.ts` and
+    `typedLookups.ts`. `callHierarchy.ts`, `foldingRanges.ts`, `inlayHints.ts`, `selectionRanges.ts` and
     `semanticTokens.ts` descend through the visitor. They need an edit only where the kind declares something
-    callable, writes something a Hint should annotate, or names a Case. A new Expression or Statement joins the
-    levels of `selectionRanges.ts`, and the type checker asks for it there.
+    callable, writes something a Hint should annotate, folds, or names a Case. A new Expression or Statement
+    joins the levels of `selectionRanges.ts`, and the type checker asks for it there.
 12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
 13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,
