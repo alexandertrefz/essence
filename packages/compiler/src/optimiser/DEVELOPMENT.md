@@ -330,9 +330,10 @@ an operation into its answer or inline a loop. Such a Constant goes when two ans
 Only Constants go. A `variable` can be assigned later, by a Statement this pass does not read.
 
 `namesReadBy` collects every Identifier in an Expression position, Parameter defaults included, and the names lowered
-Statements hold. The walk offers no bindings. A Method's Namespace, a native's Function name and a Lookup's member
-name no binding. So a Program's `Integer` Methods are no reads of a Constant named `Integer`. Every exported name and
-alias is a root, since other Modules read them.
+Statements hold. It walks the simplified child table and passes over the bindings: a declared or assigned name, a
+Parameter's names and an inlined loop's callback Parameters. A Method's Namespace, a native's Function name and a
+Lookup's member name no binding. So a Program's `Integer` Methods are no reads of a Constant named `Integer`. Every
+exported name and alias is a root, since other Modules read them.
 
 It reads once rather than to a fixed point. A Constant read only by another dropped Constant stays.
 

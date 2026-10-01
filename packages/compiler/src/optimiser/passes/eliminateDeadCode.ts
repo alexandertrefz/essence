@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { forEachSimpleChild, type SimpleNode } from "../../visitor/typedSimple"
 import type { OptimiserPass } from "../index"
 import { isPureExpression } from "../purity"
 import { rewriteNodes } from "../walk"
@@ -40,31 +41,12 @@ function withoutUnreadConstants(
 	return kept.length === nodes.length ? nodes : kept
 }
 
-// Every Identifier in an Expression position. The walk offers no bindings, and
-// a Method's Namespace or a Lookup's member names no binding.
+// Every Identifier in an Expression position, Parameter defaults included.
+// See "eliminate-dead-code" in DEVELOPMENT.md.
 function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 	let read = new Set<string>()
 
-	rewriteNodes(program, {
-		// A Parameter's default reads names too.
-		parameterDefaults: true,
-		expression: (node) => {
-			if (node.nodeType === "Identifier") {
-				read.add(node.name)
-			}
-
-			return node
-		},
-		// Names a lowered Statement holds, counted though none can be a
-		// droppable Constant, since a miss would be a `ReferenceError`.
-		statement: (node) => {
-			if (node.nodeType === "IntrinsicStatement") {
-				readIntrinsicStatementNames(node, read)
-			}
-
-			return node
-		},
-	})
+	collectReads(program, read)
 
 	// Other Modules read every exported name and alias.
 	for (let entry of program.exports?.entries ?? []) {
@@ -78,6 +60,84 @@ function namesReadBy(program: common.typedSimple.Program): ReadonlySet<string> {
 	return read
 }
 
+function collectReads(node: SimpleNode, read: Set<string>): void {
+	switch (node.nodeType) {
+		case "Identifier":
+			read.add(node.name)
+
+			return
+		case "MethodInvocation":
+			forEachSimpleChild(node, pastBase, read)
+
+			return
+		case "Lookup":
+			forEachSimpleChild(node, pastMember, read)
+
+			return
+		case "VariableDeclarationStatement":
+		case "VariableAssignmentStatement":
+		case "NamespaceDefinitionStatement":
+		case "ProtocolDeclarationStatement":
+		case "TypeAliasStatement":
+		case "FunctionStatement":
+			forEachSimpleChild(node, pastName, read)
+
+			return
+		case "Parameter":
+			forEachSimpleChild(node, pastParameterNames, read)
+
+			return
+		case "Intrinsic":
+			if (node.kind === "inline-loop") {
+				forEachSimpleChild(node, pastParameters, read)
+
+				return
+			}
+
+			break
+		case "IntrinsicStatement":
+			readIntrinsicStatementNames(node, read)
+
+			if (node.kind === "inline-loop") {
+				forEachSimpleChild(node, pastParameters, read)
+
+				return
+			}
+
+			break
+	}
+
+	forEachSimpleChild(node, collectReads, read)
+}
+
+// Reads every child but those in the fields named, which hold a binding or a
+// member name rather than a read.
+function readsPast(
+	...fields: Array<string>
+): (child: SimpleNode, read: Set<string>, field: string) => void {
+	return (child, read, field) => {
+		if (!fields.includes(field)) {
+			collectReads(child, read)
+		}
+	}
+}
+
+// A Method's Namespace.
+const pastBase = readsPast("base")
+
+const pastMember = readsPast("member")
+
+// A declared or assigned name.
+const pastName = readsPast("name")
+
+const pastParameterNames = readsPast("externalName", "internalName")
+
+// An inlined loop callback's Parameters.
+const pastParameters = readsPast("parameters")
+
+// Names a lowered Statement holds as text, counted though none can be a
+// droppable Constant, since a miss would be a `ReferenceError`. The name its
+// answer goes to is an Identifier, and is read with the rest.
 function readIntrinsicStatementNames(
 	node: common.typedSimple.IntrinsicStatementNode,
 	read: Set<string>,
@@ -90,12 +150,5 @@ function readIntrinsicStatementNames(
 		for (let temporary of node.temporaries) {
 			read.add(temporary.name)
 		}
-	}
-
-	if (
-		node.result.kind === "declaration" ||
-		node.result.kind === "assignment"
-	) {
-		read.add(node.result.name.name)
 	}
 }
