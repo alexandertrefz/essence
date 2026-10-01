@@ -2382,6 +2382,122 @@ export {
 		)
 	})
 
+	// The refinement's predicate names `Parity` inside the Type of `n`, but
+	// nothing here calls it, so removing the entry compiles.
+	it("warns about a Namespace import only a refinement's predicate names", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Parity.es" {
+		Even
+		Parity
+		halved
+	}
+}
+
+implementation {
+	function passOn(_ n: Even) -> Integer {
+		<- halved(n)
+	}
+}
+
+export {
+	passOn
+}
+`,
+				"Parity.es": `implementation {
+	namespace Parity for Integer {
+		isTwice() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+	}
+
+	type Even = Integer where @::isTwice()
+
+	function halved(_ n: Even) -> Integer {
+		<- n::divide(by 2)::round(toward #TowardZero)
+	}
+}
+
+export {
+	Parity
+	Even
+	halved
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					["unused-import", "'Parity' is imported and never used"],
+				])
+			},
+		)
+	})
+
+	// `isWrapped` asks `isTwice`, so its Method Type carries a predicate alias
+	// naming `Parity`. The call names only `Wrapper`.
+	it("warns about a Namespace import only a predicate alias names", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Parity.es" {
+		Parity
+		Wrapper
+	}
+}
+
+implementation {
+	function check(_ n: Integer) -> Boolean {
+		<- n::isWrapped()
+	}
+
+	Terminal.print(check(4))
+}
+`,
+				"Parity.es": `implementation {
+	namespace Parity for Integer {
+		isTwice() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+	}
+
+	namespace Wrapper for Integer {
+		isWrapped() -> Boolean {
+			<- @::isTwice()
+		}
+	}
+}
+
+export {
+	Parity
+	Wrapper
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(
+						linkedAt(
+							directory,
+							linkProject(directory, "Main.es"),
+							"Main.es",
+						).diagnostics,
+					),
+				).toEqual([
+					["unused-import", "'Parity' is imported and never used"],
+				])
+			},
+		)
+	})
+
 	it("refuses an export of a Variable and of a name the Module does not declare", () => {
 		withProject(
 			{

@@ -72,7 +72,10 @@ It reads both trees, since neither holds every use:
   names neither. Every bound Namespace over that Choice declaring `is Printable` counts.
 
 A named Type the typed tree resolved to does not count as a use. Every Type object carries a name, so an
-import whose Type merely flows through a call would otherwise never be reported.
+import whose Type merely flows through a call would otherwise never be reported. So the walk reads no Type but
+the Namespace a call resolved to, for its `providedBy`. A refinement's predicate names its Namespace inside a
+Type, as a conjunct or as a Method's predicate alias. That is no use either. A call the Module writes to that
+Namespace counts on its own.
 
 The warning stays off for a Module whose parser recovery abandoned lines, since a dropped line may be the one
 that read the import. It asks for `recovery.lines` rather than for the record, because a dropped Pattern

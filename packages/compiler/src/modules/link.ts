@@ -1287,6 +1287,16 @@ function usedNames(
 
 		let record = node as Record<string, unknown>
 
+		// A resolved Type is no use, or an import whose Type only flows through
+		// would never be reported. So is the Namespace a refinement's predicate
+		// names in it: a call the Module writes to it counts on its own.
+		if (
+			typeof record["type"] === "string" &&
+			record["nodeType"] === undefined
+		) {
+			return
+		}
+
 		if (
 			record["nodeType"] === "Identifier" &&
 			typeof record["content"] === "string"
@@ -1301,6 +1311,15 @@ function usedNames(
 
 			if (typeof namespace?.["name"] === "string") {
 				names.add(namespace["name"])
+			}
+
+			// The one Type read, for the Protocol a provided Method needs.
+			let resolved = namespace?.["type"] as
+				| common.NamespaceType
+				| undefined
+
+			if (resolved?.providedBy !== undefined) {
+				identities.add(resolved.providedBy)
 			}
 
 			// The derive answers only where a Namespace declared the Choice
@@ -1346,9 +1365,6 @@ function usedNames(
 				bareCaseNames.add(caseName.content)
 			}
 		}
-
-		// A resolved Type's name is not a use, or an import whose Type only
-		// flows through would never be reported.
 
 		for (let value of Object.values(record)) {
 			visit(value)
