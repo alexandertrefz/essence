@@ -4968,16 +4968,9 @@ class DescentParser {
 		}
 	}
 
-	// `_` is a wildcard only here — everywhere else it marks a labelless
-	// Parameter — so it is recognised in Matcher position rather than in
-	// `parseType`, where it would make `_` look like a Type name.
-	//
-	// `allowsWholeValueBinder` is false in a Match Handler, where `@` is the
-	// scrutinee narrowed to the Matcher and a `} as name` would be a second
-	// name for it. An assertion has no `@`, and its subject is often a computed
-	// value with no name at all — `require { name } as row = rows::item(at 1)`
-	// — so there the binder is the only way to hold onto the whole of what was
-	// taken apart.
+	// `_` is a wildcard only in Matcher position; elsewhere it marks an
+	// unlabelled Parameter. `allowsWholeValueBinder` is false in a Match
+	// Handler, where `@` already names the narrowed value.
 	protected parseMatcher(allowsWholeValueBinder = false): parser.MatcherNode {
 		let token = this.tokens.peek()
 
@@ -4993,21 +4986,15 @@ class DescentParser {
 			return generators.literalMatcher(value, value.position)
 		}
 
-		// A Record in Matcher position is always a Pattern rather than a
-		// Record Type, because only the Pattern form admits `name = value`
-		// members alongside `name: Type` ones — and a bare `name`, which binds.
-		//
-		// No whole-value binder here: `@` is the scrutinee narrowed to this
-		// Matcher, so `} as name` would be a second name for what already has
-		// one.
+		// A Record in Matcher position is a Pattern, which admits `name = value`
+		// and binding members as well as `name: Type`.
 		if (token?.type === TokenType.SymbolLeftBrace) {
 			return this.parsePattern(allowsWholeValueBinder)
 		}
 
-		// `case #Add` — the bare form resolves against the matched
-		// value's own Union; `case CalculatorOperation#Add` is the prefixed
-		// form for when that is ambiguous. Either may carry a payload binder,
-		// `case #Value(item)`, parsed by `parseCaseMatcherBinding` below.
+		// `case #Add` resolves against the matched value's Union, and
+		// `case CalculatorOperation#Add` names the Choice. Either may bind a
+		// payload.
 		if (token?.type === TokenType.SymbolHash) {
 			this.tokens.next()
 
@@ -5050,29 +5037,12 @@ class DescentParser {
 		return this.parseType()
 	}
 
-	// The payload binder of a Case Matcher — `case #Value(item)`. It names
-	// what the CONSTRUCTOR takes, so the parens hold either one name or a
-	// Pattern that takes apart what the constructor was handed:
-	// `case #Rectangle({ width, height })`.
-	//
-	// Braces after the Case name are NOT a second spelling of this. After a
-	// Matcher a `{` opens the arm's own block, and `{ left = 0 }` IS a block —
-	// one holding a variable assignment. So `case #Add { left = 0 }` has two
-	// readings that are both valid Programs, and no lookahead settles which was
-	// written. The parens have no such problem, which is why the payload Pattern
-	// lives in them.
-	//
-	// A Case Matcher is the only Matcher that takes a binder. `@` already
-	// answers for every Matcher kind — the scrutinee, narrowed — so this adds a
-	// second name rather than redefining the one that exists. That is also why a
-	// Pattern in Matcher position carries no whole-value binder of its own,
-	// while one in a payload does: what the constructor took is not `@`.
+	// The payload binder of a Case Matcher: a name or a Pattern in
+	// parentheses, as in `case #Rectangle({ width, height })`. Braces would
+	// open the arm's block, so `case #Add { left = 0 }` stays a block.
 	protected parseCaseMatcherBinding(): {
 		node: parser.IdentifierNode | parser.PatternNode
-		// Where the binder ends, which is the closing paren rather than
-		// the name inside it. A Matcher's span is what a failed assertion draws
-		// its underline from, and one that stopped at the name left the `)`
-		// standing bare beyond it.
+		// The closing parenthesis, which ends the Matcher's span.
 		end: common.Cursor
 	} | null {
 		if (this.tokens.peek()?.type !== TokenType.SymbolLeftParen) {
@@ -5141,11 +5111,8 @@ class DescentParser {
 		})
 	}
 
-	// `name` binds the member under its own name; `name: Type` binds it
-	// and constrains the Type as well; `name = value` constrains the value and
-	// binds nothing, because the value is written right there. The bare form is
-	// the annotated one with its Type elided, which is the same relation
-	// `(item)` has to `(_ item: Type)`.
+	// `name` binds the member, `name: Type` also constrains its Type, and
+	// `name = value` constrains the value and binds nothing.
 	protected parsePatternMember(): [string, parser.PatternMemberNode] {
 		let name = this.parseIdentifier()
 
@@ -5182,15 +5149,9 @@ class DescentParser {
 		]
 	}
 
-	// `as` binds a member under another name, or takes it apart further —
-	// a binder is a name or another Pattern, which is the whole of nesting.
-	//
-	// `as` is an ordinary Identifier everywhere it is not a Keyword (the Module
-	// grammar says the same about its own use of it), so a member may be CALLED
-	// `as`. Two Tokens settle it: an `as` is the binder only when a name or a
-	// `{` follows. `{ as }` binds a member called `as`; `{ as as as }` binds
-	// that member under that name; `{ as as }` ends the member at the first
-	// `as` and reports the stray one.
+	// `as` binds a member under another name or a nested Pattern. It is a
+	// binder only when a name or `{` follows, so `{ as as as }` binds a member
+	// called `as` under that name.
 	protected parseMemberBinder(): parser.PatternBinderNode | null {
 		if (!this.binderFollows()) {
 			return null
@@ -5205,9 +5166,7 @@ class DescentParser {
 		return this.parseIdentifier()
 	}
 
-	// `} as name` — one name for the whole value, alongside the names its
-	// members bind. Never a nested Pattern: the Pattern that would take it apart
-	// is the one this is written on.
+	// `} as name`: one name for the whole value, alongside its members' names.
 	protected parseWholeValueBinder(
 		allowsBinder: boolean,
 	): parser.IdentifierNode | null {
@@ -5225,8 +5184,7 @@ class DescentParser {
 			return name
 		}
 
-		// Reported and then dropped, rather than failed on, so that one
-		// redundant binder does not cascade into a parse failure for the arm.
+		// Reported and dropped rather than thrown, so the arm still parses.
 		let position = { start: keyword.position.start, end: name.position.end }
 
 		reportError(
@@ -5238,36 +5196,21 @@ class DescentParser {
 				notes: [
 					"Inside an arm, '@' is the scrutinee narrowed to what the Matcher established — which is exactly what this would name a second time.",
 				],
-				// BOTH edits, because the binder is what is refused and
-				// rewriting the body alone leaves it standing. The Quick Fix has
-				// always made the pair of edits; the Help named only one.
+				// Both edits, since rewriting the body alone leaves the binder.
 				helps: [
 					`Drop the 'as ${name.content}' and write '@' where '${name.content}' was meant.`,
 				],
 			},
 		)
 
-		// Recorded as ABANDONED, which is what it is: the binder was
-		// written, it was refused, and the body below goes on reading the name
-		// it would have bound. Without this the arm reported a second time —
-		// `unknown-name '<name>'`, once per read — for a name the reader DID
-		// declare, which is this mistake said again in words about a different
-		// one. `declarationWasAbandoned` is the question every "no such name"
-		// report already asks.
-		//
-		// The binder is written BEFORE the arm's own `{`, so the block
-		// that claims it is the MATCH block rather than the arm. That is wider
-		// than the binder ever was: a read of the same name in a SIBLING arm is
-		// silenced too. It is deliberate — the alternative is teaching the claim
-		// about a block that has not been opened yet — and the cost is one arm's
-		// worth of over-silence inside one Match Expression, not the file.
+		// Recorded as abandoned, so the body's reads of the name are not
+		// reported as undeclared. See "Abandoned Statements" in DEVELOPMENT.md.
 		this.recordAbandonedDeclaration(name.content, name.position, false)
 
 		return null
 	}
 
-	// Whether the `as` at the cursor opens a binder rather than being a
-	// name in its own right. Two Tokens, no backtracking.
+	// Whether the `as` at the cursor opens a binder rather than being a name.
 	protected binderFollows(): boolean {
 		if (this.tokens.peek()?.type !== TokenType.KeywordAs) {
 			return false
@@ -5280,10 +5223,8 @@ class DescentParser {
 		)
 	}
 
-	// A Matcher compares against a written literal and nothing else —
-	// `size = expected` does not read the Constant `expected`, because a
-	// Matcher is a pattern rather than an Expression. Anything else after `=`
-	// is a parse error here rather than something quietly stood in for.
+	// A Matcher compares against a written literal only: `size = expected`
+	// does not read a Constant `expected`.
 	protected parseLiteralMatcherValue(): parser.LiteralMatcherValueNode {
 		let token = this.peekOrFail()
 
@@ -5300,11 +5241,8 @@ class DescentParser {
 			case TokenType.LiteralFalse:
 				this.tokens.next()
 				return generators.booleanValueNode(false, token.position)
-			// An interpolated String is not a compile-time literal — its
-			// holes are evaluated — so it can never be the fixed value a `case`
-			// compares against. Refused with its own message rather than the
-			// generic one, since "found an interpolated String" alone does not
-			// say why a String would be turned away here.
+			// An interpolated String's holes are evaluated, so it is no fixed
+			// value to compare against.
 			case TokenType.LiteralStringStart:
 				fail(
 					"An interpolated String can not be matched against — a Matcher compares one written literal, and a hole is evaluated.",
@@ -5320,10 +5258,8 @@ class DescentParser {
 		}
 	}
 
-	// `where` is not a Keyword — it is an ordinary Identifier used as an
-	// Argument label elsewhere (`removeEvery(where …)`), so it is recognised
-	// by content. That is unambiguous here because a Matcher is otherwise
-	// always followed by the Handler's opening brace.
+	// `where` is recognised by content, since it is also an Argument label. A
+	// Matcher is otherwise always followed by the Handler's `{`.
 	protected parseOptionalGuard(): parser.ExpressionNode | null {
 		let token = this.tokens.peek()
 
@@ -5423,14 +5359,8 @@ class DescentParser {
 
 		let lhs = this.parseExpression()
 
-		// `{ "a" = 1 }` — a Dictionary written in a Record's braces. Only
-		// a WRITTEN VALUE is refused here, and never a name: `{ x = ] }` also
-		// reaches this line, because a member whose value does not parse throws
-		// the whole Record reading away, and `x` there is a member name whose
-		// value is broken rather than a key that is a value. What a value key
-		// spells is a Dictionary and nothing else, so it is reported here,
-		// where what was written is still in hand, rather than as "expected
-		// 'with'" about a Token nobody meant.
+		// `{ "a" = 1 }`: a Dictionary in a Record's braces. Only a written value
+		// is refused, since `{ x = ] }` also arrives here with a broken member.
 		if (
 			this.tokens.peek()?.type === TokenType.SymbolEqual &&
 			writesAValueKey(lhs)
@@ -5456,10 +5386,8 @@ class DescentParser {
 
 		let combinationOfKeys = (allowShorthand: boolean) =>
 			this.backtrack(() => {
-				// The value being updated, spelled, for the key readers
-				// below — a descend that updates nothing is answered by naming
-				// it, and the key list is several readers deep from here. Saved
-				// and put back, because an update nests inside an update.
+				// The value being updated, for the key readers' Helps. Saved
+				// and restored, since updates nest.
 				let outer = this.updatedValue
 				this.updatedValue = writtenReceiver(lhs)
 
@@ -5497,11 +5425,9 @@ class DescentParser {
 			return keyValuePairCombination
 		}
 
-		// The Expression reading is speculated too, so the key list can
-		// be read ONE more time below when it fails. Order is what keeps
-		// `{ base with other }` meaning what it has always meant — a whole
-		// value merged in — because a bare name reads as an Expression here
-		// before it is ever offered the shorthand.
+		// Speculated, so the key list can be read once more if it fails. A bare
+		// name reads as an Expression first, so `{ base with other }` merges a
+		// whole value.
 		let expressionCombination = this.backtrack(() => {
 			let rhs = this.parseExpression()
 			let rightBrace = this.tokens.expectClosing(
@@ -5519,13 +5445,8 @@ class DescentParser {
 			return expressionCombination
 		}
 
-		// Neither reading spans this. `{ base with port, host }` is the
-		// shape that lands here, and left alone it reports
-		// `Expected '}' but found ','` — a message about the comma rather than
-		// about the rule the author was tripped by. Reading the key list once
-		// more WITH shorthand says which rule that is; it costs nothing a user
-		// can measure, since it runs only where two readings have already been
-		// thrown away.
+		// Neither reading spans `{ base with port, host }`. Reading the keys
+		// once more with shorthand lets the report name the rule.
 		let shorthandCombination = combinationOfKeys(true)
 
 		if (shorthandCombination !== null) {
