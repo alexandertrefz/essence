@@ -34,6 +34,25 @@ That check runs before writing, so a warm run never reads the bundles it replays
 
 Records are written after the snapshot, baseline and corpus stores, so every key reads a settled disk.
 
+### The result key
+
+`src/resultCache.ts` keeps one record per entry, the unit the bundle cache names and a watch session reruns. Essence
+is pure, so an entry's outcome follows from its code, the stores it compares against and the tests the run selected.
+`resultKey` hashes all of them:
+
+- `RESULTS_FORMAT`, so a change in what a record means retires every older name at once.
+- `hostKey`, since a bundle inlines its runtime but not its host, and the host decides things events show.
+- The bundle cache's key, read off the bundle's file name by `bundleHashOf`. It covers everything about the code.
+- The filters, so a narrowed run is remembered as an answer of its own.
+- The text of every snapshot, baseline and corpus file of every Module the entry reaches, labelled by base name. A
+  missing file is the empty string, so deleting one changes the key.
+
+The key holds no network traffic, no host input and no entropy, which is why an entry that touched any of them is
+never recorded. A replay writes the entry's events verbatim, so a reader and a `--json` consumer see what the live
+run wrote. Records are written atomically and never replaced, since a file under the same key answers the same
+question. The store follows the bundle cache's rules for its area variable, `ESSENCE_RESULTS_CACHE`, and its
+age-ordered pruning.
+
 ## The bundle cache
 
 `src/cache.ts` keeps the bundles `esc` emitted, each named by `bundleKey`. The key hashes every source of the linked

@@ -29,7 +29,6 @@
 	"packages/cli/src/pool.ts": {"sentence-length": 25, "em-dash": 19, "all-caps": 3, "history": 2, "position": 1, "block-length": 3},
 	"packages/cli/src/projectOptions.ts": {"sentence-length": 13, "em-dash": 10, "all-caps": 6, "position": 1, "block-length": 2},
 	"packages/cli/src/report.ts": {"sentence-length": 8, "em-dash": 6, "all-caps": 1, "block-length": 2},
-	"packages/cli/src/resultCache.ts": {"sentence-length": 25, "em-dash": 17, "all-caps": 22, "position": 3, "block-length": 5},
 	"packages/cli/src/running.ts": {"sentence-length": 6, "em-dash": 6, "all-caps": 3, "block-length": 2, "counts": 1},
 	"packages/cli/src/session.ts": {"sentence-length": 20, "em-dash": 11, "all-caps": 4},
 	"packages/cli/src/spinner.ts": {"sentence-length": 2, "em-dash": 2},

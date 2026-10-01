@@ -14,83 +14,39 @@ import {
 } from "@essence-lang/compiler/testing"
 import type { TestEvent } from "@essence-lang/runtime/Testing"
 
-// What `essence test` already ANSWERED, kept under the hash of everything
-// the answer is a function of. Essence is pure: a test's outcome is decided by
-// the code of its Module graph, by the stores it compares against, and by which
-// tests the run selected — every one of which is a file or a flag, and every one
-// of which is in the key below. So an entry nothing touched does not have to be
-// staged, imported and run again to be told what it said last time; its EVENT
-// STREAM is replayed instead, which is the same bytes a reader and a `--json`
-// consumer would have been handed.
-//
-// The unit is the ENTRY — one compiled bundle — because that is the unit
-// the bundle cache names and the unit a watch session re-runs. Anything finer
-// would have to key a test against a graph slice nothing computes, and anything
-// coarser would lose the whole project to one edit.
-//
-// The network, the host's input read as a bundle loads and the machine's
-// entropy are in no key, so an entry that reached one is never written here.
-// `linksEffectfulRuntime` decides the first from the bundle, and the bundle's
-// own `hasReadHostInput` and `hasDrawnEntropy` the other two.
-//
-// A sibling of `cache.ts` in shape and deliberately so: same area rules,
-// same atomic write, same age-ordered prune. What it holds is the only
-// difference — JSON a run wrote rather than JavaScript the emitter did.
+// What `essence test` already answered, one record per entry, keyed by
+// everything the answer depends on. See "The result key" in DEVELOPMENT.md.
 const AREA = "results"
 
-// The format, in the record and in the key both. In the RECORD so that a
-// file an older toolchain wrote is read as a miss rather than half-understood;
-// in the KEY so that a change to what a record means retires every name spelled
-// under the old meaning, rather than leaving them to be read and refused one at
-// a time.
-//
-// `2` because the exception for a bundle that reaches the world is a
-// change to what a record MEANS: a store written before it can hold an answer
-// this version would never have remembered, and the only way to be sure of not
-// replaying one is to stop reading the names it was written under.
+// In the record, so a file an older toolchain wrote reads as a miss. In the key,
+// so a change of meaning retires every older name at once.
 export const RESULTS_FORMAT = "essence-results-2"
 
-// How many answers are kept. A record is a few kilobytes of JSON where a
-// bundle is a few hundred, so this store may hold four times what the bundle
-// cache does and still be smaller than it. Eviction is by age rather than by
-// use, exactly as next door: a record is written once under a name that can only
-// mean it, and what a wrongly evicted one costs is one re-run.
+// Records are small, so this store keeps more entries than the bundle cache.
 const KEPT_RESULTS = 2048
 
-// What one entry answered, whole. `events` is that entry's stream verbatim
-// and WITHOUT the run's bookends — `run-start` and `run-end` belong to the run
-// rather than to a bundle, and a replay is folded into a run that writes its
-// own.
+// What one entry answered. `events` is its stream verbatim, without the run's
+// `run-start` and `run-end`.
 export type ResultRecord = {
 	format: string
 	entry: string
-	// Every tag the entry's registry carries, so that `--tag nonsense` can
-	// still be told it named nothing without the bundle being loaded to ask.
+	// So an unknown `--tag` is reported without loading the bundle.
 	tags: Array<string>
-	// How many tests the entry PLANNED under the keyed filters, which is
-	// what the run's `run-start` has to count as its own — the very number the
-	// selection gave the entry when it ran, written down rather than worked out
-	// again from the stream by every reader.
+	// How many tests the entry planned under the keyed filters, which
+	// `run-start` counts.
 	tests: number
-	// How many tests the entry's `--filter` matched, whatever narrowed
-	// them afterwards — the count `reportUnmatchedFilter` adds up across a run.
+	// How many tests the entry's `--filter` matched, before anything else
+	// narrowed them.
 	matched: number
-	// Every Module of this entry that HAS tests, in the order the bundle
-	// reported them, and the ones this entry was the one to run. Two entries that
-	// reach one Module both carry its tests and only one of them may run them,
-	// which `claimRegistries` decides across the whole run — so a replay has to
-	// prove it would still be handed the same Modules it was handed when it was
-	// recorded. Recorded here because the bundle a hit does not load can not be
-	// asked.
+	// The entry's Modules that have tests, in bundle order, and the ones it
+	// claimed. A replay is valid only while it would claim the same ones.
 	modules: Array<string>
 	claimed: Array<string>
 	events: Array<TestEvent>
 }
 
-// Where the answers live, or `null` when the user turned this cache off.
-// One variable does both — `ESSENCE_RESULTS_CACHE=off` for a run that has to be
-// live, `ESSENCE_RESULTS_CACHE=<path>` for a spec that may not touch the user's
-// — which is the rule every other area follows.
+// Where the answers live, or `null` when `ESSENCE_RESULTS_CACHE=off`. A path
+// in the same variable moves the store.
 export function resultCacheDirectory(): string | null {
 	return isCacheDisabled(AREA) ? null : cacheDirectory(AREA)
 }
@@ -99,23 +55,16 @@ function resultFile(directory: string, key: string): string {
 	return path.join(directory, `${key}.json`)
 }
 
-// Which JavaScript ran the tests. A bundle inlines its own runtime but not
-// its own host, and what a host decides reaches an event: how a Number prints,
-// what a `sort` does with equal keys, which `Intl` data is compiled in. Two
-// hosts are two runs.
-//
-// Read off `process.versions` rather than off the `Bun` global, which is
-// the same string without a global this package would otherwise have to declare.
+// Which JavaScript host ran the tests. A bundle inlines its runtime but not its
+// host, and the host decides things events show, such as how a Number prints.
 export function hostKey(): string {
 	let bun = process.versions.bun
 
 	return bun === undefined ? `node@${process.versions.node}` : `bun@${bun}`
 }
 
-// One companion file of one Module, as text — the `.snap`, the `.bench`
-// and the `.json` a Module's tests compare themselves against. A file that is
-// not there is the empty string rather than an absence, so that deleting a
-// stored snapshot is a different key rather than the same one.
+// One companion store of one Module, as text. A missing file is the empty
+// string, so deleting a store changes the key.
 type StorePart = { label: string; text: string }
 
 const STORE_KINDS: Array<[kind: string, fileOf: (module: string) => string]> = [
@@ -126,10 +75,7 @@ const STORE_KINDS: Array<[kind: string, fileOf: (module: string) => string]> = [
 
 type StoreReader = (modules: Iterable<string>) => Promise<Array<StorePart>>
 
-// Reads each companion ONCE per run however many entries reach the Module
-// it belongs to. A project where twenty test files import one Module would
-// otherwise read that Module's three companions twenty times to mix the same
-// three strings into twenty keys.
+// Reads each companion once per run, however many entries reach its Module.
 export function createStoreReader(): StoreReader {
 	let read = new Map<string, Promise<string>>()
 
@@ -147,16 +93,12 @@ export function createStoreReader(): StoreReader {
 	return async (modules) => {
 		let parts: Array<StorePart> = []
 
-		// Sorted, so that the same set of Modules reached from two entries
-		// mixes the same bytes — the rule `hashGraph` follows next door, for the
-		// same reason.
+		// Sorted, so one set of Modules always mixes the same bytes.
 		for (let module of [...modules].sort()) {
 			for (let [kind, fileOf] of STORE_KINDS) {
 				parts.push({
-					// The BASE NAME rather than the path. The paths are in
-					// the bundle hash already, which is mixed in beside this, and
-					// naming them again would make the same project keyed twice
-					// under two checkouts.
+					// The base name only, so two checkouts of a project share keys.
+					// The bundle hash already covers the Modules.
 					label: `${path.basename(module)}:${kind}`,
 					text: await textOf(fileOf(module)),
 				})
@@ -167,11 +109,8 @@ export function createStoreReader(): StoreReader {
 	}
 }
 
-// What a run NARROWED itself to, as the key sees it. The filters are in
-// the key rather than a reason to refuse the cache, so that a project whose
-// configuration skips `slow` by default caches its ordinary run — and so that
-// `--tag slow` is an answer of its own rather than a run that can never be
-// remembered.
+// The filters a run narrowed itself to. They join the key, so a narrowed run
+// is remembered as an answer of its own.
 export type KeyedFilters = {
 	filter: string | null
 	tags: Array<string>
@@ -180,18 +119,14 @@ export type KeyedFilters = {
 }
 
 export type ResultKeyParts = {
-	// The bundle cache's own key, which already digests the whole Module
-	// graph's content, the Compiler's sources, the standard library, the runtime
-	// and the Optimiser Options. Everything about the CODE is in this one string,
-	// which is why nothing about the code is spelled again below.
+	// The bundle cache's key, which covers everything about the code.
 	bundleHash: string
 	stores: Array<StorePart>
 	filters: KeyedFilters
 	host: string
 }
 
-// Length-prefixed and counted, exactly as `embed/hash.ts` mixes, so that
-// no two different sequences of parts can spell the same bytes.
+// Length-prefixed, so no two sequences of parts spell the same bytes.
 function mix(hash: Hash, text: string): void {
 	hash.update(`${text.length}:${text}`)
 }
@@ -205,10 +140,8 @@ export function resultKey(parts: ResultKeyParts): string {
 	mix(hash, parts.filters.filter ?? "")
 	mix(hash, parts.filters.bench ? "bench" : "plain")
 
-	// The count before the list, and the same for the stores below.
-	// Length-prefixing makes one part unambiguous; a count is what makes a LIST
-	// of them unambiguous, since a run with two tags and none skipped would
-	// otherwise mix the same bytes as one with one of each.
+	// Each list is preceded by its length, so two tags and no skipped ones
+	// never mix like one of each. The stores are counted the same way.
 	for (let named of [parts.filters.tags, parts.filters.skipTags]) {
 		let sorted = [...new Set(named)].sort()
 
@@ -229,37 +162,17 @@ export function resultKey(parts: ResultKeyParts): string {
 	return hash.digest("hex")
 }
 
-// The runtime modules a cached answer may not have been produced by. One
-// name so far, and it is named rather than reached for: `Http` is the module a
-// Program's requests go out through.
-//
-// `Terminal` and `Randomness` are not among them, though both reach the
-// host, because every test bundle links both. A bundle that read the host's
-// input or drew the machine's entropy says so through `hasReadHostInput` or
-// `hasDrawnEntropy` instead.
-//
-// Spelled as esbuild LABELS it. Every module a bundle inlines is written
-// into the output under its path relative to the runtime directory — see
-// `absWorkingDir` in `bundler/index.ts`, which anchors those labels so that the
-// same Program compiles to the same bytes from any directory — so the label is
-// a fact about the bundle rather than a string that happens to be in it.
+// The runtime modules that reach the world, as esbuild labels them in a bundle:
+// by path from the runtime directory. Every test bundle links `Terminal` and
+// `Randomness`, so those report their use at run time instead.
 const EFFECTFUL_RUNTIME_LABELS = ["// Http.ts"]
 
-// Any label at all, which is what says the labels are READABLE. A minified
-// bundle carries none of them, and a run that can not see what a bundle links
-// may not conclude that it links nothing — so it is refused the store instead.
-// Nothing minifies a test bundle today; this is what keeps that from becoming a
-// silent hole the day something does.
+// Any label at all. A minified bundle has none, and then what it links cannot
+// be seen.
 const RUNTIME_LABEL = /^\/\/ [\w./-]+\.ts$/m
 
-// Whether this bundle links a runtime module that reaches the world. It is
-// asked of an entry ABOUT TO BE REMEMBERED, and of nothing else: an entry that
-// is never written is never found, so the warm path never reads a bundle to
-// decide it is allowed to skip it.
-//
-// A bundle that can not be read at all is refused too. The store is an
-// optimisation over a run that works without it, so every uncertainty here is
-// answered by running the tests.
+// Whether this bundle links a runtime module that reaches the world. A bundle
+// that cannot be read, or whose labels cannot be seen, counts as linking one.
 export async function linksEffectfulRuntime(
 	bundleFileName: string,
 ): Promise<boolean> {
@@ -280,11 +193,8 @@ export async function linksEffectfulRuntime(
 	)
 }
 
-// The name the bundle cache wrote this entry under, read back off the file
-// it handed over. A cache entry is `<key>.mjs` and a scratch bundle — what an
-// emit with something to say produces — is `<key>.run.mjs`; both are named by the
-// same hash, and the hash is what this needs. Taking it off the file rather than
-// hashing the graph a second time is what keeps the two from ever disagreeing.
+// The bundle cache's key, read off the bundle's file name: `<key>.mjs` or the
+// scratch `<key>.run.mjs`. So the two caches never disagree about it.
 export function bundleHashOf(outputFileName: string): string {
 	let name = path.basename(outputFileName)
 	let dot = name.indexOf(".")
@@ -292,10 +202,8 @@ export function bundleHashOf(outputFileName: string): string {
 	return dot === -1 ? name : name.slice(0, dot)
 }
 
-// A record whose shape is anything but this one is read as a MISS. A
-// cache is an optimisation on top of a run that still works without it, so the
-// worst a file from another toolchain can cost is the run it would have saved —
-// and refusing it here is what makes that true.
+// A record of any other shape reads as a miss, so a foreign file costs at most
+// the run it would have saved.
 export function readRecord(text: string): ResultRecord | null {
 	let parsed: unknown
 
@@ -334,10 +242,8 @@ function isStringList(value: unknown): value is Array<string> {
 	)
 }
 
-// Only that it IS an event, by the two fields every one of them carries.
-// What is inside a kind is the stream's business and never this file's — the
-// stream is versioned separately from the payload, and a record holding a kind
-// this build has never heard of is a record it may still replay.
+// Only that it is an event with a `kind`. A kind this build does not know may
+// still be replayed.
 function isEvent(value: unknown): value is TestEvent {
 	return (
 		typeof value === "object" &&
@@ -353,17 +259,13 @@ export async function readResult(
 	try {
 		return readRecord(await readFile(resultFile(directory, key), "utf8"))
 	} catch {
-		// No file, an unreadable directory, a half-written name — every one
-		// of them means the same thing here, which is that there is nothing to
-		// read. Running the tests is always available and always correct.
+		// Any failure is a miss.
 		return null
 	}
 }
 
-// Written through the atomic rename every other store uses, and NOT
-// replaced: the name is the hash of everything the answer depends on, so a file
-// already sitting there is an answer to the same question. Whichever run got
-// there first wrote it, and the durations in it are as true as this one's.
+// Written atomically and never replaced: a file under the same key answers the
+// same question.
 export async function writeResult(
 	directory: string,
 	key: string,
@@ -376,15 +278,12 @@ export async function writeResult(
 			await prune(directory, file)
 		}
 	} catch {
-		// A failure to remember is not a failure of the run. The tests have
-		// already answered; a read-only cache directory or a full disk costs the
-		// next run its shortcut and nothing else.
+		// A failure to remember only costs the next run its shortcut.
 	}
 }
 
-// Only ever after a write, so a run that found what it came for touches no
-// directory at all. Failure is ignored throughout: a record that outlives its
-// welcome costs disk rather than correctness.
+// Runs only after a write, so a hit reads no directory. Failures are ignored,
+// since a stale record only costs disk.
 export async function prune(
 	directory: string,
 	keep: string,
@@ -413,6 +312,6 @@ export async function prune(
 			await rm(file, { force: true })
 		}
 	} catch {
-		// Nothing pruned is nothing wrong.
+		// A failed prune only costs disk.
 	}
 }
