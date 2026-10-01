@@ -11,26 +11,21 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The `Http` Namespace end to end, against a server started in this file.
-// It is the one part of the standard library the golden harness can not hold to
-// account — a line there would record what some host answered on the day it was
-// captured — so everything `Http.send` and the six verbs on it promise is
-// asserted here instead: the status, the body, the header case, the three
-// redirect modes, what each verb puts on the wire, the three failures, and that
-// a stopped request is stopped at the SERVER rather than only dropped here.
+// The `Http` Namespace end to end, against a server started in this file. A
+// golden line would record what some host answered on one day, so `Http.send`
+// and its verbs are asserted here. That covers the status, the body, header
+// case, redirect modes, what each verb sends, the failures, and stopping a
+// request at the server.
 //
-// Deterministic, and no external network. The server listens on an
-// ephemeral port and every address a Program here writes is built from it. The
-// one address that is not is the unreachable one, which is port 1 on the
-// loopback interface — a port nothing binds and the kernel refuses in a turn.
+// No external network. The server listens on an ephemeral port, and every
+// address but one is built from it. The unreachable one is port 1 on the
+// loopback interface, which nothing binds.
 //
-// The slow route answers only when it is STOPPED, or after a wait no test
-// here sits through. Nothing sleeps for a fixed time: a test that waits waits
-// for the server to say what it saw, up to a deadline, so a loaded machine
-// makes this file slower and never makes it fail.
+// The slow route answers only when it is stopped, or after a wait no test sits
+// through. Nothing sleeps for a fixed time. A test waits for the server to say
+// what it saw, up to a deadline, so a loaded machine only makes it slower.
 
-// What the server saw, read back by the tests. It is reset before each
-// Program runs rather than accumulated, so a test reads its own run.
+// What the server saw, reset before each Program runs.
 type Seen = {
 	requests: number
 	methods: Array<string>
@@ -43,9 +38,8 @@ let seen: Seen = freshSeen()
 let server: ReturnType<typeof Bun.serve> | null = null
 let base = ""
 
-// The waits the slow route is holding, so that the last test of this file
-// can not leave a timer behind that keeps the runner's event loop open. Each is
-// its own `release`, and `afterAll` calls every one that is left.
+// The waits the slow route holds, each its own `release`. `afterAll` releases
+// what is left, so no timer keeps the runner's event loop open.
 let pendingWaits = new Set<() => void>()
 
 function freshSeen(): Seen {
@@ -65,9 +59,8 @@ function headersOf(request: Request): Record<string, string> {
 beforeAll(() => {
 	server = Bun.serve({
 		port: 0,
-		// The host's own idle timeout would answer the slow route for us,
-		// which would make the stopping test pass without anything being
-		// stopped.
+		// The host's idle timeout would end the slow route itself, and the
+		// stopping test would pass without stopping anything.
 		idleTimeout: 0,
 		async fetch(request) {
 			let url = new URL(request.url)
@@ -152,9 +145,8 @@ beforeAll(() => {
 })
 
 afterAll(() => {
-	// The set is taken and replaced before it is walked, because each
-	// `release` takes itself out of the one it was put in — walking the set a
-	// release is removing from would be reading and writing one thing at once.
+	// Each `release` deletes itself from the set, so the set is swapped out
+	// before it is walked.
 	let waiting = pendingWaits
 
 	pendingWaits = new Set()
@@ -166,10 +158,8 @@ afterAll(() => {
 	server?.stop(true)
 })
 
-// `await import`, and not because this file prefers it: a Program that
-// completes anything at its top level emits a top-level `await`, which is a
-// Module a `require` can not read at all. The same harness `asynchrony.spec.ts`
-// runs its Programs through.
+// A Program that completes anything at its top level emits a top-level
+// `await`, which only `await import` can load, as in `asynchrony.spec.ts`.
 async function run(source: string): Promise<Array<string>> {
 	seen = freshSeen()
 
@@ -190,10 +180,8 @@ async function run(source: string): Promise<Array<string>> {
 
 	writeFileSync(file, javaScript)
 
-	// Both doors a Program writes through, for the reason
-	// `terminal.spec.ts` intercepts both: `Terminal.print` reaches
-	// `process.stdout.write`, and `Terminal.inspect` reaches `console.log`. A
-	// capture of one of them would see half of what these Programs say.
+	// `Terminal.print` reaches `process.stdout.write` and `Terminal.inspect`
+	// reaches `console.log`, so both are captured.
 	let written = ""
 	let originalLog = console.log
 	let originalOut = process.stdout.write
@@ -220,9 +208,7 @@ async function run(source: string): Promise<Array<string>> {
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
-// Everything a Program here asks of an answer, written once. A `match`
-// over the Result is what a reader of `Http` writes, and spelling it out in
-// every Program would bury what each test is about.
+// The `match` over a Result that every Program here uses, written once.
 function program(body: string): string {
 	return `implementation {
 	function report(_ answer: Result<Response, HttpFailure>) -> {} {
@@ -238,10 +224,8 @@ ${body}
 }`
 }
 
-// What the server has said it saw, waited for rather than assumed. A
-// request is stopped by the client, and the server learns of it a turn or more
-// later — so a test that asserted straight away would be asserting that this
-// machine was fast enough.
+// Waits until the server has seen something, since it learns of a stopped
+// request a turn or more after the client stops it.
 async function until(
 	holds: () => boolean,
 	within: number = 5_000,
@@ -298,9 +282,8 @@ describe("Http", () => {
 		expect(output[4]).not.toContain("X-Custom")
 	})
 
-	// The one name a host may answer twice on the wire. A Dictionary holds
-	// one value per key, so the second cookie would have overwritten the first
-	// and the first would have been gone with nothing said anywhere.
+	// A Dictionary holds one value per key, so a second cookie would
+	// otherwise overwrite the first.
 	it("folds a header a host sent twice, cookies included", async () => {
 		let output = await run(
 			program(`	constant answered = complete Http.get("${base}/repeated")
@@ -355,21 +338,17 @@ describe("Http", () => {
 
 		expect(output[0]).toBe("200 hello")
 		expect(output[1]).toBe("302 ")
-		// The `location` header is the whole of what `#Manual` is for —
-		// the redirect is the answer, and where it points is what a Program
-		// reads off it. Pinned on the hosts that hand a redirect over at all.
+		// Under `#Manual` the redirect is the answer, and a Program reads
+		// where it points off the `location` header.
 		expect(output[2]).toBe('Value("/hello")')
-		// This library's own sentence, and none of the host library's. A
-		// refused redirect used to arrive as `fetch`'s rejection, which named
-		// `fetch()` and its options in a value an Essence Program prints.
+		// This library's own sentence, never the host library's.
 		expect(output[3]).toBe(
 			'Unreachable("the host answered a redirect, and this request refused to follow one")',
 		)
 	})
 
-	// A redirect mode is about redirects, not about a range of numbers:
-	// 304 is a 3xx that carries no `location` and means "what you have is
-	// current", so it is an answer under every mode.
+	// A 304 carries no `location` and means "what you have is current", so it
+	// is an answer under every redirect mode.
 	it("hands back a 3xx that is no redirect even where redirects are refused", async () => {
 		let output = await run(
 			program(
@@ -380,10 +359,8 @@ describe("Http", () => {
 		expect(output[0]).toBe("304 ")
 	})
 
-	// What this library refuses to send at all, in its own words. A host
-	// library refuses both of these too, with a sentence naming `fetch()` and
-	// its options — a Function no Essence Program can reach, in a value a
-	// Program prints.
+	// A host library's refusal names `fetch()`, which no Essence Program can
+	// reach, so this library refuses these itself.
 	it("refuses a request it can decide about itself, in its own words", async () => {
 		let output = await run(
 			program(`	report(complete Http.send({ url = "${base}/hello", body = Optional<String>#Value("payload") }))
@@ -418,9 +395,7 @@ describe("Http", () => {
 			"HEAD",
 		])
 		expect(seen.bodies).toEqual(["", "posted", "put", "patched", "", ""])
-		// A HEAD answer carries no body, which is what the Method is for
-		// — so its Response body is the empty String and not the `/echo` route's
-		// answer.
+		// A HEAD answer carries no body, so its Response body is empty.
 		expect(output).toEqual([
 			"201 ",
 			"201 posted",
@@ -431,10 +406,8 @@ describe("Http", () => {
 		])
 	})
 
-	// The Record default on `send`'s Parameter, which is where a Record's
-	// defaults are written in this language. A request that names only its
-	// address is a whole request, and this is what says the other four members
-	// arrive rather than going missing.
+	// The Record default on `send`'s Parameter fills in the members a
+	// request leaves out.
 	it("fills in every member of a request but the address", async () => {
 		let output = await run(
 			program(
@@ -447,9 +420,8 @@ describe("Http", () => {
 		expect(output).toEqual(["200 hello"])
 	})
 
-	// The second call is the `content-type` promise the Request's own
-	// documentation makes: a request carrying a body names its own type,
-	// because this library names none for it.
+	// The second call holds the promise the Request's documentation makes:
+	// this library names no `content-type` for a body.
 	it("sends the headers a call writes", async () => {
 		await run(
 			program(`	report(
