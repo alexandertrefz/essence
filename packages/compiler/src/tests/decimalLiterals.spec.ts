@@ -11,17 +11,14 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// `0.75` is a second SPELLING of `3/4` and nothing more — the Parser
-// joins the two digit runs into a fraction over a power of ten, and every
-// stage behind it sees the Rational it has always seen. So what is worth
-// testing is not the Node, which `parserDiagnostics.spec.ts` pins, but that
-// the value reaching the runtime is the same one the fraction reaches it with:
-// exact, reduced on read, printed as a fraction, and folded by the Optimiser
-// the way a written fraction is.
+// `0.75` is a second spelling of `3/4`. The Parser joins the two digit runs
+// into a fraction over a power of ten, and every later stage sees a Rational.
+// `parser.spec.ts` pins the Node. These specs check that the runtime gets the
+// fraction's value: exact, reduced on read, printed as a fraction, and folded
+// by the Optimiser.
 //
-// The harness is `rationals.spec.ts`'s, for the reason that spec gives —
-// the damage a broken Rational does is visible from Essence, so these run
-// Essence rather than reading the tree.
+// The harness is `rationals.spec.ts`'s: a broken Rational shows from Essence,
+// so these run Essence rather than reading the tree.
 
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
@@ -61,10 +58,7 @@ async function run(source: string): Promise<Array<string>> {
 }
 
 describe("Decimal Literals", () => {
-	// The whole reason a decimal can be a Rational Literal at all. A
-	// Program that adds two tenths in binary floating point answers something
-	// that is not three tenths; this one answers three tenths, because the
-	// Literal never became a float.
+	// In binary floating point, two tenths do not add up to three tenths.
 	it("adds two tenths exactly", async () => {
 		expect(
 			await run(`implementation {
@@ -82,9 +76,6 @@ describe("Decimal Literals", () => {
 		).toEqual(['"true"', '"3/4"'])
 	})
 
-	// No scale is kept anywhere — a Rational has no memory of how it was
-	// written, so `1.50` and `1.5` are one value rather than two that compare
-	// equal.
 	it("keeps no scale, so a trailing zero changes nothing", async () => {
 		expect(
 			await run(`implementation {
@@ -94,9 +85,6 @@ describe("Decimal Literals", () => {
 		).toEqual(['"true"', '"3/2"'])
 	})
 
-	// Printing is untouched by any of this. `inspect` shows a Rational
-	// as the fraction it is, whichever way the Literal was written, and the
-	// decimal form is asked for by name.
 	it("prints as a fraction and as a decimal on request", async () => {
 		expect(
 			await run(`implementation {
@@ -106,9 +94,7 @@ describe("Decimal Literals", () => {
 		).toEqual(["1999/100", '"19.99"'])
 	})
 
-	// `2.0` is a Rational the way `4/2` is one, and a whole Rational
-	// prints its numerator alone — so the spelling that looks like a float
-	// still prints `2`.
+	// A whole Rational prints its numerator alone, so `2.0` prints `2`.
 	it("prints a whole decimal bare", async () => {
 		expect(
 			await run(`implementation {
@@ -118,10 +104,8 @@ describe("Decimal Literals", () => {
 		).toEqual(['"2"', '"2"'])
 	})
 
-	// A written decimal above zero proves its sign for itself, so the
-	// root reaches `PositiveRational`'s total entry and there is no Optional
-	// to take apart. A computed receiver goes to `Rational`'s own entry, which
-	// still answers one.
+	// A written positive decimal reaches `PositiveRational`'s total square
+	// root. A computed receiver reaches `Rational`'s, which answers an Optional.
 	it("reaches the numeric tower through a decimal receiver", async () => {
 		expect(
 			await run(`implementation {
@@ -135,9 +119,7 @@ describe("Decimal Literals", () => {
 		).toEqual(['"3/2"', '"3/2"', '"1/2"'])
 	})
 
-	// A whole mixed sum answers an Integer rather than a Rational over
-	// one, which is the rule the fraction spelling already follows — the
-	// decimal spelling reaches the same fold.
+	// A whole mixed sum answers an Integer, as it does for written fractions.
 	it("sums a mixed List down to an Integer", async () => {
 		expect(
 			await run(`implementation {
@@ -160,10 +142,8 @@ describe("Decimal Literals", () => {
 		).toEqual(['"a half"'])
 	})
 
-	// The Optimiser folds a decimal because it folds a Rational, and it
-	// never learned about decimals at all — the numerator and denominator it
-	// reads are plain digit strings, which is what the Parser normalises them
-	// through `BigInt` to guarantee.
+	// The Optimiser knows nothing of decimals. The Parser normalises the
+	// numerator and denominator through `BigInt` into plain digit strings.
 	it("is folded by the Optimiser the way a fraction is", () => {
 		let generated = generate(`implementation {
 			constant half = 0.25::add(0.25)
