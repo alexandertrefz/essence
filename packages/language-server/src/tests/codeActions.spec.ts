@@ -5978,6 +5978,35 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
+		// A binding's value is a read the Compiler writes at the binder, so a
+		// `match` there would land inside the Matcher.
+		it("should offer nothing on a Pattern's binding", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction depth (nested: Optional<Optional<Integer>>) -> Integer {",
+				"\t\t<- match nested -> Integer {",
+				"\t\t\tcase #Value(inner) {",
+				"\t\t\t\t<- 1",
+				"\t\t\t}",
+				"\t\t\tcase #Empty {",
+				"\t\t\t\t<- 0",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+				"",
+				"tests {",
+				'\ttest "unwraps" {',
+				"\t\tconstant nested: Optional<Optional<Integer>> = #Value(#Empty)",
+				"\t\trequire #Value(inner) = nested",
+				"\t}",
+				"}",
+			]
+
+			expect(matchActions(lines, spanOf(lines, 4, "inner"))).toEqual([])
+			expect(matchActions(lines, spanOf(lines, 17, "inner"))).toEqual([])
+		})
+
 		// The request must sit inside the Expression. A selection of the whole
 		// file is about no Expression in particular.
 		it("should offer nothing for a request no Expression contains", () => {

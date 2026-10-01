@@ -159,9 +159,14 @@ function visitNode(
 	visit: Visit,
 ) {
 	switch (node.nodeType) {
+		// A Pattern's binding reads a member at the binder's Position. No source
+		// wrote that read, and a `match` before it would land in the Matcher.
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			visitNode(node.value, node.declaredType ?? node.type, visit)
+			if (node.synthesized !== "binding") {
+				visitNode(node.value, node.declaredType ?? node.type, visit)
+			}
+
 			return
 		// An assignment's Type is at its Declaration, out of the walk's
 		// reach.
