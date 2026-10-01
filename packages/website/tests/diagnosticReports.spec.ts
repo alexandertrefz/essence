@@ -76,8 +76,8 @@ function reportsOf(fileName: string): Array<string> {
 	return reports
 }
 
-// When no report matches, compare with the one at the same place, or else
-// with the same message, so a drift reads as a diff of one report.
+// Without a match, compare with the report at the same place, else with the
+// same message. A drift then reads as a diff of one report.
 function counterpartOf(quoted: string, reports: Array<string>): string {
 	let opening = (report: string, lines: number) =>
 		report.split("\n").slice(0, lines).join("\n")

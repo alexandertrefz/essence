@@ -11,20 +11,13 @@ import { createPalette, createTheme } from "@essence-lang/cli/src/theme.ts"
 
 /*
  * The command-line reference, held to the screens `essence help <command>`
- * prints.
+ * prints. Every listed flag has an entry at
+ * `/docs/reference/cli#<command>--<flag>`, which guides link to, and every
+ * entry documents a listed flag.
  *
- * A flag is only as useful as its documentation is findable, and the site's
- * address for one is `/docs/reference/cli#<command>--<flag>` — the address
- * every guide and the project-file reference link to. So every flag a screen
- * lists has an entry under that address, and no entry documents a flag no
- * screen lists: a renamed flag fails here in both directions.
- *
- * What is read is the RENDERED screen's OPTIONS and GLOBAL OPTIONS
- * sections, never its description or its examples. Both of those mention flags
- * in passing — `--watch stays up and re-runs on every save` opens a line of
- * `essence help test` — and a flag named in passing is not one the command
- * takes. The screen rather than the command specs, because the screen is what
- * a reader compares the page with, and it leaves out what a spec marks hidden.
+ * Only the rendered screen's OPTIONS and GLOBAL OPTIONS sections are read,
+ * since descriptions and examples mention flags in passing. The screen is what
+ * a reader compares the page with, and it omits hidden flags.
  */
 
 const CLI_PAGE = path.resolve(
@@ -32,9 +25,8 @@ const CLI_PAGE = path.resolve(
 	"../src/content/docs/reference/cli.mdx",
 )
 
-// The flags only the experimental test modes take. The site documents
-// none of those modes, so these are neither required on the page nor allowed
-// on it.
+// The flags only the experimental test modes take. The site documents none of
+// those modes, so these are neither required nor allowed on the page.
 const EXPERIMENTAL_FLAGS = new Set([
 	"bench",
 	"contracts",
@@ -44,8 +36,8 @@ const EXPERIMENTAL_FLAGS = new Set([
 	"strict",
 ])
 
-// Hidden from every screen and documented anyway, beside the flag it
-// undoes: `--no-color` is how a reader keeps colour codes out of a file.
+// Hidden from every screen but documented beside the flag it undoes, since
+// `--no-color` keeps colour codes out of a file.
 const DOCUMENTED_HIDDEN_FLAGS = new Set(["no-color"])
 
 const GLOBAL = "global"
@@ -74,9 +66,8 @@ function flagsUnder(screen: string, title: string): Array<string> {
 			break
 		}
 
-		// A row opens four spaces in, with its short flag or the four
-		// spaces that stand for a missing one; what an option says about
-		// itself is indented further and never matches.
+		// A row opens four spaces in, with its short flag or four spaces for a
+		// missing one. An option's description is indented further.
 		let row = /^ {4}(?:-[A-Za-z], | {4})?--([a-z][a-z-]*)/.exec(line)
 
 		if (row !== null) {
@@ -155,8 +146,8 @@ describe("the command-line reference", () => {
 	let entries = pageEntries()
 
 	it("reads the screens and the page", () => {
-		// A guard on both readers — a section title or a heading shape
-		// that stopped matching would make every check below vacuous.
+		// A guard on both readers: a section title or heading shape that
+		// stopped matching would make every other check vacuous.
 		expect(printed.size).toBeGreaterThan(30)
 		expect(entries.length).toBeGreaterThan(30)
 	})
@@ -223,10 +214,8 @@ describe("the command-line reference", () => {
 	})
 })
 
-// An address a screen prints is one a reader types, long after the page
-// behind it moved — so it names the site's real host, and a page the site
-// builds or a redirect `netlify.toml` serves. A help screen once sent readers to
-// a domain the site never had.
+// A reader types the addresses a screen prints. So each names the site's real
+// host, and a page the site builds or a redirect `netlify.toml` serves.
 describe("the addresses the help screens print", () => {
 	const SITE = "https://essencelang.org"
 	const DOCS_DIRECTORY = path.resolve(
