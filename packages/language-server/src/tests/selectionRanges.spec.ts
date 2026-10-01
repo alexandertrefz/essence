@@ -413,3 +413,43 @@ describe("Selection Ranges inside a native Method's default", () => {
 		])
 	})
 })
+
+describe("Selection Ranges inside a snapshot", () => {
+	it("should widen from the recorded text out through the assertion", () => {
+		let source = [
+			"implementation {",
+			"}",
+			"tests {",
+			'\ttest "spells a number" {',
+			'\t\texpect 3::toString() matches snapshot "3"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 5, column: 42 })).toEqual([
+			{ start: { line: 5, column: 41 }, end: { line: 5, column: 44 } },
+			{ start: { line: 5, column: 3 }, end: { line: 5, column: 44 } },
+			{ start: { line: 4, column: 2 }, end: { line: 6, column: 3 } },
+			{ start: { line: 3, column: 1 }, end: { line: 7, column: 2 } },
+		])
+	})
+
+	it("should widen from a stored snapshot's name out through the assertion", () => {
+		let source = [
+			"implementation {",
+			"}",
+			"tests {",
+			'\ttest "spells a number" {',
+			'\t\texpect 3::toString() matches snapshot from "the-number"',
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 5, column: 48 })).toEqual([
+			{ start: { line: 5, column: 46 }, end: { line: 5, column: 58 } },
+			{ start: { line: 5, column: 3 }, end: { line: 5, column: 58 } },
+			{ start: { line: 4, column: 2 }, end: { line: 6, column: 3 } },
+			{ start: { line: 3, column: 1 }, end: { line: 7, column: 2 } },
+		])
+	})
+})

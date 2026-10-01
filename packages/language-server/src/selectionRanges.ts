@@ -220,6 +220,7 @@ function collectFromNode(
 				descend(expression, cursor, chain)
 			}
 
+			descendSnapshot(node.snapshot, cursor, chain)
 			return
 		case "Match":
 			descend(node.value, cursor, chain)
@@ -358,6 +359,19 @@ function collectFromOverloads(
 		} else {
 			collectFromDefaults(method.parameters, cursor, chain)
 		}
+	}
+}
+
+// A stored snapshot's name and an inline one's recorded text are Strings
+// written in the source.
+function descendSnapshot(
+	snapshot: parser.SnapshotNode | null,
+	cursor: common.Cursor,
+	chain: Array<common.Position>,
+) {
+	if (snapshot !== null) {
+		descend(snapshot.name, cursor, chain)
+		descend(snapshot.value, cursor, chain)
 	}
 }
 
