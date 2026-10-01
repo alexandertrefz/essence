@@ -206,6 +206,32 @@ Development Host, over a workspace holding at least two files that write
   once there is nothing left to accept.
 - `Essence: Restart Language Server` empties the tree and fills it in again.
 
+## Applying a batch
+
+`applyBatch` in `testModel.ts` applies one `essence/testRun` batch to what the
+client holds, by three rules:
+
+1. A file the batch covered is replaced by what the batch says about it.
+2. A narrowed batch replaces only the ids it names. A Run lens over one test
+   reports every other test of its file as deselected, and adopting those
+   would forget results nobody asked to forget.
+3. A file the batch has nothing for, in a batch that did not compile, is kept
+   and marked stale. A half-typed line does not empty the Test Explorer.
+
+A record belongs to the file its test is written in, which the events carry as
+`module`. In a batch over exactly one file, a record without a module belongs
+to that file.
+
+Coverage is held apart from the test results, because the two sets of files
+differ: a cycle runs `Foo.tests.es` and counts `Foo.es`. The coverage files a
+batch carries are laid over what is held, by module, since a cycle covers only
+what a change reached. A whole run replaces them instead: the first run of a
+session, or the run after a setting changed. Switching coverage makes the
+Server discard what it counted and run everything as a `settings` cycle. Such
+a cycle with no files therefore means coverage was turned off, and every mark
+goes. The Choices always replace what is held, since the Server works that
+answer out across the whole session.
+
 ## Packaging
 
 ```sh
