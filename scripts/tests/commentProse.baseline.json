@@ -59,7 +59,7 @@
 	"packages/compiler/src/embed/emit.ts": {"sentence-length": 10, "em-dash": 8, "all-caps": 2, "position": 2, "counts": 1},
 	"packages/compiler/src/embed/hash.ts": {"sentence-length": 12, "em-dash": 9, "all-caps": 6, "block-length": 2},
 	"packages/compiler/src/embed/index.ts": {"sentence-length": 30, "em-dash": 28, "all-caps": 19, "history": 1, "block-length": 6, "stacked": 1},
-	"packages/compiler/src/helpers/types.ts": {"sentence-length": 160, "em-dash": 118, "all-caps": 102, "history": 2, "position": 17, "block-length": 39},
+	"packages/compiler/src/helpers/types.ts": {"sentence-length": 120, "em-dash": 95, "all-caps": 80, "history": 2, "position": 13, "block-length": 30},
 	"packages/compiler/src/testing/attribution.ts": {"sentence-length": 6, "em-dash": 7, "all-caps": 5, "block-length": 2, "stacked": 1},
 	"packages/compiler/src/testing/benchmarks.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 4, "block-length": 2},
 	"packages/compiler/src/testing/corpus.ts": {"sentence-length": 22, "em-dash": 13, "all-caps": 16, "block-length": 2, "stacked": 1},

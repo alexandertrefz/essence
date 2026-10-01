@@ -391,3 +391,51 @@ declared `NonEmptyList<Item>` and each instantiation share it. The base's tag is
 
 `boundArgument` reads a bound as an exact pair without dividing, the sign on the numerator, since bounds are only
 compared. It repeats `predicateEval.ts`'s reader, because that module imports this one.
+
+## Filling undecided slots
+
+`resolveUnknownSlots` fills each `Unknown` slot of a name's stored Type that a written value answers, so
+`variable items = []` becomes a `List<Integer>` once `items = [1, 2]` is written. Only `Unknown` slots change, and
+a call that pins nothing gets the stored Type back as itself.
+
+A slot takes the written Type without its refinements, at any depth. A slot holds many values over the life of
+its name, such as a fold's accumulator, and a refinement proves something of one value. Pinning
+`NonEmptyList<String>` into a Dictionary's values would refuse the fold's own next write of an empty List. A
+refinement over the container itself is looked through the same way: after `variable items = []`,
+`items = items::append("a")` pins `List<String>`. An author who wants a proof in the slot annotates the name.
+
+`decidesAnUndecidedSlot` says whether a written Type decides a slot: anything but a blank, unless it holds an
+`Error`. An `Error` was reported where it came from, so it neither pins a slot nor is refused by one. Both
+`resolveUnknownSlots` and `matchTypes` ask it, so a write is never pinned by one and refused by the other.
+
+A written Union is resolved member by member, and `agreedDecisions` merges the answers slot by slot. A fold's
+branches answer `NonEmptyList<Integer> | List<Unknown>`: the branch that appends decides the item Type, and the
+branch that hands the accumulator back says nothing. One branch with an answer decides a slot. Two branches that
+answer differently leave it open, and the write is refused with the note that nothing decided it. Records merge
+member by member, so a seed such as `{ evens = [], odds = [] }` can be decided one member per branch. The Union
+case runs before the visiting guard, since each member is smaller than the Union it came from.
+
+Stored Union arms are paired with written arms by shape, and only where exactly one written arm has that shape.
+Two Dictionary slots are filled independently. A rebuilt Union drops its `name` and `alias`, since
+`Optional<List<Unknown>>` is not what a Union with a decided List arm is called.
+
+`typeContainsUnknown` names the shapes it looks into rather than walking every field. `Unknown` is also the
+declared default of a bare `List`'s Type Parameter, and a reflective walk would call every bare `List`
+undecided. It looks where a Type Argument can stand: List items, Dictionary slots, Record members, Union arms,
+a Future's or Started's value, a refinement's base.
+
+## Display spellings
+
+`withoutRefinements` takes every proof off a Type, at the positions `typeContainsUnknown` looks into. A Type
+holding no refinement comes back as itself, which is how callers tell a pin from a no-op. A rebuilt Record or
+Union drops its display spelling: a `Standing` whose `NonZeroInteger` member erased declares something `Standing`
+does not.
+
+`withoutRecordNames` takes a Record's `name` and `alias` off a Type for anything that is not a reader. A Type
+descriptor is data the runtime consults, and `Standing` says nothing about a value that its shape does not.
+Emitted, the name would reach every Program that matches on an Alias and split the constant pool between two
+spellings of one shape. A Union keeps its `name` and `alias`, which reach an emitted descriptor inertly. The walk
+also strips Record names inside applied spellings' Type Arguments and inside Function and Overload signatures. The
+embedding boundary prints both. `withoutRecordNamesInSignature` serves `printSignature`.
+It keeps identity where nothing changed, and answers a back-edge unstripped. The Enricher refuses a Type that
+names itself, so the guard only keeps the language server from hanging.

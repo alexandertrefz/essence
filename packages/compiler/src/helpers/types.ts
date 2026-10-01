@@ -776,8 +776,7 @@ export function pendingRefinementCopiesOf(
 	return copies
 }
 
-// Substitutes bound Generics in `type` — unbound bindable Generics are
-// left untouched, opaque Generics always are.
+// Substitutes bound Generics in `type`. Unbound and opaque Generics stay.
 export function applyGenericBindings(
 	type: common.Type,
 	bindings: GenericBindings,
@@ -1485,9 +1484,8 @@ function boundArgument(
 		: { numerator, denominator }
 }
 
-// The one door to a refinement's conjuncts. They are null while a refined
-// Alias waits for the Namespace answering its predicate to hoist, and nothing
-// may be decided about a predicate nobody has read, so the null is refused.
+// A refinement's conjuncts, refused while still null, as they are while the
+// Namespace answering the predicate waits to hoist.
 export function provenConjuncts(
 	refinement: common.RefinementType,
 ): Array<common.PredicateConjunct> {
@@ -1498,12 +1496,8 @@ export function provenConjuncts(
 	return refinement.conjuncts
 }
 
-// The canonical form a refinement's conjuncts are stored in — sorted by
-// key, with duplicates dropped, so that one predicate spells one conjunct set
-// however it was written. Two aliases proving the same thing are then the same
-// Type to every reader of `conjuncts`, and the inclusion check above never has
-// to care that `@::isNot(0)::and(@::isPositive())` and its mirror image are the
-// same predicate.
+// The canonical conjunct set: sorted by key, duplicates dropped, so one
+// predicate is one set however it was written.
 export function canonicalPredicateConjuncts(
 	conjuncts: Array<common.PredicateConjunct>,
 ): Array<common.PredicateConjunct> {
@@ -1522,30 +1516,19 @@ export function canonicalPredicateConjuncts(
 		.map(([, conjunct]) => conjunct)
 }
 
-// Whether a slot nothing has decided yet sits anywhere in this Type. It
-// enumerates the shapes on purpose, unlike its Error-hunting sibling: an
-// Unknown also occurs as the DECLARED default of `List`'s Type Parameter, and a
-// walk that reads every field would call every bare `List` undecided. Only the
-// places a Type ARGUMENT can end up in are looked at — a List's items, a
-// Dictionary's keys and values, a Record's members, a Union's arms.
+// Whether an undecided slot sits anywhere in this Type. See "Filling undecided
+// slots" in DEVELOPMENT.md.
 export function typeContainsUnknown(type: common.Type): boolean {
 	switch (type.type) {
 		case "Unknown":
 			return true
 		case "List":
 			return typeContainsUnknown(type.itemType)
-		// And the two asynchronous containers, whose open slot no Program
-		// can write — a bare `Future` is refused where it is spelled, and no
-		// Expression builds one out of nothing. So the answer here is about the
-		// Compiler's own Types: a Future nobody decided the answer Type of is
-		// undecided, full stop, whichever stage was holding it.
+		// A Future's or a Started's slot, which no Program can leave open itself.
 		case "Future":
 		case "Started":
 			return typeContainsUnknown(type.valueType)
-		// Either slot undecided leaves the Type undecided — there is one
-		// answer to "is anything here still open?", and two slots to ask it of.
-		// `GenericDictionary` is left out for the reason a bare `List` is: its
-		// Unknowns are DECLARED defaults, not slots waiting on an answer.
+		// Either slot. A `GenericDictionary`'s Unknowns are declared defaults.
 		case "Dictionary":
 			return (
 				typeContainsUnknown(type.keyType) ||
@@ -1555,8 +1538,7 @@ export function typeContainsUnknown(type: common.Type): boolean {
 			return Object.values(type.members).some(typeContainsUnknown)
 		case "UnionType":
 			return type.types.some(typeContainsUnknown)
-		// A refinement decides nothing its base has not decided — what is
-		// still undecided about `List<Unknown> where …` is the item Type.
+		// A refinement decides nothing its base has not.
 		case "Refinement":
 			return typeContainsUnknown(type.base)
 		default:
@@ -1564,29 +1546,14 @@ export function typeContainsUnknown(type: common.Type): boolean {
 	}
 }
 
-// Whether a value written into a slot nothing has decided DECIDES it.
-// Anything that is not itself a blank does, with one exception: a Type carrying
-// an Error decides nothing. Whatever produced that Error was reported where it
-// came from, and an Error is poison everywhere else for the same reason —
-// pinning a slot to one would spread a single mistake over every later use of
-// the name, and REFUSING the write would report that mistake a second time.
-//
-// One question, asked by both halves of the rule: `resolveUnknownSlots` fills a
-// slot where this holds, and `matchTypes` refuses a write where it holds and the
-// slot is still open. Asking it in only one of the two places is what made
-// `{ box with items = box.items::append(undeclared) }` a
-// `partial-type-mismatch` stacked on top of the name that is not declared.
+// Whether a written Type decides an undecided slot: anything but a blank,
+// unless it holds an Error. See "Filling undecided slots" in DEVELOPMENT.md.
 export function decidesAnUndecidedSlot(written: common.Type): boolean {
 	return written.type !== "Unknown" && !typeContainsError(written)
 }
 
-// The Type with every proof taken off it, however deep one sits — the
-// shape a decision is allowed to be. It enumerates the places a Type ARGUMENT
-// can stand, the same list `typeContainsUnknown` walks and for the same reason:
-// those are the positions a value's own Type reaches. A Type holding no
-// refinement at all comes back as itself, so a decision that changes nothing is
-// recognisable by identity, which is how every caller here tells a pin from a
-// no-op.
+// The Type with every proof taken off it, or itself where it holds none. See
+// "Display spellings" in DEVELOPMENT.md.
 function withoutRefinements(type: common.Type): common.Type {
 	switch (type.type) {
 		case "Refinement":
@@ -1620,11 +1587,7 @@ function withoutRefinements(type: common.Type): common.Type {
 				? type
 				: { type: "Dictionary", keyType, valueType }
 		}
-		// A rebuilt Record drops its own display spelling for the same
-		// reason the Union below drops its arms' — a `Standing` whose
-		// `NonZeroInteger` member erased to an Integer declares something
-		// `Standing` does not, and a shape is not the Alias it stopped being.
-		// One holding no refinement anywhere comes back as itself and keeps it.
+		// A rebuilt Record drops its display spelling: it is no longer the Alias.
 		case "Record": {
 			let members: Record<string, common.Type> = {}
 			let stripped = false
@@ -1636,9 +1599,7 @@ function withoutRefinements(type: common.Type): common.Type {
 
 			return stripped ? { type: "Record", members } : type
 		}
-		// The name and the alias go with the arm they described:
-		// `NonEmptyList<String> | X` is not what a Union whose first arm is now
-		// a plain List is called.
+		// The name and the alias go with the arm they described.
 		case "UnionType": {
 			let types = type.types.map(withoutRefinements)
 
@@ -1651,27 +1612,9 @@ function withoutRefinements(type: common.Type): common.Type {
 	}
 }
 
-// The Type with a Record's display spelling taken off it, however deep one
-// sits — what a Type looks like to anything that is not a reader. A descriptor is
-// DATA the runtime consults, and `Standing` says nothing about a value that
-// `{ team: …, played: … }` does not; emitted, it would put a name the runtime has
-// never heard of into every Program that matches on an Alias, and split the
-// constant pool between two spellings of one shape. So the Rewriter strips it on
-// the way out, which is also what keeps the emitted JavaScript byte for byte what
-// it was before Records could be named at all.
-//
-// A Union's own `name` and `alias` are deliberately LEFT — they reach an emitted
-// descriptor today, inert, and taking them out here would change the output this
-// is written to keep identical. The one new field is the one that goes.
-//
-// Identity-preserving, like every walk here: a Type holding no named Record
-// comes back as itself, so the common descriptor allocates nothing. The visiting
-// set is the back-edge guard `resolveUnknownSlots` carries.
-//
-// A back edge is answered with the type UNSTRIPPED, which is defence rather than
-// an answer that arises: the Enricher refuses a Type declaration that names
-// itself, directly or around a cycle. The guard keeps a Language Server that
-// walks into a cycle from hanging.
+// The Type with every Record's display spelling taken off, for the runtime and
+// the embedding boundary. A Union keeps its own. See "Display spellings" in
+// DEVELOPMENT.md.
 export function withoutRecordNames(type: common.Type): common.Type {
 	let visiting = new Set<common.Type>()
 
@@ -1749,13 +1692,8 @@ export function withoutRecordNames(type: common.Type): common.Type {
 						? type
 						: { type: "Dictionary", keyType, valueType }
 				}
-				// The Type ARGUMENTS of a Union's or a Case's applied
-				// spelling are stripped alongside its members, because a
-				// spelling is printed too: `Optional<Standing>` is the word a
-				// reader recognises in a Diagnostic and `Optional<{ … }>` is
-				// what the embedding boundary has to say, and both are read off
-				// these. A Refinement's are stripped for the same reason, and
-				// its base along with them.
+				// An applied spelling's Type Arguments are stripped too, since they are
+				// printed.
 				case "UnionType": {
 					let types = type.types.map((arm) =>
 						arm.type === "GenericUse" ? arm : strip(arm),
@@ -1805,12 +1743,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 									: { typeArguments }),
 							}
 				}
-				// Walked through as well, because a Function Type is DATA
-				// in a descriptor like any other and a Record standing in one of
-				// its Parameters is still a Record nobody can name at run time.
-				// The one field `isValueOfType` reads of a Function is that it
-				// is one, so what is left in the signature is bytes — and bytes
-				// that differ from the ones this was emitting before.
+				// A Function Type is data in a descriptor like any other.
 				case "Function":
 				case "SimpleMethod":
 				case "StaticMethod": {
@@ -1818,13 +1751,7 @@ export function withoutRecordNames(type: common.Type): common.Type {
 
 					return signature === type ? type : { ...type, ...signature }
 				}
-				// An Overload set is those signatures in a list, and a
-				// Record standing in one of them is as nameless as one in a
-				// plain Function's. Nothing emits an Overload set today — the
-				// descriptor path can not reach here — but this walk answers
-				// the embedding boundary too, which PRINTS what it is given,
-				// and a list of the shapes it happens to be asked about is the
-				// kind of list that goes quietly out of date.
+				// An Overload set, which the embedding boundary prints.
 				case "OverloadedMethod":
 				case "OverloadedStaticMethod": {
 					let overloads = type.overloads.map((overload) =>
@@ -1848,19 +1775,14 @@ export function withoutRecordNames(type: common.Type): common.Type {
 	return strip(type)
 }
 
-// The same answer for a signature, which is what the embedding boundary
-// asks — `printSignature` takes a `BaseFunction`, and a `BaseFunction` carries no
-// `type` field to discriminate on, so the walk above can not hand one back. This
-// is that walk's Function case, shared rather than written twice.
+// The same for a signature, which has no `type` field, for `printSignature`.
 export function withoutRecordNamesInSignature(
 	signature: common.BaseFunction,
 ): common.BaseFunction {
 	return strippedSignature(signature, withoutRecordNames)
 }
 
-// A list of Type Arguments stripped, answering the very list it was given
-// where nothing changed — which is how each branch above tells a Type it has to
-// rebuild from one it can hand back.
+// Type Arguments stripped, or the same list where nothing changed.
 function strippedArguments<Argument extends common.Type>(
 	typeArguments: Array<Argument> | undefined,
 	strip: (type: common.Type) => common.Type,
@@ -1898,17 +1820,13 @@ function strippedSignature<Signature extends common.BaseFunction>(
 		: { ...signature, parameterTypes, returnType }
 }
 
-// `stored` with every Unknown slot `value` has an answer for filled in —
-// what turns `variable items = []` into a List of Integers the moment
-// `items = [1, 2]` says so. Only slots that are Unknown are touched, so a Type
-// that already decided something keeps it and the caller can tell that nothing
-// was pinned by getting the very same Type back.
+// `stored` with every Unknown slot `value` answers filled in, or `stored` itself.
+// See "Filling undecided slots" in DEVELOPMENT.md.
 export function resolveUnknownSlots(
 	stored: common.Type,
 	value: common.Type,
 ): common.Type {
-	// The Types being walked. The Enricher refuses a Type declaration
-	// that names itself, so meeting one of them again is defence only.
+	// The Types being walked, a guard for a Type naming itself.
 	let visiting = new Set<common.Type>()
 
 	let resolve = (stored: common.Type, written: common.Type): common.Type => {
@@ -1916,56 +1834,23 @@ export function resolveUnknownSlots(
 			return stored
 		}
 
-		// A DECISION never carries a refinement, at any depth. A slot
-		// decided by inference holds many values over the life of the name that
-		// owns it — a fold's accumulator, a Dictionary's values, a List's items —
-		// and a refinement is a proof about ONE value. Pinning the proof into the
-		// slot makes the next write of an unrefined value impossible, and that
-		// write is usually the fold's own: `[current with word = []::append(word)]`
-		// decides the values `NonEmptyList<String>`, and then the
-		// `current::value(at key, defaultingTo [])` that BUILT it no longer fits
-		// its own Dictionary. An author who wants the proof in the slot annotates,
-		// which is the one place a Type is stated rather than inferred.
-		//
-		// A slot refuses a write that does not fit it, so it has to hold the Type
-		// the name can keep writing, not the Type one write proved.
+		// A decision never carries a refinement: a slot holds many values, and a
+		// refinement proves something of one.
 		if (stored.type === "Unknown") {
 			return decidesAnUndecidedSlot(written)
 				? withoutRefinements(written)
 				: stored
 		}
 
-		// A refinement standing over the CONTAINER whose slots are being
-		// filled is looked through instead, and its evidence dropped:
-		// `variable items = []` followed by `items = items::append("a")` pins a
-		// `List<String>`, never the `NonEmptyList<String>` the call answered.
-		// The refinement is proof about THAT value, and `stored` is the Type of
-		// a name whose earlier value — the empty List — was not refined at all,
-		// so keeping it would put a Type on the name that its own Declaration
-		// never satisfied. The slots underneath are still the value's, which is
-		// why the rule stops at this one level. Refinements nest, so the walk
-		// does too.
+		// A refinement over the container is looked through, and its proof dropped.
 		let value = written
 
 		while (value.type === "Refinement") {
 			value = value.base
 		}
 
-		// A written Union is asked member by member, because a value built
-		// out of branches says what it holds in the branches that WRITE into the
-		// accumulator and nothing at all in the ones that hand it back untouched.
-		// `if number::isLessThan(0) { <- kept }` beside `<- kept::append(number)`
-		// answers `NonEmptyList<Integer> | List<Unknown>`: one member decides the
-		// item Type, the other is the blank the seed came in as, and reading the
-		// two together decides nothing. Asked separately and merged slot-wise,
-		// the blank takes the answer the members that have one agree on — which
-		// is also what lets a Record seed decide one member per branch, as
-		// `{ evens = [], odds = [] }` does.
-		//
-		// Before `visiting`, so the members can each be walked against the very
-		// `stored` this call is resolving. What guards the recursion instead is
-		// the written side shrinking: every member is smaller than the Union it
-		// came from, and a Type is a finite tree.
+		// A written Union is resolved member by member and merged by
+		// `agreedDecisions`, before the visiting guard, since each member is smaller.
 		if (value.type === "UnionType" && stored.type !== "UnionType") {
 			return agreedDecisions(
 				stored,
@@ -1984,7 +1869,7 @@ export function resolveUnknownSlots(
 					: { type: "List", itemType }
 			}
 
-			// The one slot each, pinned the way a List's item Type is.
+			// One slot each, as a List's item Type.
 			if (stored.type === "Future" && value.type === "Future") {
 				let valueType = resolve(stored.valueType, value.valueType)
 
@@ -2001,10 +1886,7 @@ export function resolveUnknownSlots(
 					: { type: "Started", valueType }
 			}
 
-			// Each slot pinned INDEPENDENTLY, which is the whole of what
-			// a second slot changes here: a `Dictionary<Unknown, Unknown>` that
-			// meets a `Dictionary<String, Unknown>` keeps its undecided values
-			// and gains its keys. Nothing may read one slot from the other.
+			// Each slot is filled independently.
 			if (stored.type === "Dictionary" && value.type === "Dictionary") {
 				let keyType = resolve(stored.keyType, value.keyType)
 				let valueType = resolve(stored.valueType, value.valueType)
@@ -2034,10 +1916,7 @@ export function resolveUnknownSlots(
 			}
 
 			if (stored.type === "UnionType" && value.type === "UnionType") {
-				// Arms are paired by shape — a `List` arm is answered by
-				// the value's `List` arm — and only when exactly one arm
-				// answers. Two arms of the same shape have no obvious pairing,
-				// and guessing one would decide a slot from the wrong Type.
+				// Arms pair by shape, only where exactly one written arm has it.
 				let types = stored.types.map((arm) => {
 					let candidates = value.types.filter(
 						(candidate) => candidate.type === arm.type,
@@ -2048,9 +1927,7 @@ export function resolveUnknownSlots(
 						: arm
 				})
 
-				// The name and the alias are dropped along with the arm
-				// they described — `Optional<List<Unknown>>` is not what a
-				// Union whose List arm now holds Integers is called.
+				// The name and the alias go with the arm they described.
 				return types.some((arm, index) => arm !== stored.types[index])
 					? { type: "UnionType", types }
 					: stored
@@ -2065,18 +1942,8 @@ export function resolveUnknownSlots(
 	return resolve(stored, value)
 }
 
-// What several readings of the same `stored` AGREE its blanks are, slot by
-// slot. Each candidate is `stored` with some of its blanks filled — one per
-// member of a written Union — so every one of them has its shape, and each blank
-// is answered by the candidates that HAVE an answer for it: a branch handing the
-// accumulator back untouched says nothing about it, and the branch appending to
-// it says everything, so one branch is enough to decide a slot.
-//
-// Two candidates answering the same blank DIFFERENTLY leave it blank. There is
-// no one Type the value holds, and picking either would be picking the branch
-// that happens to be written first — so the slot stays open and the write is
-// refused with the note that says nothing decided it, which is the truth about a
-// fold whose branches disagree.
+// What several readings of `stored` agree its blanks are, slot by slot. One
+// answer decides a slot, and differing answers leave it open.
 function agreedDecisions(
 	stored: common.Type,
 	candidates: Array<common.Type>,
@@ -2155,9 +2022,8 @@ function agreedDecisions(
 			: { type: "Dictionary", keyType, valueType }
 	}
 
-	// Member by member, which is what a seed holding two accumulators
-	// needs: `{ evens = [], odds = [] }` is written one member per branch, so
-	// neither branch decides the Record and both together decide every member.
+	// Member by member, so `{ evens = [], odds = [] }` is decided one member per
+	// branch.
 	if (stored.type === "Record") {
 		let members: Record<string, common.Type> = {}
 		let pinned = false
