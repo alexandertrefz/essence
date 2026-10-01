@@ -3,13 +3,10 @@ import * as path from "node:path"
 
 import { projectSchema } from "@essence-lang/compiler/configuration"
 
-// The JSON Schema for `essence.json` is generated from the reader's own
-// catalogue of settings, so that what an editor completes and validates can
-// not drift from what the toolchain reads. Two copies are checked in, each
-// owned by the package that ships it: the VS Code extension bundles one and
-// registers it for the filename, and the website serves the other at the URL
-// the file's `$schema` names. Each package holds a spec that fails when its
-// copy is out of date; this script is what brings them up to date.
+// Generates the JSON Schema for `essence.json` from the reader's catalogue, so
+// editors validate what the toolchain reads. The VS Code extension bundles one
+// copy and the website serves another at the `$schema` URL. Each package's spec
+// fails when its copy is stale.
 //
 // Regenerate with `bun run generate:schema`.
 

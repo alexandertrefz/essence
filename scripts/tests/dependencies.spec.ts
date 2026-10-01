@@ -11,9 +11,9 @@ import {
 	REPOSITORY_ROOT,
 } from "../publishing/packages"
 
-// The workspace resolves every `@essence-lang/*` package from the root
-// `node_modules`, declared or not, but a package installed on its own finds only
-// what its manifest names: the nearest tracked `package.json` above the file.
+// The workspace resolves every `@essence-lang/*` package from the root, declared
+// or not. An installed package finds only what its manifest names, the nearest
+// tracked `package.json` above the file.
 
 type Token = {
 	kind: "word" | "string" | "punctuation"
@@ -40,9 +40,9 @@ const regexpAfterWords = new Set([
 	"await",
 ])
 
-// The words, Strings and punctuation of a script. Comments are skipped,
-// and a template or a regular expression is skipped whole apart from the code in
-// a template's holes, so text inside any of them never reads as an import.
+// The words, Strings and punctuation of a script. Comments, templates and
+// regular expressions are skipped, except code in a template's holes, so their
+// text never reads as an import.
 function tokensOf(source: string): Array<Token> {
 	let tokens: Array<Token> = []
 	let index = 0
@@ -505,9 +505,8 @@ describe("the @essence-lang imports", () => {
 		})
 	})
 
-	// The checks that follow pass on an empty list, so a scanner that
-	// read no file, or found no import in the files it read, would pass them
-	// all unnoticed.
+	// The other checks pass on an empty list, so a scanner that read no file
+	// or found no import would pass them unnoticed.
 	it("finds imports to check", async () => {
 		let { fileCount, imports } = await readRepository()
 
