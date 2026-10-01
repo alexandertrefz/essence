@@ -318,3 +318,54 @@ Statement the source wrote it in.
 `holdsAwait` asks this of the emitted JavaScript: whether an `await` stands anywhere in the body without a
 Function of its own around it. It walks every field rather than a list per node kind, so a shape added to
 the emission later is covered without anyone listing it.
+
+## Hybrid Integers
+
+An Integer holds a JavaScript number while a double holds its value exactly, and a bigint beyond that. This
+is the canonical invariant: one Integer has exactly one representation. `Integer.createInteger` in the
+runtime canonicalises, and `packages/runtime/src/tests/hybridIntegers.spec.ts` holds the runtime to it.
+
+### Equality and order
+
+`rawEquals` compares two Integers with `===` on what they hold. Two equal values meet as two numbers or two
+bigints, where `===` is exact. A number and a bigint can only be values on opposite sides of the safe range,
+and `===` correctly answers false for them without comparing. Two Strings are compared by
+`$helpers.stringEquals`, because equal Strings may differ in code points until normalised.
+
+`<`, `>`, `<=` and `>=` order a number against a bigint exactly, so `raw-compare` needs no guard.
+
+### Arithmetic
+
+`rawArithmetic` writes `+`, `-` and `*` inline around a guard; a call would give back what
+`lower-scalar-operations` saved. JavaScript throws on a mix of number and bigint, so both operands must be
+numbers. The guard asks `typeof` rather than a range test. Both decide the same question under the
+invariant, but a range test compares a bigint against a double.
+
+The guard then checks the answer against the safe range, which keeps the result canonical. The check is
+exact. IEEE 754 `+`, `-` and `*` round correctly, so the double answer is the double nearest the true result.
+Rounding is monotone and 2⁵³ is a double. So a true result of magnitude at least 2⁵³ rounds to a double of
+at least that magnitude and fails the check. A true result inside the safe range is exactly representable and
+rounds to itself. So the check passes exactly when the double is the true result. A product can leave the
+safe range from operands well inside it. Its rounded value can not come back inside, so the operands need no
+bound of their own.
+
+When the check fails, the escape arm hands the two raw values to the runtime. Its `sum`, `difference` and
+`product` redo the guard and fall back to bigint. The guard reads each operand twice and the answer
+three times. An operand that `isRepeatable` rejects, anything with a call in it, goes to the runtime whole.
+Every value the Rewriter emits is a plain object without accessors, so reading a name or a member chain
+twice observes nothing.
+
+### Unboxing
+
+`unboxedInteger` reads an emitted Integer Expression for the value it holds, as a rewrite of the finished
+JavaScript. Whether a slot is unboxed depends on the emitted body, so the answer is not known until the body
+exists. A guarded arithmetic is read through both arms. The guarded arm's box is never built, and the escape
+arm reads the value off the Integer the runtime built. This is what keeps a chain of operations from
+building an Integer that the next operation takes apart. The operands of an escaped operation, both sides of
+a comparison and an equality, and a raw slot's value read through it. `valueRead` remains for other reads,
+such as a Boolean's value, a List's count and a counted walk's bounds.
+
+`exitBox` remembers by identity the Integer a walk builds where it answers, so an enclosing walk can take
+the box apart again without building it. It must be by identity, not by shape. `Integer.createInteger` also
+boxes a counted walk's index, which may be a bigint holding a safe value, and stripping that call would skip
+its canonicalisation.

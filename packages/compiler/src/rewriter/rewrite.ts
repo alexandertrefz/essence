@@ -2340,11 +2340,8 @@ function rewriteIntrinsic(
 			return rawEquals(node)
 		case "raw-arithmetic":
 			return rawArithmetic(node)
-		// Through the one function every reference to a standard library
-		// member routes through, so a devirtualised Method is spelled exactly
-		// as the witness spelled it — an Essence-implemented one as its own
-		// const, a native one as a read off the runtime module, and a Choice's
-		// derived equality as the runtime helper.
+		// Through `namespaceMember`, so a devirtualised Method is spelled as
+		// its witness spelled it.
 		case "direct-method":
 			return namespaceMember(
 				node.namespaceName,
@@ -2362,10 +2359,8 @@ function rewriteIntrinsic(
 		case "direct-case":
 			return {
 				type: "ObjectExpression",
-				// The payload is spread FIRST and the tag written over it,
-				// exactly as `createCase` does — a payload Record carries the
-				// `"Record"` brand of its own, and whichever of the two is
-				// written last is the one the value ends up with.
+				// The payload is spread first and the tag written over its
+				// `"Record"` brand, as `createCase` does.
 				properties: [
 					...(node.payload === null
 						? []
@@ -2380,8 +2375,7 @@ function rewriteIntrinsic(
 				],
 			}
 		case "spread-combination":
-			// No brand of its own — the hidden Type key rides along on the
-			// spread of the left-hand side, which is a Record and carries it.
+			// The spread of the left-hand Record carries the Type key.
 			return node.rhs === null
 				? {
 						type: "ObjectExpression",
@@ -2394,10 +2388,8 @@ function rewriteIntrinsic(
 						],
 					}
 				: projectedCombination(node.lhs, node.rhs, node.rhsMembers)
-		// `options.retries ?? 3` — one member of the Record a callee
-		// rebuilds a Record-defaulted Parameter into. `??` and not `||`: `false`
-		// and `0` are values a member may legitimately hold, and only absence
-		// may reach the default.
+		// `options.retries ?? 3`, one member of a rebuilt Record default. `??`
+		// rather than `||`, since `false` and `0` are values.
 		case "member-or-default":
 			return {
 				type: "LogicalExpression",
@@ -2411,25 +2403,16 @@ function rewriteIntrinsic(
 			}
 		case "dispatch-chain":
 			return dispatchChain(node)
-		// The one place "no Argument given" is written into emitted code
-		// on purpose — the hole a call leaves where a Parameter took its
-		// default and something after it still has to be passed. It is consumed
-		// by the callee's parameter binding before the first Statement runs, so
-		// it never becomes a value.
+		// The hole a call leaves for a defaulted Parameter followed by another
+		// Argument. The callee's parameter default consumes it.
 		case "omitted-argument":
 			return omittedArgument()
-		// A walk written where it stands, wrapped in an arrow because an
-		// Expression position has nowhere to write a `while`. Where it stands in
-		// a Statement position the Optimiser lifted it to the Statement form
-		// above, and there is no arrow at all.
+		// A walk in an Expression position, wrapped in an arrow to hold its
+		// `while`. In a Statement position it is an intrinsic Statement instead.
 		case "inline-loop":
 			return inlineLoopExpression(node)
-		// A build is not an Expression that can stand anywhere: it names
-		// the Array a walk is filling, and there is no way to answer with one
-		// without saying whether the walk is finished with it. The walks that
-		// build read it where their answer is written and never reach here, so
-		// this names the Compiler rather than the reader — the Node exists only
-		// where `build-lists-in-place` put it, and it put one nowhere else.
+		// `build-lists-in-place` puts a build only where an inlined walk
+		// writes its answer, which never reaches this switch.
 		case "list-build":
 			throw new Error(
 				"Internal Compiler Error: a list build reached an ordinary Expression position — a build may only stand where an inlined walk writes its answer.",
@@ -2458,23 +2441,14 @@ function rewriteIntrinsic(
 	}
 }
 
-// A Union dispatch decided where it stands — a conditional for each case
-// that still has a question, and the call the Compiler resolved for it:
+// A Union dispatch decided in place, one conditional per tested case:
 //
 //   value[$type.typeKeySymbol] === "Shape#Circle"
 //     ? Shapes.area(value)
 //     : Shapes.area(value)
 //
-// The cases are folded back to front, so each conditional becomes the
-// `alternate` of the one before it and the first case is tested first. A case
-// with no test IS the answer from there on: it stands where the alternate would
-// have gone, and whatever the Optimiser left after it — nothing, since it drops
-// what such a case makes unreachable — goes with it.
-//
-// The chain ends in `$type.noDispatchCaseMatched()` only where the LAST
-// case still has a test, which is the same throw the runtime's own search ends
-// with. Where the Optimiser could elide that test the last call is simply the
-// alternate, and the throw is gone with the question it answered.
+// A case without a test is the answer from there on. Only a tested last case
+// falls through to `$type.noDispatchCaseMatched()`.
 function dispatchChain(
 	node: common.typedSimple.DispatchChainNode,
 ): estree.Expression {
@@ -2501,13 +2475,8 @@ function dispatchChain(
 		return answer
 	}
 
-	// The Expressions the branches read more than once, held for the
-	// length of the chain — as the Parameters of an arrow the chain is the body
-	// of, called at once with them. JavaScript evaluates a call's Arguments left
-	// to right and before the call, which is the order and the once-ness the
-	// dispatch's own Argument array had; a `let` would say the same thing and
-	// can not be said in an Expression position, which is where a Method
-	// Invocation stands.
+	// Values the branches read more than once become an arrow's Parameters,
+	// evaluated once and in order, since no `let` fits an Expression position.
 	return calledWrapper(
 		{
 			type: "ArrowFunctionExpression",
@@ -2524,14 +2493,8 @@ function dispatchChain(
 	)
 }
 
-// One branch's call — the Method the Compiler resolved for this member
-// Type, spelled through the one function every reference to a Namespace member
-// goes through, and given the receiver, the shared Arguments and this case's
-// own hidden conformance Arguments, in the order the runtime handed them over.
-// An Argument this branch overrides stands in the position it stands in for,
-// where the search wrote it into a COPY of the shared array; the copy is what
-// kept one branch's Arguments from becoming another's, and writing each branch's
-// call out is what makes it unnecessary.
+// One branch's call: the resolved Method, given the receiver, the shared
+// Arguments with this branch's overrides, and this branch's witnesses.
 function dispatchCaseCall(
 	node: common.typedSimple.DispatchChainNode,
 	dispatchCase: common.typedSimple.DispatchChainCase,
@@ -2542,10 +2505,8 @@ function dispatchCaseCall(
 		values[contextual.index] = contextual.value
 	}
 
-	// The shared list is what the call WROTE — the branches need not agree
-	// on which Parameters they leave out — so the holes are opened here, in the
-	// branch that makes the call, and after the overrides above, which stand at
-	// the positions the call wrote.
+	// Branches may leave out different Parameters, so each opens its own
+	// holes, after the overrides.
 	let written = values.map((value) => rewriteExpression(value))
 	let receiver = rewriteExpression(node.receiver)
 	let conformances = dispatchCase.conformanceArguments.map((value) =>
@@ -2573,10 +2534,8 @@ function dispatchCaseCall(
 	}
 }
 
-// `void 0` rather than the Identifier `undefined`, which is a name a
-// Program may bind: `constant undefined = 99` is legal Essence and emits a
-// `const undefined`, and every hole in that Module would then have been passed
-// its value. `void 0` is the same value under a spelling nothing can rebind.
+// `void 0` rather than `undefined`, which a Program may bind:
+// `constant undefined = 99` is legal Essence.
 function omittedArgument(): estree.UnaryExpression {
 	return {
 		type: "UnaryExpression",
@@ -2586,10 +2545,8 @@ function omittedArgument(): estree.UnaryExpression {
 	}
 }
 
-// The emitted counterpart of the Simplifier's `expandOmittedArguments`,
-// for the one Argument list the Simplifier could not build: a dispatch branch's,
-// which is assembled here because the branches share one written list and each
-// takes its own defaults out of it. Both go through `openArgumentHoles`.
+// The Simplifier's `expandOmittedArguments` for a dispatch branch, whose
+// Argument list is only assembled here.
 function openOmittedArguments(
 	leading: Array<estree.Expression>,
 	written: Array<estree.Expression>,
@@ -2617,38 +2574,18 @@ function noDispatchCaseMatched(): estree.CallExpression {
 	}
 }
 
-// The value a scalar wrapper holds — the number or bigint under an
-// Integer, the JavaScript boolean under a Boolean. Not a member the language
-// has: it is the runtime's own field, read here exactly as every runtime Method
-// reads it.
+// The runtime field a scalar wrapper holds its JavaScript value in.
 function valueRead(object: estree.Expression): estree.MemberExpression {
 	return memberRead(object, "value")
 }
 
-// `Number.MAX_SAFE_INTEGER`, written as the literal the guard below
-// compares against rather than reached for by name: `Number` is a Namespace of
-// the language, and an emitted Module that opens with `import * as Number` would
-// shadow the global this took it from. `Integer.ts` in the runtime holds the
-// same bound; `src/tests/hybridIntegers.spec.ts` holds the two to each other.
+// `Number.MAX_SAFE_INTEGER` as a literal, because emitted code imports the
+// language's `Number` Namespace over the global.
 const SAFE_INTEGER = 9007199254740991
 
-// Two Strings are equal when their CHARACTERS are, which is not what
-// `===` decides — the same accent written as one code point and as two is one
-// String — so the runtime helper that normalises decides it, and the double
-// normalisation stays in the one place that has always performed it.
-//
-// An Integer is `===` on what it holds, and THE CANONICAL INVARIANT is
-// what makes that the whole answer. An Integer holds a number while its value is
-// one a double holds exactly and a bigint beyond that, never the other way
-// round, so one mathematical Integer has exactly one representation. Two equal
-// values therefore meet as two numbers or as two bigints, where `===` is exact
-// either way; two unequal ones answer false in those pairings, and in the mixed
-// pairing `===` answers false between a number and a bigint without comparing —
-// which is right, because a mixed pairing can only be values whose magnitudes
-// put them on opposite sides of safe range. Every construction site canonicalises
-// (`Integer.createInteger` is the one place it happens), so the invariant is what
-// this site depends on and what `runtime/src/tests/hybridIntegers.spec.ts` is
-// there to keep true.
+// Integers compare with `===`, which the canonical invariant makes exact.
+// Strings go through the normalising runtime helper. See "Hybrid Integers" in
+// DEVELOPMENT.md.
 function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 	if (node.scalar === "Integer") {
 		return {
@@ -2682,39 +2619,9 @@ function rawEquals(node: common.typedSimple.RawEqualsNode): estree.Expression {
 		: equals
 }
 
-// The three exact operations, written INLINE around a guard rather than as
-// a call — a call is what `lower-scalar-operations` took this site away from,
-// and putting one back would give the saving away.
-//
-// A hybrid Integer holds a number or a bigint, and JavaScript's `+`, `-`
-// and `*` THROW on a mix of the two, so the two operands have to be known to be
-// numbers before they meet. That is asked with `typeof` rather than with the
-// range test the canonical invariant would also allow: the two decide the same
-// question, but a range test compares a bigint against a double, which is a real
-// comparison and measured ~10ns a side, while `typeof` is a tag read. On values
-// that HAVE escaped — where the guard exists only to be refused — the range test
-// cost 21ns a turn against 0.3, and it bought about 1ns a turn on values that had
-// not.
-//
-// The ANSWER is then checked against safe range, which is what keeps the
-// result canonical, and the check is EXACT rather than a conservative
-// approximation. IEEE 754 `+`, `-` and `*` are correctly rounded, so the double
-// answer is the nearest double to the true result. Rounding is monotone and 2⁵³
-// is itself a double, so a true result of magnitude ≥ 2⁵³ can only round to a
-// double of magnitude ≥ 2⁵³ and fails the check; a true result inside safe range
-// is exactly representable and rounds to itself. The check therefore passes
-// exactly when the double IS the true result. Multiplication is the case worth
-// stating: two factors well inside safe range can have a product far outside it,
-// and the rounded product can not sneak back INSIDE — which is why the operands
-// need no bound of their own beyond being numbers at all.
-//
-// The escape arm hands the two RAW values to the runtime, which redoes the
-// guard and falls to bigint. It is reached by an operation that left safe range
-// and by one whose operands had already left it, and both are cold.
-//
-// Every operand here is read through `unboxedInteger` rather than through
-// `valueRead` — `unboxed-operand`, which is what keeps a CHAIN from building the
-// Integer its next operation immediately takes apart.
+// `+`, `-` and `*` inline: both operands held as numbers and the answer in
+// the safe range, or else the runtime's bigint path. See "Hybrid Integers" in
+// DEVELOPMENT.md.
 function rawArithmetic(
 	node: common.typedSimple.RawArithmeticNode,
 ): estree.Expression {
@@ -2730,10 +2637,8 @@ function rawArithmetic(
 		arguments: [unboxedInteger(left), unboxedInteger(right)],
 	}
 
-	// The guard reads each operand twice and the answer three times, so
-	// an operand it can not read twice — anything with a call in it — is handed
-	// to the runtime whole instead. What is left is what the hot sites are: a
-	// name, a Record member, a pooled constant.
+	// The guard reads each operand more than once, so an operand that can
+	// not be repeated goes to the runtime whole.
 	if (!isRepeatable(left) || !isRepeatable(right)) {
 		return escaped
 	}
@@ -2759,11 +2664,8 @@ function rawArithmetic(
 	}
 }
 
-// An Integer around a value, written as the object the runtime's own
-// constructor would have built. Reached only where the value is already
-// canonical — the guard above IS what establishes that — so nothing here
-// converts, and `Integer.createInteger` is what a value nothing is known about
-// goes through instead.
+// An Integer around a value already known to be canonical, built as the
+// runtime's constructor would build it.
 function boxedInteger(value: estree.Expression): estree.ObjectExpression {
 	return {
 		type: "ObjectExpression",
@@ -2782,17 +2684,9 @@ function boxedInteger(value: estree.Expression): estree.ObjectExpression {
 	}
 }
 
-// The Integer a walk builds where it ANSWERS, remembered by identity so
-// that a walk nested in another does not build one only for the enclosing walk
-// to take it apart on the same line. Its argument is a value the raw slot's own
-// invariant has already made canonical, which is what makes taking it apart the
-// identity.
-//
-// By IDENTITY and not by shape, which is the whole reason this exists.
-// `Integer.createInteger` is also how a counted walk boxes its index, and that
-// index is a bigint spelling of a value a double holds exactly wherever the
-// bounds straddle safe range — a call recognised by its shape would strip the
-// canonicalisation that site is there to perform.
+// The Integers walks build where they answer, by identity, so an enclosing
+// walk can read the value without the box. See "Hybrid Integers" in
+// DEVELOPMENT.md.
 const exitBoxes = new WeakMap<estree.Expression, estree.Expression>()
 
 function exitBox(value: estree.Expression): estree.Expression {
@@ -2803,23 +2697,8 @@ function exitBox(value: estree.Expression): estree.Expression {
 	return box
 }
 
-// One Integer-valued Expression, read as the VALUE it holds. Written as a
-// rewrite of the finished JavaScript rather than as a second emission mode,
-// because what decides whether a slot is unboxed at all is a question about the
-// emitted body — see `heldRaw` — and the answer is not known until that body
-// exists. The text is the text either way.
-//
-// A guarded arithmetic is read through both of its arms: the box the
-// guarded arm would have built is never written, and the escaped arm reads the
-// value off the Integer the runtime built. Both arms are values of one Integer,
-// so reading both is the same rewrite twice. Anything else — a name, a call, a
-// member — is read through as it stands.
-//
-// Every site that reads an Integer for its value reads it through here and
-// not through `valueRead`: the operands of an operation that escaped, the two
-// sides of a comparison, the two sides of an equality, and the value a raw slot
-// takes. `valueRead` is what is left where the Expression is not an Integer or
-// where the read is the runtime's own — a Boolean's, a List's count, a bound.
+// One Integer-valued Expression read for the value it holds, through both
+// arms of a guarded arithmetic. See "Hybrid Integers" in DEVELOPMENT.md.
 function unboxedInteger(value: estree.Expression): estree.Expression {
 	let held = exitBoxes.get(value)
 
@@ -2843,12 +2722,7 @@ function unboxedInteger(value: estree.Expression): estree.Expression {
 	return valueRead(value)
 }
 
-// The value an emitted Integer LITERAL holds, and null for everything
-// else. `boxedInteger` above is the one site that writes this shape, and the
-// test is what it wrote: the hidden Type key answering `"Integer"` and one
-// member named `value`. It can not answer yes for anything that is not an
-// Integer — nothing else in the language carries that Type key — so a caller
-// reading BOTH arms of a Conditional through it reads two Integers.
+// The value inside an Integer object `boxedInteger` wrote, or null.
 function boxedValue(node: estree.Expression): estree.Expression | null {
 	if (node.type !== "ObjectExpression" || node.properties.length !== 2) {
 		return null
@@ -2868,26 +2742,18 @@ function boxedValue(node: estree.Expression): estree.Expression | null {
 		return null
 	}
 
-	// A Property's value is an Expression or a Pattern, and only a
-	// destructuring writes the latter — this one was written by `boxedInteger`,
-	// out of an Expression.
+	// `boxedInteger` wrote an Expression here, never a Pattern.
 	return held.value as estree.Expression
 }
 
-// The runtime entry each operator escapes to. Each takes the two raw
-// values, not the Integers around them — the guard already read them, and
-// neither side wants an Integer built to be taken apart again.
+// The runtime entry each operator escapes to, taking the two raw values.
 const escapedArithmetic: Record<"+" | "-" | "*", string> = {
 	"+": "sum",
 	"-": "difference",
 	"*": "product",
 }
 
-// Which of its two representations a value an Integer holds is in — the
-// one question about a hybrid Integer that a comparison can not ask, since `<`
-// and `>` read both alike. Asked here as the tag read it is rather than as the
-// range test the canonical invariant would also answer it with, because that
-// test compares a bigint against a double whenever the answer is `false`.
+// Which representation an Integer's value is in, asked with `typeof`.
 function heldAsNumber(value: estree.Expression): estree.Expression {
 	return typeIs(value, "===")
 }
@@ -2932,9 +2798,8 @@ function withinSafeRange(
 	]
 }
 
-// A JavaScript number as a literal expression. JavaScript has no negative
-// numeric literal — `-1` is a negation of `1`, and the emitter says so by
-// refusing one — so a negative value is written as the negation it is.
+// A number as a literal. The emitter refuses a negative literal, so a
+// negative value is written as a negation.
 function numberLiteral(value: number): estree.Expression {
 	return value < 0
 		? {
@@ -2955,12 +2820,8 @@ function allOf(tests: Array<estree.Expression>): estree.Expression {
 	}))
 }
 
-// Whether an emitted expression may be written into the output more than
-// once. A name and a chain of plain member reads over one are: every value the
-// Rewriter emits is a plain object, there are no accessors anywhere in the
-// runtime or in what a Program can build, so reading `state.total.value` twice
-// costs two loads and observes nothing. Everything else — a call above all — is
-// evaluated once and once only.
+// Whether an emitted Expression may be written more than once: a literal, a
+// name, or plain member reads over one, since emitted values have no accessors.
 function isRepeatable(node: estree.Expression): boolean {
 	switch (node.type) {
 		case "Identifier":
@@ -2978,11 +2839,8 @@ function isRepeatable(node: estree.Expression): boolean {
 	}
 }
 
-// The hidden Type key every runtime value carries, as emitted code
-// reaches it: `$type.typeKeySymbol`, off the module alias every Program already
-// imports. It is a Symbol, so it is invisible to `Object.keys` — which is what
-// Record equality, the printer and the runtime Type checks read with — and a
-// value branded here is indistinguishable from one the runtime branded.
+// The hidden Type key every runtime value carries. It is a Symbol, so
+// `Object.keys` does not see it.
 function typeKey(): estree.MemberExpression {
 	return memberRead({ type: "Identifier", name: "$type" }, "typeKeySymbol")
 }
@@ -2999,20 +2857,9 @@ function typeKeyProperty(tag: string): estree.Property {
 	}
 }
 
-// The same key, read off a value — what the runtime's own Type checks ask
-// and what a `tag-test` is.
-//
-// `optional` makes it `?.[…]`, for the one reader that asks about a value
-// which may not be there at all: a Record Matcher is open, so a member it names
-// can be missing from a value that reaches the test, and a read of a missing
-// member is `undefined`. Optional chaining answers `undefined` for it instead of
-// throwing, and `undefined` equals no tag.
-//
-// And it is WRAPPED, because an optional read is a `ChainExpression` in
-// ESTree and a bare `MemberExpression` carrying `optional` is not a tree the
-// grammar has — the chain is the Node that says where the short circuit stops.
-// It prints the same either way, so this is the shape being right rather than
-// the output changing.
+// The Type key read off a value. `optional` reads `?.[…]`, for a member an
+// open Record Matcher names that may be missing; ESTree wraps it in a
+// `ChainExpression`.
 function typeKeyRead(
 	object: estree.Expression,
 	optional = false,
@@ -3028,10 +2875,7 @@ function typeKeyRead(
 	return optional ? { type: "ChainExpression", expression: read } : read
 }
 
-// Member names go through the same `memberKey` quoting every other
-// emitted Record member does — an Essence name JavaScript can not spell becomes
-// a string key, and the read of it agrees because both positions ask this one
-// question.
+// Member names go through `memberKey`, like every emitted Record member.
 function memberProperties(
 	members: Record<string, common.typedSimple.ExpressionNode>,
 ): Array<estree.Property> {
@@ -3046,10 +2890,8 @@ function memberProperties(
 	}))
 }
 
-// A Case is its payload Record with a nominal tag riding along on the
-// hidden Type key — `$type.createCase` copies the payload and stamps the tag,
-// which is what lets `@.left`-style member access work on the Case value
-// directly.
+// A Case is its payload Record with the tag on the hidden Type key, so
+// `@.left` reads the payload directly.
 function rewriteCaseValue(
 	node: common.typedSimple.CaseValueNode,
 ): estree.CallExpression {
