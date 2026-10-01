@@ -3890,17 +3890,9 @@ function assertionNode(
 		: { nodeType, value, matcher, snapshot, position }
 }
 
-// The one Parameter a table test should have, spelled out of the rows the
-// reader WROTE. `Row` was an invented Type — a name nothing in the file declares
-// — and a reader who wrote it back was answered with `unknown-type 'Row'`; the
-// last such name among the Helps this Compiler prints.
-//
-// The first row's Type is the row Type: every row is measured against the same
-// Parameter, so one of them says what that Parameter takes. Refinements come off
-// it — `[1, 2]` proves each item is a NonZeroInteger, which is a fact about the
-// rows rather than about what the Parameter has to admit — and a Record row also
-// says what taking it apart would bind. Where the rows say nothing usable, the
-// spelling is a schematic and says so.
+// The one Parameter a table test should have, spelled from the rows the reader
+// wrote. The first row's Type, with refinements erased, is the row Type. A
+// Record row also shows the Pattern that takes it apart.
 function oneRowParameterHelp(rows: Array<common.typed.ExpressionNode>): string {
 	let first = rows[0]
 	let rowType =
@@ -3923,11 +3915,8 @@ function oneRowParameterHelp(rows: Array<common.typed.ExpressionNode>): string {
 	).join(", ")} }: ${spelled})'.`
 }
 
-// The Parameter list as the reader wrote it, for the Help that asks them
-// to write the ROWS — what is missing there is the List, and handing back their
-// own '(number: Integer)' says so without inventing anything. A schematic where
-// the Parameter has no written Type, which is the one thing this can not read
-// off the source.
+// The Parameter list as the reader wrote it, for the Help that asks for the
+// rows. A schematic `<Type>` where the Parameter has no written Type.
 function rowParameterSpelling(
 	node: parser.TestTableNode,
 	declaredType: common.Type | null,
@@ -3943,42 +3932,25 @@ function rowParameterSpelling(
 		: `(${name}: ${describeType(declaredType)})`
 }
 
-// `across [ … ] (row: Row)` — the rows a table test runs for, and the one
-// name the body reads a row under.
-//
-// The rows are WRITTEN, not worked out: a table test is N tests before anything
-// runs, each carrying its row index in its identity, and a List a run produces
-// could not be numbered at compile time. They are read against what the
-// Parameter declared, which is what lets a bare Case stand in a row.
-//
-// A Pattern Parameter desugars exactly as a Pattern Declaration does: the row
-// is bound to a Compiler name, and one Constant per binding reads its way down
-// it. Those Constants stand on the table rather than at the head of the body,
-// because the NAME reads them too.
+// `across [ … ] (row: Row)`: the rows a table test runs for and the name the
+// body reads a row under. The rows must be written, since each is a test
+// numbered at compile time. A Pattern Parameter's Constants stand on the table,
+// since the test's name reads them too.
 export function enrichTestTable(
 	node: parser.TestTableNode,
 	scope: enricher.Scope,
 	bodyScope: enricher.Scope,
-	// Whether the test carrying this table is SKIPPED, which is the one
-	// thing about the enclosing item a table needs to know: an empty table is
-	// reported because nothing would say the test had stopped running, and a
-	// `skipped "…"` is exactly the reader saying it out loud.
+	// Whether the test is skipped. An empty table is reported unless `skipped
+	// "…"` already says why.
 	skipped: boolean = false,
-	// Whether the test's NAME reads a row, which decides one clause of
-	// the row mismatch Help below: a widened row Parameter has to stay Printable
-	// where the name interpolates it, and a reader who widens without knowing
-	// that lands on `interpolation-not-printable` pointing at the name.
+	// Whether the test's name reads a row, so the row mismatch Help can say a
+	// widened row Type must stay Printable.
 	nameReadsTheRow: boolean = false,
 ): common.typed.TestTableNode {
 	let parameter = node.parameters[0]
 
-	// Null where the Parameter list was just refused, which silences the
-	// row check with it. A table that names two Parameters has no row Type: the
-	// FIRST of them is not it, and measuring every row against that one reported
-	// `table-row-type-mismatch` about a Type the reader never wrote for the row
-	// — one mistake, said twice, the second time in words about the first
-	// Parameter's Type. One report, and the row Types are read once the list
-	// says which Parameter is the row.
+	// Null where the Parameter list is refused, which silences the row check. A
+	// table naming two Parameters has no row Type.
 	let declaredType =
 		node.parameters.length !== 1 ||
 		parameter?.type === undefined ||
@@ -3994,11 +3966,8 @@ export function enrichTestTable(
 		rowParameterSpelling(node, declaredType),
 	)
 
-	// Reported once the rows have been read, because the rows are where
-	// the Help gets the row's TYPE from — a table naming two Parameters has
-	// declared none, and the Help used to invent one. The rows themselves report
-	// nothing extra here: a Parameter list this refuses leaves `declaredType`
-	// null, which is what a row is measured against.
+	// Reported after the rows are read, because the Help spells the row's Type
+	// from them.
 	if (node.parameters.length !== 1) {
 		reportError(
 			node.parameters.length === 0
@@ -4023,11 +3992,8 @@ export function enrichTestTable(
 			},
 		)
 	}
-	// And Error for the bindings where the list was refused, which is what
-	// every other dropped Declaration binds. Reading the row Type off the rows
-	// there only moved the report: the two names bound whatever the rows held,
-	// and the body's calls refused THEM instead — two reports about the Argument
-	// Types in place of one about the Parameter list.
+	// Error for the bindings where the list was refused, as for any dropped
+	// Declaration, so the body's calls do not report again.
 	let type =
 		node.parameters.length !== 1
 			? ({ type: "Error" } as const)
@@ -4052,11 +4018,8 @@ export function enrichTestTable(
 		true,
 	)
 
-	// A table that named several Parameters has already been reported,
-	// and the rest of them are declared anyway — every one of them binds the
-	// row. What the body says about them is wrong in the same way the
-	// Parameter list is, and a cascade of "unknown name" underneath the one
-	// Diagnostic that explains it would say nothing further.
+	// The extra Parameters of a refused list are declared too, binding the row,
+	// so no unknown names cascade under the one report.
 	for (let extra of node.parameters.slice(1)) {
 		if (extra.internalName?.nodeType === "Identifier") {
 			declareVariableInScope(extra.internalName, type, bodyScope, true)
@@ -4082,31 +4045,21 @@ export function enrichTestTable(
 	}
 }
 
-// The items of the written List, each read against what the Parameter
-// declared. A value that is no written List has no rows at all — reported, and
-// answered with none, so the body is still enriched and still reports whatever
-// else it says.
+// The items of the written List, each read against the declared Type. A value
+// that is no written List is reported and has no rows, and the body is still
+// enriched.
 function enrichTableRows(
 	node: parser.ExpressionNode,
 	declaredType: common.Type | null,
 	scope: enricher.Scope,
 	skipped: boolean,
 	nameReadsTheRow: boolean,
-	// The Parameter list written after the rows, spelled back into the
-	// Help that asks for the rows — see `rowParameterSpelling`.
+	// The Parameter list written after the rows; see `rowParameterSpelling`.
 	parameterSpelling: string = "(row: <Type>)",
 ): Array<common.typed.ExpressionNode> {
 	if (node.nodeType === "ListValue") {
-		// No rows is no tests, and a test that never exists is exactly
-		// what `skipped "reason"` demands a reason for. Nothing in a report
-		// says it: no line, no count, no failure — the test is simply not
-		// there, and a reader who wrote it believes it ran.
-		//
-		// Which is why a test that IS skipped is left alone. The Help
-		// below asks for a `skipped "…"`, and a reader who wrote one had it
-		// reported right back at them — the modifier was never read here. A
-		// skipped test running no rows is a reader who said so, and the reason
-		// they wrote is the line a report does carry.
+		// No rows is no tests, and nothing in a report would show it. A skipped
+		// test is left alone, since its reason is what the report shows.
 		if (node.values.length === 0 && !skipped) {
 			reportError(
 				"A table test with no rows in it runs no test",
@@ -4127,21 +4080,10 @@ function enrichTableRows(
 		return node.values.map((value) => {
 			let row = enrichExpression(value, scope, declaredType)
 
-			// The one place a row is ever checked. A row is neither an
-			// Argument nor a Declaration, so nothing else holds it to anything —
-			// the declared Type reaches `enrichExpression` as a HINT, which only
-			// ever resolves a bare Case and refuses nothing. A row that slipped
-			// through reached the runtime under a Type it does not have: the body
-			// read it as the Parameter declared, and an interpolated name printed
-			// it that way before the body ever ran.
-			//
-			// Asked as `fitsWritten` rather than as `matchesType`, because
-			// a row is WRITTEN where it stands and carries the evidence of a
-			// written value: `across [1, 2] (n: NonZeroInteger)` decides the
-			// predicate on each row while compiling, exactly as the identical
-			// Argument or Declaration does. Assignability alone can not see
-			// that, and a row Parameter carrying a refinement would refuse every
-			// row a reader could write.
+			// The one place a row is checked. The declared Type only hints to
+			// `enrichExpression`, which refuses nothing. `fitsWritten` reads a
+			// written row's evidence, so `across [1, 2] (n: NonZeroInteger)`
+			// decides each predicate.
 			if (
 				declaredType !== null &&
 				!typeContainsError(declaredType) &&
@@ -4173,9 +4115,7 @@ function enrichTableRows(
 	return []
 }
 
-// Reported once per row rather than once per table, because every row is
-// a test of its own — a reader fixes the row that is wrong, and a table of forty
-// says which one that is.
+// Reported once per row, since every row is a test of its own.
 function reportRowTypeMismatch(
 	row: common.typed.ExpressionNode,
 	declaredType: common.Type,
@@ -4219,11 +4159,9 @@ function reportRowTypeMismatch(
 	)
 }
 
-// `for any (a: Integer, b: NonEmptyList<String>)` — the Parameters a
-// property test generates a value of, once per case. Every one of them writes
-// a Type, because the Type is the whole of what says what to generate, and
-// every one of them writes a NAME rather than a Pattern, because a shrunk
-// counterexample is reported beside the name it was generated for.
+// `for any (a: Integer, b: NonEmptyList<String>)`: the Parameters a property
+// test generates per case. Each writes a Type, which says what to generate, and
+// a name, which a shrunk counterexample is reported beside.
 export function enrichTestProperties(
 	node: parser.TestPropertiesNode,
 	scope: enricher.Scope,
@@ -4267,9 +4205,8 @@ function enrichTestProperty(
 		)
 	}
 
-	// `a: Integer` records one Identifier as both names — the label and
-	// the name are the same word — so a LABEL is two words that differ, which
-	// is what this refuses.
+	// `a: Integer` records one Identifier as both names, so a label is two
+	// different words.
 	if (
 		parameter.externalName !== null &&
 		parameter.internalName?.nodeType === "Identifier" &&
@@ -4293,11 +4230,9 @@ function enrichTestProperty(
 		)
 	}
 
-	// A Parameter with no Type is still BOUND, to the Error Type every
-	// unanswerable Type resolves to — so the body underneath reports what IT
-	// says rather than a cascade of "unknown name" about a Parameter that was
-	// reported already. The table path binds an unreadable Parameter for the
-	// same reason.
+	// A Parameter without a Type is still bound, to an Error, so the body does
+	// not cascade unknown names. A table binds an unreadable Parameter
+	// likewise.
 	let type: common.Type =
 		parameter.type === null
 			? { type: "Error" }
@@ -4311,11 +4246,8 @@ function enrichTestProperty(
 	)
 
 	if (parameter.type === null) {
-		// `for any (Integer)` is a reader who wrote the TYPE and left the
-		// name out — the Parser reads the one word written as the name, so the
-		// Help would otherwise ask for 'for any (Integer: Integer)', which names
-		// a Parameter after a builtin. What the name resolves to is what says
-		// which of the two halves is missing.
+		// `for any (Integer)` is read with `Integer` as the name. Whether that
+		// name resolves to a Type says which half is missing.
 		let wroteAType = findTypeInScope(name, scope) !== null
 
 		reportPropertyParameters(
@@ -4341,11 +4273,8 @@ function enrichTestProperty(
 		nodeType: "TestProperty",
 		name,
 		type,
-		// The placeholder stands where a Diagnostic has already been
-		// reported, and a Program carrying one never reaches emission — so what
-		// it generates is never asked for. It is a Boolean rather than nothing
-		// so the Parameter keeps its place, and the body underneath reports
-		// what IT says rather than a cascade about a Parameter that vanished.
+		// The placeholder stands where a Diagnostic was reported, so it is
+		// never emitted. A Boolean keeps the Parameter in place for the body.
 		generator: deriveGenerator(
 			type,
 			scope,
@@ -4359,13 +4288,9 @@ function enrichTestProperty(
 	}
 }
 
-// The name a `Generatable` conformance could be declared under, or null
-// where nothing could. A Namespace targets a Type the source can NAME, so the
-// Parameter has to have written one — `for any (h: Handler)` and not
-// `for any (h: { read: (_: String) -> Integer })`, which has no name to write
-// `for` — and the Type it names has to be one a value is BUILT of: a Record to
-// fill member by member, or a Choice to pick a Case of. Everything else has no
-// shape a generator could be written against.
+// The name a `Generatable` conformance could be declared under, or null. A
+// Namespace targets a named Type, and only a Record or a Choice has a shape a
+// generator can be written against.
 function conformableTypeName(
 	written: parser.TypeDeclarationNode,
 	type: common.Type,
@@ -4380,9 +4305,8 @@ function conformableTypeName(
 	return type.type === "Record" || isChoice ? written.type.content : null
 }
 
-// The Parameter's own name as an Identifier Node rather than as a bare
-// string: a Diagnostic about a name declared twice underlines WHERE, and rename
-// and go-to-definition read the same table.
+// An Identifier Node rather than a string, so a duplicate declaration, rename
+// and go-to-definition have a position.
 function binding(
 	name: string,
 	position: common.Position,
@@ -4405,24 +4329,16 @@ function reportPropertyParameters(
 	})
 }
 
-// THE derivation: what to draw a value of one Type from. A Namespace's
-// own `Generatable` conformance is asked first, because a Type whose values
-// carry an invariant no structure can state is exactly what a conformance is
-// for; everything else is read off the Type itself.
-//
-// `enclosing` is the Choices already being derived, which is what refuses a
-// Type that contains itself: a descriptor is finite data, and a Choice naming
-// itself in a payload would be an infinite one.
+// What to draw a value of one Type from. A Namespace's own `Generatable`
+// conformance comes first, for invariants no structure states. `enclosing`
+// holds the Choices being derived, refusing a Choice that contains itself.
 export function deriveGenerator(
 	type: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
 	enclosing: Array<string>,
-	// The Type a `Generatable` conformance would be DECLARED for, which
-	// is the Parameter's own Type as the source wrote it — never the Type the
-	// walk below tripped over, which may be a member three levels inside it.
-	// It rides along unchanged, the way `position` does: what a refusal has to
-	// name is the Type the reader can do something about.
+	// The Parameter's own Type as written, which a `Generatable` conformance
+	// would be declared for, rather than a nested member the walk refused.
 	declared: string | null = null,
 ): common.typed.TestGenerator | null {
 	let conformance = generatableConformance(type, scope, position)
@@ -4451,8 +4367,7 @@ export function deriveGenerator(
 
 			return item === null ? null : { kind: "list", item }
 		}
-		// A List nothing applied a Type Argument to. Its items are
-		// whatever a Type Parameter admits, which is the ladder below.
+		// A List with no Type Argument holds what a Type Parameter admits.
 		case "GenericList":
 			return { kind: "list", item: anyValueGenerator() }
 		case "Dictionary": {
@@ -4476,26 +4391,16 @@ export function deriveGenerator(
 				declared,
 			)
 
-			// Both slots or nothing — a Dictionary whose values can not be
-			// built is no more generatable than one whose keys can not be, and
-			// the refusal was already reported by whichever half answered null.
+			// Both slots or nothing; the half that answered null already
+			// reported.
 			if (value === null) {
 				return null
 			}
 
-			// The key Type's OWN Equatable, resolved here exactly as a
-			// written `Dictionary.of` resolves it at its call site — which is
-			// what makes a drawn Dictionary hold the keys a Program would call
-			// distinct, rather than the ones a universal comparison would. A
-			// Namespace writing its own `is` is the whole reason this has to
-			// travel: `namespace Tags for Tag is Equatable` says two Tags with
-			// one `name` are ONE key, and a plan without the witness draws two.
-			//
-			// A witness a Type PARAMETER carries is not one of these. It is a
-			// name bound at a call site, and a generator is emitted in the tests
-			// section where no such name stands — so the plan carries nothing
-			// and the runtime's universal comparison stands in, which is what a
-			// Type Parameter's ladder of drawn values wants anyway.
+			// The key Type's own Equatable, so a drawn Dictionary holds the
+			// keys the Program calls distinct. A witness from a Type Parameter
+			// is not carried, since no binding of it exists in the tests
+			// section.
 			let keyConformance = equatableKeyConformance(
 				type.keyType,
 				scope,
@@ -4512,20 +4417,16 @@ export function deriveGenerator(
 					: { keyConformance }),
 			}
 		}
-		// A Dictionary nothing applied Type Arguments to — both slots are
-		// whatever a Type Parameter admits, for the reason a bare List's items
-		// are.
+		// Both slots of a Dictionary with no Type Arguments hold what a Type
+		// Parameter admits.
 		case "GenericDictionary":
 			return {
 				kind: "dictionary",
 				key: anyValueGenerator(),
 				value: anyValueGenerator(),
 			}
-		// A Type Parameter, which stands for whatever a use site
-		// instantiates it with. The ladder is what the design asks for: a
-		// generic instantiates over an Integer, a String and a small Record,
-		// which between them exercise a scalar, a sequence of characters and a
-		// structure.
+		// A Type Parameter draws an Integer, a String and a small Record, which
+		// exercise a scalar, a sequence and a structure.
 		case "GenericUse":
 			return anyValueGenerator()
 		case "Record": {
@@ -4585,9 +4486,7 @@ export function deriveGenerator(
 		}
 		case "Refinement":
 			return refinedGenerator(type, scope, position, enclosing, declared)
-		// An Error Type has already been reported by whatever produced
-		// it, and a second Diagnostic about the same Parameter would say
-		// nothing further.
+		// An Error Type has already been reported.
 		case "Error":
 			return null
 		default:
@@ -4600,8 +4499,8 @@ export function deriveGenerator(
 	}
 }
 
-// What a Type Parameter admits, and what a bare `List`'s items are: an
-// Integer, a String, and a Record small enough to read in a counterexample.
+// What a Type Parameter admits: an Integer, a String, and a Record small enough
+// to read in a counterexample.
 function anyValueGenerator(): common.typed.TestGenerator {
 	return {
 		kind: "union",
@@ -4647,12 +4546,8 @@ function deriveMembers(
 	return derived
 }
 
-// A checked refinement. Every conjunct is answered in one of two ways: a
-// recognised one NARROWS the generator, so the values drawn hold it by
-// construction, and anything else is enriched as the check an author could have
-// written and used as a filter. A conjunct that is neither is refused rather
-// than ignored — generating a value the Type says is impossible would make
-// every property test over it a report about the generator.
+// A checked refinement. A recognised conjunct narrows the generator, any other
+// is enriched as a filter check, and a conjunct that is neither is refused.
 function refinedGenerator(
 	type: common.RefinementType,
 	scope: enricher.Scope,
@@ -4678,10 +4573,9 @@ function refinedGenerator(
 		let check = predicateCheck(conjunct, type, binding, scope, position)
 
 		if (check === null) {
-			// A refinement names ITSELF as what to declare a conformance
-			// for, whatever Parameter it was reached through: the predicate is
-			// the refinement's, and a conformance on the base Type would draw
-			// values the refinement calls impossible.
+			// A refinement names itself as what to declare a conformance for,
+			// since a conformance on the base would draw values the predicate
+			// refuses.
 			return refuseUngeneratableType(
 				type,
 				position,
@@ -4705,25 +4599,11 @@ function refinedGenerator(
 	}
 }
 
-// The predicates a generator can hold BY CONSTRUCTION, which is every one
-// the standard library writes and the obvious neighbours of each. A refinement's
-// base is an Integer, a Rational, a String or a List and nothing else, so this
-// table is bounded by the language rather than by what anybody has thought of.
-//
-// The bounds read below are Integer DIGITS, so a Rational conjunct falls
-// through to `false` and its check is enriched rather than built in. A
-// generator that draws a Rational satisfying `@::isNot(0/1)` by construction is
-// worth writing; nobody has weighed it, and until somebody does the drawn
-// values are filtered instead.
-//
-// Answering `true` means the narrowing now holds the conjunct entirely: no
-// check is enriched for it and no value that fails it is ever drawn.
-//
-// The rows are the PRIMITIVES, and each is read in both polarities. A
-// conjunct arrives resolved — `isZero` is `is(0)`, `isNot` is `is` negated,
-// `hasItems` is `isEmpty` negated, `isGreaterThanOrEqualTo` is `isLessThan`
-// negated — so a table naming the written spellings would have half its rows
-// unreachable and the other half doing the same work twice.
+// The predicates a generator holds by construction. A conjunct arrives
+// resolved, so `isZero` is `is(0)` and `hasItems` is `isEmpty` negated, and
+// each primitive row reads both polarities. Rational bounds are not built in
+// and are filtered. Answering `true` means the narrowing holds the conjunct
+// entirely.
 function narrowedBy(
 	conjunct: common.PredicateConjunct,
 	base: common.Type,
@@ -4733,11 +4613,8 @@ function narrowedBy(
 	let whole =
 		typeof digits === "string" && /^-?\d+$/.test(digits) ? digits : null
 
-	// The NAMESPACE has to be the base's own. A Program may perfectly
-	// well declare `namespace Weird for Integer { isPositive() … }` and mean
-	// something else by the word — reading the name alone would narrow a
-	// generator by a promise nobody made, and the check that would have caught
-	// it is dropped exactly where a narrowing is taken.
+	// The Namespace must be the base's own, since a Program's own `isPositive`
+	// on Integer may mean something else.
 	if (conjunct.namespaceName !== base.type) {
 		return false
 	}
@@ -4769,11 +4646,8 @@ function narrowedBy(
 		}
 	}
 
-	// A Dictionary is counted in ENTRIES rather than items or characters,
-	// and `minimumLength`/`maximumLength` say exactly that about it — the field
-	// names are the narrowing's, and what a length is belongs to the Type. This
-	// is what lets `NonEmptyDictionary` draw a Dictionary that holds something
-	// rather than draw and throw away.
+	// A Dictionary's length counts entries, so `NonEmptyDictionary` draws a
+	// Dictionary that holds something.
 	if (
 		(base.type === "List" ||
 			base.type === "String" ||
@@ -4820,15 +4694,10 @@ function step(digits: string, by: bigint): string {
 	return (BigInt(digits) + by).toString()
 }
 
-// A conjunct as the Boolean Expression an author could have written about
-// the value — `<candidate>::isEven()`. It is enriched HERE, where the property
-// test stands, so it resolves through the Scope the test can see and is emitted
-// in the Module the test is in; a predicate rebuilt anywhere else could name a
-// Namespace the emitted JavaScript does not bind.
-//
-// The Diagnostics are collected and DROPPED: a conjunct this can not rebuild is
-// answered with null, and the refusal is reported once, about the Type, rather
-// than as a puzzle about a call nobody wrote.
+// A conjunct as the Boolean Expression an author could write, such as
+// `<candidate>::isEven()`. It is enriched where the test stands, so it resolves
+// and is emitted in the test's Module. Its Diagnostics are dropped, and the
+// Type is refused once instead.
 export function predicateCheck(
 	conjunct: common.PredicateConjunct,
 	refinement: common.RefinementType,
@@ -4836,21 +4705,17 @@ export function predicateCheck(
 	scope: enricher.Scope,
 	position: common.Position,
 ): common.typed.ExpressionNode | null {
-	// The candidate is typed as the refinement's BASE rather than as the
-	// refinement: what the check answers is whether a drawn value has earned the
-	// refinement, and typing it as one already would make the question answered.
+	// Typed as the refinement's base, since the check asks whether a drawn
+	// value has earned the refinement.
 	let checkScope = childScope(scope, {
 		members: { [binding]: refinement.base },
 		declarations: { [binding]: position },
 		constants: new Set([binding]),
 	})
 
-	// Every entry of the Method is tried, in order, because a conjunct
-	// names no Overload — the Arguments are what tell two entries apart, and
-	// they are stable scalars rather than Types. So the signatures are read for
-	// what they can offer, an Argument LABEL and the Type each scalar was
-	// written as, and the one that rebuilds into a call this Scope accepts is
-	// the one that was meant. A wrong guess does not typecheck.
+	// A conjunct names no Overload, so every entry of the Method is tried in
+	// order. The one that rebuilds into a call this Scope accepts is the one
+	// meant.
 	for (let signature of predicateSignatures(conjunct, scope)) {
 		let call = predicateCall(
 			conjunct,
@@ -4879,8 +4744,8 @@ export function predicateCheck(
 	return null
 }
 
-// One conjunct rebuilt against one candidate signature, or null where the
-// scalars it keeps are not the Types that signature takes.
+// One conjunct rebuilt against one signature, or null where its scalars do not
+// fit the signature's Types.
 function predicateCall(
 	conjunct: common.PredicateConjunct,
 	signature: common.BaseFunction,
@@ -4888,10 +4753,8 @@ function predicateCall(
 	binding: string,
 	position: common.Position,
 ): parser.MethodInvocationNode | null {
-	// The Parameters the ARGUMENTS stand for. A Method's own signature
-	// carries its receiver first, and a Protocol's carries it too, so a
-	// signature that has one more Parameter than the conjunct has Arguments is
-	// one whose first Parameter is the value itself.
+	// The Parameters the Arguments stand for. A signature with one more
+	// Parameter than the conjunct has Arguments carries the receiver first.
 	let parameters =
 		signature.parameterTypes.length === conjunct.args.length + 1
 			? signature.parameterTypes.slice(1)
@@ -4926,11 +4789,8 @@ function predicateCall(
 			content: conjunct.methodName,
 			position,
 		},
-		// The Namespace the predicate was RESOLVED to when the refinement
-		// was declared, written out. Two Namespaces may answer one Method name
-		// for one Type — a Program declaring `namespace Weird for Integer` is
-		// exactly that — and a call that named neither would be ambiguous where
-		// the predicate was not.
+		// The Namespace the predicate resolved to, written out, since two
+		// Namespaces may answer one Method name for one Type.
 		namespaceSpecifier: {
 			nodeType: "Identifier",
 			content: conjunct.namespaceName,
@@ -4940,11 +4800,8 @@ function predicateCall(
 		position,
 	}
 
-	// A negated leaf is the call the standard library writes for it —
-	// `@::isEmpty()::negate()` — because that is the Essence an author would
-	// have written and the only spelling that holds for every leaf. The
-	// spelling the predicate WAS written as names one Method for the reader;
-	// this has to be code.
+	// A negated leaf is built as `@::isEmpty()::negate()`, the spelling that
+	// holds for every leaf.
 	return conjunct.negated
 		? {
 				nodeType: "MethodInvocation",
@@ -4961,14 +4818,9 @@ function predicateCall(
 		: call
 }
 
-// The Arguments of a call the Compiler builds rather than reads: one per
-// Parameter of the signature it is built against, in order, labelled with the
-// Parameter's own EXTERNAL name and written positionally where it has none.
-//
-// Shared by everything that rebuilds a call out of a resolved signature — a
-// refinement's conjunct against a candidate value, and a contract goal against
-// the values it generated — because "how a signature is spelled at a call site"
-// is one fact, and two spellings of it could come to disagree.
+// The Arguments of a call the compiler builds: one per Parameter, in order,
+// labelled with the Parameter's external name where it has one. Shared by
+// refinement checks and contract goals, so both spell calls alike.
 export function invocationArguments(
 	parameters: Array<common.Parameter>,
 	values: Array<parser.ExpressionNode>,
@@ -4988,24 +4840,16 @@ export function invocationArguments(
 	}))
 }
 
-// The signatures the conjunct's Method could have been resolved to — the
-// Namespace's own where it declares one, and the Protocol's where a conformance
-// provided it (`Equatable` provides `isNot`, which is what 'NonZeroInteger' is
-// written with). They are read for two things only: what each Argument is
-// LABELLED, and what Type it is, which is what turns a conjunct's stable
-// scalars back into the Literals they were written as.
-//
-// All of an Overload's entries come back, in order. A conjunct names none of
-// them, and the caller finds the one that was meant by rebuilding the call and
-// seeing whether it typechecks.
+// The signatures the conjunct's Method could have resolved to: the Namespace's
+// own, or the Protocol's where a conformance provides it. They give each
+// Argument's label and Type. Every Overload entry comes back, in order.
 function predicateSignatures(
 	conjunct: common.PredicateConjunct,
 	scope: enricher.Scope,
 ): Array<common.BaseFunction> {
-	// The lookup REPORTS where the name means something other than a
-	// Namespace here, which is the reading a written `::<Name>method()`
-	// deserves. This is not one: nobody wrote this name, and what a failed
-	// lookup means is answered once, about the Type, by whoever asked.
+	// The lookup reports a name that is no Namespace here, which suits a
+	// written `::<Name>method()`. Nobody wrote this one, so its Diagnostics are
+	// dropped.
 	let found = collectDiagnostics(() =>
 		getAllNamespacesInScope(scope, {
 			nodeType: "Identifier",
@@ -5048,18 +4892,9 @@ function predicateSignatures(
 		: [method]
 }
 
-// What a Type Parameter in a Method's signature stands for, resolved
-// against what the refinement is ABOUT — and null where the base says nothing
-// about the name, which leaves the Parameter as it was declared.
-//
-// `Self` is the base: `Equatable::isNot(_ other: Self)` over an Integer takes an
-// Integer. A List Method's Parameter is the item Type the base was applied with,
-// whatever the Method spelled it — a List has ONE slot, so there is nothing else
-// it could stand for.
-//
-// A Dictionary has TWO, so the name is what tells them apart and a
-// Parameter spelled anything else is left alone rather than guessed at. The one
-// place a second slot changes an answer that a first slot could give blind.
+// What a Type Parameter in a Method's signature stands for, given the
+// refinement's base, or null to keep it as declared. `Self` is the base, a List
+// has one slot, and a Dictionary's slot is told by name.
 function refinementBaseGeneric(
 	name: string,
 	base: common.Type,
@@ -5083,10 +4918,8 @@ function refinementBaseGeneric(
 	return null
 }
 
-// One stable scalar as the Literal it was written as. A conjunct keeps an
-// Integer's digits and a String's characters in the one field, so the Parameter
-// is what says which of the two is in hand — the same reading the Enricher gave
-// the Literal when it read the predicate.
+// One stable scalar as the Literal it was written as. Integer digits and String
+// characters share one field, so the Parameter's Type says which it is.
 function predicateArgument(
 	argument: string | boolean,
 	declared: common.Type | common.GenericUse,
@@ -5110,10 +4943,8 @@ function predicateArgument(
 				? { nodeType: "IntegerValue", value: argument, position }
 				: null
 		case "String": {
-			// A String scalar arrives as the JSON of its characters,
-			// which is the half of it that says it was a String and not the
-			// digits it may happen to spell. Anything else is a scalar of
-			// another kind and no Literal this Parameter takes.
+			// A String scalar arrives as the JSON of its characters, starting
+			// with a quote.
 			if (!argument.startsWith('"')) {
 				return null
 			}
@@ -5141,28 +4972,18 @@ function predicateArgument(
 	}
 }
 
-// A Namespace conforming to `Generatable`, as the calls an author could
-// have written — `Team.generate(from <source>)` and `<drawn>::<Team>shrink()`.
-// The conformance replaces the structural answer entirely, which is the whole
-// point of declaring one.
-//
-// Both halves are enriched here, in the Scope the test was written in, so
-// that a conformance which draws a value also says how a failing one gets
-// smaller. `shrink` is `Generatable`'s provided Method where the Namespace
-// writes none, and answers no candidates there — which is what a conformance
-// cost before it could be written at all.
+// A Namespace conforming to `Generatable`, as the calls an author could write:
+// `Team.generate(from <source>)` and `<drawn>::<Team>shrink()`. It replaces the
+// structural answer. Both are enriched in the test's Scope; a Namespace that
+// writes no `shrink` gets `Generatable`'s provided one.
 function generatableConformance(
 	type: common.Type,
 	scope: enricher.Scope,
 	position: common.Position,
 ): common.typed.TestGenerator | null {
-	// Each candidate SPECIALIZED against the Type first, which is what
-	// `solveConformance` does before it asks anything of one: a generic
-	// Namespace's target is `Pair<Item>` and the Type asked about is
-	// `Pair<Twin>`, so the raw target is assignable neither to it nor from it
-	// and `targetsExactly` would pass every generic conformance over in
-	// silence. The raw Namespace is kept beside it, because whether it was
-	// generic is what decides between using it and refusing it.
+	// Each candidate is specialized against the Type first, as
+	// `solveConformance` does, since a generic target such as `Pair<Item>`
+	// matches no applied Type. The raw Namespace says whether it was generic.
 	let raw = namespacesTargeting(getAllNamespacesInScope(scope, null), type)
 	let targeting = specializedNamespacesFor(raw, type)
 	let generic: common.NamespaceType | null = null
@@ -5175,10 +4996,9 @@ function generatableConformance(
 			continue
 		}
 
-		// A GENERIC Namespace's conformance can not be reached from here,
-		// and is refused below rather than passed over — but only once the
-		// search is over, because a Program may also hold a Namespace for the
-		// applied Type, and that one is the answer.
+		// A generic Namespace's conformance can not be reached from here. It is
+		// refused only after the search, since a Namespace for the applied Type
+		// may answer.
 		let declared = raw.get(name)
 
 		if (declared !== undefined && declared.generics.length > 0) {
@@ -5260,11 +5080,8 @@ function generatableConformance(
 			enrichExpression(shrinking, drawnScope),
 		)
 
-		// A conformance whose `shrink` does not resolve is not one this
-		// derivation can use: the Protocol provides the body, so the only way
-		// to reach here is a Namespace whose own `shrink` the conformance check
-		// already refused, and generating through a broken conformance would
-		// report values of a Type nobody agreed on.
+		// A conformance whose `shrink` does not resolve was already refused by
+		// the conformance check, so it is passed over.
 		if (containsErrors(shrunk.diagnostics)) {
 			continue
 		}
@@ -5284,14 +5101,9 @@ function generatableConformance(
 		: refuseUnreachableConformance(generic, type, position)
 }
 
-// A generic Namespace's `Generatable` conformance, which nothing here can
-// call. `generate` is a STATIC taking a `Randomness` and nothing else, so a call
-// has no Argument for the Namespace's own Type Parameters to be worked out from,
-// and the language has no spelling for a Type Argument at a call — `esc` reports
-// `uninferable-type-parameter` for the very call an author would write by hand.
-// So the conformance is refused out loud instead of being discarded: it was
-// declared to replace the structural draw AND the structural shrink, and
-// silently doing neither runs a different test than the one that was written.
+// A generic Namespace's `Generatable` conformance, which nothing here can call.
+// The static `generate` takes only a `Randomness`, so no Argument decides the
+// Namespace's Type Parameters. It is refused rather than silently replaced.
 function refuseUnreachableConformance(
 	namespace: common.NamespaceType,
 	type: common.Type,
@@ -5325,13 +5137,9 @@ function refuseUnreachableConformance(
 	return null
 }
 
-// Whether a Namespace targets THIS Type rather than one this Type flows
-// into. A refinement flows freely into its base — the evidence is simply
-// forgotten — so a `namespace Counter for Integer is Generatable` is offered
-// for every `Integer where …` alias in the project, and taking it would
-// generate values the refinement says are impossible. Mutual assignability is
-// what says the two are the same Type, which is what a conformance replacing
-// the whole derivation has to be about.
+// Whether a Namespace targets this Type rather than one it flows into. A
+// refinement flows into its base, so only mutual assignability keeps a
+// Namespace for Integer from drawing values a refinement refuses.
 function targetsExactly(
 	namespace: common.NamespaceType,
 	type: common.Type,
@@ -5354,11 +5162,8 @@ function refuseUngeneratableType(
 	type: common.Type,
 	position: common.Position,
 	label: string,
-	// The Type a conformance would be declared FOR, where there is one to
-	// declare it for — the Parameter's own, which is what a fix writes a
-	// Namespace beside. Null where the Parameter names no such Type: a Function
-	// has no Namespace to hang a conformance off, and a Type Parameter is not a
-	// Type anybody can declare one for.
+	// The Parameter's own Type a conformance would be declared for, or null
+	// where there is none, as for a Function or a Type Parameter.
 	declared: string | null,
 	note = "A property test generates a value of every Parameter's Type, once per case.",
 	help = "Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.",
@@ -5378,11 +5183,8 @@ function refuseUngeneratableType(
 							typeName: declared,
 						},
 					}),
-			// The second help is the half of a conformance nobody thinks
-			// to write. `Generatable` provides a `shrink` answering no
-			// candidates, so a conformance declared for the first help alone
-			// reports whatever the source drew — which is what the reader of
-			// this Diagnostic is about to declare.
+			// `Generatable` provides a `shrink` that answers no candidates, so
+			// the second Help asks for one.
 			helps: [
 				help,
 				"Write 'shrink' in the conformance as well: 'Generatable' provides one that answers no candidates, and a counterexample is otherwise reported as it was drawn.",
@@ -5393,9 +5195,8 @@ function refuseUngeneratableType(
 	return null
 }
 
-// A value that is a Function, under every spelling the Type union has for
-// one. It is the one shape `snapshot-not-printable` can not offer a conformance
-// to: a Namespace targets a Type a reader can NAME, and none of these is one.
+// A Function value under any of its Type spellings. No Namespace can target
+// one, so `snapshot-not-printable` offers it no conformance.
 function isFunctionType(type: common.Type): boolean {
 	return (
 		type.type === "Function" ||
@@ -5406,12 +5207,8 @@ function isFunctionType(type: common.Type): boolean {
 	)
 }
 
-// What a snapshot RECORDS: the asserted value rendered through
-// `Printable`, which is the Protocol the design names — so a Type that says
-// what it looks like is recorded in that form rather than in a structural dump
-// of its members. It is built as the interpolation an author could have written
-// (`"{value}"`), which is the one lowering of `toString` the whole Compiler
-// already has, witness and all.
+// What a snapshot records: the value rendered through `Printable`, built as the
+// interpolation `"{value}"` an author could write.
 function enrichSnapshotValue(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
@@ -5440,31 +5237,10 @@ function enrichSnapshotValue(
 					"A snapshot records what a value LOOKS like, which is what 'Printable::toString' answers — so a value with no such answer has nothing to record.",
 					...solved.chain,
 				],
-				// The conformance, first, because it is the answer that
-				// works for every value. The two alternatives that stood here
-				// alone were unfollowable for anything with no Cases — a
-				// Function value has none to take apart, and "render it
-				// yourself" is the whole of what declaring the conformance is,
-				// written where nothing else can reach it.
-				// The conformance first, because it is the answer that
-				// works for every value that can carry one — and the one the
-				// docs have always given. The two alternatives that stood here
-				// alone were unfollowable for a value with no Cases: "take it
-				// apart and snapshot each Case" has nothing to take apart, and
-				// "render it yourself" is what declaring the conformance IS,
-				// written where nothing else can reach it.
-				//
-				// Withheld for a Function value, which is the one shape
-				// that can carry no conformance — `namespace … for (_: Integer)
-				// -> Integer` does not parse, and never will, because a
-				// Namespace targets a Type a reader can name.
-				//
-				// And a bare Case gets the Choice's name rather than its
-				// own, for the reason `unsatisfied-bound` gives at the same
-				// fork: `namespace X for Colour#Red` does not parse, because a
-				// Namespace targets a Type and one Case of a Choice is not one.
-				// Both edits are named, since the value has to be SEEN as the
-				// Choice before a conformance to it can answer.
+				// The conformance comes first, since it works for any value
+				// that can carry one. A Function value can carry none. A bare
+				// Case is named by its Choice, since a Namespace can not target
+				// one Case.
 				helps: isFunctionType(expression.type)
 					? [
 							"Snapshot a String you build yourself — a Function value has no Type a Namespace can be declared for.",
@@ -5504,23 +5280,14 @@ function enrichSnapshotValue(
 	}
 }
 
-// `expect` and `require`, which differ in exactly two things: what a
-// failure does to the rest of the test, and whether either may take a value
-// apart. Both are typed here, together, because everything else about them is
-// one thing.
-//
-// It answers with a LIST because `require MATCHER = EXPR` is three Statements:
-// the Constant holding what was asserted, the assertion itself, and one
-// Constant per name the Matcher binds. That is the same desugar a Pattern
-// Declaration does, and for the same reason: what the Matcher binds has to be
-// a name the rest of the block reads, and the value it is read off has to be
-// evaluated once.
+// `expect` and `require` differ only in what a failure does and in whether a
+// Matcher may take the value apart. `require MATCHER = EXPR` becomes three
+// Statements: the asserted value's Constant, the assertion, and its bindings.
 function enrichAssertionStatement(
 	node: parser.ExpectStatementNode | parser.RequireStatementNode,
 	scope: enricher.Scope,
 ): Array<common.typed.ImplementationNode> {
-	// A snapshot compares the value as it prints, so it holds nothing and
-	// binds nothing.
+	// A snapshot compares the value as it prints, so it binds nothing.
 	if (node.snapshot !== null) {
 		return [
 			assertionNode(
@@ -5545,9 +5312,8 @@ function enrichAssertionStatement(
 		]
 	}
 
-	// The Boolean form asserts an Expression and reads it once, so there
-	// is nothing to hold and nothing to bind. The Validator refuses a value that
-	// is no Boolean, as `expect-not-boolean`.
+	// The Boolean form reads its Expression once and binds nothing. The
+	// validator refuses a value that is no Boolean with `expect-not-boolean`.
 	if (node.matcher === null) {
 		return [
 			assertionNode(
@@ -5560,10 +5326,9 @@ function enrichAssertionStatement(
 		]
 	}
 
-	// Everything below here is `require MATCHER = EXPR`. A Matcher is
-	// written on no other assertion: `expect MATCHER = EXPR` is refused where
-	// it is read, because an `expect` carries on past a miss and so can
-	// introduce no names, and the Parser writes none on an `expect` at all.
+	// From here on this is `require MATCHER = EXPR`. The Parser refuses a
+	// Matcher on an `expect`, which carries on past a miss and so can bind no
+	// names.
 	let value = enrichExpression(node.value, scope)
 	let resolved = resolveMatcher(node.matcher, value.type, [], scope)
 	let baseName = synthesizedName("assertion", node.value.position)
@@ -5591,9 +5356,8 @@ function enrichAssertionStatement(
 
 	let assertion = assertionNode(
 		node.nodeType,
-		// The NAME rather than the Expression. A Matcher reads the value
-		// as many times as it has parts, and what was asserted may be a Method
-		// Invocation, which has to run once.
+		// The name rather than the Expression, so a Method Invocation runs once
+		// however many parts the Matcher reads.
 		{
 			nodeType: "Identifier",
 			content: baseName,
@@ -5626,15 +5390,10 @@ function enrichAssertionStatement(
 	]
 }
 
-// The Constant a `require`’s Matcher binds — `constant row = $assertion.value`
-// — declared in the block the assertion stands in, because everything below it
-// reads it. It is the Constant an author could have written, exactly as a Match
-// Handler’s bindings are, so nothing downstream meets a new shape.
-//
-// The base is read AT THE MATCHER’S Type rather than at what it was declared
-// as: a `require` only lets the block below it run where the Matcher matched,
-// so below it the value IS the Case the Matcher named. That is the same claim
-// `declareMatcherBindings` makes by typing its `@` as the Matcher.
+// The Constant a `require` Matcher binds, such as `constant row =
+// $assertion.value`, declared in the enclosing block. The base is read at the
+// Matcher's Type, since the rest of the block runs only where the Matcher
+// matched.
 function declareAssertionBinding(
 	binding: MatcherBinding,
 	baseName: string,
@@ -5662,10 +5421,9 @@ function declareAssertionBinding(
 			member: {
 				nodeType: "Identifier",
 				content: step,
-				// Where the step was WRITTEN, every step of the way — the
-				// Language Server joins a Pattern member to the Record member
-				// it reads off this tree, and a shared span would make renaming
-				// the member rewrite the binder instead.
+				// Where each step was written, so the language server joins a
+				// Pattern member to its Record member and a rename does not
+				// rewrite the binder.
 				position: binding.stepPositions[index] ?? binding.name.position,
 				type: stepType,
 			},
@@ -5698,11 +5456,9 @@ function declareAssertionBinding(
 
 // #region Statements
 
-// The two Declarations are NOT among these — they are the only Statements
-// that can become several, so `enrichNode` routes them through
-// `enrichDeclarationStatement` before they get here. Excluding them from the
-// parameter Type rather than leaving unreachable cases in the switch is what
-// keeps that routing a fact TypeScript checks.
+// The two Declarations are excluded from the parameter Type: they may become
+// several Statements, so `enrichNode` routes them to
+// `enrichDeclarationStatement`.
 export function enrichStatement(
 	node: Exclude<
 		parser.StatementNode,
@@ -5714,10 +5470,8 @@ export function enrichStatement(
 	scope: enricher.Scope,
 	hoistedTypes?: HoistedTypes,
 ): common.typed.StatementNode {
-	// A hoisted declaration's Type is already resolved and in scope — the
-	// enrichment reuses it rather than resolving the same Node again. The cast
-	// is sound because the Map is keyed by Node and each entry was produced by
-	// the very resolver the matching case reuses it in.
+	// A hoisted declaration's Type is reused. The casts hold because each entry
+	// was produced by the resolver the matching case calls.
 	let hoistedType = hoistedTypes?.get(node)
 
 	switch (node.nodeType) {
@@ -5763,19 +5517,17 @@ export function enrichStatement(
 				hoistedType as common.FunctionType | undefined,
 			)
 		case "OverloadedFunctionStatement":
-			// This declares a name and nothing to emit, and is handled
-			// before enrichment by `enrichImplementation` — the top level is the
-			// only place it is valid. Reaching here means one was nested in a
-			// body (a `declarations`-mode Program only), which the Compiler has
-			// no typed Node to represent.
+			// The top-level walk in `enrich.ts` enriches this with
+			// `enrichOverloadedFunctionStatement`. One nested in a body has no
+			// typed Node.
 			throw new Error(
 				`A '${node.nodeType}' may only appear at the top level of a 'declarations { … }' Program`,
 			)
 	}
 }
 
-// The value shapes that can not be a Function, whatever they are made
-// of. A List of Functions is still a List, and takes no Parameters itself.
+// Value shapes that can not be a Function. A List of Functions takes no
+// Parameters itself.
 const parameterlessValues = new Set([
 	"RecordValue",
 	"StringValue",
@@ -5788,17 +5540,9 @@ const parameterlessValues = new Set([
 	"CaseValue",
 ])
 
-// The Parameters the value of a Declaration holds, or null where they
-// can not be read off it. A `§§` block above a `constant` documents whatever
-// it holds, so a `@param` there names a Parameter of a Function written as its
-// value — that much is visible here.
-//
-// `constant alias = greet` is function-valued too, and is exactly why the
-// answer is nullable: its Parameters live in a resolved Type, which keeps only
-// the external names, so a `@param` naming an internal one could not be told
-// from a typo. Answering null leaves such a Declaration unchecked, which is
-// the honest outcome — the alternative was telling it that it takes no
-// Parameters while Hover showed them.
+// The Parameters a Declaration's value holds, so a `§§` block's `@param` can be
+// checked against them. Null where they can not be read off the value, as for
+// `constant alias = greet`, whose resolved Type keeps only external names.
 function heldParameters(
 	value: parser.ExpressionNode | null,
 ): Array<parser.ParameterNode> | null {
@@ -5824,9 +5568,7 @@ function reportUnknownDocumentationOfValue(
 	}
 }
 
-// A Declaration is one Statement or several — several exactly when its
-// name is a Pattern, which is the only thing in the language that declares more
-// than one name at a time.
+// Several Statements exactly when the name is a Pattern.
 function enrichDeclarationStatement(
 	node:
 		| parser.ConstantDeclarationStatementNode
@@ -5851,8 +5593,8 @@ function enrichConstantDeclarationStatement(
 ): common.typed.ConstantDeclarationStatementNode {
 	reportUnknownDocumentationOfValue(node.documentation, node.value)
 
-	// The annotation is the value's expected Type — a bare Case in the
-	// value resolves against it before the scope scan.
+	// The annotation is the value's expected Type, so a bare Case resolves
+	// against it.
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
 	let value = enrichExpression(node.value, scope, declaredType)
 
@@ -5875,14 +5617,9 @@ function enrichConstantDeclarationStatement(
 	}
 }
 
-// What a Constant was given, kept beside its Type so that a Case payload
-// default may name it — see `Scope.constantValues`, which only a Program's top
-// level Scope carries, so this records a Module's own Constants and nothing
-// inside a body.
-//
-// A redeclaration overwrites, the way `declareVariableInScope` overwrites the
-// Type: the two answers about one name are kept in step, and the Module is
-// already reporting.
+// What a Constant was given, so a Case payload default may name it; see
+// `Scope.constantValues`. Only a top-level Scope carries one. A redeclaration
+// overwrites, as `declareVariableInScope` does.
 function recordConstantValue(
 	name: string,
 	value: common.typed.ExpressionNode,
@@ -5900,8 +5637,8 @@ function enrichVariableDeclarationStatement(
 ): common.typed.VariableDeclarationStatementNode {
 	reportUnknownDocumentationOfValue(node.documentation, node.value)
 
-	// The annotation is the value's expected Type — a bare Case in the
-	// value resolves against it before the scope scan.
+	// The annotation is the value's expected Type, so a bare Case resolves
+	// against it.
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
 	let value = enrichExpression(node.value, scope, declaredType)
 
@@ -5922,31 +5659,8 @@ function enrichVariableDeclarationStatement(
 	}
 }
 
-// `constant { accepted, refused } = list::partition(where …)` — the Pattern
-// desugars into the Statements an author could have written instead: one
-// Constant holding the value, and one per name the Pattern binds, each reading
-// its way down that Constant.
-//
-// The base is a Constant even where the Declaration was a `variable`, and even
-// where the value is a bare name that could have been read again: the value
-// must be evaluated EXACTLY ONCE, because it is one Expression in the source
-// and an author reading `partition(…)` twice is not what was written. Only the
-// bindings themselves follow the Declaration's own keyword, so
-// `variable { index, total } = …` gives two Variables.
-//
-// The base KEEPS its Position, because what it holds is the Declaration's own
-// value Expression — real source, on the line the author wrote it, and the
-// statement a debugger should stop on for that line. Dropping it was tried and
-// is wrong: an unmapped statement is how the debug adapter recognises Compiler
-// glue, so it answered a Step Over there with a step OUT and one step across a
-// Pattern Declaration abandoned the rest of the body.
-//
-// Only its NAME is the Compiler's, and that name is unspellable in Essence for
-// the same reason the Optimiser's are: the Lexer reads `_` as a Symbol, so no
-// user Identifier holds one. It is derived from the Pattern's own Position so
-// that enriching a body twice — which is what return-Type inference does —
-// mints the same name both times, and `isSynthesizedName` is what every place
-// that must not SHOW it asks.
+// Desugars a Pattern Declaration into a base Constant and one Declaration per
+// binding. See "Pattern declarations" in DEVELOPMENT.md.
 function enrichPatternDeclarationStatement(
 	node:
 		| parser.ConstantDeclarationStatementNode
@@ -5961,9 +5675,8 @@ function enrichPatternDeclarationStatement(
 	let declaredType = node.type !== null ? resolveType(node.type, scope) : null
 	let value = enrichExpression(node.value, scope, declaredType)
 
-	// The members are read off what the author DECLARED where they
-	// declared anything, not off what the value happened to be — otherwise the
-	// bindings and the annotation could disagree about the same value.
+	// Members are read off the declared Type where there is one, so bindings
+	// and annotation agree.
 	let subjectType = declaredType ?? value.type
 	let baseName = synthesizedName("pattern", pattern.position)
 
@@ -6000,14 +5713,9 @@ function enrichPatternDeclarationStatement(
 	]
 }
 
-// The Statements a Pattern in an IRREFUTABLE position desugars into — a
-// Parameter's and a Declaration's alike. Both hold the value under one name
-// first (a Parameter already is one; a Declaration has to make one), and both
-// then read each binding off it.
-//
-// `isConstant` follows the Declaration's own keyword, so
-// `variable { index, total } = state` gives two Variables while a Parameter's
-// bindings, which nothing may assign to, are always Constants.
+// The Statements a Pattern in a Declaration or a Parameter desugars into, each
+// reading a binding off the base name. `isConstant` follows the Declaration's
+// keyword; a Parameter's bindings are always Constants.
 function declarePatternBindings(
 	pattern: parser.PatternNode,
 	baseName: string,
@@ -6017,10 +5725,8 @@ function declarePatternBindings(
 ): Array<common.typed.ImplementationNode> {
 	return irrefutablePatternBindings(pattern).map((binding) => {
 		let type = memberTypeInIrrefutablePosition(binding, subjectType, scope)
-		// Carried as a written annotation rather than checked here, so
-		// that a member annotated `width: String` over an Integer fails as the
-		// `assignment-type-mismatch` the Validator reports for every other
-		// annotated Declaration — the same Diagnostic, at the member's own span.
+		// Carried as a written annotation, so a mismatch is the validator's
+		// `assignment-type-mismatch` at the member's span.
 		let declaredType =
 			binding.type === null ? null : resolveType(binding.type, scope)
 
@@ -6039,10 +5745,8 @@ function declarePatternBindings(
 			pattern.position,
 		)
 
-		// A binding is a Constant an author could have written, so it is
-		// recorded like one — a Lookup is no literal and a payload default
-		// naming one is refused either way, but refused for what it IS rather
-		// than for a name this Module supposedly does not declare.
+		// Recorded like any Constant, so a payload default naming a binding is
+		// refused for being no literal rather than for an undeclared name.
 		if (isConstant) {
 			recordConstantValue(binding.name.content, value, scope)
 		}
@@ -6068,20 +5772,8 @@ function declarePatternBindings(
 	})
 }
 
-// What a binding actually reads in an irrefutable position, resolved
-// through `lookupTypeOf` — the very resolver the Lookup an author could have
-// written instead goes through.
-//
-// That is the whole point rather than a convenience: a Declaration Pattern
-// PROMISES to be the Constants an author could have written, so it may not
-// admit what those are refused for. `constant x = value.x` on a Union reports
-// `type-without-members`, and on a misspelled member `unknown-member`; a
-// `constant { x } = value` that quietly answered `Unknown` instead would bind
-// a name to nothing and hand the body a value the checker had blessed.
-//
-// A Matcher is the opposite case and asks `memberTypeOf` instead: naming a
-// member only some arms carry is how a Matcher DISCRIMINATES, and an arm that
-// no value reaches is `unreachable-case` rather than an error.
+// What a binding reads in a Declaration or a Parameter, through the resolver a
+// written Lookup uses. See "Pattern declarations" in DEVELOPMENT.md.
 function memberTypeInIrrefutablePosition(
 	binding: PatternBinding,
 	subjectType: common.Type,
@@ -6101,10 +5793,9 @@ function memberTypeInIrrefutablePosition(
 			scope,
 		)
 
-		// An annotation on an INTERMEDIATE step constrains that step and
-		// nothing below it, so it is checked here and then stepped past — the
-		// binding's own annotation is the last one, and the Validator checks
-		// that through `declaredType` like any other.
+		// An annotation on an intermediate step constrains that step only, so
+		// it is checked here. The validator checks the last one through
+		// `declaredType`.
 		let annotation = step.type
 
 		if (annotation !== null && step !== binding.steps.at(-1)) {
@@ -6121,19 +5812,15 @@ function memberTypeInIrrefutablePosition(
 	return type
 }
 
-// An intermediate step's annotation fails the way every annotation fails,
-// under the code a reader already knows — this only has to be reported by hand
-// because such a step becomes no Statement of its own for the Validator to
-// check.
+// Reported by hand because an intermediate step becomes no Statement for the
+// validator to check.
 function reportPatternMemberMismatch(
 	name: parser.IdentifierNode,
 	declared: common.Type,
 	actual: common.Type,
 ): void {
-	// Notes and no Labels — there is no written value here at all. What
-	// stands at this step is a member READ off the subject, so there is no
-	// Literal whose members could be pointed at, and the only span in hand is
-	// the name the Pattern wrote.
+	// Notes and no labels: the step is a member read off the subject, with no
+	// Literal to point into.
 	let record = recordMismatchEvidence(declared, actual, null)
 
 	reportError(
@@ -6191,8 +5878,8 @@ function enrichVariableAssignmentStatement(
 
 	let name = enrichIdentifier(node.name, scope)
 
-	// The target Variable's Type is the value's expected Type — a bare
-	// Case in the value resolves against it before the scope scan.
+	// The Variable's Type is the value's expected Type, so a bare Case resolves
+	// against it.
 	let value = enrichExpression(node.value, scope, name.type)
 	let pinned = narrowUnknownSlots(
 		node.name.content,
@@ -6202,13 +5889,9 @@ function enrichVariableAssignmentStatement(
 
 	return {
 		nodeType: "VariableAssignmentStatement",
-		// The Identifier carries the Type the assignment DECIDED, not the
-		// undecided one it was read with: the Validator judges this very
-		// statement against `name.type`, and an assignment that decides a slot
-		// is judged against the slot it decided rather than against the blank
-		// it filled. The Node is rebuilt instead of re-enriched, because
-		// `enrichIdentifier` reports the capture of an undecided name and the
-		// capture is a fact about where the Identifier was READ.
+		// Carries the Type the assignment decided, which the validator judges
+		// it against. Rebuilt rather than re-enriched, so the capture check
+		// stays where the name was read.
 		name: pinned === null ? name : { ...name, type: pinned },
 		value,
 		declarationPosition,
@@ -6216,29 +5899,15 @@ function enrichVariableAssignmentStatement(
 	}
 }
 
-// An empty List Literal leaves its item Type Unknown, so `variable items
-// = []` declares a name whose Type has a slot nothing has decided. The FIRST
-// assignment that decides one decides it for good: from here on `items` is a
-// List of Integers, a later `items = ["a"]` is the assignment-type-mismatch it
-// looks like, and no annotation can be handed a List of Integers under the name
-// of a List of Strings. Reads written ABOVE this point keep the undecided Type,
-// which is sound — the value they read is genuinely empty — while a Function
-// literal that captured it is not, and `enrichIdentifier` refuses that.
-//
-// Two Handlers of a Match assigning different item Types therefore leave the
-// second one mismatched rather than widening to a Union: the declaration is
-// where a name that holds both belongs, and an annotation there says so.
-//
-// The decided Type is answered back, or null where this assignment decided
-// nothing, so the statement that made the decision can be judged against it.
+// The first assignment that decides an empty literal's Unknown slot decides it
+// for good. Answers the decided Type, or null. See "Undecided slots" in
+// DEVELOPMENT.md.
 function narrowUnknownSlots(
 	name: string,
 	declaringScope: enricher.Scope | null,
 	valueType: common.Type,
 ): common.Type | null {
-	// A Constant's reassignment was reported already, and letting the
-	// statement that was refused decide the Type every accepted one is judged
-	// against would make the refusal change the Program.
+	// A refused Constant reassignment decides nothing.
 	if (declaringScope === null || declaringScope.constants.has(name)) {
 		return null
 	}
@@ -6260,17 +5929,13 @@ function enrichNamespaceDefinitionStatement(
 	scope: enricher.Scope,
 	hoistedType?: common.NamespaceType,
 ): common.typed.NamespaceDefinitionStatementNode {
-	// The Namespace's own block. Its Methods and Properties each check
-	// their own, so this is only about a `@param` written above `namespace`.
+	// Methods and Properties check their own blocks, so this only checks a
+	// `@param` above `namespace`.
 	reportDocumentationParameters(node.documentation, [])
 
-	// `namespace Self for Integer { … }` — a Namespace is named where a
-	// Type is named and is reached the same way, `Self.twice` reading as a
-	// static of it, so it takes the reserved name as surely as a Choice or an
-	// Alias does. It compiled. Reported HERE rather than in the resolver the
-	// Choice and the Alias use, because a Namespace's Type is resolved more
-	// than once — hoisting retries a Namespace whose conformance clause waits
-	// on a Protocol — and this pass runs exactly once per declaration.
+	// `namespace Self for Integer { … }`: a Namespace is named and reached like
+	// a Type, so `Self` is reserved for it too. Reported here because hoisting
+	// may resolve a Namespace's Type more than once, and this pass runs once.
 	if (node.name.content === "Self") {
 		reportReservedTypeName(node.name.position)
 	}
@@ -6282,11 +5947,9 @@ function enrichNamespaceDefinitionStatement(
 	): Record<string, common.typed.NamespaceProperty> {
 		let result: Record<string, common.typed.NamespaceProperty> = {}
 
-		// The Namespace as its own static Properties see it, seeded the
-		// way the resolution pass seeded it — every native bound, every bodied
-		// Property Error until its value has been enriched here — so a value
-		// enriched in this pass is typed exactly as the one that pass read the
-		// Namespace Type off was. The Methods are the finished ones either way.
+		// The Namespace as its static Properties see it, seeded as the
+		// resolution pass seeded it: natives bound, bodied Properties Error
+		// until enriched here.
 		let boundProperties = scopeMap<common.Type>()
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
@@ -6303,10 +5966,8 @@ function enrichNamespaceDefinitionStatement(
 		)
 
 		for (let [propertyKey, propertyValue] of Object.entries(properties)) {
-			// A native static Property has no value to enrich, so there
-			// is nothing for a typed Node to hold — it is in the Namespace
-			// Type (that is what resolution reads) but not in the typed tree
-			// the Rewriter emits from, exactly like a native Method.
+			// A native static Property has no value, so it is in the Namespace
+			// Type but not in the typed tree, like a native Method.
 			if (propertyValue.value === null) {
 				continue
 			}
@@ -6329,8 +5990,8 @@ function enrichNamespaceDefinitionStatement(
 			}
 
 			result[propertyKey] = {
-				// As with a Method, the name is a typed Identifier of
-				// its own so that the cursor can land on it.
+				// A typed Identifier of its own, so the cursor can land on the
+				// name.
 				name: {
 					nodeType: "Identifier",
 					content: propertyKey,
@@ -6348,10 +6009,8 @@ function enrichNamespaceDefinitionStatement(
 		return result
 	}
 
-	// When hoisted, the Namespace Type is reused from the hoist pass —
-	// resolving it re-enriches every property value, so skipping that here is
-	// the win. A non-hoisted Namespace (nested, or one that could not hoist)
-	// still resolves in place.
+	// A hoisted Namespace reuses its Type, since resolving it again re-enriches
+	// every Property value. A nested or unhoisted one resolves in place.
 	let type =
 		hoistedType ?? resolveNamespaceDefinitionStatementType(node, scope)
 
@@ -6361,15 +6020,10 @@ function enrichNamespaceDefinitionStatement(
 
 	let checkedConformances = checkProtocolConformance(node, type, scope)
 
-	// The mirror of `infer-on-applied-parameter`: a Namespace is the one
-	// declaration whose Type Parameters have nothing BUT a use to work them out
-	// from — every receiver hands the Arguments over, and the marker is what says
-	// so. Written without it the Parameter is opaque and can never bind, so the
-	// target Type matches no receiver at all and the Namespace is simply never
-	// found: `namespace Maybe<T> for Maybe<T> is Equatable` was passed over in
-	// silence and a generic Choice's DERIVED equality answered `is` instead,
-	// contradicting the Methods right there in the file. Refused rather than
-	// quietly re-read as `infer`, so the two spellings never mean the same thing.
+	// A Namespace's Type Parameters can only be worked out from a receiver,
+	// which is what `infer` says. Without it the target matches no receiver and
+	// the Namespace is never found, so the spelling is refused rather than
+	// re-read as `infer`.
 	for (let generic of node.generics) {
 		if (!generic.inferred) {
 			reportError(
@@ -6392,27 +6046,9 @@ function enrichNamespaceDefinitionStatement(
 		}
 	}
 
-	// A bound on a Namespace's own Type Parameter is still rejected, and
-	// now for a reason the Helps can finish: a bound written HERE would apply to
-	// every Method whether it needs one or not, and a Namespace is reached by
-	// every receiver of its target shape. The two places a bound belongs both
-	// reach exactly what they are about — a Method's own `<…>`, which reaches
-	// that Method, and a conditional conformance's `where`, which reaches the
-	// Methods fulfilling it.
-	//
-	// The per-Method Help leads, because it is the one that always
-	// applies: it needs nothing declared and no Protocol implemented. It is
-	// written as the shape rather than against a Method by name — WHICH Methods
-	// need the bound is the one thing this Diagnostic can not know, and naming
-	// the first would quietly recommend it.
-	//
-	// The conformance Help names a conformance this Namespace ALREADY
-	// declares. Naming the bound Protocol instead read as an instruction to
-	// declare `is Comparable` — which a Namespace that implements no `compare`
-	// does not, so following it reported a missing requirement and sent the
-	// reader back here. Where nothing is declared there is no name to give and
-	// the Help is left out rather than written as a schematic: the per-Method
-	// edit above is a real one, and two Helps where one works is one too many.
+	// A bound on a Namespace's own Type Parameter would apply to every Method.
+	// It belongs on a Method's `<…>` or a conformance's `where`. The
+	// conformance Help names only conformances this Namespace already declares.
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
 			let conformances = node.conformsTo.map(
@@ -6455,11 +6091,9 @@ function enrichNamespaceDefinitionStatement(
 	refuseDuplicateTypeParameters(node.generics)
 	refuseMalformedMethodBounds(node, type)
 
-	// Idempotent, and run a second time on purpose: the hoist already wove
-	// these bounds into the Namespace Type so that use sites ABOVE this
-	// Statement see the same Type the ones below it do. What is only available
-	// here is the typed half — the Generic Declarations the Rewriter emits the
-	// hidden conformance Parameters from.
+	// Run again on purpose. The hoist wove these bounds into the Namespace Type
+	// for earlier use sites. Only this pass makes the typed Generic
+	// Declarations the rewriter emits witnesses from.
 	let injectedGenerics = weaveMethodBounds(
 		node,
 		type,
@@ -6468,15 +6102,11 @@ function enrichNamespaceDefinitionStatement(
 		true,
 	)
 
-	// Namespace Generics are visible in every Method — bodies reference
-	// them as opaque GenericUses.
+	// Namespace Type Parameters are opaque GenericUses in every Method.
 	let methodScope = scopeWithGenerics(node.generics, scope)
 
-	// Written onto the fresh Scope rather than nested in one of its own,
-	// because it costs a body nothing and is read by one Diagnostic. A Method
-	// body does NOT see the Namespace's own name as a binding — the Namespace is
-	// declared in the Scope around the Statement, and that is what `Clock.noon`
-	// resolves through inside a Method exactly as outside it. See
+	// Read by one Diagnostic. A Method body does not see the Namespace's name
+	// as a binding; `Clock.noon` resolves through the surrounding Scope. See
 	// `Scope.namespace`.
 	methodScope.namespace = { name: node.name.content, type }
 
@@ -6511,7 +6141,7 @@ function enrichNamespaceDefinitionStatement(
 			node.name.position,
 			...node.generics.map((generic) => generic.position),
 			node.targetType?.position,
-			// A clause's Position covers its `where` conditions too.
+			// A clause's Position covers its `where` conditions.
 			...node.conformsTo.map((clause) => clause.position),
 		]),
 		type,
@@ -6519,21 +6149,10 @@ function enrichNamespaceDefinitionStatement(
 	}
 }
 
-// One `<…>` naming a Type Parameter twice. Only one of the two can take
-// effect — every reader downstream keys a Generic list by name, and the LAST
-// writing wins — so the first was dropped in silence, which is how
-// `<Item is Comparable, Item is Printable>` came to mean `<Item is Printable>`
-// and refuse the sort in the body with no word about the bound the reader had
-// written.
-//
-// In the Enricher rather than in the Parser, although the Parser is the one
-// place every `<…>` comes through: the list PARSES, and a Parser error makes
-// `esfmt` leave the whole file alone. A reader who writes two bounds has a file
-// that is wrong in one line, not one the toolchain stops handling.
-//
-// Called from each head with the list exactly as written — a Method's includes
-// the entries that BOUND the Namespace's own Parameters, which are stripped
-// before anything else sees them.
+// One `<…>` naming a Type Parameter twice. Readers key a Generic list by name
+// and the last writing wins, so `<Item is Comparable, Item is Printable>` would
+// drop a bound silently. Checked here, not in the Parser, so the formatter
+// still handles the file. A Method's list is checked as written.
 function refuseDuplicateTypeParameters(
 	generics: Array<parser.GenericDeclarationNode>,
 ): void {
@@ -6553,10 +6172,8 @@ function refuseDuplicateTypeParameters(
 			continue
 		}
 
-		// Two BOUNDS on one Parameter is a different mistake from two
-		// declarations of it — the reader meant both to hold, and the language
-		// has no spelling for that. `oneBoundOnly` says so in the words a body
-		// wanting the second Protocol is told.
+		// Two bounds on one Parameter is a different mistake: the language has
+		// no spelling for both. `oneBoundOnly` words it.
 		let carried = seen.constraint?.content ?? null
 		let wanted = entry.constraint?.content ?? null
 		let bothBounded = carried !== null && wanted !== null
@@ -6588,25 +6205,15 @@ function refuseDuplicateTypeParameters(
 	}
 }
 
-// The two `<…>` entries a Method may write against one of the Namespace's
-// OWN Type Parameters that are not per-Method bounds and can not be read as one.
-// Reported once, from the reporting pass, and never from the hoist: a Diagnostic
-// there keeps the whole Namespace out of Scope.
-//
-// Both are refusals of a SPELLING, not of an intention. `splitMethodGenerics`
-// has already taken the entry out of the Method's own Generics, so the analysis
-// that follows sees the Namespace's Parameter and one mistake gives one
-// Diagnostic — the second of the two is even read as the bound it means, so a
-// Program carrying it still resolves everywhere else.
+// Refuses the two entries a Method may write against a Namespace Type Parameter
+// that are no bound. See "Method bounds on Namespace Type Parameters" in
+// DEVELOPMENT.md.
 function refuseMalformedMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
 ): void {
-	// Every Method, whatever the Namespace declares — a list naming one
-	// Parameter twice is the same mistake in a Namespace with no Generics of its
-	// own, and the entries a generic one bounds are gone by the time any other
-	// reader sees them. Per FORM: two Overloads of one Method may each name
-	// `Item`, and that is not a repetition.
+	// Every Method, generic Namespace or not, checked per form: two Overloads
+	// may each name `Item`.
 	for (let method of Object.values(node.methods)) {
 		for (let form of methodGenericForms(method)) {
 			refuseDuplicateTypeParameters(form)
@@ -6622,12 +6229,8 @@ function refuseMalformedMethodBounds(
 	)
 
 	for (let [methodName, method] of Object.entries(node.methods)) {
-		// One report per Parameter per Method, however many entries name
-		// it — across the forms of an Overload set, which share a name and a
-		// mistake, and across a list that writes one name twice, which
-		// `duplicate-type-parameter` has already said its own piece about. The
-		// same rule the conflicting-`where` report follows, and for the same
-		// reason: a reader reads one Method.
+		// One report per Parameter per Method, across the forms of an Overload
+		// set and across a list that names it twice.
 		let reported = new Set<string>()
 
 		for (let entry of methodGenericEntries(method)) {
@@ -6639,24 +6242,13 @@ function refuseMalformedMethodBounds(
 
 			reported.add(parameter)
 
-			// `infer` is asked FIRST, and the two questions are asked in
-			// that order because the word is what decides which mistake this
-			// is. `<infer Item>` is not a shadow: the receiver DOES bind it —
-			// that is what `infer` asks for, and it is how this spelling worked
-			// before the bound existed. What it is, is the Namespace's own word
-			// written twice.
+			// `infer` is asked first, because the word decides which mistake
+			// this is. `<infer Item>` is no shadow: the receiver binds it, so
+			// it restates the Namespace's own declaration.
 			if (entry.inferred) {
-				// `infer` says where a Parameter's Type comes from, and the
-				// Namespace already said it. Restated here the entry reads as a
-				// DECLARATION of a second Parameter — which is what it used to
-				// be, and what made the bound and the shadow two spellings of one
-				// meaning. One of them had to go, and the one that reads as what
-				// it does is the one that stayed.
-				//
-				// With a bound the entry has something to keep, so the edit keeps
-				// it and loses the word. Without one it has nothing left to say
-				// and the edit is the removal — which is why the `data` below
-				// names the EDIT rather than the code.
+				// With a bound the edit keeps the bound and drops `infer`.
+				// Without one the edit removes the entry, so `data` names the
+				// edit rather than the code.
 				let bound = entry.constraint
 				let restated =
 					bound === null
@@ -6705,18 +6297,10 @@ function refuseMalformedMethodBounds(
 			}
 
 			if (entry.constraint === null) {
-				// The one mistake that used to pass in silence. Nothing
-				// can bind the entry — it carries no `infer` and the receiver
-				// binds the Namespace's Parameter, not this one — so the Method
-				// asked for an Argument of a Type no call could ever produce and
-				// answered `no-matching-overload` for every call that named it,
-				// including the ones in the same file.
-				//
-				// ONE Help. The second used to be `'<Item is …>' with the
-				// Protocol this Method needs`, which is a schematic a reader can
-				// not write down: where the body needs a bound, dropping the
-				// entry reports `unsatisfied-bound`, and THAT Diagnostic names
-				// the Protocol and writes the edit.
+				// Nothing can bind this entry, since the receiver binds the
+				// Namespace's Parameter. Where the body needs a bound, dropping
+				// the entry raises `unsatisfied-bound`, which names the
+				// Protocol.
 				reportError(
 					`'${parameter}' is already this Namespace's Type Parameter`,
 					entry.position,
@@ -6745,8 +6329,7 @@ function refuseMalformedMethodBounds(
 	}
 }
 
-// Every `<…>` list a Namespace Method writes, one per form, for the
-// question that is asked of one list at a time.
+// Every `<…>` list a Namespace Method writes, one per form.
 function methodGenericForms(
 	method: parser.NamespaceMethods[string],
 ): Array<Array<parser.GenericDeclarationNode>> {
@@ -6766,9 +6349,7 @@ function methodGenericForms(
 	}
 }
 
-// Every `<…>` entry a Namespace Method writes, across every form of it,
-// flattened — for the reporting that is about entries one at a time and has no
-// use for which Overload each came from.
+// Every `<…>` entry a Namespace Method writes, across all its forms.
 function methodGenericEntries(
 	method: parser.NamespaceMethods[string],
 ): Array<parser.GenericDeclarationNode> {
@@ -6788,18 +6369,9 @@ function methodGenericEntries(
 	}
 }
 
-// Threads each conditional conformance's bounds into the Methods that
-// fulfil it, in place on the Namespace Type, and answers the Generic
-// Declarations to inject into their typed Nodes. Run TWICE for every hoisted
-// Namespace — once speculatively while it hoists, so a use site above the
-// Statement solves against the bounded Type, and once from the Statement, which
-// is the only pass with typed Nodes to inject into. Idempotent on the Type:
-// `retainNamespaceBounds` retains and bounds the same set every time.
-//
-// `report` is off for the speculative pass: a Diagnostic during hoisting keeps
-// the Namespace out of Scope entirely. The injected Declarations are built in
-// the reporting pass alone — resolving a Generic's default Type can report as
-// well, and they have nowhere to go until there are typed Nodes.
+// Threads per-Method and conditional conformance bounds into the Methods they
+// reach, and answers the Generic Declarations to inject into their typed Nodes.
+// See "Method bounds on Namespace Type Parameters" in DEVELOPMENT.md.
 function weaveMethodBounds(
 	node: parser.NamespaceDefinitionStatementNode,
 	type: common.NamespaceType,
@@ -6807,18 +6379,9 @@ function weaveMethodBounds(
 	scope: enricher.Scope,
 	report: boolean,
 ): Map<string, Array<Array<common.typed.GenericDeclarationNode>>> {
-	// Which Namespace Generic each Method must treat as bound, ONE MAP PER
-	// OVERLOAD. Two sources feed it and they are not shaped alike: a conditional
-	// conformance's `where` reaches every form of a fulfilling Method at once,
-	// because its witness is curried onto the Method as a whole; a per-Method
-	// bound is written on ONE form's `<…>` and reaches that form only, so an
-	// overload set may bound its Parameter in one entry and leave it open in the
-	// next. Keyed by Method name and indexed by Overload, which is the index the
-	// retained Type, the typed Node and the witness list are all ordered by.
-	//
-	// A Method asked for two different bounds on one Generic is a conflict — one
-	// hidden conformance Parameter can not be two things — whichever of the two
-	// sources each side came from.
+	// Which Namespace Type Parameter each Method treats as bound, one map per
+	// Overload, keyed by Method name. The Overload index orders the retained
+	// Type, the typed Node and the witness list alike.
 	let methodBounds = new Map<string, Array<Map<string, string>>>()
 	let splitsOf = new Map<string, Array<MethodGenericSplit>>()
 
@@ -6837,11 +6400,9 @@ function weaveMethodBounds(
 
 		splitsOf.set(methodName, splits)
 
-		// Seeded from the Method's OWN `<…>` bounds, per form, so a
-		// conformance condition meeting one of them is read as the conflict it
-		// is rather than quietly overwriting it — and, under them, from the
-		// bounds the Namespace's TARGET Type implies, which hold for every
-		// Method alike and are what a written one would be restating.
+		// Seeded from the Method's own bounds and those its target Type
+		// implies, so a conflicting condition is reported rather than
+		// overwriting one.
 		let implied = impliedTargetBounds(node, scope)
 		let bounds = splits.map(
 			(split) => new Map([...implied, ...split.bounds]),
@@ -6852,8 +6413,8 @@ function weaveMethodBounds(
 		return bounds
 	}
 
-	// The per-Method bounds first and on their own, because a Method that
-	// fulfils no conformance at all is exactly the case this form exists for.
+	// Per-Method bounds first, since a Method that fulfils no conformance needs
+	// them too.
 	for (let methodName of Object.keys(node.methods)) {
 		boundsFor(methodName)
 	}
@@ -6895,9 +6456,8 @@ function weaveMethodBounds(
 			continue
 		}
 
-		// The map's VALUES are the fulfilling Methods' emitted names; an
-		// overloaded fulfiller carries a `__overload$N` suffix, stripped here
-		// to recover the Namespace Method's own name.
+		// The values are emitted names, and an overloaded fulfiller's carries a
+		// `__overload$N` suffix.
 		let fulfillingMethods = new Set(
 			Object.values(conformance.methodMap).map((emittedName) =>
 				emittedName.replace(/__overload\$\d+$/, ""),
@@ -6936,38 +6496,10 @@ function weaveMethodBounds(
 		}
 	}
 
-	// The constrained Namespace Generics to weave into each fulfilling
-	// Method, as typed Generic Declarations, ONE LIST PER OVERLOAD (a
-	// non-overloaded Method has exactly one). They lead the Method's own
-	// Generics so `simplifyFunctionDefinition` emits their hidden conformance
-	// Parameters first, in Namespace declaration order.
-	//
-	// INVARIANT (the three views of a Method's Type Parameters must agree, per
-	// Overload): the resolved Method Type, the typed Node the Rewriter emits
-	// from, and the witnesses `$type.boundConformance` curries onto a
-	// conformance value are all derived from ONE retained list. A Namespace
-	// Generic is retained on an Overload when its signature mentions it, when a
-	// conditional conformance this Method fulfils bounds it, or when the
-	// Overload's own `<…>` bounds it — the two bound cases are what make the
-	// hidden conformance Parameter honest, because a witness is passed for every
-	// bound on every call. Pruning a bound Generic from one Overload would leave
-	// that Overload's emitted signature and its call sites disagreeing about how
-	// many hidden Arguments there are.
-	//
-	// `boundConformance` curries a `where` witness onto EVERY fulfilling
-	// Method uniformly, whatever each Overload happens to mention, which is why
-	// a conformance condition fills every index of the bounds above. A
-	// per-Method bound is the other shape — written on one form, retained on
-	// that form — and the per-Overload list is what lets the two live together.
-	//
-	// A NATIVE Method has only TWO of those three views — there is no
-	// typed Node, because there is no body to emit. The retention below still
-	// runs over it (it is keyed off the parser Node, which exists either way),
-	// so its resolved Method Type carries the bound Namespace Generics exactly
-	// as a bodied one does; the typed-Node half is simply absent, and
-	// `enrichMethods` drops the corresponding injected list on the floor. That
-	// is the whole difference: the Type view and the witness view still agree,
-	// which is what call sites and `boundConformance` read.
+	// The bounded Namespace Type Parameters to inject per Overload, leading the
+	// Method's own so their witness Parameters are emitted first. INVARIANT:
+	// the Method Type, the typed Node and the curried witnesses agree. See
+	// "Method bounds on Namespace Type Parameters" in DEVELOPMENT.md.
 	let injectedGenerics = new Map<
 		string,
 		Array<Array<common.typed.GenericDeclarationNode>>
@@ -6985,16 +6517,12 @@ function weaveMethodBounds(
 			continue
 		}
 
-		// The Generics each form declares for itself, per Overload — what
-		// tells a retained Namespace Generic apart from a Method Generic that
-		// shadows its name, which no amount of inspecting the merged list can.
+		// The names each form declares itself, telling a retained Namespace
+		// Type Parameter from a Method one that shadows it.
 		let ownGenerics = ownGenericNames(splitsOf.get(methodName) ?? [])
 
-		// Force the bound Namespace Generics back onto every Overload the
-		// signature-driven merge pruned them from, and retrofit the bound onto
-		// the entries that survived — on fresh Generic objects, so the shared
-		// unbounded Namespace Generics (and every other Method) stay untouched.
-		// Idempotent: re-running retains and bounds exactly the same set.
+		// Puts bound Namespace Type Parameters back on Overloads that pruned
+		// them, on fresh objects so shared ones stay untouched. Idempotent.
 		methodType = retainNamespaceBounds(
 			methodType,
 			ownGenerics,
@@ -7008,9 +6536,8 @@ function weaveMethodBounds(
 			continue
 		}
 
-		// The typed Node's Generics are READ BACK OFF the retained Type,
-		// per Overload, rather than derived a second way — that is what keeps
-		// the two views in step by construction.
+		// Read back off the retained Type, so the two views agree by
+		// construction.
 		let retained =
 			methodType.type === "SimpleMethod" ||
 			methodType.type === "StaticMethod"
@@ -7057,13 +6584,9 @@ function weaveMethodBounds(
 	return injectedGenerics
 }
 
-// The Type Parameter names each form of a Namespace Method declares for
-// ITSELF, one Set per Overload. A Method Generic shadows a Namespace Generic of
-// the same name, and once the two are merged into one list the entry no longer
-// says which it came from — this is what remembers. Read off the same splits the
-// bounds are, so an entry that BOUNDS the Namespace's Parameter counts as
-// neither: it declares nothing, and a retained Parameter must not be mistaken
-// for one the Method took over.
+// The Type Parameter names each form of a Namespace Method declares for itself,
+// one Set per Overload. An entry that only bounds the Namespace's Parameter
+// counts as neither.
 function ownGenericNames(
 	splits: Array<MethodGenericSplit>,
 ): Array<Set<string>> {
@@ -7072,18 +6595,10 @@ function ownGenericNames(
 	)
 }
 
-// Returns a copy of a Method Type whose every Overload carries the bound
-// Namespace Generics ITS OWN entry of `bounds` names — re-adding the ones the
-// signature-driven merge pruned because that Overload's signature never mentions
-// them, and retrofitting the bound onto the ones that survived. A conditional
-// conformance's witnesses are curried onto every fulfilling Method uniformly, so
-// an Overload that drops one would emit a signature its call sites do not agree
-// with; retaining them is what keeps the arity honest (and is what makes an
-// unbindable Type Parameter the reportable error it should be). A per-Method
-// bound is retained on the one form that wrote it, for the same reason read the
-// other way round: its witness is passed at calls to THAT form.
-// Fresh Generic objects throughout, so the shared unbounded Namespace Generics
-// are never mutated. Idempotent: re-running retains and bounds the same set.
+// A copy of a Method Type whose every Overload carries the bound Namespace Type
+// Parameters its own entry of `bounds` names, re-added where pruned. Fresh
+// objects throughout, and idempotent. See "Method bounds on Namespace Type
+// Parameters" in DEVELOPMENT.md.
 function retainNamespaceBounds(
 	method: common.MethodType,
 	ownGenerics: Array<Set<string>>,
@@ -7098,9 +6613,8 @@ function retainNamespaceBounds(
 		let leading: Array<common.GenericDeclaration> = []
 
 		for (let namespaceGeneric of namespaceGenerics) {
-			// A Method Generic of the same name shadows this one
-			// outright — it is the Method's entry that is in the list, and
-			// re-adding would duplicate the name.
+			// A Method Type Parameter of the same name shadows this one, and
+			// re-adding it would duplicate the name.
 			if (own.has(namespaceGeneric.name)) {
 				continue
 			}

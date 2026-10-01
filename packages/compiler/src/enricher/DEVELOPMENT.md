@@ -189,3 +189,88 @@ Union of the arms' Types. The Type that spoke is pushed into every arm as its ex
 Some arms decide no Type of their own, such as a bare Case. Under a `define` with no Type to hand them, they
 raise `define-without-answer-type` after the arm's own Diagnostic. `enrichDefine` watches the Diagnostics an arm
 raises to tell this from an undeclared Case, which is also an Error.
+
+## Pattern declarations
+
+A Pattern in a Declaration, such as `constant { accepted, refused } = list::partition(where …)`, desugars into the
+Statements an author could have written instead (`enrichPatternDeclarationStatement`). One Constant holds the
+value, and one Declaration per bound name reads its way down that Constant (`declarePatternBindings`). A
+Parameter's Pattern desugars the same way at the head of the body, and a table test's at the table.
+
+The base is a Constant even under `variable`, and even where the value is a bare name, so the value is evaluated
+exactly once. Only the bindings follow the Declaration's keyword: `variable { index, total } = …` gives two
+Variables, while a Parameter's bindings are always Constants.
+
+The base keeps its Position, because it holds the Declaration's own value Expression, the Statement a debugger
+stops on for that line. The debug adapter treats an unmapped Statement as compiler glue and steps out of it. An
+unmapped base would make Step Over leave the body.
+
+Only the base's name is the compiler's. `synthesizedName` derives it from the Pattern's Position, so enriching a
+body twice, as return Type inference does, mints the same name both times. No Essence Identifier can spell it,
+and `isSynthesizedName` is what every place that must not show it asks.
+
+The members are read off the declared Type where there is one, so the bindings and the annotation never disagree
+about one value. A member annotation is carried as a written annotation rather than checked here, so a mismatch
+is the validator's `assignment-type-mismatch` at the member's own span. A Declaration or a Parameter has nowhere
+to fall through to, so a member matched against a written value is refused there (`refuseRefutablePattern`).
+
+A binding in a Declaration or a Parameter reads its member through `lookupTypeOf`, the resolver a written
+Lookup uses (`memberTypeInIrrefutablePosition`). The Pattern stands for the Constants an author could have
+written, so it must refuse what they are refused for. That is `type-without-members` on a Union, or
+`unknown-member` on a misspelled member. A Matcher reads through `memberTypeOf` instead, because naming a member only some arms carry
+is how it discriminates. An annotation on an intermediate step becomes no Statement, so it is checked where it
+is read.
+
+## Undecided slots
+
+An empty literal leaves a slot undecided: `variable items = []` declares a `List<Unknown>`, and `[=]` leaves both
+slots of a Dictionary Unknown. The first assignment that decides a slot decides it for good (`narrowUnknownSlots`).
+After `items = [1]`, `items` is a List of Integers, and a later `items = ["a"]` is an
+`assignment-type-mismatch`. The assignment's Identifier carries the decided Type, so the validator judges the
+assignment against the slot it decided.
+
+Reads written before the deciding assignment keep the undecided Type, which is sound, since the value they read
+is empty. A Function literal that captures the name is not sound: its body is checked once, against a Type that
+fits every List. `reportUninferableCapture` refuses such a capture with `uninferable-item-type`, and the call
+around it does not report its unbound Type Parameters again.
+
+Two Match Handlers that assign different item Types leave the second mismatched rather than widening the slot
+to a Union. A name that holds both says so in its annotation. A reassigned Constant is already reported, so its
+assignment decides nothing.
+
+## Method bounds on Namespace Type Parameters
+
+A Namespace's own Type Parameters carry no bound (`protocol-bound-namespace-generic`), since a bound there would
+apply to every Method. A bound reaches Methods in two ways. A per-Method bound, `<Item is Comparable>` after a
+Method's name, bounds the Namespace's `Item` for that one form. A conditional conformance's `where` bounds it
+for every Method that fulfils the conformance. `splitMethodGenerics` takes a per-Method bound out of the Method's
+own Type Parameters, so later readers see the Namespace's Parameter.
+
+`refuseMalformedMethodBounds` refuses the two entries a Method may write against a Namespace Type Parameter that
+are no bound. `<infer Item>` restates what the Namespace already declares (`restated-inferred-parameter`).
+`<Item>` without a bound shadows the Namespace's `Item` with a Parameter nothing can bind
+(`shadowed-type-parameter`). Each is reported once per Parameter per Method. Only the reporting pass reports
+them, since a Diagnostic during the hoist keeps the whole Namespace out of Scope.
+
+`weaveMethodBounds` collects the bounds into one map per Method and Overload. A per-Method bound is written on
+one form and reaches that form only. A `where` witness is curried onto the fulfilling Method as a whole, so a
+condition fills every Overload's map. The maps are seeded with the bounds the target Type implies
+(`impliedTargetBounds`) and with the Method's own bounds. A condition that meets a different bound on the same
+Type Parameter is then a conflict. One hidden witness can not stand for two Protocols, so the conflict reports
+`conflicting-where-condition`.
+
+The weave runs twice for a hoisted Namespace. While it hoists, it runs silently so that use sites before the
+Statement see the bounded Method Types. From the Statement it runs again, reporting, and builds the typed
+Generic Declarations the rewriter emits witness Parameters from. It is idempotent on the Type.
+
+INVARIANT: three views of a Method's Type Parameters agree per Overload. They are the resolved Method Type, the
+typed Node the rewriter emits, and the witnesses `boundConformance` in `packages/runtime/src/type.ts` curries
+onto a conformance value. `retainNamespaceBounds` keeps a bound Namespace Type Parameter on an Overload even where
+its signature does not mention it. The typed Node's injected Generics are read back off that retained Type.
+A witness is passed for every bound on every call. Pruning one would leave the emitted signature and its
+call sites disagreeing about the number of hidden Arguments. A native Method has no typed Node, so only the Type
+view and the witness view exist, and they still agree.
+
+`ownGenericNames` remembers which names each form declares for itself. A Method Type Parameter with the
+Namespace's name shadows it, and the merged list does not say which is which. An entry that only bounds the
+Namespace's Parameter declares nothing and counts as neither.
