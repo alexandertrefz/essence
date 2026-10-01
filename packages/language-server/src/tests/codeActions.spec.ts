@@ -5144,10 +5144,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// `Self` is written back as the target Type was WRITTEN. A Record
-		// Alias resolves to the Record it names and carries the name nowhere,
-		// so a signature printed from the Type would read `-> { side: Integer }`
-		// where the reader wrote `Square`.
+		// `Self` is written as the target Type was written. A Record Alias
+		// resolves to its Record, so printing the Type would lose `Square`.
 		it("should write every requirement, a static and a Self among them", () => {
 			let lines = [
 				"implementation {",
@@ -5172,9 +5170,8 @@ describe("Code Actions", () => {
 
 			expect(fix.title).toBe("Implement 'Shape'")
 
-			// A blank line in front of the first stub, because the
-			// Namespace already holds a Method — its members stand a line
-			// apart, and a stub written straight under one reads as part of it.
+			// A blank line before the first stub, since the Namespace's members
+			// already stand a line apart.
 			expect(result.slice(9)).toEqual([
 				"\tnamespace Square for Square is Shape {",
 				"\t\tdescribe() -> String {",
@@ -5230,7 +5227,7 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// `Equatable` requires `is` and PROVIDES `isNot`. A stub for the
+		// `Equatable` requires `is` and provides `isNot`. A stub for the
 		// provided one would replace a working Method with an empty one.
 		it("should leave a Method the Protocol provides alone", () => {
 			let lines = [
@@ -5256,9 +5253,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// An `overload` requirement is a SET, so the stub is the block
-		// and an entry per Overload — a Namespace fulfilling one entry and not
-		// the others fulfills none of them.
+		// An `overload` requirement is a set, so the stub is the block with an
+		// entry per Overload.
 		it("should write an 'overload' block for an overloaded requirement", () => {
 			let lines = [
 				"implementation {",
@@ -5307,8 +5303,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// A Choice derives its own equality, so a Namespace that writes
-		// nothing is right — and there is no Diagnostic to answer.
+		// A Choice derives its own equality, so a Namespace that writes nothing
+		// is right.
 		it("should offer nothing where the Choice derives the conformance", () => {
 			expect(
 				titles(
@@ -5324,9 +5320,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The same edit, offered where the Quick Fix can not reach — the
-		// Diagnostic underlines the clause's Protocol Identifier alone, and a
-		// cursor resting on `namespace` is nowhere near it.
+		// The same edit as a refactoring, since the Diagnostic underlines only
+		// the clause's Protocol and a cursor on `namespace` is not there.
 		it("should offer the same edit as a refactoring on the Namespace head", () => {
 			let lines = [
 				"implementation {",
@@ -5350,8 +5345,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// `Shown` provides a `describe` answering any Number, which is no
-		// answer to the one `Sized` requires, and an Integer answers both.
+		// `Shown` provides a `describe` answering any Number, which does not
+		// fulfil `Sized`'s. An Integer answers both.
 		let describing = (sized: string, shown: string): Array<string> => [
 			"implementation {",
 			"\tprotocol Sized {",
@@ -5387,8 +5382,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// A `describe` answering a String replaces the one `Shown`
-		// provides without fulfilling it, so the stub would be refused as well.
+		// A `describe` answering a String would replace `Shown`'s without
+		// fulfilling it, so the stub would be refused.
 		it("should offer no stub another conformance would refuse", () => {
 			let lines = describing("String", "Integer")
 
@@ -5460,8 +5455,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The refactoring stands down on the clause itself rather than
-		// offering the reader one edit under one title twice.
+		// The refactoring is not offered on the clause, where the Quick Fix
+		// already is.
 		it("should not repeat the Quick Fix on the clause it answers", () => {
 			expect(
 				actionsOf([
@@ -5478,10 +5473,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The conformance a property test asks for, written beside the Type it
-	// is about. What it can not draw it leaves OUT, so the value it builds is
-	// incomplete and says so — a drawn value that was plausible rather than
-	// right would make every property over it a report about the generator.
+	// The conformance a property test asks for, written beside its Type. What
+	// it cannot draw it leaves out, so the value is visibly incomplete.
 	describe("ungeneratable-type", () => {
 		let generatableActions = (
 			lines: Array<string>,
@@ -5527,9 +5520,8 @@ describe("Code Actions", () => {
 				"}",
 			])
 
-			// The conformance replaces the derivation, so the refusal is
-			// answered — and the member it could not draw is a hole the Record
-			// below reports on its own.
+			// The conformance replaces the derivation, so the refusal is answered.
+			// The member it could not draw is a reported hole.
 			expect(codesOf(result)).not.toContain("ungeneratable-type")
 			expect(codesOf(result)).not.toContain("syntax-error")
 			expect(codesOf(result)).toContain("return-type-mismatch")
@@ -5568,9 +5560,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// The hole is per MEMBER rather than per value — a member with no
-		// draw is named in a `§` line and left out, and the members beside it
-		// are written all the same.
+		// A member with no draw is named in a `§` line and left out, and the
+		// other members are written.
 		it("should keep the members it can draw beside the ones it can not", () => {
 			let lines = [
 				"implementation {",
@@ -5615,9 +5606,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// A Case carrying a payload is BUILT before it is picked, and the
-		// list breaks where the Formatter would break it — a scaffold laid out
-		// differently would be rewritten the next time the file is saved.
+		// A Case carrying a payload is built before it is picked, and the list
+		// breaks where the Formatter would break it.
 		it("should build a Case's payload and break the list that does not fit", () => {
 			let lines = [
 				"implementation {",
@@ -5666,10 +5656,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// `generate` takes a source and nothing else, so a call has no
-		// Argument for a Type Parameter to be worked out from — which is what
-		// `unreachable-conformance` refuses. Offering to write one would be
-		// offering to break the file.
+		// `generate` takes only a source, so no Argument can fix a Type
+		// Parameter, which `unreachable-conformance` refuses.
 		it("should offer nothing for a generic Choice", () => {
 			expect(
 				generatableActions(
@@ -5723,11 +5711,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The TITLE quotes what will be written, which is the Hint's edit
-		// and not always the Hint's label: an Alias the position can not
-		// resolve is shown under its name and written as the shape. A title
-		// reading one and an edit writing the other would be the refactoring
-		// promising an annotation it does not make.
+		// The title quotes the Hint's edit, not its label. An Alias the position
+		// cannot resolve is shown by name and written as the shape.
 		it("should quote the annotation it writes where the two differ", () => {
 			let lines = [
 				"implementation {",
@@ -5762,10 +5747,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Match a reader is about to write, scaffolded from the value the
-	// cursor stands on. Its arms are the `missing-case` fix's arms, by the same
-	// rule and in the same spelling, so a scaffold and a Case added later meet
-	// as one thing rather than two.
+	// A Match scaffolded from the value under the cursor. Its arms are the
+	// `missing-case` fix's arms, in the same spelling.
 	describe("Match on a value", () => {
 		let matchActions = (
 			lines: Array<string>,
@@ -5797,9 +5780,8 @@ describe("Code Actions", () => {
 			expect(refactor.diagnosticCode).toBeNull()
 			expect(refactor.isPreferred).toBe(false)
 
-			// The `<- ` is left where it was — only what stands between
-			// `match ` and ` -> ` is written, so the Return stays a Return and
-			// the Function's own `-> String` is what the Match answers with.
+			// The `<- ` stays, and the Match answers with the Function's own
+			// `-> String`.
 			expect(result).toEqual([
 				"implementation {",
 				"\tchoice Colour { Red, Green, Blue }",
@@ -5893,8 +5875,7 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// There is nothing to take apart — a Match over a Type with no
-		// members to name would be a `case Integer` and nothing else.
+		// A value that is no Union has nothing to take apart.
 		it("should offer nothing on a value that is no Union", () => {
 			expect(
 				matchActions(["implementation {", "\tconstant n = 1", "}"], {
@@ -5904,9 +5885,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The request has to sit INSIDE the Expression. A client asking
-		// about a selection of the whole file is asking about no Expression in
-		// particular, and scaffolding into the last one would be a guess.
+		// The request must sit inside the Expression. A selection of the whole
+		// file is about no Expression in particular.
 		it("should offer nothing for a request no Expression contains", () => {
 			expect(
 				titles(
@@ -5921,11 +5901,9 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The `§§` block a signature wants, with nothing written in it. The
-	// assertion that matters is the one about the Diagnostics: a `@param` line
-	// documents the Parameter at its own position and names it the way the
-	// signature does, and getting that wrong by hand is what the three Warnings
-	// exist for.
+	// The empty `§§` block a signature wants. Each `@param` line documents the
+	// Parameter at its position and names it as the signature does, which the
+	// Warnings check.
 	describe("Document a Function", () => {
 		const documentationCodes: Array<common.DiagnosticCode> = [
 			"undocumented-parameter",
@@ -5984,9 +5962,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// The LABEL, never the internal name — a Parameter that carries
-		// no label is `_` to the signature and to the rule alike, whatever the
-		// body reads it under.
+		// The label, never the internal name. A Parameter with no label is `_`
+		// to the signature and the rule alike.
 		it("should name a Parameter that carries no label '_'", () => {
 			let lines = [
 				"implementation {",
@@ -6056,8 +6033,8 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// The `static` keyword stands in front of the name on the same
-		// line, and the block goes above that line rather than between them.
+		// The `static` keyword stands before the name on the same line, and
+		// the block goes before that line.
 		it("should write above the 'static' keyword rather than under it", () => {
 			let lines = [
 				"implementation {",
@@ -6104,9 +6081,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Formatter refuses to move between the two spellings, so this is
-	// where a reader gets to. Both directions, and neither of them inside an
-	// update's key list, where the two spellings do not mean the same thing.
+	// The Formatter does not switch between the two spellings, so this does.
+	// Neither direction is offered in an update's key list.
 	describe("Property shorthand", () => {
 		let shorthandTitles = (
 			lines: Array<string>,
@@ -6166,8 +6142,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// `{ base with x }` merges the VALUE `x`, so shortening the key
-		// list would be a rewrite of what the file means.
+		// `{ base with x }` merges the value `x`, so shortening the key list
+		// would change the meaning.
 		it("should offer nothing inside an update's key list", () => {
 			expect(
 				shorthandTitles([
@@ -6210,11 +6186,9 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Enricher writes a path's Function literal for it, so the two
-	// spellings reach the rest of the pipeline as one Node — which is what
-	// makes this a round trip rather than a rewording. Both directions are
-	// offered inside an Argument and nowhere else, so that neither of them can
-	// produce something the other would refuse to turn back.
+	// The Enricher writes a path's Function literal, so both spellings reach
+	// the pipeline as one Node. Both directions are offered only inside an
+	// Argument, so each can turn the other back.
 	describe("Member paths", () => {
 		let pathRefactors = (
 			lines: Array<string>,
@@ -6267,9 +6241,8 @@ describe("Code Actions", () => {
 			)
 		})
 
-		// The two directions are inverses, and the Compiler is asked
-		// about every text either of them wrote — a rewrite that produced a
-		// Program nobody can compile would still round trip.
+		// The directions are inverses, and every text either wrote is compiled,
+		// since a broken rewrite would still round trip.
 		it("should hand the text back when both directions are applied", () => {
 			let lines = [
 				"implementation {",
@@ -6302,8 +6275,7 @@ describe("Code Actions", () => {
 			expect(codesOf(applied(lines, refactor))).toEqual([])
 		})
 
-		// A path reads members and does nothing else — a call in the
-		// chain is a Function that only the literal can write.
+		// A path only reads members, so a call in the chain needs the literal.
 		it("should offer nothing on a body that computes", () => {
 			expect(
 				titles(
@@ -6330,10 +6302,9 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// A path is read in several kinds of position and an Argument is
-		// only one of them, but it is the one that can be recognised without
-		// asking the Enricher what the position expected. A literal bound to an
-		// annotated name keeps its own spelling.
+		// An Argument is the position recognised without asking the Enricher
+		// what it expected. A literal bound to an annotated name keeps its
+		// spelling.
 		it("should offer nothing outside an Argument", () => {
 			expect(
 				titles(
@@ -6346,8 +6317,7 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The Comment stands between the brackets that are about to go,
-		// and there is nowhere in a path to write it.
+		// A path has nowhere to keep the Comment.
 		it("should offer nothing on a literal holding a Comment", () => {
 			expect(
 				titles(
@@ -6399,10 +6369,9 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The other way round: an if/else whose branches only answer is a
-	// definition by cases with the case written after the answer instead of in
-	// front of it. Both directions are offered, and the `-> Type` is what a
-	// `define` needs and an if/else does not.
+	// An if/else whose branches only answer is a definition by cases. Both
+	// directions are offered, and a `define` needs a `-> Type` an if/else does
+	// not.
 	describe("define ladders", () => {
 		let defineRefactors = (
 			lines: Array<string>,
@@ -6469,10 +6438,8 @@ describe("Code Actions", () => {
 			expect(applied(written, onlyRefactor(written))).toEqual(ladder)
 		})
 
-		// A `<-` inside a Match Handler answers the MATCH rather than the
-		// Function around it, so the `-> Type` a `define` standing in for one
-		// carries is the Match's. The Function's would be the wrong Type on
-		// every arm, and the round trip would not hand the text back either.
+		// A `<-` inside a Match Handler answers the Match, so a `define` standing
+		// in for one carries the Match's `-> Type`.
 		it("should answer the Match a Handler's define stands in", () => {
 			let handler = [
 				"implementation {",
@@ -6520,9 +6487,7 @@ describe("Code Actions", () => {
 			expect(applied(asDefine, onlyRefactor(asDefine))).toEqual(handler)
 		})
 
-		// One action rather than one per rung — every `else if` of a
-		// cascade is an if/else of its own, and each would offer the same
-		// rewrite one arm shorter.
+		// One action rather than one per rung of an `else if` cascade.
 		it("should read a whole else-if cascade as one ladder", () => {
 			let lines = [
 				"implementation {",
@@ -6555,10 +6520,8 @@ describe("Code Actions", () => {
 			expect(applied(result, onlyRefactor(result))).toEqual(lines)
 		})
 
-		// A `define` takes its Type from its own annotation and not from
-		// the `<-` it stands under, so an arm answering with a bare `#Case`
-		// needs the one the Function wrote. A contextually typed literal wrote
-		// none, and there is nothing to copy.
+		// A `define` takes its Type from its own annotation, copied from the
+		// Function. A contextually typed literal wrote none to copy.
 		it("should leave the annotation out where the Function wrote none", () => {
 			let lines = [
 				"implementation {",
@@ -6587,12 +6550,9 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// An arm below the first is read behind the COMPLEMENT of every
-		// Condition above it, and an `else` branch is read behind its own —
-		// `separator::isEmpty()` proves the `NonEmptyString` that `split` asks
-		// for either way. Both spellings are put to the Compiler, since a
-		// narrowing that survived one direction and not the other would be a
-		// rewrite that changes what compiles.
+		// A later arm is read behind the complement of every earlier Condition,
+		// as an `else` is. `separator::isEmpty()` proves the `NonEmptyString`
+		// that `split` asks for either way.
 		it("should keep what a Condition proves about the branch below it", () => {
 			let lines = [
 				"implementation {",

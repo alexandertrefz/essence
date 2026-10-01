@@ -105,7 +105,7 @@
 	"packages/compiler/src/tests/undecidedSeeds.spec.ts": {"sentence-length": 34, "em-dash": 21, "all-caps": 14, "history": 2, "block-length": 3},
 	"packages/compiler/src/tests/unknownNarrowing.spec.ts": {"sentence-length": 20, "em-dash": 24, "all-caps": 10, "history": 2, "block-length": 1},
 	"packages/compiler/src/tests/validator.spec.ts": {"sentence-length": 101, "em-dash": 84, "all-caps": 39, "history": 1, "position": 4, "block-length": 5},
-	"packages/language-server/src/tests/codeActions.spec.ts": {"sentence-length": 74, "em-dash": 64, "all-caps": 29, "history": 2, "position": 5, "block-length": 2},
+	"packages/language-server/src/tests/codeActions.spec.ts": {"sentence-length": 50, "em-dash": 47, "all-caps": 17, "history": 2, "position": 4, "block-length": 2},
 	"packages/runtime/src/tests/asciiFastPath.spec.ts": {"sentence-length": 29, "em-dash": 18, "all-caps": 30, "position": 4, "block-length": 3},
 	"packages/runtime/src/tests/asynchrony.spec.ts": {"sentence-length": 14, "em-dash": 9, "all-caps": 6, "position": 1, "block-length": 2},
 	"packages/runtime/src/tests/dictionaries.spec.ts": {"sentence-length": 85, "em-dash": 55, "all-caps": 64, "history": 2, "position": 5, "block-length": 6},
