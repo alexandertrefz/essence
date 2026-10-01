@@ -180,6 +180,7 @@ function walkMutations(
 		{
 			expression: (node) => mutateExpression(node, context, offer),
 			statement: (node) => mutateStatement(node, context, offer),
+			parameterDefaults: true,
 		},
 	)
 
@@ -678,6 +679,8 @@ function readContext(program: common.typedSimple.Program): MutationContext {
 
 				return node
 			},
+			// The mutation walk reaches the defaults, so this one does too.
+			parameterDefaults: true,
 		},
 	)
 
@@ -703,6 +706,7 @@ function collectCondition(
 
 				return node
 			},
+			parameterDefaults: true,
 		},
 	)
 }

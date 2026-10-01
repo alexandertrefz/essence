@@ -1321,7 +1321,12 @@ function recordDefaultPrologue(
 
 		let recordType = parameter.type as common.RecordType
 		let defaultValue = parameter.defaultValue!
-		let position = parameter.position
+		// The Parameter and its default, so a coverage point at the merge holds
+		// what the default writes.
+		let position: common.Position = {
+			start: parameter.position.start,
+			end: defaultValue.position.end,
+		}
 		let argument = (): common.typedSimple.IdentifierNode => ({
 			nodeType: "Identifier",
 			name: simplified[index]!.internalName.name,

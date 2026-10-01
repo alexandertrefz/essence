@@ -88,9 +88,10 @@ describe("Simplifier Positions", () => {
 	})
 
 	// A step into the Function stops on the defaulted Parameter rather than on
-	// glue the Debug Adapter would step out of. See "Record defaults" in
-	// packages/compiler/src/simplifier/DEVELOPMENT.md.
-	it("gives a Record default's merge the Parameter's position", () => {
+	// glue the Debug Adapter would step out of. The merge runs to the end of the
+	// default, so a coverage point there holds what the default writes. See
+	// "Record defaults" in packages/compiler/src/simplifier/DEVELOPMENT.md.
+	it("spans a Record default's merge over the Parameter and its default", () => {
 		let { typed, simplified } = simplifyWithTyped(`implementation {
 			type Options = { host: String, retries: Integer }
 
@@ -114,7 +115,10 @@ describe("Simplifier Positions", () => {
 
 		expect(simplifiedStatement.value.parameters[0]!.defaultValue).toBeNull()
 		expect(merge.nodeType).toBe("VariableAssignmentStatement")
-		expect(merge.position).toEqual(parameter.position)
+		expect(merge.position).toEqual({
+			start: parameter.position.start,
+			end: parameter.defaultValue!.position.end,
+		})
 	})
 
 	it("leaves the filler an omission emits position-less", () => {

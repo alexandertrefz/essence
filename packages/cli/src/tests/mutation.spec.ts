@@ -289,6 +289,60 @@ describe("essence test --mutate", () => {
 		})
 	})
 
+	it("judges a mutant in a Parameter default by the tests that use it", async () => {
+		let source = [
+			"implementation {",
+			"\tfunction limit(_ n: Integer = 10) -> Integer {",
+			"\t\t<- n",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "uses the default" {',
+			"\t\texpect limit()::is(10)",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Limit.es": source }, async (directory) => {
+			let counts = tally((await mutate(directory, ["--json"])).out)
+
+			expect(counts.sites).toBe(3)
+			expect(counts.uncovered).toBe(0)
+			expect(counts.killed).toBe(3)
+		})
+	})
+
+	// A Record default is merged at the head of the body, whose counter spans
+	// the Parameter and its default.
+	it("judges a mutant in a Record default by the tests that use it", async () => {
+		let source = [
+			"implementation {",
+			"\ttype Options = { retries: Integer, label: String }",
+			"",
+			'\tfunction tries(_ options: Options = { retries = 3, label = "x" }) -> Integer {',
+			"\t\t<- options.retries",
+			"\t}",
+			"}",
+			"",
+			"tests {",
+			'\ttest "uses the default" {',
+			"\t\texpect tries()::is(3)",
+			"\t}",
+			"}",
+			"",
+		].join("\n")
+
+		await withFiles({ "Tries.es": source }, async (directory) => {
+			let counts = tally((await mutate(directory, ["--json"])).out)
+
+			expect(counts.sites).toBe(3)
+			expect(counts.uncovered).toBe(0)
+			expect(counts.killed).toBe(3)
+		})
+	})
+
 	it("honours --mutation-limit", async () => {
 		await withFiles({ "Grading.es": WEAK }, async (directory) => {
 			let whole = tally((await mutate(directory, ["--json"])).out)

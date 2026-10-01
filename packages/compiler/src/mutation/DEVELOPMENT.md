@@ -8,8 +8,8 @@ CLI compiles each mutant and asks whether any test fails.
 
 `enumerateMutations` and `applyMutation` share one walk, `walkMutations`, so they can not disagree about which site an
 id names. The walk runs over a simplified Program before the optimiser. So a site stands where the author wrote it,
-and nothing the optimiser adds is mistaken for one. It walks the implementation alone: the tests section is skipped,
-so no id is spent inside it.
+and nothing the optimiser adds is mistaken for one. It walks the implementation alone, Parameter defaults included.
+The tests section is skipped, so no id is spent inside it.
 
 A site's id is its place in the walk, a running count fixed by the shape of the Program. `offer` gives every candidate
 of a Node its own id, so three nudges of one literal are three sites. Enumeration records every candidate and takes

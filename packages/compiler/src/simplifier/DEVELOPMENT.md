@@ -61,6 +61,9 @@ first reads optionally.
 `recordDefaultMembers` and `recordDefaultNesting` also give the Parameter's Type its `defaultMembers` and
 `defaultNesting`. So what a call may leave out and what the prologue fills in come from one answer.
 
+The prologue's Statements start where the Parameter does, so a step into the Function stops on it. They end
+where its default does, so a coverage point there holds what the default writes.
+
 A native Method with a Record default gets the same prologue in its shim, so the native receives a whole
 Record. Every call to such a native goes through the shim.
 

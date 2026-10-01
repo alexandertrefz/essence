@@ -105,8 +105,7 @@ the language server's session both need it. The language server may not depend o
 A `test-coverage` event names points by index into its Module's `coverage` table.
 
 `coveringPoints` finds the points over a site: every point whose span holds it, since a test reaching any of them
-reached the site. Where none holds it, every overlapping point counts instead. A site in a Parameter default, or in
-a Node whose Position the Simplifier trimmed, may only overlap. Answering with nothing would call a tested site
-uncovered. All overlapping points count, not the narrowest, since a mutant must be judged by every test that could
+reached the site. Where none holds it, every overlapping point counts instead. A site in a Node whose Position the
+Simplifier trimmed may only overlap. Answering with nothing would call a tested site uncovered. All overlapping points count, not the narrowest, since a mutant must be judged by every test that could
 notice it. The span predicates `holds` and `overlaps` come from the instrumentation pass, so both sides agree on
 what they mean.

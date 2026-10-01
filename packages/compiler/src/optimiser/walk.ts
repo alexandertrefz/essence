@@ -33,6 +33,9 @@ type NodeRewrites = {
 	// before it to lift work into. A pass that rewrites in place, or only
 	// reads, asks.
 	parameterDefaults?: true
+	// Offered each whole default after it was walked, where a walk descends
+	// into defaults.
+	parameterDefault?: ExpressionRewrite
 }
 
 // Bottom-up for Statements too: a Statement's Expressions and bodies are
@@ -622,7 +625,8 @@ function walkParameterDefaults(
 			return parameter
 		}
 
-		let defaultValue = walkExpression(parameter.defaultValue, rewrites)
+		let walked = walkExpression(parameter.defaultValue, rewrites)
+		let defaultValue = rewrites.parameterDefault?.(walked) ?? walked
 
 		return defaultValue === parameter.defaultValue
 			? parameter

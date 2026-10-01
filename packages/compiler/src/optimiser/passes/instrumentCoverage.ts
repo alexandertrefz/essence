@@ -59,14 +59,17 @@ function instrument(
 		position,
 	})
 
-	// The implementation is instrumented whole. The tests section counts only
-	// Case constructions, which are claims about what the tests did.
+	// The implementation is instrumented whole, Parameter defaults included.
+	// The tests section counts only Case constructions, which are claims about
+	// what the tests did.
 	let implementation = rewriteNodes(
 		{ ...program, tests: null },
 		{
 			body: (nodes) => instrumentBody(nodes, mark, counter),
 			statement: (node) => instrumentStatement(node, mark, counter),
 			expression: (node) => instrumentExpression(node, mark, counter),
+			parameterDefaults: true,
+			parameterDefault: (node) => instrumentDefault(node, mark, counter),
 		},
 	)
 	let instrumentedTests = rewriteNodes(
@@ -74,7 +77,10 @@ function instrument(
 			...program,
 			implementation: { nodeType: "ImplementationSection", nodes: [] },
 		},
-		{ expression: (node) => instrumentConstruction(node, mark) },
+		{
+			expression: (node) => instrumentConstruction(node, mark),
+			parameterDefaults: true,
+		},
 	)
 
 	let choices = choicesOf(program)
@@ -152,6 +158,25 @@ function countsAsStatement(
 		default:
 			return true
 	}
+}
+
+// A default runs on each call that leaves its Argument out, and counts as a
+// Statement would, before its value is built.
+function instrumentDefault(
+	node: common.typedSimple.ExpressionNode,
+	mark: Mark,
+	counter: Counter,
+): common.typedSimple.ExpressionNode {
+	if (node.position === undefined) {
+		return node
+	}
+
+	return counter(
+		mark("statement", "", node.position),
+		node.position,
+		node,
+		true,
+	)
 }
 
 // Both sides of every Conditional, so an `if` without an `else` still reports

@@ -191,6 +191,23 @@ describe("Mutation sites", () => {
 		])
 	})
 
+	it("nudges an Integer literal in a Parameter default", () => {
+		let source = [
+			"implementation {",
+			"	function limit(_ n: Integer = 10) -> Integer {",
+			"		<- n",
+			"	}",
+			"}",
+			"",
+		].join("\n")
+
+		expect(only(sitesOf(source), "integer")).toEqual([
+			"2 swap 10 for 11",
+			"2 swap 10 for 9",
+			"2 swap 10 for 0",
+		])
+	})
+
 	it("swaps a construction for the next sibling Case", () => {
 		expect(only(sitesOf(), "case")).toEqual(["17 swap #Win for #Draw"])
 	})

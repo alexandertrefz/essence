@@ -233,6 +233,22 @@ describe("The coverage instrumentation pass", () => {
 		])
 	})
 
+	it("gives a define in a Parameter default its branch points", () => {
+		let program = instrumented(`implementation {
+	function limit(_ n: Integer = define {
+		as 10 if true
+		as 20 otherwise
+	}) -> Integer {
+		<- n
+	}
+}`)
+
+		expect(labelsOf(program, "branch")).toEqual([
+			"limit › if",
+			"limit › otherwise",
+		])
+	})
+
 	it("marks a branch whose condition established something", () => {
 		let branches = pointsOf(instrumented(fixtures)).filter(
 			(point) => point.kind === "branch",
@@ -633,6 +649,38 @@ tests {
 		expect(neverConstructed(summary)).toEqual([
 			{ choice: "Colour", tag: "#Blue" },
 		])
+	})
+
+	it("counts a Parameter default on every call that leaves it out", async () => {
+		let { coverage, summary } = await runWithCoverage(`implementation {
+	choice Mode { Fast, Slow }
+
+	function speed(_ mode: Mode = #Fast) -> Integer {
+		<- match mode -> Integer {
+			case #Fast { <- 2 }
+			case #Slow { <- 1 }
+		}
+	}
+}
+
+tests {
+	test "leaves the Mode out twice" {
+		expect speed()::is(2)
+		expect speed()::is(2)
+		expect speed(#Slow)::is(1)
+	}
+}`)
+		let onDefault = coverage.points.filter(
+			(point) =>
+				point.position.start.line === 4 &&
+				point.position.start.column === 32,
+		)
+
+		expect(onDefault.map((point) => [point.kind, point.count])).toEqual([
+			["construction", 2],
+			["statement", 2],
+		])
+		expect(neverConstructed(summary)).toEqual([])
 	})
 
 	it("starts a second run where loading the Module left it", async () => {

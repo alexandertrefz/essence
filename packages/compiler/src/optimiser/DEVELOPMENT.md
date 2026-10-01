@@ -108,7 +108,10 @@ disagree about what they reached.
   there are, which `eliminate-dead-code` needs. Every body goes through `walkBody`.
 - `parameterDefaults` makes the walk descend into a Parameter's `= expression` default. It is off unless asked for.
   Several passes answer an Expression by lifting work into Statements ahead of it, and a Parameter list has nowhere to
-  put them. `fold-constants`, `pool-constants` and `eliminate-dead-code` ask for it.
+  put them. `fold-constants`, `pool-constants`, `eliminate-dead-code` and `instrument-coverage` ask for it, and so
+  does the mutation walk.
+- `parameterDefault` receives each whole default after it was walked, where the walk descends into defaults. A
+  default's root is offered to the `expression` hook too, which can not tell it from any other Expression.
 
 ### Positions
 
@@ -580,6 +583,11 @@ The points:
   what reaches it.
 - Every Case construction the source wrote gets a `construction` point, in the tests section too. "No test
   builds a `#Forfeited`" is a claim about what the tests did.
+- Every Parameter default with a Position that stays a JavaScript default gets a `statement` point that counts
+  before its value, so it counts once per call that leaves the Argument out. A Record default is merged by a
+  prologue at the head of the body instead, whose Statements span the Parameter and its default and count on
+  every call. The points inside a default are counted like any other. A mutation site in a default then has a
+  point that holds it.
 
 A Match names every Case it can meet, and a Choice names every Case there is. So "which arms never ran" and
 "which Cases were never built" are complete answers.
