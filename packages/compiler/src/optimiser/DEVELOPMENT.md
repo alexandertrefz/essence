@@ -554,3 +554,42 @@ a tag test its negation. `!` over `!` is the operand again.
 A nested Namespace named `Integer` may answer `isLessThan` however it likes, so a nested name refuses its calls
 across the whole Program. The same set answers the purity question, since a call that may not be lowered may not
 be skipped either.
+
+### instrument-coverage
+
+Coverage is instrumentation, the one pass that makes a Program do more work. It runs only when the options ask
+for coverage, and is a no-op otherwise. The prelude is built without coverage, so a report covers the project's
+own files.
+
+The pass runs first, so that each counter stands where the author wrote the code it counts, not in a Statement a later
+pass invented. A later pass may still remove code a counter stands in, as `prune-dead-match-arms` drops an unreachable
+arm. That point stays in the table, counted zero, and is reported as never taken, which is true. Nothing is ever
+counted that did not run. A counter is impure, so no pass pools, hoists or drops one.
+
+The points:
+
+- A `statement` point stands before every Statement with a Position that is not a declaration. A declaration is
+  there whether or not anything ran, and a synthesized Statement has no source to point at.
+- An `if` gets a `branch` point on each side, so an `if` without an `else` still reports a condition that was
+  never false. Each side is marked `refinement` by the claim about its own path: `narrows` for the `if`,
+  `narrowsFalse` for the `else`. `played::isNot(0)` narrows the `if` side and `separator::isEmpty()` the `else`.
+- Every Match Handler gets a `case` point, labelled as its Matcher was written. A literal Matcher is labelled by
+  its value, so `case 0` and `case Integer` are told apart.
+- Every `define` arm gets a `branch` point labelled `if`, and the `otherwise` one labelled `otherwise`, so
+  arms roll into branch coverage. The `otherwise` point is a refinement where any arm's complement narrows
+  what reaches it.
+- Every Case construction the source wrote gets a `construction` point, in the tests section too. "No test
+  builds a `#Forfeited`" is a claim about what the tests did.
+
+A Match names every Case it can meet, and a Choice names every Case there is. So "which arms never ran" and
+"which Cases were never built" are complete answers.
+
+An arm has no body to put a Statement in, so its counter wraps the value and answers with it. A construction's
+counter wraps its value too. `CoverageCounterNode.leads` says which side of the value the count happens on. An
+arm counts before its value, since taking the path is all it claims. A construction counts after, so a payload
+that throws counts nothing.
+
+Each point records its innermost enclosing Function or Method, found by Position, so a report reads
+`Standings::compute › case #Postponed`. On a tie the first collected, the nested one, wins. `essence test
+--mutate` joins its mutation sites onto these points by span, using this pass's own definitions of holding and
+overlapping.
