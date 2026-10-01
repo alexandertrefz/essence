@@ -5457,19 +5457,8 @@ class DescentParser {
 
 		let rhs = this.parseExpression()
 
-		// `{ ages with "alex" = 40 }` — a Dictionary update written in a
-		// Record's braces, which is the same mistake the head of a braced
-		// literal catches one Token earlier and it is caught by the same test:
-		// a key that is a WRITTEN VALUE with an `=` behind it spells a
-		// Dictionary and nothing else. Left alone this reports
-		// `Expected '}' but found '='` about a Token nobody meant, which is
-		// exactly what the check above exists to prevent — it just never ran
-		// here, because the `with` had already been read past.
-		//
-		// It is reported after the three readings have been thrown away rather
-		// than before them, so a Record update still reads as one: `port` is a
-		// member name and no value, and `{ base with other }` is an Expression
-		// the first two readings claim.
+		// `{ ages with "alex" = 40 }`: a Dictionary update in a Record's braces.
+		// See "Record literals and updates" in DEVELOPMENT.md.
 		if (
 			this.tokens.peek()?.type === TokenType.SymbolEqual &&
 			writesAValueKey(rhs)
@@ -5502,10 +5491,8 @@ class DescentParser {
 		})
 	}
 
-	// One Diagnostic per bare name, on a Combination the third reading
-	// recovered. The recovered key list is kept — it is what the author meant,
-	// and the Language Server goes on offering completions and colour inside a
-	// file the Compiler has already refused.
+	// One Diagnostic per bare name in a recovered update, which is kept as the
+	// author meant it.
 	protected reportShorthandInCombination(
 		combination: parser.CombinationNode,
 	): void {
@@ -5516,11 +5503,7 @@ class DescentParser {
 			return
 		}
 
-		// EVERY bare key, gathered before the first report is written.
-		// One Diagnostic is raised per name, but the Record each of them offers
-		// to merge has to hold them all: `{ config with port, host }` answered
-		// the `port` report with `'{ base with { port } }'`, and a reader who
-		// followed it dropped `host` on the floor without being told.
+		// Every bare key, so each report's Help merges all of them.
 		let bare = Object.values(combination.rhs.members).filter(
 			(member) => member.shorthand === true && member.steps === undefined,
 		)
@@ -5528,9 +5511,7 @@ class DescentParser {
 		let merged = `'{ ${base} with { ${bare.map((member) => member.name.content).join(", ")} } }'`
 
 		for (let member of bare) {
-			// A bare PATH key was already refused as it was read, with
-			// the message that explains why no reading rescues it — there is
-			// no `a.b = a.b` for it to have meant.
+			// A bare path key was refused as it was read.
 			let name = member.name.content
 
 			reportError(
@@ -5556,19 +5537,9 @@ class DescentParser {
 		}
 	}
 
-	// `allowShorthand` is a property of the BRACES, not of the member —
-	// a Record literal's member list takes `{ x }` for `{ x = x }`, and a
-	// Combination's key list does not, because a bare name after `with` is
-	// already the whole value being merged in. The one flag is what keeps
-	// `{ base with other }` from silently turning into "set member `other`".
-	//
-	// A Dictionary's key list has no shorthand at all, in a literal or in
-	// an update — `["a" = 1]` writes a key that is a VALUE, and a bare name
-	// there is that value and not short for anything. See
-	// `parseDictionaryUpdate`.
-	// `opening` is the `{` this list stands in, carried down so that a
-	// member the reader never began is answered with the bracket the braces are
-	// short of — see `refuseListContinuation`.
+	// `allowShorthand` belongs to the braces: a Record literal takes `{ x }`,
+	// an update's key list does not. `opening` is the `{` the list stands in.
+	// See "Record literals and updates" in DEVELOPMENT.md.
 	protected parseKeyValuePairList(
 		allowShorthand: boolean,
 		opening: Token,
@@ -5617,27 +5588,13 @@ class DescentParser {
 			return this.parsePathKeyValue(name, path.steps, allowShorthand)
 		}
 
-		// `{ x: 0 }` — a member written with the separator every other
-		// language writes an object's with. Refused HERE, where the name and the
-		// `:` are both in hand, rather than left to the readings above: the
-		// shorthand below would claim `x` as a member of its own and the reading
-		// would fall apart one Token later, on a `}` that is nowhere near the
-		// mistake.
-		//
-		// A `:` in braces is Essence in two other places, and neither
-		// reaches this: a Record TYPE (`{ x: Integer }`) is read by
-		// `parseRecordType`, and a Pattern's Type annotation (`{ x: Integer }` in
-		// `constant { x: Integer } = point`) by `parsePatternMember`. This is the
-		// key list of a Record LITERAL, where a `:` spells nothing at all.
+		// `{ x: 0 }`: another language's member separator. A Record Type and a
+		// Pattern read their `:` elsewhere, so here it spells nothing.
 		let colon = this.tokens.peek()
 
 		if (colon?.type === TokenType.SymbolColon) {
-			// The span a fix writes over runs from the name to the value,
-			// and what it writes is ' = ' — a `:` is written flush against its
-			// name and an `=` is written with a blank either side, so rewriting
-			// the Token alone would leave `{ x= 0 }` for the Formatter to tidy.
-			// Only where the value stands on the same line: a span across a line
-			// break would pull the two together.
+			// The fix writes ' = ' from the name to the value, where the value
+			// is on the same line, since a `:` stands flush against its name.
 			let value = this.tokens.peek(1)
 			let rewritten =
 				value !== undefined &&
@@ -5666,10 +5623,8 @@ class DescentParser {
 			)
 		}
 
-		// The value is a Node of its own at the name's Position rather
-		// than the name Node itself — two Declarations at one Position is
-		// exactly what the shorthand is, and the rename index is built to
-		// carry both.
+		// The value is a Node of its own at the name's Position, which the
+		// rename index carries alongside the name.
 		if (
 			allowShorthand &&
 			this.tokens.peek()?.type !== TokenType.SymbolEqual
@@ -5692,19 +5647,9 @@ class DescentParser {
 		})
 	}
 
-	// The steps after a key's first Identifier, or null where the key is
-	// a plain name — which is what tells the two apart everywhere below. Every
-	// key position reads a path, a plain Record Literal's included: this is
-	// the one key list the Parser has, read for a Record Literal, for the
-	// members of a `with` and for a default alike, so it can not tell from
-	// here which of them it is inside of. What a path key needs is a value
-	// already under it to reach into, and that is what the Enricher refuses it
-	// for — `path-key-outside-combination` — with the whole Record in hand.
-	//
-	// One Token of lookahead settles `.{`: after a step's dot, a `{` opens a
-	// braced descend and an Identifier continues the path. A member name is
-	// never `{`, so there is nothing to be ambiguous about — and a descend ends
-	// the key, since it already writes every member the key reaches.
+	// The steps after a key's first Identifier, or null for a plain name. A
+	// `{` after a dot opens a braced descend, which ends the key.
+	// See "Record literals and updates" in DEVELOPMENT.md.
 	protected parseKeyPath(name: parser.IdentifierNode): {
 		steps: Array<parser.IdentifierNode>
 		group: parser.RecordValueNode | null
@@ -5728,16 +5673,13 @@ class DescentParser {
 		return { steps, group: null }
 	}
 
-	// `server.{ port = 1, host }` — the member list of an update written
-	// one level down. Shorthand is allowed inside it, where it is refused after
-	// a `with`: a bare name there could be the whole value being merged, and
-	// inside a descend there is no such reading to lose.
+	// `server.{ port = 1, host }`: an update's member list one level down,
+	// where shorthand is allowed.
 	protected parseKeyGroup(
 		steps: Array<parser.IdentifierNode>,
 	): parser.RecordValueNode {
-		// Counted, because a descend holding a descend recurs through
-		// the key list rather than through an Expression — so without this the
-		// only nesting in the language the depth guard did not bound.
+		// Counted, since nested descends recur through the key list rather
+		// than through an Expression.
 		this.enterNesting()
 
 		try {
@@ -5783,8 +5725,8 @@ class DescentParser {
 		})
 	}
 
-	// Reported and recovered rather than failed on: an empty descend is a
-	// half-written one, and the rest of the list is still worth reading.
+	// Reported rather than thrown, since an empty descend is half-written and
+	// the rest of the list still reads.
 	protected reportEmptyPathGroup(
 		steps: Array<parser.IdentifierNode>,
 		position: common.Position,
@@ -5801,12 +5743,8 @@ class DescentParser {
 			notes: [
 				`An update writes the members it names, so a descend with none in it says to leave '${spelling}' exactly as it is.`,
 			],
-			// "or drop the key" was one Help and it was a dead end where
-			// the key is the ONLY one: `{ config with server.{ } }` dropped down
-			// to `{ config with }`, which is a syntax error. The second clause
-			// says what to do there, and names the value the update was written
-			// on — dropping the last key drops the update, and the value on its
-			// own is what it was going to answer anyway.
+			// Dropping the only key drops the update, so the Help names the
+			// value written on its own.
 			helps:
 				this.updatedValue === null
 					? [
@@ -5819,13 +5757,9 @@ class DescentParser {
 		})
 	}
 
-	// A path key always spells its value. Where the key ENDED without
-	// one — a `,` or the closing brace stands where the `=` was — the member is
-	// recovered under the name of its last step so the rest of the list can be
-	// read, and refused with the one message that fits: no reading rescues a
-	// bare path, since there is no `a.b = a.b` for it to have meant. Anything
-	// else after the key falls through to the `=` this expects, whose failure
-	// is what lets `{ config.server with … }` be read as the Combination it is.
+	// A path key always spells its value. A bare path is reported and kept
+	// under its last step's name. Otherwise the `=` is expected, and its
+	// failure lets `{ config.server with … }` read as an update.
 	protected parsePathKeyValue(
 		name: parser.IdentifierNode,
 		steps: Array<parser.IdentifierNode>,
@@ -5887,12 +5821,8 @@ class DescentParser {
 		})
 	}
 
-	// Two keys clash when they are the same, or when one is a PREFIX of
-	// the other at a step boundary: `server = s` sets the whole Record and
-	// `server.port = 1` reaches into it, so writing both says two things about
-	// `server` and only one of them can survive a Record keyed by name.
-	// `serverPort` is not a prefix of `server` — the boundary is the dot, not
-	// the characters.
+	// Two keys clash when they are the same, or one is a prefix of the other
+	// at a dot, as `server` and `server.port` are.
 	protected reportClashingMemberKeys(
 		pairs: Array<ReturnType<typeof generators.keyValuePair>>,
 	): void {
@@ -5920,10 +5850,7 @@ class DescentParser {
 						primary(position, "defined a second time here"),
 						secondary(clash.position, "first defined here"),
 					],
-					// The edit the two Labels spell out between them,
-					// said rather than left to be worked out — and the second
-					// writing is the one that goes, because the Record a reader
-					// gets is the one the first key made.
+					// The second writing is the one to remove.
 					helps: [
 						`Remove the second '${key}', or give it a name of its own.`,
 					],
@@ -5954,12 +5881,9 @@ class DescentParser {
 		}
 	}
 
-	// The Lexer has already split the interpolated String into its chunk
-	// Tokens (`Start`/`Middle`/`End`) with each hole's own Tokens lexed in
-	// place between them, so this reads as an ordinary alternation: a chunk, a
-	// hole parsed by the full Expression grammar, a chunk, and so on, ending on
-	// the `End` chunk. Positions come out absolute because the holes were never
-	// a separate parse.
+	// The Lexer has split the String into chunk Tokens with each hole's Tokens
+	// between them, so this alternates chunks and Expressions. Positions are
+	// absolute, since the holes are no separate parse.
 	protected parseInterpolatedString(): parser.InterpolatedStringValueNode {
 		let start = this.tokens.expect(TokenType.LiteralStringStart)
 
@@ -5989,9 +5913,8 @@ class DescentParser {
 				continue
 			}
 
-			// Unreachable for a String the Lexer produced — every hole it
-			// opens it closes with a `Middle` or `End` chunk — but the grammar
-			// says so rather than trusting it to.
+			// Reached where a hole holds more than one Expression, as `{a b}`
+			// does.
 			fail(
 				`Expected the rest of the interpolated String but found ${describeToken(chunk)}.`,
 				chunk.position,
@@ -6009,10 +5932,7 @@ class DescentParser {
 		| parser.RationalValueNode {
 		let numerator = this.parseInteger()
 
-		// `1/2` is one Rational Literal because the three Tokens are
-		// written flush — a `/` that stands apart from the Integer above it
-		// belongs to whatever was meant on its own line, and joining it here
-		// would silently turn that Integer into a Rational instead.
+		// `1/2` is one Rational Literal only when the three Tokens are flush.
 		let slash = this.tokens.peek()
 		let denominatorStart = this.tokens.peek(1)
 

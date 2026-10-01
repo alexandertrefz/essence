@@ -360,3 +360,26 @@ abandoned.
 An arm after the `otherwise` arm can never be reached. `reportUnreachableArm` reports it once it is read, so the
 report spans the whole arm, and then drops it. Throwing would take the whole Statement and leave its Constant
 undeclared. The Node never holds the arm, so the report is the only record of its extent for the Quick Fix.
+
+## Record literals and updates
+
+A `{` in Expression position opens a Record literal or an update, `{ base with … }`. `parseRecordLiteralOrCombination`
+tries these readings in order:
+
+1. A Record literal, whose member list allows shorthand: `{ x }` is `{ x = x }`.
+2. After an Expression and `with`, a key list without shorthand. A bare name after `with` is the whole value being
+   merged, so `{ base with other }` never turns into "set member `other`".
+3. An Expression after `with`, merged whole.
+4. The key list once more, with shorthand. A shape like `{ base with port, host }` gets here, and the parser keeps the
+   update and reports `shorthand-in-combination` for each bare name. Each report's Help merges all of them.
+
+A key that is a written value, such as `{ "a" = 1 }` or `{ ages with "alex" = 40 }`, belongs to a Dictionary in
+brackets and is refused as such. A name is never refused this way, since `{ x = ] }` also arrives with a broken
+member value. The check for an update runs after the readings are thrown away, so a Record update still reads.
+
+A Dictionary's key list has no shorthand: in `["a" = 1]` the key is a value.
+
+Every key position reads a path, such as `server.port`, since one key list serves literals, updates and defaults.
+The enricher refuses a path key outside an update with `path-key-outside-combination`, where the whole Record is
+in hand. After a step's dot, a `{` opens a braced descend, `server.{ port = 1, host }`, which ends the key.
+Shorthand is allowed inside a descend, because no whole value can be merged there.
