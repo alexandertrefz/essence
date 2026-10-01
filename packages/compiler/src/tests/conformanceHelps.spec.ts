@@ -2,15 +2,9 @@ import { describe, expect, it } from "bun:test"
 
 import { compiles, firstAnalysed, firstOf } from "./followedHelps"
 
-// The Helps about conformance, each one followed LITERALLY — the audit
-// that wrote this spec found four of them leading in circles and one leading
-// somewhere worse than nowhere.
-//
-// Two of the five were a pair: `unsatisfied-bound` sent a reader to write
-// `<infer Item is Comparable>` on a Namespace's Type Parameter, which
-// `protocol-bound-namespace-generic` refuses, whose own Help sent them back. A
-// loop between two reports is not something either of them can be tested out of
-// alone, so both ends are written down here.
+// The Helps about conformance, each followed literally and compiled. A Help
+// must not lead to a report whose Help leads back. So both ends of such a
+// pair, `unsatisfied-bound` and `protocol-bound-namespace-generic`, are here.
 
 describe("A bound on a Namespace's own Type Parameter", () => {
 	let underAWhere = `implementation {
@@ -65,10 +59,8 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		}
 	})
 
-	// The Help that always applies, and the only one that needs nothing
-	// declared: the bound goes on the Method that needs it. Followed literally
-	// — `biggest<Item is Comparable>()` — and the result compiles, which is the
-	// whole of what these specs are for.
+	// Bounding the Method that needs it always applies and needs nothing
+	// declared.
 	it("should send the reader to the Method that needs the bound", () => {
 		for (let source of [underAWhere, withoutTheWhere, noConformanceAtAll]) {
 			expect(firstOf(source, "unsatisfied-bound").helps[0]).toBe(
@@ -95,11 +87,8 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// No `where` alternative here, and that is the point of the Scope
-	// carrying the Method's name. A `where` reaches only the Methods that fulfil
-	// the conformance — `biggest` fulfils nothing, so adding it changes nothing
-	// and the report comes back unchanged. Offered where it WOULD work, which is
-	// the spec below this one.
+	// A `where` reaches only the Methods that fulfil the conformance, and
+	// `biggest` fulfils nothing, so a `where` is not offered.
 	it("should not offer a 'where' the reported Method would not be reached by", () => {
 		let diagnostic = firstOf(withoutTheWhere, "unsatisfied-bound")
 
@@ -114,10 +103,9 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(false)
 	})
 
-	// The same Namespace shape, the same Parameter, asked from a Method
-	// that DOES fulfil the conformance — and now the `where` is the edit that
-	// works, and the only one offered: a fulfilling Method may not carry a bound
-	// of its own, because the conformance promised it without one.
+	// A Method that fulfils the conformance may not carry a bound of its own,
+	// since the conformance promised it without one. So the `where` is the only
+	// edit offered.
 	it("should offer the 'where' to a Method the conformance reaches", () => {
 		let fulfilling = `implementation {
 			type Box<Item> = { item: Item }
@@ -147,10 +135,8 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// Where the condition is already written, the Note says why it does
-	// not reach here — `biggest` fulfils nothing — and the Help is the same edit
-	// as everywhere else. This used to end in no Help at all, on the reading
-	// that a Method fulfilling nothing could not be bounded; it can.
+	// Where the condition is already written, the Note says why it does not
+	// reach `biggest`, and the Help still bounds the Method.
 	it("should explain a 'where' that does not reach this Method", () => {
 		let diagnostic = firstOf(underAWhere, "unsatisfied-bound")
 
@@ -169,9 +155,8 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	// The other end of what used to be a loop. The refusal of a bound on
-	// the NAMESPACE now leads with the per-Method edit, which is one that works
-	// whatever the Namespace declares.
+	// The refusal of a bound on the Namespace leads with the per-Method edit,
+	// which works whatever the Namespace declares.
 	it("should send a refused Namespace bound to the Methods", () => {
 		let source = `implementation {
 			namespace Boxes<infer Item is Comparable> for List<Item> is Printable {
@@ -217,8 +202,7 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// A Function's Parameter is a different mistake and keeps the Help it
-	// always had — the edit it names is one that exists.
+	// A Function's own Type Parameter can carry the bound, so the Help says so.
 	it("should still bound a Function's own Type Parameter", () => {
 		let source = `implementation {
 			function biggest<infer Item>(of items: List<Item>) -> Optional<Item> {
@@ -245,10 +229,9 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 })
 
 describe("A conformance condition that can not be added", () => {
-	// `nonconforming-namespace` asked for a `where` that
-	// `conflicting-where-condition` then refused, leaving the original report
-	// standing beside a new one. One bound per Type Parameter per conformance,
-	// so the second bound is a conformance of its own.
+	// A Type Parameter takes one bound per conformance, so
+	// `nonconforming-namespace` must not ask for a `where` that
+	// `conflicting-where-condition` refuses. The second bound needs a Namespace.
 	let twoBounds = `implementation {
 		type Box<Item> = { item: Item }
 
@@ -307,8 +290,6 @@ describe("A conformance condition that can not be added", () => {
 		).toBe(true)
 	})
 
-	// The code that used to print nothing at all, which left a reader
-	// holding a refusal and no direction.
 	it("should say where a second bound belongs", () => {
 		let source = `implementation {
 			type Wrapper<Item> = { item: Item }
@@ -330,9 +311,8 @@ describe("A conformance condition that can not be added", () => {
 })
 
 describe("A conformance a Namespace does not fulfil", () => {
-	// The Label names the requirement the check stopped at; the Help names
-	// every one the conformance owes, which is what a reader in a terminal —
-	// with no Quick Fix to apply — was never told.
+	// The Label names the requirement the check stopped at. The Help names every
+	// one owed, for a reader in a terminal with no Quick Fix.
 	it("should name every requirement the conformance owes", () => {
 		let source = `implementation {
 			protocol Measured {
@@ -375,8 +355,8 @@ describe("A conformance a Namespace does not fulfil", () => {
 		).toBe(true)
 	})
 
-	// A Method to CORRECT rather than one to write, so no stub is named
-	// and the Help says where the shape it has to take is written down.
+	// The Method exists and needs correcting, so no stub is named. The Help
+	// says where its signature is declared.
 	it("should send a mismatched signature to the Protocol", () => {
 		let source = `implementation {
 			type Point = { x: Integer }
@@ -496,9 +476,9 @@ describe("A requirement another conformance provides a body for", () => {
 })
 
 describe("A Type in want of a conformance", () => {
-	// The Type to do something about is the LAST link of the chain, not
-	// the one the bound was written on: a Namespace `for Result<String, Problem>`
-	// answers this one call and leaves every other Result unprintable.
+	// The Help names the last link of the chain, not the Type the bound was on.
+	// A Namespace `for Result<String, Problem>` would leave every other Result
+	// unprintable.
 	let resultOfAChoice = `implementation {
 		choice Problem {
 			NotANumber,
@@ -515,13 +495,9 @@ describe("A Type in want of a conformance", () => {
 		Terminal.print(parse("3"))
 	}`
 
-	// TWO Helps, and the order is the two questions a reader has. The
-	// escape comes first because it always works at a print and costs no
-	// declaration — `Terminal.inspect` takes any value — and the declaration
-	// comes second because it is what keeps `print`. The escape is offered
-	// wherever a print is refused, whatever the failing Type is: a Record whose
-	// member can not print, a Result holding a Choice nobody declared Printable,
-	// a List of either.
+	// `Terminal.inspect` comes first because it takes any value and needs no
+	// declaration. The declaration comes second because it keeps `print`. The
+	// escape is offered wherever a print is refused, whatever the failing Type.
 	it("should name the culprit rather than the Type the bound was on", () => {
 		expect(
 			firstOf(resultOfAChoice, "unsatisfied-conformance-condition").helps,
@@ -573,10 +549,9 @@ describe("A Type in want of a conformance", () => {
 		).toBe(true)
 	})
 
-	// Work is one word short, not a Type in want of a conformance.
-	// Declaring `for Future<String> is Printable` COMPILES and prints a
-	// description of the work, which is the one outcome nobody wanted — so this
-	// says what every other report about a forgotten `complete` says.
+	// A Future is missing a `complete`, not a conformance. Declaring
+	// `for Future<String> is Printable` would compile and print a description
+	// of the work, so the Help asks for `complete`.
 	it("should never send a reader to make Futures Printable", () => {
 		let source = `implementation {
 			function headline(_ url: String) -> Future<String> {
@@ -601,9 +576,8 @@ describe("A Type in want of a conformance", () => {
 		).toBe(true)
 	})
 
-	// And where the body can NOT wait, the word is not offered at all —
-	// the same rule `interpolation-not-printable` follows, said in one voice
-	// because one helper writes both.
+	// Where the body cannot wait, `complete` alone is not offered. The Help
+	// first asks for a body that can wait.
 	it("should ask for the declaration where the body can not wait", () => {
 		let source = `implementation {
 			function fetched() -> Future<Integer> {
@@ -640,8 +614,8 @@ describe("A Type in want of a conformance", () => {
 })
 
 describe("A bounded Function used as a value", () => {
-	// "Call it directly" answered by throwing the value away, which is not
-	// an edit anybody who reached for a value can make. The wrap keeps it.
+	// Invoking the Function would throw the value away, so the Help also offers
+	// a wrapping Function literal, which keeps it.
 	let source = `implementation {
 		function largest<infer Item is Comparable>(of items: List<Item>) -> Optional<Item> {
 			<- items::sort()::lastItem()
@@ -675,13 +649,9 @@ describe("A bounded Function used as a value", () => {
 	})
 })
 
-// A Method that has ALREADY bounded the Namespace's Parameter and wants a
-// second Protocol. The bound reaches its body through a Scope of its own, and
-// that Scope used to answer "no Namespace declares this name" — so the report
-// took the FUNCTION branch and told the reader to write
-// `<infer Item is Comparable>`, which is the one spelling a Namespace's own
-// Parameter refuses. The label said "unbounded" of a Parameter bounded two
-// lines up.
+// A Method that already bounds the Namespace's Parameter wants a second
+// Protocol. The bound reaches the body through a Scope of its own, which must
+// still answer that the Parameter is the Namespace's and is bounded.
 describe("A second bound wanted by a Method that carries one", () => {
 	let source = `implementation {
 		namespace Boxes<infer Item> for { items: List<Item> } {
@@ -708,21 +678,16 @@ describe("A second bound wanted by a Method that carries one", () => {
 		)
 	})
 
-	// And no Quick Fix either — `data` is the same decision the text is
-	// made of, so an Editor can not offer what the report withheld.
+	// `data` comes from the same decision as the Helps, so an editor offers no
+	// Quick Fix the report withheld.
 	it("should carry no Quick Fix", () => {
 		expect(firstOf(source, "unsatisfied-bound").data).toBeUndefined()
 	})
 })
 
-// The Help that has to say what the language can NOT do. A Type Parameter
-// carries one bound, so the two written here are not a Parameter bounded by
-// both — the second silently replaced the first until this was refused, and the
-// body was then refused for wanting what the reader had already asked for.
-//
-// Followed literally, both halves: the one the body needs compiles, and the
-// other leaves the body reported at the call that wants it, which is where the
-// Protocol it needs is named.
+// A Type Parameter carries one bound, so writing two is refused rather than
+// letting the second replace the first. Keeping the bound the body needs
+// compiles. Keeping the other reports the call that needs the missing one.
 describe("Two bounds on one Type Parameter", () => {
 	let source = `implementation {
 		namespace Boxes<infer Item> for { items: List<Item> } {
@@ -753,9 +718,8 @@ describe("Two bounds on one Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// Not a Help that fails — a Help that says "the one the body needs",
-	// tested by showing the other one is not it, and that the report a reader
-	// meets then is the one that names the Protocol.
+	// The Help says to keep the one the body needs, so keeping the other
+	// leads to a report that names the Protocol the body needs.
 	it("should report the missing bound where the other one is kept", () => {
 		expect(
 			firstAnalysed(
