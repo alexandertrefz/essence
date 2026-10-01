@@ -1,13 +1,9 @@
 import {
-	caseDefaults,
-	memberExpression,
-	parameterDefaults,
-} from "@essence-lang/compiler/helpers"
+	forEachParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { assertionExpressions } from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
-import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { type DeclarationKind, indexProgram, type ProgramIndex } from "./rename"
 import { programBodies } from "./sections"
 
@@ -107,7 +103,9 @@ export function findSemanticTokens(
 
 	// Every body the Program holds, test bodies included.
 	for (let body of programBodies(program)) {
-		collectCases(body, tokens)
+		for (let node of body) {
+			collectCases(node, tokens)
+		}
 	}
 
 	for (let occurrence of index) {
@@ -169,40 +167,11 @@ function pushToken(
 	})
 }
 
-// A Case is named at its declaration, in a `#Case` value and in a
-// `case #Case` Matcher. The `#` keeps its grammar scope as punctuation. These
-// Tokens never overlap the index's, which cannot bind a Case name.
-function collectCases(
-	nodes: Array<parser.ImplementationNode>,
-	tokens: Array<SemanticToken>,
-) {
-	for (let node of nodes) {
-		collectCasesFromNode(node, tokens)
-	}
-}
-
-// A Parameter default holds Expressions, such as the Case in `= #None`.
-function collectCasesFromDefinition(
-	definition: parser.FunctionDefinitionNode,
-	tokens: Array<SemanticToken>,
-) {
-	collectCasesFromDefaults(definition.parameters, tokens)
-	collectCases(definition.body, tokens)
-}
-
-function collectCasesFromDefaults(
-	parameters: Array<parser.ParameterNode>,
-	tokens: Array<SemanticToken>,
-) {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		collectCasesFromNode(defaultValue, tokens)
-	}
-}
-
-function collectCasesFromNode(
-	node: parser.ImplementationNode,
-	tokens: Array<SemanticToken>,
-) {
+// A Case is named at its declaration, in a `#Case` value and in a Case
+// Matcher, as in `case #Case` and `require #Case(item) = …`. The `#` keeps its
+// grammar scope as punctuation. These Tokens never overlap the index's, which
+// cannot bind a Case name.
+function collectCases(node: ParserNode, tokens: Array<SemanticToken>) {
 	switch (node.nodeType) {
 		case "ChoiceDeclarationStatement":
 			for (let choiceCase of node.cases) {
@@ -211,205 +180,14 @@ function collectCasesFromNode(
 				])
 			}
 
-			// A payload default holds Case values too, such as `#Empty`.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				collectCasesFromNode(defaultValue, tokens)
-			}
-
-			return
+			break
 		case "CaseValue":
+		case "CaseMatcher":
 			pushToken(tokens, node.caseName.position, "enumMember", [])
-
-			if (node.value !== null) {
-				collectCasesFromNode(node.value, tokens)
-			}
-
-			return
-		case "Match":
-			collectCasesFromNode(node.value, tokens)
-
-			for (let handler of node.handlers) {
-				collectCaseOfMatcher(handler.matcher, tokens)
-
-				if (handler.guard !== null) {
-					collectCasesFromNode(handler.guard, tokens)
-				}
-
-				collectCases(handler.body, tokens)
-			}
-
-			return
-		// An arm holds Case values too, as in `as #Empty if …`.
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				collectCasesFromNode(expression, tokens)
-			}
-
-			return
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				// A native static Property has no value.
-				if (property.value !== null) {
-					collectCasesFromNode(property.value, tokens)
-				}
-			}
-
-			// An `overload` block may mix bodied Methods and native signatures; see
-			// `namespaceMembers`.
-			for (let member of Object.values(node.methods)) {
-				for (let method of methodsOf(member)) {
-					collectCasesFromDefinition(method.value, tokens)
-				}
-
-				for (let signature of nativeSignaturesOf(member)) {
-					collectCasesFromDefaults(signature.parameters, tokens)
-				}
-			}
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let signatures =
-					member.nodeType === "OverloadedProtocolMethod" ||
-					member.nodeType === "OverloadedStaticProtocolMethod"
-						? member.signatures
-						: [member.signature]
-
-				for (let { body } of signatures) {
-					if (body !== null) {
-						collectCasesFromDefinition(body.value, tokens)
-					}
-				}
-			}
-
-			return
-		case "FunctionStatement":
-			collectCasesFromDefinition(node.value, tokens)
-			return
-		case "OverloadedFunctionStatement":
-			for (let method of node.methods) {
-				if (method.nodeType === "FunctionValue") {
-					collectCasesFromDefinition(method.value, tokens)
-				} else {
-					collectCasesFromDefaults(method.parameters, tokens)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			collectCasesFromDefinition(node.value, tokens)
-			return
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			collectCasesFromNode(node.value, tokens)
-			return
-		case "ReturnStatement":
-			collectCasesFromNode(node.expression, tokens)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			collectCaseOfMatcher(node.matcher, tokens)
-
-			for (let expression of assertionExpressions(node)) {
-				collectCasesFromNode(expression, tokens)
-			}
-
-			return
-		case "IfStatement":
-			collectCasesFromNode(node.condition, tokens)
-			collectCases(node.body, tokens)
-			return
-		case "IfElseStatement":
-			collectCasesFromNode(node.condition, tokens)
-			collectCases(node.trueBody, tokens)
-			collectCases(node.falseBody, tokens)
-			return
-		case "MethodInvocation":
-			collectCasesFromNode(node.base, tokens)
-			collectCasesFromArguments(node.arguments, tokens)
-			return
-		case "FunctionInvocation":
-			collectCasesFromNode(node.name, tokens)
-			collectCasesFromArguments(node.arguments, tokens)
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				collectCasesFromNode(memberExpression(member), tokens)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				collectCasesFromNode(value, tokens)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				collectCasesFromNode(entry.key, tokens)
-				collectCasesFromNode(entry.value, tokens)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					collectCasesFromNode(segment.expression, tokens)
-				}
-			}
-
-			return
-		case "Combination":
-			collectCasesFromNode(node.lhs, tokens)
-			collectCasesFromNode(node.rhs, tokens)
-			return
-		case "Lookup":
-			collectCasesFromNode(node.base, tokens)
-			return
-		case "Start":
-		case "Complete":
-			collectCasesFromNode(node.expression, tokens)
-			return
-		case "RefusedValue":
-			collectCasesFromNode(node.base, tokens)
-			return
-		// A predicate checks literals, but a refused one may still name a Case.
-		case "TypeAliasStatement":
-			if (node.predicate !== null) {
-				collectCasesFromNode(node.predicate, tokens)
-			}
-
-			return
-		// A path holds no Case; its steps colour as members through the index.
-		case "MemberPath":
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
+			break
 	}
-}
 
-// A Case Matcher names its Case, in a Match Handler and in a `require` alike.
-function collectCaseOfMatcher(
-	matcher: parser.MatcherNode | null,
-	tokens: Array<SemanticToken>,
-) {
-	if (matcher?.nodeType === "CaseMatcher") {
-		pushToken(tokens, matcher.caseName.position, "enumMember", [])
-	}
-}
-
-function collectCasesFromArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-	tokens: Array<SemanticToken>,
-) {
-	for (let argument of nodeArguments) {
-		collectCasesFromNode(argument.value, tokens)
-	}
+	forEachParserChild(node, collectCases, tokens)
 }
 
 // The protocol forbids overlapping Tokens, and a member of two same-named

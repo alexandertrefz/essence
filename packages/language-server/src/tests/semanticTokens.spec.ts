@@ -478,8 +478,8 @@ describe("Semantic Tokens in where clauses", () => {
 	})
 })
 
-// The Case walk descends into bodies, and a default is not one, so a
-// `= #Case` default needs a case of its own.
+// A default stands outside every body, and the Case walk must reach a
+// `= #Case` there too.
 describe("Semantic Tokens of a Case written in a default", () => {
 	it("should colour a bare Case as an enum member", () => {
 		let source = [
@@ -538,8 +538,7 @@ describe("Semantic Tokens of a Record Literal's shorthand member", () => {
 	})
 })
 
-// A `#Case` written into a Case payload's default would go uncoloured
-// otherwise, for the same reason a Parameter default's would.
+// A Case payload's default stands outside every body, like a Parameter's.
 describe("Semantic Tokens of a Case written in a payload default", () => {
 	// A default may name a Constant of the Module, whose value is baked into
 	// the Case Type. The walk meets an Expression like any other.
@@ -621,7 +620,7 @@ describe("Semantic Tokens inside a define", () => {
 	].join("\n")
 
 	// A Case resolves through its Choice, not a Scope, so Cases are coloured
-	// off the Parser AST. That walk must reach both halves of an arm itself.
+	// off the Parser AST. That walk must reach both halves of an arm.
 	it("should classify a Case written in an arm's value as an enumMember", () => {
 		expect(tokenAt(source, 9, 8)?.type).toBe("enumMember")
 		expect(tokenAt(source, 10, 8)?.type).toBe("enumMember")
@@ -633,8 +632,7 @@ describe("Semantic Tokens inside a define", () => {
 })
 
 // The two Types are builtins and colour off the index, which they must reach.
-// `collectCases` walks the Parser AST and reaches a Case under `start` only
-// through a case for the Keyword.
+// `collectCases` walks the Parser AST and must reach a Case under `start`.
 describe("Semantic Tokens around start and complete", () => {
 	let source = [
 		"implementation {",
