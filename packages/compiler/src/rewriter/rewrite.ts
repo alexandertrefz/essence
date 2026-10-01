@@ -6009,9 +6009,8 @@ function steppedTarget(
 
 			stop()
 
-			// A block of its own, so that two answers falling back to the
-			// tag read in one body each hold their `Step` under a name of their
-			// own.
+			// A block of its own, so two such answers in one body do not share
+			// the held name.
 			let held = `${prefix}_step`
 
 			return [
@@ -6048,20 +6047,13 @@ function steppedTarget(
 	}
 }
 
-// The two Cases of the builtin `Step`, and the single member each carries
-// — `#Done(x)` is `Step#Done { value: x }` and `#Continue(x)` is
-// `Step#Continue { state: x }`. Nothing else may be read this way: a `Step` is
-// the Type the two drivers take, and the Enricher admits no other value there.
+// The builtin `Step`'s Cases: `#Done(x)` carries `value` and `#Continue(x)`
+// carries `state`.
 const doneTag = "Step#Done"
 const continueTag = "Step#Continue"
 
-// A `Step` the Compiler can see being BUILT, and null for every other
-// answer. Both shapes of a construction are read, because both can arrive:
-// `collapse-construction` runs AFTER the pass that inlines loops and turns a
-// Case with a Record payload into the literal it emits, so a body holds a
-// `CaseValue` with that pass off and a `direct-case` with it on. Reading one and
-// not the other would make an optimisation depend on another being enabled,
-// which is the one thing a pass may not do.
+// A `Step` the Compiler can see being built, as a `CaseValue` or as the
+// `direct-case` `collapse-construction` makes of one, or null.
 function stepConstruction(
 	node: common.typedSimple.ExpressionNode | null,
 ): { done: boolean; value: common.typedSimple.ExpressionNode } | null {
@@ -6086,12 +6078,8 @@ function stepConstruction(
 	return null
 }
 
-// The payload of a `Step`, and the one member each Case declares. A
-// payload holding anything MORE than that member is refused rather than read:
-// taking the Case away takes the construction of every member with it, and a
-// member the walk does not read is one that would stop being evaluated. `Step`
-// declares exactly one member per Case today, so this refuses nothing — it is
-// what keeps a second member from silently disappearing if one is ever added.
+// A `Step` payload's one member. A payload with any other member is refused,
+// since dropping the Case would drop that member's evaluation.
 function stepPayload(
 	tag: string,
 	members: Record<string, common.typedSimple.ExpressionNode>,
@@ -6116,29 +6104,15 @@ function stepPayload(
 	return null
 }
 
-// What a body may be handed in place of the first Argument's Integer: the
-// name it reads where it read `<name>.value`, and whatever has to be bound for
-// the turn to establish that name. The binding is emitted ONLY where the swap is
-// taken, so a body that keeps its box does not also pay for a view of it, and it
-// is empty where the name is already what the body should read.
+// What a body reads in place of `<first Parameter>.value`, and the binding
+// that name needs, emitted only where the swap is taken.
 type UnboxedArgument = {
 	read: string
 	binding: Array<estree.Statement>
 }
 
-// One callback's body, where the call to it was. The Parameters are bound
-// as the `const`s of a block around it, which is the Scope the closure gave them
-// and nothing more: the body reads its Parameters and everything enclosing the
-// call under the same names it always did, and a Parameter standing in front of
-// an outer binding stands in front of it for exactly the length of the block. No
-// name is rewritten, so no name can be rewritten wrongly.
-//
-// The body's Return Statements are what the walk reads, and the redirect
-// is what writes them where they go — the same machinery a lowered Match's
-// Handlers are written through, so a Match, a Conditional or another lowered
-// loop inside a callback answers the walk exactly as a bare Return does. A
-// Function DECLARED in the body keeps its own Returns, because that machinery
-// descends by name and a Function is not one of the names it descends into.
+// One callback's body where the call to it was, its Parameters bound as
+// `const`s. See "Callbacks" in DEVELOPMENT.md.
 function inlinedCallback(
 	callback: common.typedSimple.InlineLoopCallback,
 	args: Array<estree.Expression>,
@@ -6171,8 +6145,7 @@ function inlinedCallback(
 		...redirectedStatements(callback.body, {
 			result,
 			label,
-			// The body IS the block, so its last Statement has nothing
-			// after it to skip — an answer written there needs no way out.
+			// The body is the block, so its last answer needs no `break`.
 			isTail: true,
 			broke: () => {
 				broke = true
@@ -6180,21 +6153,13 @@ function inlinedCallback(
 		}),
 	])
 	let first = callback.parameters[0]
-	// One `const` short where the accumulator's was elided, which is what
-	// the two slices below count in.
+	// One `const` fewer where the accumulator's was elided.
 	let bound = callback.parameters.length - (dropped === null ? 0 : 1)
-	// Taken ONCE, before the swap below reshapes `body` — both questions
-	// are about the Statements the callback's own body emitted, and the Array
-	// holds the very Statements either swap rewrites in place.
+	// The body's own Statements, taken before any swap reshapes `body`.
 	let statements = body.slice(bound)
 
-	// The List the walk builds in place, whose Parameter is not bound at
-	// all: `build-lists-in-place` proved that every mention of it is a
-	// rebuilding chain, and the target above consumed every one of them as
-	// pushes. So a mention that survives is a mention the proof missed, and the
-	// `const` this elided would have been what made it read. It can not happen
-	// while the pass is right, and it is asked because the cost of it happening
-	// silently is an emission that names something nothing declared.
+	// The accumulator of a List built in place is not bound, so a surviving
+	// mention is a compiler bug.
 	if (dropped !== null) {
 		let accumulator = callback.parameters[dropped]
 
@@ -6208,10 +6173,7 @@ function inlinedCallback(
 		}
 	}
 
-	// The State, handed to the walk that threads it rather than swapped
-	// here: a `while` driver hands one State to TWO bodies, and it is held raw
-	// for both of them or for neither. What this body contributes is the name it
-	// reads the State under and the Statements the fence is asked of.
+	// The State is swapped by the walk, which may hand it to two bodies.
 	if (carried !== null) {
 		let held = callback.parameters[carried.parameter]
 
@@ -6223,26 +6185,8 @@ function inlinedCallback(
 		}
 	}
 
-	// The Integer the first Argument boxes, NEVER BUILT where the body
-	// only ever reads what it holds — which is what a counting body does, since
-	// every arithmetic and every comparison reads through to the value. It is
-	// one allocation a turn, and the walk's own measured cost roughly halves
-	// without it.
-	//
-	// What makes the swap safe is that it is refused on ANY other mention
-	// of the name. A body that hands the Integer on, stores it, or shadows the
-	// name keeps its box, and so does one that merely reads a member called
-	// `index` off something else — the test does not try to tell those apart,
-	// because being wrong once is worse than optimising every time.
-	//
-	// The counter is a `for` head's `let`, so each turn binds a fresh one
-	// and a closure the body builds captures the turn it was built in — which is
-	// exactly what capturing the Integer gave it.
-	//
-	// The two elisions are on DIFFERENT Parameters of the one callback
-	// that can have both — the counted walk hands the counter first and the
-	// State second — so the counter's `const` is still `body[0]` where the
-	// State's was dropped, and neither elision has to know about the other.
+	// The counter's Integer is never built where the body only reads its
+	// value. See "Unboxed counters and States" in DEVELOPMENT.md.
 	if (unboxable !== null && first !== undefined) {
 		let name = rewriteIdentifier(first).name
 
@@ -6256,10 +6200,7 @@ function inlinedCallback(
 		}
 	}
 
-	// Asked LAST, of whatever the two elisions above left — a build whose
-	// turn is one push has neither of them to take, so the three never argue over
-	// the same `const`, and asking here means this reads the Statements as they
-	// will be emitted rather than as they were written.
+	// Last, on the Statements as they will be emitted.
 	if (dropped !== null) {
 		body = pushedWhereBound(body)
 	}
@@ -6267,24 +6208,9 @@ function inlinedCallback(
 	return broke ? labelled(label, loopBlock(body)) : loopBlock(body)
 }
 
-// A walk's loop-carried State, held as the number or bigint its Integer
-// boxes rather than as the Integer. The Integer is the walk's own — nobody
-// outside it can hold one — so a walk whose bodies only ever read what it holds
-// can carry the value itself and build the Integer once, where the walk answers.
-// It is one allocation a TURN against one a walk, and on the two-million turn
-// sum the walk's cost falls by roughly half again on top of the counter's.
-//
-// It pays only together with the other half — a body whose arithmetic
-// still answers a boxed Integer that the slot then reads back through `.value`
-// is SLOWER than leaving the State alone, measured 23.65 ms against 22.06 on
-// that sum. So `unboxedInteger` reads the guarded arithmetic through both arms
-// and the box is never written at all.
-//
-// `bodies` is what the fence is asked of: one entry per callback the State
-// is handed to, holding the name that callback reads it under and the Statements
-// it emitted. `answer` is the slot a `Step`-answering walk settles on, and null
-// for a walk that answers with the State itself — it is the second place the
-// State may be written WHOLE, and the place that write is boxed.
+// A walk's State that may be held raw. `bodies` holds each receiving
+// callback's Parameter name and Statements; `answer` is a `Step` walk's answer
+// slot. See "Unboxed counters and States" in DEVELOPMENT.md.
 type CarriedState = {
 	name: string
 	answer: string | null
@@ -6292,18 +6218,8 @@ type CarriedState = {
 	bodies: Array<{ parameter: string; statements: Array<estree.Statement> }>
 }
 
-// The State of a walk that may be held raw, and null for one that may not.
-// The Type has to be EXACTLY Integer in every body — not a Union it is a member
-// of, not a Type Parameter that could be one — because the whole swap is that the
-// slot holds what an Integer holds, and only an Integer is known to hold that. It
-// is the same exactness `lower-scalar-operations` rests on, and it is what leaves
-// a Record, a String or a Rational State untouched.
-//
-// A Refinement over Integer IS carried, and there is nothing here that
-// says so because there is nothing here that could see one: `eraseRefinements`
-// runs at the head of every pipeline, before any pass, so a `NonZeroInteger`
-// State reaches this as the Integer it is. That is right — a refinement is a
-// promise the Validator kept, not a second representation.
+// A State that may be held raw, or null. Its Type must be exactly Integer in
+// every receiving body.
 function carriedInteger(
 	name: string,
 	answer: string | null,
@@ -6317,31 +6233,8 @@ function carriedInteger(
 		: null
 }
 
-// The swap, asked and taken in one — it answers whether the State is held
-// raw, which is what decides how the walk answers with it.
-//
-// The fence is `mentionsBeyondValue`, asked of every body: a body that
-// hands the State on, stores it, matches it, asks any Method of it, shadows the
-// name or reads a member of that name off something else keeps the box, and so
-// does every OTHER body of the same walk, because one State can not be two
-// things at once. Two mentions past `.value` are admitted, both of them the State
-// written WHOLE into a slot the walk owns and neither of them a value that
-// escapes: `<- carried`, which is what an arm that changes nothing writes, and
-// `<- #Done(carried)`, which is how a `Step`-answering body ordinarily finishes.
-// The first stands in a write that is unboxed with every other; the second stands
-// in a write that is BOXED, once, where the walk is leaving anyway.
-//
-// What is rewritten is every WRITE of the State: the `let` its seed
-// declares and every assignment to it. They are found by NAME rather than
-// recorded as they are emitted, because the name is the Compiler's own and holds
-// a `_`, so no Essence Program can write it — and `mentionsBeyondWrites` is what
-// makes finding them by name enough. It refuses unless every mention of the slot
-// is one this understands, so a write `unboxWrites` would walk past can not be
-// there when it runs: the two halves fail closed together rather than the fence
-// refusing and the rewriter shrugging.
-//
-// And the reads are redirected LAST, so that a write unboxed into
-// `<parameter>.value` is redirected along with the reads the body already had.
+// Decides and performs the State swap, answering whether the State is held
+// raw. See "Unboxed counters and States" in DEVELOPMENT.md.
 function heldRaw(
 	state: CarriedState | null,
 	statements: Array<estree.Statement>,
@@ -6382,27 +6275,13 @@ function heldRaw(
 	return true
 }
 
-// How a walk answers with its State: the Integer built once where the walk
-// is over, or the State itself where it was one all along. `createInteger` and
-// not the literal `boxedInteger` writes, even though every value the raw slot can
-// hold is canonical by the invariant below — it is one call at the END of a walk
-// rather than one a turn, and an exit that canonicalises does not have to be read
-// together with everything that writes the slot to be believed.
-//
-// The invariant the slot holds to is the Integer's own: a value in safe
-// range is a number and a value outside it is a bigint. The seed enters as the
-// value of an Integer, which is canonical; a guarded arithmetic answers a number
-// it has just range-checked; an escaped one answers the value of an Integer the
-// runtime built. There is no fourth way into the slot.
+// How a walk answers with its State: boxed once with `createInteger` where
+// it was held raw.
 function carriedAnswer(state: string, raw: boolean): estree.Expression {
 	return raw ? exitBox(loopIdentifier(state)) : loopIdentifier(state)
 }
 
-// Every write of a name, read as the value the Integer it was given holds.
-// Two shapes are written and no others: the `let` a seed is declared as, and the
-// plain assignments a walk threads the State with. Anything else standing under
-// that name is left alone — there is nothing else today, and a shape this does
-// not understand is one it must not rewrite.
+// Unboxes every write of a name: its declaration and its plain assignments.
 function unboxWrites(root: unknown, name: string): void {
 	function visit(node: unknown): void {
 		if (node === null || typeof node !== "object") {
@@ -6426,12 +6305,8 @@ function unboxWrites(root: unknown, name: string): void {
 	visit(root)
 }
 
-// Which key of a Node holds the value written to a name — `init` of the
-// declarator that binds it, `right` of the plain assignment that sets it — and
-// null for a Node that writes it some other way or not at all. A compound
-// assignment answers null and is therefore never unboxed: the walk emits none,
-// and one that appeared would mean something reads the slot this does not know
-// about.
+// The key holding the value a node writes to a name, or null. A compound
+// assignment is never unboxed.
 function writtenValue(
 	record: Record<string, unknown>,
 	name: string,
@@ -6461,19 +6336,8 @@ function isNamed(node: unknown, name: string): boolean {
 	return record["type"] === "Identifier" && record["name"] === name
 }
 
-// Whether a name is mentioned anywhere in the emitted body OTHER than as
-// `<name>.value`. Every position is read — a property key and a member name
-// included, which no reference can be — so the answer is conservative in the one
-// direction that matters: a name this says nothing about is a name nothing may
-// be assumed of.
-//
-// `slots` widens that by exactly one position per slot, and only for a
-// State: the name written WHOLE into a slot the walk owns. `<- carried` answers
-// the State unchanged and `<- #Done(carried)` finishes with it, and the writes
-// those two stand in are the two the caller rewrites — so each mention becomes a
-// value the slot wanted anyway. Nothing else about either write is admitted:
-// `<- carried::negate()` puts a call in that position and is a mention like any
-// other.
+// Whether a name is mentioned anywhere other than as `<name>.value`, keys
+// included. `slots` admits the name written whole into one of the walk's slots.
 function mentionsBeyondValue(
 	root: unknown,
 	name: string,

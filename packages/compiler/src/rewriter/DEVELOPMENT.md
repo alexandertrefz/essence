@@ -646,3 +646,47 @@ can not see being built would have to replace the State whole, which an owned Ar
 a push of it, as in `<- accumulated::append(item)`. Only a name read and `push` on the walk's own Array move
 ahead of the Argument, and neither can run a Program's code. V8 keeps the loop in optimised code when the
 item is not bound before it is stored. Anything else in the body keeps its binding.
+
+### Callbacks
+
+`inlinedCallback` writes a callback's body where the call to it was. Its Parameters become the `const`s of a
+block around the body, the Scope the closure gave them, so no name is rewritten. The body's Returns go
+through `redirectedStatements`. A Match, a Conditional or a nested loop inside a callback then answers the
+walk as a bare Return does. A Function declared in the body keeps its own Returns.
+
+A walk building its List in place binds no accumulator Parameter at all. `build-lists-in-place` proved every
+mention of it is a build, so a surviving mention is a compiler bug, and `inlinedCallback` throws on one.
+
+### Unboxed counters and States
+
+A counted walk hands its body the counter as an Integer. A counting body usually only reads the value the
+Integer holds. Then the box is never built, and the reads go to the raw counter. `mentionsBeyondValue` refuses
+the swap on any other mention. Handing the counter on, storing it, shadowing its name, or reading a member of
+that name off something else all count. The counter is the `let` of a `for` head, so each turn binds a fresh
+one. A closure the body builds captures its own turn's value.
+
+A walk's State is held raw too, as the number or bigint its Integer holds. That needs the State's Type to be
+exactly Integer in every body that receives it. A Union or a Type Parameter does not count. A refinement over Integer
+does, since `eraseRefinements` has removed it before any pass runs. The Integer is the walk's own, so the walk
+can carry the raw value and build the Integer once, where it answers. This pays only together with
+`unboxedInteger`, which reads a guarded arithmetic through both arms so the box is never written.
+
+`heldRaw` decides and performs the swap:
+
+1. Every body the State is handed to must pass `mentionsBeyondValue`. A `while` walk hands one State to two
+   bodies, and it is raw for both or neither. Two whole writes into slots the walk owns are admitted:
+   `<- carried`, which an unchanged arm writes, and `<- #Done(carried)`.
+2. `mentionsBeyondWrites` must find every mention of the slot in a shape the rewrite understands, so the
+   check and the rewrite fail closed together.
+3. `unboxWrites` unboxes every write of the slot: the seed's `let` and each plain assignment. They are found
+   by name, which is safe because the name contains `_`.
+4. A `#Done(carried)` write is boxed where it stands, since the walk is leaving there anyway.
+5. The reads are redirected last, so a write unboxed into `<parameter>.value` is redirected with them.
+
+`carriedAnswer` then boxes the slot once, with `Integer.createInteger`, where the walk answers. Every value
+the slot can hold is already canonical. The seed is an Integer's value, and a guarded arithmetic answers a
+range-checked number. An escaped one answers the value of an Integer the runtime built. The exit still
+canonicalises, so it need not be read together with every write to be believed.
+
+`inlinedCallback` takes the swaps in a fixed order. It checks the dropped accumulator, hands the State's body
+to the walk and swaps the counter. Only then does it try `pushedWhereBound`, on the Statements as emitted. The counter and the State are different Parameters, so neither swap disturbs the other.
