@@ -3,16 +3,10 @@ import path from "node:path"
 
 import type { BenchmarkRecord } from "./index"
 
-// The STORED half of a benchmark — the time each measurement is held to,
-// and the file it lives in. The runtime never touches any of this: a bundle may
-// be running in a browser, so whoever starts a run reads the file and hands the
-// baselines over, and writes back whatever the run says it recorded. Snapshots
-// next door work exactly this way, and for exactly this reason.
+// The time each benchmark is held to, kept beside the source and read and
+// written as snapshots are. See "Benchmark baselines" in DEVELOPMENT.md.
 
-// Beside the source rather than in one directory at the root of the
-// project, so that a baseline travels with the file it belongs to — a file that
-// moves takes what its benchmarks cost with it, and a file that is deleted
-// leaves nothing behind that nothing names.
+// Beside the source, so a baseline travels with its file.
 export const BENCHMARK_DIRECTORY = "__benchmarks__"
 
 export function benchmarkFileOf(modulePath: string): string {
@@ -23,9 +17,8 @@ export function benchmarkFileOf(modulePath: string): string {
 	)
 }
 
-// One file's baselines, keyed by the entry a measurement is written under
-// — the identity without the Module path, and with a table row's number behind
-// it. Nanoseconds, which is the unit the runtime answers in.
+// One file's baselines in nanoseconds, keyed by identity without the Module
+// path, with a table row's number after it.
 export type BenchmarkStore = Record<string, number>
 
 const HEADER = [
@@ -37,32 +30,14 @@ const HEADER = [
 const ENTRY = /^benchmark "((?:[^"\\]|\\.)*)"$/
 const VALUE = /^\t(\d+) ns$/
 
-// THE FORMAT, and the whole of it:
-//
-//   • Lines above the first entry are a comment, and are written afresh every
-//     time the file is written.
-//   • An entry opens with `benchmark "key"` at the left margin. The key is
-//     written the way a String Literal is, so a quote, a backslash or a line
-//     break in one escapes — the format is line-oriented, and a key holding a
-//     raw line break would be a key no line could ever hold.
-//   • One tab-indented line follows it, holding the time of a single run in
-//     whole nanoseconds. Nothing else belongs to an entry: unlike a snapshot,
-//     what is recorded here is a number rather than whatever a value printed.
-//   • Entries are written in name order, so that recording one twice writes the
-//     same bytes and a diff shows what changed rather than what moved.
-//
-// It is `.bench` beside the source rather than a `.es` file for the same reason
-// a snapshot is `.snap`: nothing here is Essence, and a reader looking at a
-// number should not have to read past an escaping to find it.
+// The `.bench` format: a header comment, then entries in name order, each a
+// `benchmark "key"` line and one tab-indented time in whole nanoseconds.
 export function parseBenchmarkFile(text: string): BenchmarkStore {
 	let entries: BenchmarkStore = {}
 	let key: string | null = null
 
 	for (let line of text.split("\n")) {
-		// A `\r` at the end of a line is always the line ending's here.
-		// Unlike a snapshot, no line of this format holds text a value put
-		// there — a key is written escaped on one line, and a value is digits —
-		// so there is nothing a carriage return could belong to.
+		// A trailing `\r` is a line ending's, since no line holds printed text.
 		let read = line.endsWith("\r") ? line.slice(0, -1) : line
 		let opening = ENTRY.exec(read)
 
@@ -113,16 +88,14 @@ function unescapeKey(key: string): string {
 	)
 }
 
-// The baselines of every Module of the run, keyed by the Module's
-// canonical path — the shape the runtime's `RunOptions.benchmarks` takes. A
-// Module with no companion file has an empty entry rather than none, so that
-// naming one is always a lookup and never a question about the disk.
+// Every Module's baselines, keyed by canonical path, as
+// `RunOptions.benchmarks` takes them. Every Module has an entry.
 export async function readBenchmarks(
 	modules: Iterable<string>,
 ): Promise<Record<string, BenchmarkStore>> {
 	let stores: Record<string, BenchmarkStore> = {}
 
-	// Fanned out, exactly as the snapshots beside them are.
+	// Read in parallel.
 	await Promise.all(
 		[...modules].map(async (module) => {
 			stores[module] = await readBenchmarkFile(benchmarkFileOf(module))
@@ -152,14 +125,8 @@ export const noBenchmarkWrites: BenchmarkWrites = {
 	problems: [],
 }
 
-// Everything a run recorded, written where it belongs. Only a `written`
-// measurement is one: a `matched` one changed nothing, an `improved` one is
-// news the report carries and a baseline nobody asked to move, and a
-// `regressed` one is the failure.
-//
-// A `__benchmarks__` companion is written straight to disk. Nothing edits one
-// by hand and no Editor holds it open — which is the whole difference between
-// this and a snapshot, half of which are written back into a source.
+// Writes only `written` measurements, straight to disk. An `improved` one is
+// news, not a baseline to move.
 export async function writeBenchmarks(options: {
 	benchmarks: Array<BenchmarkRecord>
 	stored: Record<string, BenchmarkStore>
@@ -198,11 +165,8 @@ export async function writeBenchmarks(options: {
 	return { recorded, files, problems }
 }
 
-// The whole companion file is written afresh, entries in name order — the
-// ones this run recorded laid over the ones it read. An entry no benchmark
-// names any more is KEPT: a run narrowed by `--filter` or by a tag has not
-// measured everything, and deleting what it did not visit would lose a baseline
-// for the price of a filter.
+// The companion written afresh: this run's entries over the ones read. An entry
+// no benchmark names is kept, since a narrowed run has not measured everything.
 async function writeStored(
 	module: string,
 	benchmarks: Array<BenchmarkRecord>,

@@ -85,3 +85,28 @@ one by hand. An inline snapshot rewrites a source through the formatter, which t
 run without inline snapshots never loads it. The language server asks for the new text instead of a write, since
 the buffer it compiled may be unsaved. An entry no test names is kept, since a run narrowed by `--filter` or a tag
 has not visited every test.
+
+## Benchmark baselines
+
+`benchmarks.ts` keeps the time each benchmark is held to, read and written as snapshots are. Its `.bench` file in
+`__benchmarks__` holds a header comment, then one entry per key in name order. An entry is a `benchmark "key"`
+line, then one tab-indented line with a single run's time in whole nanoseconds. A key is escaped as a String Literal's would
+be, line breaks included, since the format is line-oriented. A trailing `\r` is always a line ending's here, since
+no line holds text a value printed.
+
+`writeBenchmarks` writes only `written` measurements. A `matched` one changed nothing, and a `regressed` one is
+the failure. An `improved` one is news in the report, not a baseline anybody asked to move. An entry no benchmark
+names is kept, since a narrowed run has not measured everything.
+
+## Coverage attribution
+
+`attribution.ts` joins which tests reached which coverage points. The mutation driver in `@essence-lang/cli` and
+the language server's session both need it. The language server may not depend on the CLI, so it lives here.
+A `test-coverage` event names points by index into its Module's `coverage` table.
+
+`coveringPoints` finds the points over a site: every point whose span holds it, since a test reaching any of them
+reached the site. Where none holds it, every overlapping point counts instead. A site in a Parameter default, or in
+a Node whose Position the Simplifier trimmed, may only overlap. Answering with nothing would call a tested site
+uncovered. All overlapping points count, not the narrowest, since a mutant must be judged by every test that could
+notice it. The span predicates `holds` and `overlaps` come from the instrumentation pass, so both sides agree on
+what they mean.
