@@ -40,9 +40,8 @@ beforeAll(async () => {
 	geometry = await loadModule(fixturePath("modules", "Geometry.es"), {
 		cacheDirectory,
 	})
-	// The `modules` fixture prints three lines as its body runs, and
-	// importing the bundle is what runs it — so it is loaded with both doors of
-	// the terminal held shut rather than into the middle of this run's output.
+	// The `modules` fixture prints as its body runs, so it loads with output
+	// held back.
 	main = await withoutOutput(() =>
 		loadModule(fixturePath("modules", "Main.es"), { cacheDirectory }),
 	)
@@ -78,16 +77,12 @@ afterAll(() => {
 
 type AnyCall = (...args: Array<unknown>) => unknown
 
-// The exports as a host writes them — `unknown` is the honest Type for a
-// Module whose shape is only known once it is compiled, and every test below
-// says what it expects of a name by using it.
+// An export as `unknown`, since its shape is known only once compiled.
 function exported(module: EssenceModule, name: string): AnyCall {
 	return module.exports[name] as AnyCall
 }
 
-// A Choice reaches a host as an object of constructors — under a
-// Namespace's name where the Module wrote one, and under its own where it did
-// not. Both are read the same way.
+// A Choice's constructors, under its own name or its Namespace's.
 function choice(module: EssenceModule, name: string): Record<string, unknown> {
 	return module.exports[name] as Record<string, unknown>
 }
@@ -172,11 +167,8 @@ describe("Calling a Function", () => {
 		})
 	})
 
-	// A Function is the one value that carries no Type tag, so the Type
-	// its position declared is what says how it crosses: the answer of a call
-	// and a Record member both come back wrapped, callable exactly as the
-	// generated declarations spell them — not as the raw emitted Function,
-	// which takes tagged values no host holds.
+	// A Function carries no tag, so its declared position wraps it, as a
+	// call's answer or a Record member.
 	it("marshals a Function that comes back out of a call", () => {
 		let adder = exported(calls, "makeAdder")(5n) as AnyCall
 
@@ -189,12 +181,8 @@ describe("Calling a Function", () => {
 		expect(handler.callback(4n)).toBe(8n)
 	})
 
-	// A constant is marshalled where it is READ, so a constant holding a
-	// Function wraps a fresh one on every read — and everything a SIGNATURE
-	// settles about a call is compiled once against the Descriptor rather than
-	// again on each. What is left per crossing is the name an Error calls the
-	// Function, which is the position it was met at and not a property of the
-	// signature: two crossings of one signature have to keep their own.
+	// A signature is compiled once, but each crossing keeps the name an Error
+	// calls the Function by, which is where it was met.
 	it("names each crossing of one signature by where it was met", () => {
 		let interpreter = createInterpreter(
 			calls.bridge,
@@ -214,16 +202,9 @@ describe("Calling a Function", () => {
 		expect(callError(() => there(1n)).message).toStartWith("there(")
 	})
 
-	// The one way the asynchrony door can be missing: a Descriptor that
-	// names work bound against a bridge that carries none, which is a Descriptor
-	// and a bundle that did not come from one compile. It is unreachable from a
-	// boundary the Compiler described — `carriesFuture` asks of the whole of it
-	// — so it is built here by taking the door off a bridge that has one.
-	//
-	// Both halves are asked, because they are refused in different places:
-	// a call's ANSWER finds out when the answer comes back, and a callback
-	// declared to answer work finds out where it ARRIVES, which is where a host
-	// can still be told what to do about it.
+	// A Descriptor and a bundle from two compiles, made by taking the Future
+	// door off a bridge. An answer is refused when it comes back, and a callback
+	// when it arrives.
 	it("says so where the bundle carries no asynchrony door", () => {
 		let doorless = { ...async.bridge }
 
@@ -262,18 +243,14 @@ describe("Calling a Function", () => {
 		).toContain("argument 2: this bundle carries no asynchrony door")
 	})
 
-	// And a Function goes the other way as well. What the Module hands a
-	// callback are its own values, so they cross OUT to reach it; what the
-	// callback answers with is built against the declared return, so it crosses
-	// IN. Both halves of the boundary meet at a call site the host wrote.
+	// A callback receives values crossing out and answers one crossing in.
 	it("takes a Function passed into a call", () => {
 		expect(
 			exported(calls, "applied")(3n, (value: bigint) => value * 2n),
 		).toBe(6n)
 	})
 
-	// Called as many times as the Module calls it, each call its own
-	// crossing — a callback is not a value marshalled once and remembered.
+	// Each call the Module makes is a crossing of its own.
 	it("takes a Function the Module calls more than once", () => {
 		expect(
 			exported(calls, "applyTwice")((value: bigint) => value * 3n, 2n),
@@ -304,9 +281,7 @@ describe("Calling a Function", () => {
 		).toBe(8n)
 	})
 
-	// The Record the callback is handed is the MODULE's, so it arrives
-	// marshalled — a plain object with `bigint` members, not the tagged value the
-	// raw door would have passed.
+	// The callback gets the Module's Record marshalled, with `bigint` members.
 	it("hands a callback the Module's values as JavaScript", () => {
 		let seen: Array<unknown> = []
 
@@ -320,9 +295,7 @@ describe("Calling a Function", () => {
 		expect(seen).toEqual([{ box: 6n }])
 	})
 
-	// Spelled from where the callback ARRIVED, because the Function that
-	// answered wrongly is the one the caller passed at that Argument rather than
-	// one of the Module's own.
+	// Spelled from where the callback arrived, which names the Function passed.
 	it("says which callback of which Argument did not fit", () => {
 		expect(
 			marshalError(() => exported(calls, "applied")(3n, () => "twice"))
@@ -346,10 +319,8 @@ describe("Calling a Function", () => {
 		).toBe("argument 2: expected (_ Integer) -> Integer, got the bigint 4.")
 	})
 
-	// A Choice is erased — it names Cases, and a Case is a value's Type
-	// rather than a value — so the bundle binds nothing under its name and the
-	// raw door has nothing to offer. What `exports` offers instead is spelling:
-	// one constructor per Case, written on this side.
+	// A Choice binds nothing in the bundle, so only `exports` has its
+	// constructors.
 	it("leaves a Choice off the raw door", () => {
 		expect("Shape" in marshal.raw).toBe(false)
 		expect("Shape" in marshal.exports).toBe(true)
@@ -365,17 +336,14 @@ describe("Calling a Function", () => {
 			...Object.keys(marshal.raw),
 		])
 
-		// `namespace Colour for Colour` binds a name of its own, so the
-		// two doors hold the same names and the Cases are members of that one.
+		// `namespace Colour for Colour` binds the name, so both doors hold it.
 		expect(Object.keys(calls.exports)).toEqual(Object.keys(calls.raw))
 	})
 })
 
 describe("A Choice", () => {
-	// The `$case` a constructor writes is the one `toJS` writes, so a
-	// value spelled here and a value that came back out of the Module are the
-	// same object — which is what makes `areaOf(Shape.Circle({ radius: 3n }))`
-	// work without a word about tags.
+	// A constructor writes the `$case` `toJS` writes, so
+	// `areaOf(Shape.Circle({ radius: 3n }))` works.
 	it("spells a Case with a payload as a call", () => {
 		let shape = choice(marshal, "Shape").Circle as AnyCall
 
@@ -386,8 +354,7 @@ describe("A Choice", () => {
 		expect(exported(marshal, "areaOf")(shape({ radius: 3n }))).toBe(9n)
 	})
 
-	// And a Case with no payload as the value itself. There is nothing to
-	// pass, so a call would exist only to look like the others.
+	// A Case with no payload is the value itself.
 	it("spells a Case with no payload as a value", () => {
 		expect(choice(marshal, "Shape").Blank).toEqual({ $case: "Shape#Blank" })
 		expect(
@@ -395,12 +362,8 @@ describe("A Choice", () => {
 		).toBe(0n)
 	})
 
-	// And a Case of a UNIT Choice as the string it crosses as, so the
-	// constructor and what a host would have written by hand are the very same
-	// value. What the name is worth there is a place to read the Cases off and
-	// a misspelling caught by the generated declaration, rather than a wrapper
-	// around anything: `Direction.Up` and `"Up"` are one value, not two
-	// spellings of one.
+	// A unit Choice's Case is its string, so `Direction.Up` and `"Up"` are one
+	// value.
 	it("spells a Case of a unit Choice as the string it crosses as", () => {
 		expect(choice(marshal, "Direction")).toEqual({
 			Up: "Up",
@@ -411,9 +374,7 @@ describe("A Choice", () => {
 		).toBe("Up")
 	})
 
-	// One name binds one thing, and `namespace Colour for Colour` is how a
-	// Choice is given its Methods — so the constructors ride on the Namespace
-	// rather than taking the name away from it.
+	// The constructors join the Namespace of the same name.
 	it("hands its constructors to the Namespace of its own name", () => {
 		let colour = choice(calls, "Colour")
 
@@ -425,23 +386,16 @@ describe("A Choice", () => {
 		expect((colour.preferred as AnyCall)()).toEqual({ $case: "Colour#Red" })
 	})
 
-	// A Type Alias for a Choice is the same Union, and gets no
-	// constructors of its own: a value built through one would say `Shape#Circle`
-	// while the name that offered it said something else, and one set of
-	// constructors reached through two names is a second thing to keep true.
+	// A Type Alias for a Choice gets no constructors, since its values would
+	// carry the Choice's name.
 	it("is spelled under its own name alone", () => {
 		expect("Label" in marshal.exports).toBe(false)
 	})
 })
 
-// `Optional` is the one Choice spelled by ABSENCE rather than by a
-// `$case`, and a `constant present = Optional<Integer>#Value(3)` is inferred as
-// one of its Cases ALONE rather than as the Union an annotation would have
-// named — writing the Choice out is not an annotation, and it is written out
-// because `Result` declares a `#Value` too. So the lone Case is a shape the
-// boundary meets, and it has to read as the item itself in every position it
-// appears in. The way in, the way out and the generated declarations each carry
-// that rule, and this is where they are held to saying the same thing.
+// `constant present = Optional<Integer>#Value(3)` infers one of `Optional`'s
+// Cases alone. The way in, the way out and the declarations must all read it as
+// the item.
 describe("One of Optional's own Cases met alone", () => {
 	it("reads a lone #Value as the item and a lone #Empty as nothing", () => {
 		expect(absence.exports.present).toBe(3n)
@@ -453,10 +407,7 @@ describe("One of Optional's own Cases met alone", () => {
 		expect(absence.exports.listed).toEqual([3n, 4n])
 	})
 
-	// The two doors of one Marshaller, on the same value: the walk the
-	// VALUE directs, which has no Descriptor to consult, and the reader compiled
-	// out of the one the Module declared. A shape only one of them has a rule for
-	// is a shape a round trip can not survive.
+	// The walk the value directs and the compiled reader must agree.
 	it("reads the same with the Type declared and without it", () => {
 		let marshaller = absence.marshaller
 		let raw = absence.raw as Record<string, EssenceValue>
@@ -471,31 +422,26 @@ describe("One of Optional's own Cases met alone", () => {
 })
 
 describe("A labelled call", () => {
-	// Both, and they mean the same call. Essence writes the labels at
-	// every call site, so a boundary that only took positions would drop the one
-	// thing the Declaration insisted on.
+	// Labels and positions are the same call.
 	it("takes the labels or the positions", () => {
 		expect(exported(calls, "labelled")(10n, 4n)).toBe(6n)
 		expect(exported(calls, "labelled")({ first: 10n, second: 4n })).toBe(6n)
 	})
 
-	// The keys are a set, not a sequence — an object literal's order is
-	// the caller's business and never the Declaration's.
+	// The keys are a set, in any order.
 	it("reads the labels in the order the Function takes them", () => {
 		expect(exported(calls, "labelled")({ second: 4n, first: 10n })).toBe(6n)
 	})
 
 	it("is not offered where a Parameter carries no label", () => {
-		// `square(_ value: Integer)` — its one Parameter is written `_`,
-		// so `{ value: … }` is an object handed to an Integer and nothing else.
+		// `square(_ value: Integer)` has no label, so the object is its Argument.
 		let error = marshalError(() => exported(math, "square")({ value: 12n }))
 
 		expect(error.message).toBe(
 			"argument 1: expected Integer, got an object with 'value'.",
 		)
 
-		// And half a set of labels is not a set of labels: `mixed` takes
-		// `_ first` and `second`, so the object is one positional Argument.
+		// `mixed` takes `_ first` and `second`, so it has no labelled call.
 		expect(
 			callError(() =>
 				exported(calls, "mixed")({ first: 10n, second: 4n }),
@@ -503,10 +449,8 @@ describe("A labelled call", () => {
 		).toContain("takes 2 Arguments; 1 Argument was passed.")
 	})
 
-	// THE ambiguity, and it is decided rather than guessed at: both
-	// readings take an object, and a Record is the one that can hold any shape,
-	// so the Record wins. `describe(_ shape: Rectangle)` is written with `_`
-	// anyway; `moved` proves it holds where a label is written too.
+	// A lone Record Parameter takes the object, even with a label, as `moved`
+	// shows.
 	it("loses to a single Record Parameter", () => {
 		expect(exported(main, "describe")({ width: 3n, height: 4n })).toBe(
 			"area: 12",
@@ -517,10 +461,8 @@ describe("A labelled call", () => {
 		})
 	})
 
-	// And to a single Parameter a Record merely CAN inhabit — the Box arm
-	// of a Union, the Box inside an Optional. Read as a labelled call, the
-	// object would be unwrapped to its one member and the Module silently
-	// handed the wrong value.
+	// So does a lone Parameter a Record can inhabit, through a Union or an
+	// Optional. A labelled reading would hand over the wrong value.
 	it("loses to a single Parameter a Record can inhabit", () => {
 		expect(exported(calls, "boxed")({ box: 5n })).toEqual({ box: 5n })
 		expect(exported(calls, "boxed")(5n)).toBe(5n)
@@ -550,9 +492,8 @@ describe("A call the Function does not admit", () => {
 		)
 	})
 
-	// An object handed to a Function of two Parameters was meant to be a
-	// labelled call, so it is answered as one — "takes 2 Arguments, 1 was
-	// passed" would be true and useless.
+	// One object for two Parameters was meant as a labelled call, and is
+	// refused as one.
 	it("says which label is wrong rather than counting Arguments", () => {
 		expect(
 			callError(() =>
@@ -582,9 +523,7 @@ describe("A Namespace", () => {
 		).toEqual({ width: 3n, height: 4n })
 	})
 
-	// There is no `::` on this side, so the receiver is written where a
-	// call passes it — first. The Export Surface already carries it as Parameter
-	// one, typed as the Namespace's target.
+	// The receiver comes first, as the Export Surface's first Parameter.
 	it("takes an instance Method's receiver as its first Argument", () => {
 		let rectangle = { width: 3n, height: 4n }
 
@@ -599,8 +538,7 @@ describe("A Namespace", () => {
 		)
 	})
 
-	// The receiver is written `_`, so no instance Method is ever callable
-	// by label — `shifted(by amount: Integer)` reads as one label out of two.
+	// The receiver is written `_`, so an instance Method has no labelled call.
 	it("offers no labelled call for an instance Method", () => {
 		expect(
 			callError(() => method(calls, "Point", "shifted")({ by: 3n }))
@@ -614,9 +552,8 @@ describe("A Namespace", () => {
 		expect(namespaceOf(calls, "Point").named).toBe("Point")
 	})
 
-	// A class refuses a static member named `prototype` or `constructor`,
-	// so the Rewriter mangles the two — reading them raw would answer with the
-	// class-prototype object and `Function` instead.
+	// The Rewriter mangles a static `prototype` or `constructor`, which a class
+	// refuses.
 	it("binds the two member names a class refuses", () => {
 		expect(namespaceOf(calls, "Point")["constructor"]).toBe(5n)
 		expect(method(calls, "Point", "prototype")({ x: 7n, y: 2n })).toBe(7n)
@@ -626,9 +563,8 @@ describe("A Namespace", () => {
 		expect(method(calls, "Point", "origin")()).toEqual({ x: 0n, y: 0n })
 	})
 
-	// `Rectangle` is a Type Alias AND the Namespace of that name, so its
-	// kind reads `type` while it is a value in the bundle. Binding by kind would
-	// have left it out.
+	// `Rectangle` is a Type Alias and a Namespace, so its kind reads `type`
+	// though the bundle binds it.
 	it("is bound although its kind reads as a Type", () => {
 		expect(geometry.surface.kinds.Rectangle).toBe("type")
 		expect(typeof method(geometry, "Rectangle", "of")).toBe("function")
@@ -648,8 +584,7 @@ describe("An overloaded Method", () => {
 		)
 	})
 
-	// An instance Overload's signature carries the receiver it is emitted
-	// with, because that is the Argument the caller has to pass.
+	// An instance Overload's signature carries its receiver.
 	it("lists an instance Overload with its receiver", () => {
 		expect(
 			callError(() =>
@@ -660,8 +595,7 @@ describe("An overloaded Method", () => {
 		)
 	})
 
-	// The refusal is about `exports`, which promises ONE Function per
-	// name. Each Overload is a binding of its own and stays reachable.
+	// Each Overload stays reachable through `raw`.
 	it("leaves every Overload callable through the raw Namespace", () => {
 		let namespace = calls.raw.Point as Record<string, unknown>
 		let from = namespace.from__overload$2 as (
