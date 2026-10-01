@@ -20,29 +20,23 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// What `loop-self-tail-calls` exists for, which is not a speed: it is that
-// the walk the language teaches runs on every host Essence supports. Bundles run
-// on Bun, on Node and on Deno byte-identically, JavaScriptCore eliminates a tail
-// frame and V8 does not — so before this pass, 10,000 items was a `RangeError`
-// on two of the three. This file holds the pass to that in the two ways it can
-// be held: by RUNNING the programs under Node, and by asserting the SHAPE of the
-// JavaScript, which is what makes the claim hold on an engine no suite here
-// runs.
+// `loop-self-tail-calls` lets the recursive walk the language teaches run on
+// every host. JavaScriptCore eliminates a tail frame and V8 does not, so
+// without the pass a long walk overflows on Node and Deno. These specs run the
+// walks under Node and assert the emitted shape, which holds on any engine.
 //
-// And it holds the pass to saying the same thing as the Program it
-// rewrote, over generated Programs rather than written ones — `optimiser.spec`
-// carries the written cases, one per thing the pass has to get right, and the
-// fuzzer at the foot of this file is what covers their combinations.
+// A fuzzer checks the rewritten Program answers as the original does over
+// combinations. `optimiser.spec.ts` holds the written cases. See "Self tail
+// calls" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 
 const TURNS = 200_000
 
-// One Program per shape the pass has to reach, each counting to the same
-// answer so a wrong one names the shape rather than the arithmetic.
+// One Program per shape the pass must reach, each with the same answer, so a
+// failure names the shape rather than the arithmetic.
 const ANSWER = String((TURNS * (TURNS + 1)) / 2)
 
-// The canonical walk: take the head, answer with the walk of the tail,
-// with the `match` over the `Optional` that `firstItem` answers deciding when to
-// stop. This is the shape the documentation teaches and the one that overflowed.
+// The walk the documentation teaches: a `match` over `firstItem` decides when
+// to stop, and the tail is walked next.
 const headAndTail = `implementation {
 	function total(_ rest: List<Integer>, _ sum: Integer) -> Integer {
 		<- match rest::firstItem() -> Integer {
@@ -54,8 +48,8 @@ const headAndTail = `implementation {
 	Terminal.print(total(List.of(integersFrom 1, through ${TURNS}), 0))
 }`
 
-// An accumulator walk with no List in it at all — nothing but two
-// Integers, so what it measures is the turn and not the walk of a structure.
+// Only two Integers, so the turn is measured rather than a walk of a
+// structure.
 const accumulator = `implementation {
 	function countdown(_ n: Integer, _ sum: Integer) -> Integer {
 		if n::isLessThan(1) {
@@ -68,9 +62,7 @@ const accumulator = `implementation {
 	Terminal.print(countdown(${TURNS}, 0))
 }`
 
-// A walk over an `Optional` that is not a List's head — the Choice is
-// carried by the Program itself, so the `match` is over a value the walk built
-// rather than over one a native answered.
+// The `match` is over an `Optional` the walk built, not one a native answered.
 const optionalWalk = `implementation {
 	function drain(_ next: Optional<Integer>, _ sum: Integer) -> Integer {
 		<- match next -> Integer {
@@ -88,9 +80,9 @@ const optionalWalk = `implementation {
 	Terminal.print(drain(#Value(${TURNS}), 0))
 }`
 
-// A Namespace Method, where the receiver is Parameter zero and `@` inside
-// a Handler means the matched value — so the walk binds the receiver outside the
-// chain and the loop rebinds it through a slot.
+// The receiver is Parameter zero, and `@` inside a Handler means the matched
+// value. So the walk binds the receiver outside the chain, and the loop
+// rebinds it through a slot.
 const methodWalk = `implementation {
 	namespace Walker for List<Integer> {
 		walked(_ sum: Integer) -> Integer {
@@ -140,10 +132,8 @@ function refusal(
 		: ""
 }
 
-// BUNDLED for the runs under Node. What the Rewriter emits imports the
-// runtime as TypeScript, which Bun reads and Node does not — and what ships is
-// the bundle anyway, so this is also the artefact the portability claim is
-// about.
+// Node cannot import the runtime's TypeScript, so its runs use a bundle, which
+// is also what ships.
 async function bundled(
 	source: string,
 	options: OptimiserOptions = defaultOptimiserOptions,
@@ -164,11 +154,9 @@ const withoutPass: OptimiserOptions = {
 	disabledPasses: new Set(["loop-self-tail-calls"]),
 }
 
-// One emitted Function's own text, found by its header and taken to the
-// brace that closes it. It is read off the EMISSION rather than off the Nodes,
-// because what the portability claim is about is the JavaScript: a test that
-// asked the Optimiser whether it had looped a Function would be asking the pass
-// to mark its own homework.
+// One emitted Function's text, from its header to its closing brace. The
+// claim is about the JavaScript, so the spec reads the emission rather than
+// asking the Optimiser.
 function emittedBody(generated: string, name: string): string {
 	let header = new RegExp(`(?:function|static) ${name}\\(`)
 	let match = header.exec(generated)
@@ -195,9 +183,8 @@ function emittedBody(generated: string, name: string): string {
 	throw new Error(`the emitted '${name}' has no closing brace`)
 }
 
-// `node` if there is one on the PATH, and null where there is not. It is
-// resolved by ASKING it rather than by looking for a file, so a shim, a version
-// manager's shell function and a real binary all answer the same way.
+// The `node` version, or null without one on the PATH. Running it rather than
+// looking for a file treats shims and real binaries alike.
 async function nodeVersion(): Promise<string | null> {
 	try {
 		let result = await spawnAndWait(["node", "--version"])
@@ -214,9 +201,7 @@ async function nodeVersion(): Promise<string | null> {
 
 const node = await nodeVersion()
 
-// A subprocess, and the emitted Module written to a file — an import into
-// the runner's own process would run it on Bun, which is the engine this whole
-// file exists to look past.
+// Runs the Module in a subprocess, since an import would run it on Bun.
 async function runUnder(
 	command: string,
 	javaScript: string,
@@ -237,12 +222,9 @@ async function runUnder(
 
 describe("self tail calls", () => {
 	describe("the emitted shape", () => {
-		// The guard that holds EVERYWHERE, including on an engine nothing
-		// here runs: the Function does not call itself where its answer goes. It
-		// is asked of the emitted text, and the same question is asked of the
-		// build with the pass off, where the answer has to be the opposite —
-		// otherwise this would pass just as happily against a pass that did
-		// nothing at all.
+		// The emitted Function never returns a call to itself, which holds on
+		// every engine. The build without the pass must show the opposite, or
+		// this would pass against a pass that did nothing.
 		for (let walk of walks) {
 			it(`leaves no self call in the answer of ${walk.name}`, () => {
 				let body = emittedBody(generate(walk.source), walk.looped)
@@ -267,11 +249,8 @@ describe("self tail calls", () => {
 	})
 
 	describe("under Node", () => {
-		// Skipped with a reason rather than silently, because the whole
-		// point of this block is the engine it runs on. `node` is on the PATH of
-		// every machine this repository is developed on and of CI; a machine
-		// without one still runs everything else here, and the shape guard above
-		// is what carries the claim there.
+		// Without `node`, the skip says why, and the emitted-shape specs still
+		// hold the claim.
 		if (node === null) {
 			it.skip("runs each walk at 200,000 turns (no `node` on the PATH)", () => {})
 		} else {
@@ -287,13 +266,9 @@ describe("self tail calls", () => {
 				})
 			}
 
-			// What makes the four above a guard rather than four passing
-			// tests. With the pass off, V8 is handed 200,000 frames and says so
-			// — so a change that quietly stopped looping these walks fails the
-			// block above rather than passing it more slowly. It is a claim
-			// about V8's stack, which is a deterministic limit far below 200,000
-			// frames in every configuration it has; an engine that grew proper
-			// tail calls would fail HERE, which is the right place to hear it.
+			// Without the pass, V8 overflows long before `TURNS` frames, so the
+			// walks under Node are a real guard. An engine with proper tail calls
+			// would fail this spec.
 			it("overflows Node's stack with the pass off", async () => {
 				let result = await runUnder(
 					"node",
@@ -308,21 +283,11 @@ describe("self tail calls", () => {
 		}
 	})
 
-	// The differential the written cases can not cover: not one thing at a
-	// time but their COMBINATIONS — a swap under a `define` under a `match`, with
-	// a default that reads a Parameter the same turn rebinds, with a closure
-	// holding one of them. Each generated Program is compiled twice and run
-	// twice, and the two answers have to be the same text.
-	//
-	// Deterministic. The seed is fixed, so a failure is reproducible and
-	// the counterexample is in the message; a random seed would make this a test
-	// that fails for somebody once and never again.
+	// Combinations the written cases cannot cover, such as a swap under a
+	// `define` with a default reading a rebound Parameter. Each Program runs
+	// with and without the pass, and the outputs must match. The seed is fixed,
+	// so a failure is reproducible.
 	describe("the fuzzer", () => {
-		// Sixty-four rather than forty-eight, because four knobs were
-		// added to the nine that were here and the combinations they stand for
-		// are what this block is: two of them, a closure in a default and a
-		// default reading a Record member, are each a bug an independent review
-		// found in code every one of the forty-eight agreed with.
 		const CASES = 64
 
 		function generator(seed: number): () => number {
@@ -348,36 +313,25 @@ describe("self tail calls", () => {
 			let turns = 1 + Math.floor(random() * 6)
 			let start = 1 + Math.floor(random() * 9)
 			let step = 1 + Math.floor(random() * 4)
-			// Every knob the written cases hold one at a time, drawn
-			// independently: which shape decides the turn, whether a Parameter
-			// is swapped with another, whether one takes a default that reads
-			// the Parameter before it, whether a closure captures one, and
-			// whether a non-tail call to the same Function stands beside the
-			// tail one.
+			// Each knob is drawn independently. One picks the driver of the turn.
+			// The others add a swapped pair, a default reading an earlier
+			// Parameter, a capturing closure, or a non-tail self call.
 			let driver = pick(["if", "match", "define", "nested"])
 			let swapped = random() < 0.5
 			let defaulted = random() < 0.5
 			let captured = random() < 0.35
 			let alsoRecurses = random() < 0.3
-			// And four more, each of which is a corner an independent
-			// review reached and this could not. A Record Parameter with a
-			// default that reads a MEMBER of it spelled like a Parameter, which
-			// is the difference between renaming a binding and renaming a key.
-			// A second Parameter the same closure captures, because a rule that
-			// is per Parameter can not be shown to be by capturing one. Two
-			// Arguments that PRINT, which is the only way the ORDER a turn
-			// evaluates its Arguments in is observable at all. And a Function
-			// literal standing in a DEFAULT, the one capture a slot can not
-			// hold and the pass declines.
+			// `recorded` reads a Record member named like a Parameter, which
+			// tells a binding from a key. `noisy` prints Arguments, so their order
+			// shows. `paired` captures several Parameters, and `closured` puts a
+			// Function literal in a default, which the pass declines.
 			let recorded = random() < 0.5
 			let noisy = random() < 0.5
 			let paired = captured && random() < 0.5
 			let closured = captured && random() < 0.5
 
-			// A value that says it was evaluated, where the Program has
-			// something to say it with. `note` answers what it is given, so the
-			// knob changes the ORDER a difference would show up in and never the
-			// answer.
+			// `note` prints a tag and answers its value, so it shows evaluation
+			// order without changing the answer.
 			let noted = (tag: string, value: string): string =>
 				noisy ? `note("${tag}", ${value})` : value
 
@@ -395,10 +349,8 @@ describe("self tail calls", () => {
 						]
 					: []),
 				...(recorded ? ["at mark: Integer = opts.n"] : []),
-				// AFTER the two Parameters with defaults, and written by
-				// every call — so a turn that leaves those out has a written
-				// Argument standing behind an omitted one, which a call
-				// evaluates first and a turn therefore has to hold.
+				// After the defaulted Parameters and written by every call, so a
+				// written Argument follows an omitted one, which a turn must hold.
 				...(noisy ? ["_ tag: Integer"] : []),
 				...(captured ? ["_ made: List<() -> Integer>"] : []),
 				...(closured
@@ -406,11 +358,9 @@ describe("self tail calls", () => {
 					: []),
 			]
 
-			// One call, written from the values its Arguments take — so
-			// the first call and the turn differ only in what they hand over,
-			// and a Parameter drawn into the signature above is handed something
-			// in both. The two with defaults are handed nothing by either, so
-			// both take their default afresh.
+			// The first call and the turn differ only in what they hand over.
+			// Neither hands the defaulted Parameters anything, so each takes its
+			// default afresh.
 			let called = (
 				next: string,
 				sum: string,
@@ -428,34 +378,24 @@ describe("self tail calls", () => {
 					...(captured ? [made] : []),
 				].join(", ")})`
 
-			// What the turn carries in its accumulator. A `paired` walk
-			// adds the counter rather than the stride, which leaves `stride`
-			// read by nobody but the answer — and that is what makes such a
-			// turn one whose Arguments mention no Parameter it assigns where it
-			// stands, so the ONLY reason left to hold them is the Argument it
-			// left out standing in front of one it wrote.
+			// A `paired` walk adds the counter rather than the stride. Its
+			// Arguments then read no Parameter the turn assigns, so only the
+			// omitted Argument before a written one makes the turn hold them.
 			let carried =
 				defaulted && !paired
 					? "sum::add(stride)"
 					: `sum::add(${swapped ? "left" : "n"})`
-			// The closure the turn hands on is built where it stands
-			// unless a default builds it — and where a default does, it closes
-			// over a Parameter the turn rebinds, which is the shape the pass
-			// declines rather than loops.
-			//
-			// A `paired` one closes over every value the walk carries
-			// rather than over the counter alone, so every one of them is
-			// rebound through a slot — which is the other half of "a binding per
-			// turn is decided per Parameter".
+			// A closure built in a default closes over a Parameter the turn
+			// rebinds, which the pass declines to loop. A `paired` closure captures
+			// every carried value, so each is rebound through a slot.
 			let closure = paired
 				? `() -> Integer { <- n::add(sum)${
 						swapped ? "::add(left)::add(right)" : ""
 					}::add(made::length()) }`
 				: "() -> Integer { <- n }"
-			// The turn swaps its pair, takes the defaults again by leaving
-			// them out, and hands on a closure built in THIS turn — so a loop
-			// that rebound in the wrong order, carried a stale default or shared
-			// one binding across turns answers differently.
+			// The turn swaps its pair, takes the defaults again and hands on a
+			// closure built in this turn. A wrong rebinding order, a stale default
+			// or a binding shared across turns changes the answer.
 			let turn = called(
 				noted("arg-n", `n::subtract(${step})`),
 				carried,
@@ -470,8 +410,8 @@ describe("self tail calls", () => {
 					? "sum::add(left)"
 					: "sum"
 
-			// Every Parameter drawn is READ by the answer, so a default
-			// nothing reads can not hide a difference in what it was given.
+			// The answer reads every Parameter drawn, so no difference hides in
+			// an unread default.
 			if (recorded) {
 				answer = `${answer}::add(mark)`
 			}
@@ -489,9 +429,8 @@ describe("self tail calls", () => {
 			<- ${turn}
 		}`
 			} else if (driver === "match") {
-				// A Choice of the Program's own, because a `match` needs a
-				// Union to decide over — so the turn is decided by a Case rather
-				// than by a Boolean, which is the shape the canonical walk has.
+				// A Choice of the Program's own, so a Case decides the turn as
+				// in the canonical walk.
 				body = `		<- match decided(n) -> Integer {
 			case #Stop  { <- ${answer} }
 			case #Go(it) { <- ${turn} }
@@ -513,10 +452,7 @@ describe("self tail calls", () => {
 		}`
 			}
 
-			// A second call to the same Function standing where its answer
-			// is still worked on. It must stay a call, and the Program must
-			// still answer the same thing either way — which is what says the
-			// pass told the two apart.
+			// A self call whose answer is still worked on must stay a call.
 			let extra = alsoRecurses
 				? `	function doubled(_ n: Integer) -> Integer {
 		if n::isLessThan(1) {
@@ -530,8 +466,7 @@ describe("self tail calls", () => {
 `
 				: ""
 
-			// Declared only where an Argument or a default is asked to
-			// say when it was evaluated.
+			// Declared only for `noisy` Programs.
 			let helper = noisy
 				? `	function note(_ tag: String, _ value: Integer) -> Integer {
 		Terminal.print(tag)
@@ -542,8 +477,7 @@ describe("self tail calls", () => {
 `
 				: ""
 
-			// Declared only where the `match` driver needs it, so every
-			// other generated Program stays the shape it was.
+			// Declared only for the `match` driver.
 			let choice =
 				driver === "match"
 					? `	choice Turn {
@@ -585,8 +519,7 @@ ${extra}	Terminal.print(${called(
 				let plain = await runUnder("bun", generate(source, withoutPass))
 
 				expect(looped.stderr).toBe("")
-				// The source is in the message, because a generated
-				// counterexample nobody can read is a failure nobody can fix.
+				// The source is in the message, so a failing case can be read.
 				expect({ source, ...looped }).toEqual({ source, ...plain })
 			})
 		}
