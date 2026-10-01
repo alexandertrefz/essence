@@ -3,24 +3,20 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { primary, reportError, secondary } from "../diagnostics/index"
 import { closestMatch } from "../helpers/suggest"
 
-// What a `test` and a `suite` may be Modified BY, and what each of those
-// Modifiers means. The Parser reads a Modifier generically — a name and the
-// arguments that follow it — so that `within 2s` and `retries 3` are
-// vocabulary rather than parser work; this file is the vocabulary.
+// The Modifiers of a `test` and a `suite`, and what each means. The parser
+// reads any Modifier as a name and its arguments; this file is the vocabulary.
 
 // #region Modifiers
 
 // The Modifiers, in the order a Diagnostic lists them. `across` and
-// `for any` are not Modifiers: they take a body's shape apart rather than
-// annotating it, and they come after the Modifiers.
+// `for any` shape a body rather than annotate it, so they are not Modifiers.
 const MODIFIERS = ["focused", "skipped", "tagged"] as const
 
 // The Modifiers that take bare names, which is what `regrouped` is about.
 const NAME_TAKING_MODIFIERS = new Set<string>(["tagged"])
 
-// What the Modifiers of one item established, once. Every field is what
-// the ITEM answers for: `mergedModifiers` folds an enclosing suite's in, so a
-// test inside a skipped suite is skipped and carries the suite's tags.
+// What the Modifiers of one item established. `mergedModifiers` folds in an
+// enclosing suite's, so a test inside a skipped suite is skipped too.
 export type TestModifiers = {
 	tags: Array<string>
 	skipped: common.typed.TestSkip | null
@@ -33,9 +29,8 @@ export const noModifiers: TestModifiers = {
 	focused: null,
 }
 
-// Read off the Parser's Nodes and reported about here, so that everything
-// downstream — the Enricher's own walk, code generation, the Language Server —
-// reads three settled fields rather than a list of names it has to interpret.
+// Settles the Modifiers into three fields, reporting here, so later stages
+// need not interpret a list of names.
 export function resolveTestModifiers(
 	modifiers: Array<parser.TestModifierNode>,
 	item: "test" | "suite",
@@ -107,38 +102,25 @@ export function resolveTestModifiers(
 	return { tags, skipped, focused }
 }
 
-// An item's own Modifiers over the ones covering it. A suite's cover
-// every test inside it, and the covering ones lose to the item's own only where
-// the item wrote its own — `skipped` on a suite skips a test that says nothing,
-// and a test can not un-skip itself, which is why `skipped` falls back rather
-// than being overridden.
+// An item's own Modifiers over those of the suites covering it. An item's own
+// wins where it wrote one, so a test can not un-skip itself.
 export function mergedModifiers(
 	own: TestModifiers,
 	covering: TestModifiers,
 ): TestModifiers {
 	return {
-		// Outermost first and without repeats, so that two Programs that
-		// carry the same tags carry them in the same order.
+		// Outermost first and without repeats, so the order is stable.
 		tags: [...new Set([...covering.tags, ...own.tags])],
 		skipped: own.skipped ?? covering.skipped,
 		focused: own.focused ?? covering.focused,
 	}
 }
 
-// `tagged slow focused` is read by the Parser as `tagged` taking nothing
-// and `slow` taking `focused`, and it has to be: a Modifier's argument list
-// opens on a bare name only where a comma or the body follows it, because
-// `A B C {` is otherwise two readings with nothing to settle them. The Parser
-// fails OPEN, which is what leaves this regrouping possible — the vocabulary is
-// here, and every Position is in hand.
-//
-// Two moves, and neither touches a Modifier the Parser got right. A bare name
-// that IS a Modifier, or looks like one, is taken back out of the argument list
-// it was read into; a bare name that is neither is handed to the `tagged` in
-// front of it. `tagged slow focussed` therefore reports the typo instead of
-// quietly making it a tag — which is the whole reason the near-miss test is in
-// here, and the reason a comma settles everything: `tagged focused, network` is
-// two tags and is left exactly as it was read.
+// The parser reads `tagged slow focused` as `tagged`, then `slow` taking
+// `focused`: a bare argument opens only before a comma, the body, `for` or
+// `across`. This regroups with the vocabulary in hand. A name that is or looks
+// like a Modifier leaves the argument list; any other joins the `tagged`
+// before it. So `tagged slow focussed` reports the typo.
 function regrouped(
 	modifiers: Array<parser.TestModifierNode>,
 ): Array<parser.TestModifierNode> {
@@ -168,19 +150,10 @@ function regrouped(
 	return grouped
 }
 
-// A Modifier read as taking ONE bare name that IS a Modifier is two
-// Modifiers, because no Modifier takes another one as an argument. Anything
-// with a comma in it was read unambiguously and is left alone.
-//
-// A near-miss counts only where the HEAD is not a Modifier either, which
-// is the `tagged slow focussed` shape: the Parser read `slow(focussed)`, and
-// neither name is a Modifier, so taking the pair apart is what lets `tagged`
-// adopt `slow` and the typo report itself. Where the head IS a Modifier the
-// argument is that Modifier's, and `tagged focus` is a test tagged `focus` —
-// `focus`, `skip` and `tags` all sit within a typo's distance of a Modifier
-// while being perfectly ordinary things to tag a test with, and taking one of
-// them apart reported two Diagnostics about a problem the writer did not have
-// while `tagged focus, network` was accepted right beside it.
+// A Modifier read as taking one bare name that is a Modifier is two
+// Modifiers. A near miss splits only under a head that is no Modifier, so
+// `tagged focus` stays a test tagged `focus`. An argument list with a comma
+// is never split.
 function split(
 	modifier: parser.TestModifierNode,
 ): Array<parser.TestModifierNode> {
@@ -216,9 +189,8 @@ function split(
 	]
 }
 
-// A Modifier that takes bare names and was written with none takes the
-// next bare name — as long as that name is not a Modifier, and does not look
-// enough like one to be a typo of it.
+// A Modifier that takes bare names and was written with none takes the next
+// bare name, unless that name is or looks like a Modifier.
 function adopts(
 	previous: parser.TestModifierNode,
 	modifier: parser.TestModifierNode,
@@ -316,9 +288,8 @@ function resolveTags(modifier: parser.TestModifierNode): Array<string> {
 			continue
 		}
 
-		// Lower case because a tag is typed on a command line and matched
-		// exactly there. Two spellings of one tag are two tags, and the one
-		// nobody selects is the one that quietly stops running.
+		// A tag is matched exactly on the command line, so lower case
+		// keeps one tag from having two spellings.
 		if (argument.content !== argument.content.toLowerCase()) {
 			reportError(
 				`The tag '${argument.content}' is not lower case`,
@@ -368,11 +339,8 @@ function refuseArguments(
 	}
 }
 
-// `help` where the shared sentence would loop. "Write one reason and
-// nothing else here" is anchored on the SECOND reason — the reader is standing
-// on the thing that has to go, so writing a reason there writes a third — and
-// the only edit that answers it is a deletion. Every other caller wants a value
-// of a shape written where this one stands, which is what the template says.
+// `help` replaces the template where writing a value would be wrong, such as
+// on a second reason, where the edit is a deletion.
 function refuseArgument(
 	argument: parser.TestModifierArgumentNode,
 	modifier: string,
@@ -424,15 +392,9 @@ function refuseUnknownModifier(
 
 // #region Identity
 
-// A test's name as it was WRITTEN, which is what its identity is keyed
-// on. The rendered name is worked out per run — a table test's says which row
-// it ran for — so nothing durable can be keyed on it: a stored snapshot, a
-// counterexample, a timing baseline and the Editor's own focus all have to
-// survive a name that renders differently every time.
-//
-// An interpolation that names something keeps the name, because that is what a
-// reader recognises the test by; anything worked out reduces to `{}`, because
-// there is no spelling of an Expression here that is stable and short.
+// A test's name as written, which its identity is keyed on. The rendered
+// name differs per run, as a table row's does. An interpolated Identifier
+// keeps its name, and any other interpolation reduces to `{}`.
 export function nameTemplate(
 	node: parser.StringValueNode | parser.InterpolatedStringValueNode,
 ): string {
@@ -451,10 +413,8 @@ export function nameTemplate(
 		.join("")
 }
 
-// One string standing for a whole identity, for the places that need a
-// key rather than the parts — a Map, an event's `id`, a snapshot file's
-// heading. `/` separates the steps and is escaped inside them, so that two
-// different identities can never spell the same key.
+// One string standing for a whole identity. `/` separates the steps and is
+// escaped inside them, so two identities never spell the same key.
 export function testIdentityKey(
 	identity: common.typed.TestIdentity,
 	row: number | null = null,
@@ -465,14 +425,9 @@ export function testIdentityKey(
 	])
 }
 
-// The same key with the Module step LEFT OFF, for what is stored beside
-// the source rather than across a whole run — a benchmark's baseline and a
-// failing-example corpus live in the Module's own companion directory, so
-// spelling the path inside the file as well would be the one fact written
-// twice, and a Module that moved would take a store its keys no longer name.
-// A table row's key ends with its row, the way a stored snapshot's name does:
-// the rows share a body, and one entry for all of them would be one entry the
-// rows overwrite in turn.
+// The same key without the Module step, for stores kept beside the source,
+// such as a benchmark baseline. A moved Module then keeps its keys. A table
+// row's key ends with its row, so the rows do not overwrite one entry.
 export function relativeIdentityKey(
 	identity: common.typed.TestIdentity,
 	row: number | null = null,
@@ -497,12 +452,9 @@ function identityKey(steps: Array<string>): string {
 		.join("/")
 }
 
-// The suite names the Enricher fills itself — `examples` from a file's
-// documentation, `contracts` from a run's declarations. A written suite under
-// one of those names would share the synthesized suite's identity, and with it
-// the corpus, the seeds and the focus that identity anchors — a collision the
-// author can not see, so it is refused where the synthesis happens rather
-// than diagnosed as a duplicate of a suite no source holds.
+// The enricher fills the suites `examples` and `contracts` itself. A written
+// suite of either name would share their identity and what it anchors, so it
+// is refused where the synthesis happens.
 export function refuseReservedSuite(
 	nodes: Array<parser.TestsNode>,
 	name: string,
@@ -538,12 +490,9 @@ export function refuseReservedSuite(
 	return taken
 }
 
-// Two tests of one suite that are called the same thing are one test
-// twice as far as everything durable is concerned — they share an identity, so
-// they share a snapshot, a baseline and a stored counterexample. Reported per
-// scope, and per KIND: a test and a suite of one name never collide, because
-// what a suite contributes to an identity is a step of the path rather than
-// its end.
+// Two tests of one name in one suite share an identity, and with it every
+// stored snapshot and baseline. A test and a suite of one name never collide,
+// because a suite is a step of the path rather than its end.
 export function refuseDuplicateNames(nodes: Array<parser.TestsNode>): void {
 	let seen = new Map<string, common.Position>()
 

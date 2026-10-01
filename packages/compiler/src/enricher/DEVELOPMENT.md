@@ -796,3 +796,44 @@ A Rational receiver spells its leaves one way (`forNumericBase`). `@::isNot(0)` 
 question, so every bare run of digits becomes `n/1`, and the covering `Number` is spelled as `Rational`. The
 receiver decides it, after any alias is substituted, and a Program's own Namespace over a Rational keeps its
 spelling.
+
+## Contract goals
+
+`essence test --contracts` turns each Method a Module's Namespaces declare into a property test, a goal.
+`contractSuite` builds them. A goal generates the receiver and each Argument from the declared Types and calls the
+Method. It expects the answer to hold every conjunct its return Type promises. A goal that throws fails. So an
+entry whose return Type refines nothing still gets a goal, since a signature declares the Method total over its
+domain.
+
+A Method written in Essence already has its answer checked against its return Type. The goals matter where that
+check can not see: a native binding, and a `Generatable` conformance that builds a value its own Type refuses.
+
+The goals stand in a synthetic suite named `contracts`, beside the `examples` suite. An `@example` is written in
+a comment, so it becomes parser Nodes; a goal is written nowhere, so it is built as typed Nodes. `testsSectionOf`
+appends the suite after the written tests are enriched, so every written item keeps its manifest index. The goals
+read the Scope the implementation filled, so a helper a test declares is not a goal's business. A written suite
+named `contracts` is refused (`refuseReservedSuite`), since it would share the goals' identity, and with it their
+stored counterexamples and seeds.
+
+Only the Methods a Namespace statement itself wrote get goals. The Scope answers the merged Namespace, which a
+second `namespace X for T` extends, so goals per statement over the merged table would repeat an inherited
+Method. The standard library's Methods get their goals when its own test run compiles them.
+
+An entry gets no goal where:
+
+- Its signature mentions a Type Parameter. Its contract speaks of every instantiation, and the generated values
+  come from one. This skip is silent, since no conformance could make the entry eligible.
+- A Parameter's Type can not be generated, or the call does not typecheck.
+- A conjunct of its return Type can not be rebuilt as a check. A goal under the Method's name claims the whole
+  contract, so it never checks half of it.
+- It answers a `Future` or a `Started`. The goal's call would be a bare Statement, which `unused-future` reports
+  where no edit can answer it. Proving anything would mean completing the call and performing its effect.
+
+Building a goal is speculative, since generating values and rebuilding the call report about code nobody wrote.
+Each goal is built inside a `collectDiagnostics` of its own, and the first message becomes the skip's reason. An
+internal error while building a goal skips that goal rather than failing the compile. `reportSkippedGoals`
+reports the skips once per Namespace, as the Information `ungeneratable-contract`, and offers the `Generatable`
+help only where a generation failed.
+
+Without conjuncts, the goal's body is the call as a bare Expression Statement. A Constant nothing reads would be
+dropped by `eliminate-dead-code` wherever the call is pure, and the goal would pass without running the Method.
