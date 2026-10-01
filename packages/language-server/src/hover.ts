@@ -19,6 +19,7 @@ import {
 } from "@essence-lang/compiler/printType"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { typedAssertionExpressions } from "./assertionChildren"
 import { defineExpressions } from "./defineArmChildren"
 import { documentationOf, renderDocumentation } from "./documentation"
 import { typedHandlerExpressions } from "./matchHandlerChildren"
@@ -586,7 +587,10 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
-			visitNode(node.value, state)
+			for (let expression of typedAssertionExpressions(node)) {
+				visitNode(expression, state)
+			}
+
 			return
 		case "Identifier":
 			// A Pattern's bindings read off a Constant with a made-up name at the

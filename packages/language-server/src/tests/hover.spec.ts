@@ -884,6 +884,40 @@ describe("Hover inside a Match Handler", () => {
 	})
 })
 
+// A `require` Matcher's by-value members answer as a Match Handler's do.
+describe("Hover inside a require Matcher", () => {
+	function testsHover(source: string, cursor: common.Cursor) {
+		let { program } = parseWithDiagnostics(source)
+		let { program: enrichedProgram, annotations } = enrich(program, {
+			annotations: true,
+			tests: true,
+		})
+
+		return (
+			findHover(enrichedProgram, cursor, program, annotations, source)
+				?.content ?? null
+		)
+	}
+
+	it("should describe a Record Matcher's member literal", () => {
+		let source = [
+			"implementation {",
+			"\ttype Standing = { team: String, points: Integer }",
+			"}",
+			"",
+			"tests {",
+			'\ttest "a new team has no points" {',
+			'\t\tconstant standing: Standing = { team = "Lions", points = 0 }',
+			"",
+			"\t\trequire { team: String, points = 0 } = standing",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(testsHover(source, { line: 9, column: 36 })).toBe("Integer")
+	})
+})
+
 // A Protocol's requirements and a Choice's payload members survive enrichment
 // as plain Type Records, so Hover pairs them with the parsed declaration. See
 // "What the typed tree lacks" in packages/language-server/DEVELOPMENT.md.
