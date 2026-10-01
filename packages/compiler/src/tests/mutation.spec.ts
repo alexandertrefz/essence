@@ -12,16 +12,14 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 
-// What the walker finds and what a mutant EMITS, together — the same
-// pairing `testingCodegen.spec` keeps, and for the same reason: a list of sites
-// proves nothing about the JavaScript a mutant turns into, and a golden of that
-// JavaScript says nothing about which site produced it.
+// What the walker finds and what a mutant emits, side by side, as in
+// `testingCodegen.spec.ts`. A list of sites says nothing about the emitted
+// JavaScript, and a golden of that JavaScript says nothing about its site.
 //
-// The mutants are emitted with the Optimiser OFF, which is what `esc
-// build --no-optimise` compiles with. It is not a shortcut: the passes that
-// lower `left::isGreaterThan(right)` to `<` are exactly the ones that would
-// hide the swapped Method name this spec is about, and the site is the same
-// site either way — enumeration happens before the first pass runs.
+// Mutants are emitted with every pass off, as `--no-optimise` builds, since
+// lowering `left::isGreaterThan(right)` to `<` would hide the swapped Method
+// name. Sites are enumerated before any pass runs, so they are the same
+// either way.
 
 const SOURCE = [
 	"implementation {",
@@ -62,9 +60,8 @@ const SOURCE = [
 	"",
 ].join("\n")
 
-// A ladder that narrows nothing, which is what leaves its arms free to
-// be moved. Its own file rather than a Function added to `SOURCE`, because every
-// expectation up there names a line.
+// A ladder that narrows nothing, so its arms are free to move. It is a file
+// of its own because the expectations on `SOURCE` name lines.
 const DEFINE_SOURCE = [
 	"implementation {",
 	"	function grade(_ score: Integer) -> String {",
@@ -78,8 +75,8 @@ const DEFINE_SOURCE = [
 	"",
 ].join("\n")
 
-// A `modulePath` makes this a Module compile, as every command-line
-// compile is: its Choices are then identified by path and name together.
+// A `modulePath` makes this a Module compile, as on the command line, so its
+// Choices are identified by path and name together.
 function simplified(source: string = SOURCE, modulePath?: string) {
 	let parsed = parseWithDiagnostics(source)
 
@@ -105,8 +102,7 @@ function only(
 		.map((site) => `${site.position.start.line} ${site.description}`)
 }
 
-// Every pass off, which is what `--no-optimise` means — see the note at
-// the top of the file.
+// Every pass off, as `--no-optimise` builds.
 function emitted(site: number, source: string = SOURCE): string {
 	return rewrite(
 		optimise(applyMutation(simplified(source), site), {
@@ -133,11 +129,9 @@ describe("Mutation sites", () => {
 		])
 	})
 
-	// A bound moved by one, or an order REVERSED, for every member of
-	// the table — the two `…OrEqualTo` names included. A bound written the
-	// wrong way round is the commonest comparison bug there is, and leaving
-	// those two with only their bound-moving step made them the two names a
-	// suite could get backwards without the score moving.
+	// Every comparison, the `…OrEqualTo` names included, gets a bound moved
+	// by one and an order reversed. A reversed bound is the commonest
+	// comparison bug.
 	it("reverses the order of an OrEqualTo comparison too", () => {
 		let source = [
 			"implementation {",
@@ -211,10 +205,8 @@ describe("Mutation sites", () => {
 		expect(only(sites, "case")).toEqual(["17 swap #Win for #Draw"])
 	})
 
-	// The whole reason a site can be named by a number. Two enumerations
-	// of one Program are the same list, so an id held between them means the
-	// same Node — which is what the driver rests on when it compiles a mutant
-	// in a worker that enumerated the Program for itself.
+	// A worker enumerates the Program for itself and compiles a mutant by
+	// id, so two enumerations must give the same list.
 	it("enumerates the same sites twice", () => {
 		expect(JSON.stringify(sitesOf())).toEqual(JSON.stringify(sitesOf()))
 	})
@@ -225,9 +217,8 @@ describe("Mutation sites", () => {
 		)
 	})
 
-	// Ids are the walk's own count, assigned BEFORE the per-line cap
-	// filters anything, so a crowded line leaves a gap rather than renumbering
-	// what follows it.
+	// Ids are counted before the per-line cap filters anything, so a crowded
+	// line leaves a gap rather than renumbering what follows.
 	it("counts ids in walk order", () => {
 		let sites = sitesOf()
 
@@ -254,11 +245,9 @@ describe("Mutation sites", () => {
 		expect(onLine.length).toBe(4)
 	})
 
-	// The condition of a NARROWING `if` is what typed the body it opens.
-	// A mutant that asks a different question there runs a body against a
-	// refinement nobody proved — it fails everything it touches, which
-	// distinguishes no suite from another. It is the same refusal the branch
-	// swap has always had, reaching the condition it is written out of.
+	// A narrowing condition types the body it opens. A mutant asking another
+	// question there runs the body against an unproven refinement and fails
+	// every suite alike.
 	it("offers nothing inside the condition of a narrowing if", () => {
 		let source = [
 			"implementation {",
@@ -285,9 +274,8 @@ describe("Mutation sites", () => {
 		expect(only(sites, "equality")).toEqual([])
 		expect(only(sites, "comparison")).toEqual([])
 		expect(only(sites, "branch")).toEqual([])
-		// And the literals of those conditions are still sites, which is
-		// what says the refusal is about the QUESTION being asked rather than
-		// about the line it is asked on.
+		// The conditions' literals are still sites: the refusal is about the
+		// question, not the line.
 		expect(only(sites, "integer")).toEqual([
 			"3 swap 0 for 1",
 			"3 swap 0 for -1",
@@ -300,13 +288,9 @@ describe("Mutation sites", () => {
 		])
 	})
 
-	// The other direction of the same refusal, and it is a SECOND claim
-	// rather than the same one twice: a condition can establish something for
-	// the branch it answered `false` in and nothing at all for the one it
-	// opens. `separator::isEmpty()` proves nothing about a String where it
-	// holds and proves `NonEmptyString` where it does not — which is the whole
-	// reason the `else` may call the `split` that answers a `NonEmptyList` —
-	// and a swap moves that call out from under the proof.
+	// A condition can narrow only its `else`. Where `separator::isEmpty()`
+	// fails it proves `NonEmptyString`, which lets the `else` call `split`, and
+	// a swap would move that call out from under the proof.
 	it("offers nothing at an if whose condition narrows its else", () => {
 		let source = [
 			"implementation {",
@@ -331,26 +315,18 @@ describe("Mutation sites", () => {
 		let sites = sitesOf(source)
 
 		expect(only(sites, "branch")).toEqual([])
-		// And the refusal reaches INSIDE such a condition, exactly as it
-		// reaches inside a narrowing one. `divisor::isLessThanOrEqualTo(0)` is
-		// what proves the `PositiveInteger` the `else` divides by, and either
-		// rotation of it leaves that division without its proof.
+		// `divisor::isLessThanOrEqualTo(0)` proves the `PositiveInteger` the
+		// `else` divides by, so neither rotation is offered.
 		expect(only(sites, "comparison")).toEqual([])
-		// The literals of that condition are still sites, which is what
-		// says the refusal is about the QUESTION being asked rather than about
-		// the line it is asked on.
+		// The condition's literals are still sites.
 		expect(only(sites, "integer")).toEqual([
 			"11 swap 0 for 1",
 			"11 swap 0 for -1",
 		])
 	})
 
-	// And an `if` with no `else` is still a site, however its condition
-	// narrows. There is no body standing under the complement, so there is
-	// nothing there to move out from under a proof — and the swap, which turns
-	// the condition inside out, moves a body that was read under no evidence
-	// into a branch that holds some. The claim the Simplifier carries for one
-	// is `false` because there was no false body to read.
+	// With no `else`, no body stands under the complement, so the swap moves
+	// a body read under no evidence into a branch that holds some.
 	it("still inverts an if with no else whose condition narrows below", () => {
 		let source = [
 			"implementation {",
@@ -370,41 +346,31 @@ describe("Mutation sites", () => {
 		])
 	})
 
-	// One lie per arm of a ladder — this arm answers where nothing
-	// matched, and the fallback answers where this arm held. It is the `define`
-	// reading of the branch swap: an arm and the `otherwise` below it ARE an
-	// `if` and its `else`.
+	// An arm and the `otherwise` are an `if` and its `else`, so each arm gets
+	// a branch swap with the fallback.
 	it("offers one swap for every arm of a define", () => {
-		// Both at the line the `define` opens with, which is what keeps
-		// the per-line cap from eating them: an arm's own line already spends
-		// its four sites on the literals and rotations of the Condition
-		// standing beside the answer.
+		// Both stand at the `define` line, since each arm's own line already
+		// spends its capped sites on its Condition.
 		expect(only(sitesOf(DEFINE_SOURCE), "branch")).toEqual([
 			"3 swap arm 1's answer for the 'otherwise' one",
 			"3 swap arm 2's answer for the 'otherwise' one",
 		])
 	})
 
-	// And the Conditions of that ladder are mutated like any other call,
-	// because nothing in it establishes anything — a comparison against a
-	// written bound is the site a ladder most wants.
+	// This ladder establishes nothing, so its Conditions are mutated like any
+	// other call.
 	it("still rotates the comparisons a define asks", () => {
-		// One rotation per arm rather than two, because the cap has
-		// already spent three of that line's four sites on the nudges of the
-		// bound the Condition compares against.
+		// One rotation per arm, since the bound's nudges spend most of the
+		// line's capped sites.
 		expect(only(sitesOf(DEFINE_SOURCE), "comparison")).toEqual([
 			"4 swap ::isGreaterThanOrEqualTo for ::isGreaterThan",
 			"5 swap ::isGreaterThanOrEqualTo for ::isGreaterThan",
 		])
 	})
 
-	// Every arm below the first is read in a Scope holding the complements
-	// of the Conditions above it, and every arm's own value is read behind
-	// whatever its Condition established — so an answer moved out from under the
-	// Condition that typed it runs against a refinement nobody proved. BOTH
-	// claims are asked, because they are two claims: `separator::isEmpty()`
-	// establishes nothing for its own arm and is exactly what lets the arm below
-	// it call `split`.
+	// An arm's value is read behind its own Condition and the complements of
+	// the earlier ones. So `separator::isEmpty()` narrows only the next arm,
+	// and `n::isGreaterThan(0)` only its own.
 	it("offers nothing at a define whose arms narrow anything", () => {
 		let source = [
 			"implementation {",
@@ -429,11 +395,8 @@ describe("Mutation sites", () => {
 		expect(only(sites, "branch")).toEqual([])
 		expect(only(sites, "comparison")).toEqual([])
 		expect(only(sites, "arithmetic")).toEqual([])
-		// And the literals of that arm are still sites, which is what says
-		// the refusal is about the QUESTION being asked rather than about the
-		// lines it is asked on. In the walk's own order, which reads an arm's
-		// Condition before the answer beside it: the `0` of `isGreaterThan(0)`
-		// comes first and the `1` of `subtract(1)` after it.
+		// The literals are still sites, in walk order: an arm's Condition is
+		// read before its answer.
 		expect(only(sites, "integer")).toEqual([
 			"11 swap 0 for 1",
 			"11 swap 0 for -1",
@@ -444,11 +407,8 @@ describe("Mutation sites", () => {
 		])
 	})
 
-	// The Arguments a call site wrote are handed on UNTOUCHED, so a swap
-	// onto a Method that takes a different number of them crashes wherever it
-	// runs — which a mutation run would record as a kill the tests never
-	// earned, the one answer this walker must never give. The builtin branch
-	// has always checked it; the Module's own Namespaces did not.
+	// A swap keeps the call's Arguments, so a target of another arity would
+	// crash, and a run would record a kill the tests never earned.
 	it("refuses a swap onto a same-slot Method of another arity", () => {
 		let source = [
 			"implementation {",
@@ -486,10 +446,8 @@ describe("Mutation sites", () => {
 		expect(only(sitesOf(source), "arithmetic")).toEqual([])
 	})
 
-	// A Method a PROTOCOL provided is answered by the Protocol, so the
-	// swap is sound exactly where that Protocol wrote a body for the target.
-	// `Comparable` writes all four comparisons, so a user Type conforming to it
-	// offers the rotations a builtin does.
+	// A swap onto a provided Method is sound where the Protocol wrote a body
+	// for the target. `Comparable` writes every comparison.
 	it("rotates a comparison a Protocol provided", () => {
 		let source = [
 			"implementation {",
@@ -520,11 +478,8 @@ describe("Mutation sites", () => {
 		])
 	})
 
-	// And the other half of the same rule. `Equatable` REQUIRES `is` and
-	// provides `isNot`, so the body a swap onto `is` would name is written by
-	// each conformer under its own Namespace and by the Protocol nowhere at
-	// all. Offering it emitted a call to a Function that does not exist, which
-	// this run would have recorded as a kill.
+	// `Equatable` requires `is` and writes no body for it, so a swap onto `is`
+	// would call a Function that does not exist.
 	it("refuses a swap onto a member the Protocol only requires", () => {
 		let source = [
 			"implementation {",
@@ -617,9 +572,8 @@ describe("Applying a mutation", () => {
 		expect(javaScript.split("function best()")[1]).toContain("Outcome#Draw")
 	})
 
-	// The chain with two of its answers exchanged, and nothing else about
-	// it moved — the same Conditions in the same order, so what the mutant lies
-	// about is which arm answers.
+	// Two answers exchanged, with the Conditions unmoved, so the mutant lies
+	// only about which arm answers.
 	it("emits the swapped define answer", () => {
 		let javaScript = emitted(
 			siteFor(
