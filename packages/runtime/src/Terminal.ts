@@ -10,91 +10,33 @@ import { createString, quotedText, type StringType } from "./String"
 import { toString as transcendentalToString } from "./Transcendental"
 import { type AnyType, typeKeySymbol } from "./type"
 
-// The native half of `packages/standard-library/sources/Terminal.es` —
-// everything a Program puts in front of a person, and everything a person hands
-// back. Five of the Namespace's entries are native: `write(_:to:)`, because a
-// stream has to be reached somehow, `inspect` and `describe`, because the
-// structural rendering below is what they ARE, and `readLine`/`readAll`,
-// because a descriptor has to be read somehow. `print` and `ask` are written in
-// Essence on top of those.
-//
-// `getStringRepresentation` lives here rather than in `functions.ts`
-// because `inspect` and `describe` are what the language reaches it through;
-// `functions.ts` keeps the `loop` drivers and nothing else. It is EXPORTED for
-// the runtime modules that render with it, `Record.toString`,
-// `boundRecordToString` and the difference in `Testing.ts`, and for the Debug
-// Adapter's spec, which holds the variables pane to what `Terminal.inspect`
-// prints.
+// The natives of `Terminal`, and the renderer behind `inspect`. See "Terminal"
+// in DEVELOPMENT.md.
 
-// What a rendering at indent zero becomes at a deeper one. Every arm of
-// the walk below writes its own newlines followed by four spaces per level and
-// nothing else — a String is quoted, so its own newlines and control characters
-// are escaped rather than written — which makes a rendering at any level the
-// rendering at zero with the level's indent after each newline. That is what
-// lets a child be rendered ONCE, for the single-line pass, and re-used for the
-// nested one. Rendering it twice made the walk double per level of nesting: a
-// chain of single-member Records measured 1.1, 15, 62, 260 and 1,153 ms at
-// depths 12, 16, 18, 20 and 22, against 0.03 ms at depth 22 this way.
+// A rendering at indent zero, re-indented after each newline. Every arm writes
+// only indentation after a newline, so a child is rendered once and reused.
 function indented(text: string, indent: string): string {
 	return text.includes("\n") ? text.replaceAll("\n", `\n${indent}`) : text
 }
 
-// Two readers, one walk. `Terminal.inspect` asks for the STRUCTURAL
-// rendering — what a value IS — and `Record.toString` asks for the PRINTABLE
-// one, since a Record conforms to `Printable` and `Terminal.print` goes through
-// it. The two differ in TWO pieces, and a caller hands in both: the Rational,
-// where `Record.toString` passes `formatAsFraction` and a whole Rational prints
-// its numerator alone, and the padding inside a List's brackets, where it
-// passes none, so that a List member reads `[1, 2]` — the form `List.toString`
-// answers and a Program writes a List down in. The rest of the rendering is the
-// same for both, quoted Strings included, and `Record.es` says so at its own
-// `toString`.
-//
-// A Function rather than a mode for the Rational, so that a Program which
-// never prints a Record never carries the second formatter. Naming
-// `formatAsFraction` inside this walk puts it in every Program that prints
-// anything at all, and measured 331 bytes of `Irrational.es` against the 139
-// the handed-in Function costs. The padding is a String rather than a Function
-// because there is nothing behind it to carry.
+// The structural rendering by default. `Record.toString` hands in the
+// printable Rational form and no List padding. See "The structural rendering"
+// in DEVELOPMENT.md.
 export function getStringRepresentation(
 	obj: AnyType,
 	indentLevel = 0,
 	rationalForm: (rational: RationalType) => string = formatAsRational,
 	listPadding = " ",
-	// How to render the members a RECORD ROUTES — one entry per DECLARED
-	// member whose own Namespace prints it differently from this walk, handed in
-	// by `boundRecordToString` and by nothing else. It is consulted in the Record
-	// arm alone, and it is NOT passed down: a routed member renders through its
-	// own `toString`, which decides for everything inside it, and the members
-	// this walk reaches below the top are members no static Type named.
-	//
-	// The renderer answers at indent ZERO, exactly as the recursive call beside
-	// it does, and the multi-line branch re-indents what it gets — which is the
-	// invariant `indented` already stands for. Handing the layout a function
-	// instead of forking it is what keeps `{ price = EUR 1999 }` obeying the
-	// same sixty-character budget, the same `[` padding and the same nesting as
-	// every other Record.
-	//
-	// `??` rather than a test for the entry, because a renderer answers a
-	// String and never nothing — an EMPTY one is not nullish, so a member that
-	// prints as `` still takes its own answer. It is written this way because
-	// this walk is carried by every Program that prints anything at all, and the
-	// spelled-out form cost 158 bytes of bundle where this costs 102.
+	// Renderers for the declared members a Record routes to their own
+	// `toString`, used in the Record arm only and not passed down. `??` keeps
+	// an empty rendering, which is not nullish.
 	memberRenderers?: Record<string, (value: AnyType) => string>,
 ): string {
 	const baseIndent = " ".repeat(4 * indentLevel)
 	const contentIndent = " ".repeat(4 * (indentLevel + 1))
 
-	// A Function is the one runtime value carrying no Type key — it is
-	// emitted as a bare JavaScript function, not a tagged object — so it is
-	// answered before anything reads that key, exactly as `anyIs` answers it.
-	// Without this, printing a Function, or anything merely HOLDING one, read
-	// `undefined.includes` and threw.
-	//
-	// One fixed word, and no more. A Function's Type is erased by the
-	// time it reaches here, and its source text is a JavaScript rendering of a
-	// simplified body — neither is something a Program should print. The name
-	// stays stable so a Record holding a Function renders the same every time.
+	// A Function carries no Type key, so it is answered before anything reads
+	// one. It renders as one fixed word, since its source says nothing to a reader.
 	if (typeof obj === "function") {
 		return "Function"
 	}
@@ -128,10 +70,7 @@ export function getStringRepresentation(
 			return "{}"
 		}
 	} else if (obj[typeKeySymbol] === "List") {
-		// A List holds its items in two runs with a view into each — see
-		// `List.ts` — so what is rendered is the LOGICAL items rather than
-		// whatever the backing Array happens to hold. `materialise` is what
-		// answers those, and the box it collapses reads the same afterwards.
+		// `materialise` answers the logical items, not the backing Array.
 		let items = materialise(obj)
 
 		if (items.length > 0) {
@@ -151,10 +90,6 @@ export function getStringRepresentation(
 			return "[]"
 		}
 	} else if (obj[typeKeySymbol] === "Rational") {
-		// The one value the two renderings disagree about. The
-		// structural one keeps the lowest-terms pair; the printable one
-		// answers what `Rational::toString` answers, where a whole Rational is
-		// its numerator alone.
 		return rationalForm(obj)
 	} else if (obj[typeKeySymbol] === "Algebraic") {
 		return algebraicToString(obj).value
@@ -163,24 +98,17 @@ export function getStringRepresentation(
 	} else if (obj[typeKeySymbol] === "Integer") {
 		return integerToString(obj).value
 	} else if (obj[typeKeySymbol] === "Boolean") {
-		// `Boolean.toString` is implemented in Essence now, so the
-		// rendering it does is spelled out here rather than called.
+		// `Boolean.toString` is written in Essence, so its rendering is spelled
+		// out here.
 		return obj.value ? "true" : "false"
 	} else if (obj[typeKeySymbol] === "String") {
-		// The same quoting `List.toString` and `Optional.toString` reach
-		// for, out of `String.ts` — a String is quoted inside a structure
-		// wherever the structure is rendered, and this walk is one of the
-		// places that renders one.
+		// A String inside a structure is quoted, as `List.toString` quotes it.
 		return quotedText(obj.value)
 	} else if (obj[typeKeySymbol] === "Randomness") {
-		// One fixed word, like a Function's. What a source holds is four
-		// words of generator state, which say nothing to a reader and would
-		// differ between two runs of one Program.
+		// A generator's state says nothing to a reader and differs between runs.
 		return "Randomness"
 	} else if (obj[typeKeySymbol].includes("#")) {
-		// Case values print as `Choice#Case`, with the payload spelled out
-		// like a Record when the Case carries one. The Module the tag also
-		// carries is cut off by `caseText`, which says why there.
+		// `Choice#Case`, with `caseText` dropping the Module the tag carries.
 		let payloadEntries = Object.entries(obj)
 		let tag = caseText(obj[typeKeySymbol])
 
@@ -188,13 +116,8 @@ export function getStringRepresentation(
 			return tag
 		}
 
-		// A ONE-member Case prints its payload bare, in parentheses,
-		// because that is how the language already writes one: `#Value(5)`
-		// stands for `#Value({ item = 5 })`, and the member's name is decided
-		// by the Case rather than chosen at the construction. Spelling it as a
-		// Record here would print a name the writer never wrote — and every
-		// `Optional` in a Program is one of these, so the noise would be
-		// everywhere.
+		// One member prints bare in parentheses, as the language writes
+		// `#Value(5)` for `#Value({ item = 5 })`.
 		if (payloadEntries.length === 1) {
 			return `${tag}(${getStringRepresentation(
 				payloadEntries[0]![1] as never,
@@ -216,11 +139,8 @@ export function getStringRepresentation(
 			listPadding,
 		)}`
 	} else {
-		// A kind the walk above does not know may still have said how it
-		// is rendered — the registry in `registry.ts` is where a container's
-		// own module leaves that, and probing it HERE is what keeps the arms
-		// above the whole cost of printing for a Program that holds none.
-		// `Dictionary.ts` and `Future.ts` register such kinds.
+		// Kinds no arm names may be registered. See "The kind registry" in
+		// DEVELOPMENT.md.
 		let kind = kindOf(obj[typeKeySymbol])
 
 		if (kind !== undefined) {
@@ -233,65 +153,28 @@ export function getStringRepresentation(
 			)
 		}
 
-		// Unreachable for any value the Compiler emits — every Essence
-		// value carries one of the tags above. It answers rather than throws
-		// because a printer that crashes takes the Program with it, and what a
-		// reader needs then is the tag it did not recognise.
+		// Unreachable for any value the Compiler emits. Answered rather than
+		// thrown, since a printer that crashes takes the Program with it.
 		return `<unknown value: ${String(obj[typeKeySymbol])}>`
 	}
 }
 
-// The unit value every writing entry answers with. `{}` is the language's
-// unit Type, and an empty Record is what one is at runtime — built here rather
-// than through `Record.createRecord`, because `Record.ts` reaches BACK into this
-// module for `getStringRepresentation` and a runtime cycle between the two would
-// be a cost paid on every Program for one object literal.
+// The unit value every writing entry answers with. Built here, since
+// `Record.ts` imports this module and `createRecord` would close a cycle.
 const unit: RecordType = { [typeKeySymbol]: "Record" }
 
-// Which of the two streams a piece of output was written to, as the one
-// word every reader outside this module names it by — the runtime's Stream
-// Cases are tags on a value, and a capture is not holding one.
+// The stream a piece of output went to, as a plain word.
 export type OutputStream = "output" | "error"
 
-// Where a Program's output goes when something other than the terminal is
-// asking for it. There is exactly one such caller today — the test runtime,
-// which shows what a test wrote WITH that test's report rather than
-// interleaved with the reporter's own lines — and this is the seam it reaches
-// through, so that `Terminal` stays the one place that knows how a Program
-// writes anything.
+// Where a Program's output goes when the test runtime captures it.
 export type OutputSink = (text: string, stream: OutputStream) => void
 
-// A dynamically scoped binding, installed for the length of ONE call and
-// put back when that call is over, not a mode something switches on and leaves
-// on. That is what makes it safe to say a Program's output belongs to whatever
-// `withOutputSink` was wrapped around. The test runner runs one test at a time,
-// so one test's output can not reach another's capture.
-//
-// A runner that ran tests in parallel inside one realm would need an
-// `AsyncLocalStorage` here, and the SHAPE would stay what it is: a capability
-// resolved where the writing happens rather than a parameter threaded through
-// every Method that might print. Workers need nothing: a worker is its own
-// realm and holds its own binding.
+// Installed for the length of one call by `withOutputSink`. A runner that ran
+// tests in parallel in one realm would need `AsyncLocalStorage` here.
 let outputSink: OutputSink | null = null
 
-// A run that WAITS keeps the sink for as long as it waits. The test
-// runner drives one test at a time, each awaited before the next is started, so
-// the dynamic extent of a sink is exactly the test it was installed for — and
-// putting it back when the Function RETURNED, rather than when the work it
-// describes is over, would attribute everything a test writes after its first
-// `complete` to whatever came next.
-//
-// Which leaves work a test does NOT wait for, and the answer to that is
-// not here. A sink is installed for one test at a time, so anything printed
-// after that test is over is printed under whatever sink is installed then —
-// the next test's, or none. What makes that unreachable is the emission: a test
-// body runs under a context of its own and that context is STOPPED when the
-// body settles, so a run a test walked away from is stopped with it and has
-// nothing left to print. See `testBody` in the Rewriter.
-//
-// The promise is recognised rather than awaited, so the synchronous shape
-// — every run that completes nothing — costs a `try` and one `then` test and
-// never a turn of the microtask queue.
+// Installs the sink for one call, and until the promise it answers settles.
+// See "Output sinks and input sources" in DEVELOPMENT.md.
 export function withOutputSink<Value>(
 	sink: OutputSink | null,
 	run: () => Value,
@@ -330,9 +213,8 @@ export function withOutputSink<Value>(
 	) as Value
 }
 
-// A `then` is the whole test, which is what every consumer of a promise
-// in this runtime asks: what comes back is whatever the emitted Function
-// answered with, and an `async` one answers with a real promise.
+// A `then` is the whole test, since an `async` emitted Function answers a
+// real promise.
 function isPending(value: unknown): value is Promise<unknown> {
 	return (
 		typeof (value as { then?: unknown } | null | undefined)?.then ===
@@ -340,32 +222,12 @@ function isPending(value: unknown): value is Promise<unknown> {
 	)
 }
 
-// `write(_ text: String, to stream: Stream)` — one native, with the
-// Stream DEFAULTED in `Terminal.es` to `#Output`, so a call that leaves it out
-// reaches this same export through the frame the Compiler synthesizes for the
-// default. It is the ONE primitive under everything a Program writes: no
-// newline, no quotes, nothing added. `print` puts the newline in the String it
-// hands over, in Essence, which is what keeps this honest about writing exactly
-// what it was given.
-//
-// `process.stdout.write`/`process.stderr.write` rather than
-// `console.log`/`console.error`, which both append a newline of their own —
-// there is no way to spell "no newline" through them, and a `write` that added
-// one would not be the primitive `print` is built on.
-//
-// But only where the host HAS those streams. Bun, Node and Deno do; a
-// browser has no `process` at all, and what it offers instead — the console —
-// is made of lines. So the stream is looked for first, and where there is none
-// the text goes to the console with the one newline `print` appended taken off
-// again, which is the newline the console puts back. A `write` that ends
-// without one still lands as a line of its own there — the console has no way
-// to continue a line — which is the honest cost of a host without streams, and
-// not one a Program pays on any host that has them.
+// `write(_ text: String, to stream: Stream)`, the primitive under all output.
+// It writes exactly the text. See "Writing to the host" in DEVELOPMENT.md.
 export function write(text: StringType, stream: StreamType): RecordType {
 	let toError = stream[typeKeySymbol] === "Stream#Error"
 
-	// A sink takes the bytes before any host does: what a Program under test
-	// writes belongs to the capture, on a host with streams and on one without.
+	// A sink takes the text before any host does.
 	if (outputSink !== null) {
 		outputSink(text.value, toError ? "error" : "output")
 
@@ -385,17 +247,8 @@ export function write(text: StringType, stream: StreamType): RecordType {
 	return unit
 }
 
-// Looked up on every write rather than once at load, for two reasons. A
-// top-level read of `process.stdout` is a statement esbuild can not shake, so
-// it would sit in every bundle whether or not the Program writes; and the spec
-// harnesses swap `process.stdout.write` for the duration of a Program, which a
-// stream remembered at load time would never see. The lookup is a `typeof` and
-// two property reads, beside a write to a file descriptor.
-//
-// `typeof process`, because a bare `process` in a host without one is a
-// ReferenceError, not `undefined`. And the stream's `write` is checked rather
-// than the stream's presence: a bundler's `process` shim tends to carry a
-// `stdout` that is an empty object, or null.
+// Looked up on every write rather than once at load, so the lookup can be
+// shaken out and the specs can swap the streams.
 type HostStream = { write(text: string): unknown }
 
 function hostStream(toError: boolean): HostStream | undefined {
@@ -410,27 +263,13 @@ function hostStream(toError: boolean): HostStream | undefined {
 	return typeof candidate?.write === "function" ? candidate : undefined
 }
 
-// Exactly one newline comes off, never all of them: `print("")` is a
-// blank line and has to stay one, and a text that ends in two is a line
-// followed by a blank one.
+// Exactly one newline comes off, so `print("")` stays a blank line.
 function asConsoleLine(text: string): string {
 	return text.endsWith("\n") ? text.slice(0, -1) : text
 }
 
-// `inspect` — the structural print, for the Program's AUTHOR. It answers
-// with the very value it was handed, so it can be wrapped around any Expression
-// without changing what that Expression evaluates to, which is why the runtime
-// signature is generic. That, and the arity, are exactly what the generated
-// native contract (`natives.generated.ts`) asserts this export against.
-//
-// `console.log`, not `process.stdout.write`. A structural rendering is a
-// whole line by construction — it is never continued — and going through
-// `console.log` is what a value inspected in a Program under test still arrives
-// through, which is how the golden and sweep harnesses capture it.
-//
-// A sink is offered the newline `console.log` would have appended, so
-// that a capture holds the bytes a terminal would have shown and a `write` and
-// an `inspect` compose into one text.
+// `inspect` answers the value it was handed, so it can wrap any Expression.
+// It writes through `console.log`, where the harnesses capture it.
 export function inspect<Value extends AnyType>(value: Value): Value {
 	let rendering = getStringRepresentation(value)
 
@@ -443,31 +282,13 @@ export function inspect<Value extends AnyType>(value: Value): Value {
 	return value
 }
 
-// `describe` — the walk above, handed back rather than written, so that a
-// message can carry a value's structure. It is the whole of what `inspect`
-// renders and nothing of what `inspect` does, which is why the two are separate
-// exports over one Function rather than one export the other is written on: an
-// `inspect` written as this and a `write` would move a Program's structural
-// output off the console line the golden and sweep harnesses capture it from.
+// The structural rendering as a String. Kept apart from `inspect`, so that
+// `inspect` keeps writing through `console.log`.
 export function describe<Value extends AnyType>(value: Value): StringType {
 	return createString(getStringRepresentation(value))
 }
 
-// The reading half. A Program reads its input a LINE at a time, and a
-// descriptor answers bytes at whatever boundary the host happened to have them
-// — so what a read pulls and what a read hands out are two different amounts,
-// and the difference is held here. `pending` is text the host has already given
-// up and no call has taken yet, `ended` is the host saying there is no more,
-// and `scanned` is how much of `pending` a search for a break has already been
-// over. One buffer and no more: the input is one stream, and a second buffer
-// over the same descriptor would take bytes the first one is about to need.
-//
-// The decoder is the state that makes the buffer necessary in the first
-// place. A character of three bytes can land across two reads, and a decoder
-// told `stream: true` holds the half it has until the rest arrives. Built on
-// the first read rather than at load, so that a Program which never reads
-// carries no construction — and so that a browser, where there is nothing to
-// read, never builds one at all.
+// The one buffer over the input. See "Reading input" in DEVELOPMENT.md.
 type InputState = {
 	pending: string
 	ended: boolean
@@ -482,11 +303,8 @@ let input: InputState = {
 	decoder: null,
 }
 
-// The reading half of `withOutputSink`, scoped the same way: for one
-// call, and until the promise it answers with settles. `text` is the whole of
-// the input for that call, and `null` is the host's own descriptor read from
-// the start. Either replaces `input`, which is what makes a staged read
-// repeatable.
+// Stages the input for one call, scoped as `withOutputSink` is. `null` reads
+// the host's own input from the start.
 export function withInputSource<Value>(
 	text: string | null,
 	run: () => Value,
@@ -530,24 +348,16 @@ export function withInputSource<Value>(
 	) as Value
 }
 
-// What a host can be asked for: some bytes, into a buffer, answering how
-// many arrived and zero at the end of the input. Every host below is reduced to
-// this one Function, so that the buffering above is written once.
+// Reads some bytes into the buffer, answering how many, and zero at the end.
 type ByteReader = (into: Uint8Array) => number
 
-// Deno first, because it is the one host that answers with a Method of
-// its own — `Deno.stdin.readSync` — rather than through the Node file system.
-// It answers `null` at the end of the input where the others answer zero.
+// Deno's `readSync` answers `null` at the end where the others answer zero.
 type DenoHost = {
 	stdin?: { readSync?: (into: Uint8Array) => number | null }
 }
 
-// Bun and Node reach `readSync` through `process.getBuiltinModule`, which
-// is the ONE door to a builtin that costs no import: a static `import "node:fs"`
-// here would be a specifier the bundler has to resolve, and every Program's
-// bundle is built for the browser, where it resolves to nothing at all. So the
-// module is asked for at the moment of the first read, off a global that a
-// browser does not have.
+// Bun and Node reach `node:fs` through `process.getBuiltinModule`, since a
+// static import would have to resolve in a bundle built for the browser.
 type BuiltinModules = {
 	getBuiltinModule?: (identifier: string) => unknown
 }
@@ -562,9 +372,7 @@ type FileSystem = {
 	) => number
 }
 
-// Looked up on every pull rather than once, for the reason `hostStream`
-// is: a lookup remembered at load would sit in every bundle whether or not the
-// Program reads, and the specs stage a host around a call.
+// Looked up on every pull, for the reasons `hostStream` gives.
 function hostReader(): ByteReader | undefined {
 	let deno = (globalThis as { Deno?: DenoHost }).Deno
 	let denoInput = deno?.stdin
@@ -598,14 +406,8 @@ function hostReader(): ByteReader | undefined {
 	return (into) => readDescriptor(readSync, into)
 }
 
-// Descriptor 0 is the Program's input on every host that has one, and it
-// is read rather than `process.stdin`, whose own reading is asynchronous —
-// there is nothing for a Method to answer while it waits. Two of the
-// descriptor's errors are answers rather than failures. EOF is how a console reports the end of its input on
-// Windows, where the others report zero bytes. EAGAIN is a descriptor somebody
-// put in non-blocking mode: the mode belongs to the OPEN FILE, so a parent
-// process that did it hands it to a child that never asked, and the read has to
-// be tried again rather than reported as the end of the input.
+// Reads descriptor 0. `EOF` is a Windows console's end of input, and `EAGAIN`
+// is a non-blocking descriptor, which waits and reads again.
 function readDescriptor(
 	readSync: NonNullable<FileSystem["readSync"]>,
 	into: Uint8Array,
@@ -629,12 +431,8 @@ function readDescriptor(
 	}
 }
 
-// Ten milliseconds of nothing, so that waiting for a person to type is
-// not a core at full tilt. `Atomics.wait` is the one synchronous wait a host
-// offers, and it is only reached from the EAGAIN arm above — a browser, where
-// the main thread is not allowed to wait, has no descriptor to read in the
-// first place. A host without `SharedArrayBuffer` retries at once, which is
-// slower to nobody but the machine.
+// Waits ten milliseconds so a pending read does not spin a core. A host
+// without `SharedArrayBuffer` retries at once.
 let napBuffer: Int32Array | null = null
 
 function napBriefly(): void {
@@ -647,27 +445,22 @@ function napBriefly(): void {
 	Atomics.wait(napBuffer, 0, 0, 10)
 }
 
-// 64 KiB per crossing, allocated on the first read and kept: what a read
-// costs is the crossing into the host rather than the bytes, and a buffer built
-// per call would be 64 KiB of garbage per line. A read answers what the host
-// HAS rather than filling the buffer, so a large one does not make a Program
-// wait for more input than it asked for.
+// Allocated once and kept. A read answers what the host has, so a large
+// buffer never waits for more input than a call asked for.
 const INPUT_BUFFER_LENGTH = 65536
 
 let inputBuffer: Uint8Array | null = null
 
-// Whether a read has reached the host's own input rather than a staged
-// one. A runner that remembers results asks it after a run, since the host's
-// input is in no key.
+// Whether a read reached the host's own input rather than a staged one. A
+// runner that remembers results asks, since the host's input is in no key.
 let hostInputRead = false
 
 export function hasReadHostInput(): boolean {
 	return hostInputRead
 }
 
-// One crossing, and what it produced added to the buffer. A decode of a
-// chunk ending mid-character adds nothing at all, which is why every caller
-// asks again rather than assuming a pull made progress.
+// One read into the buffer. A chunk ending mid-character adds nothing, so
+// callers ask again rather than assume progress.
 function pull(): void {
 	let reader = hostReader()
 
@@ -684,8 +477,8 @@ function pull(): void {
 	let count = reader(inputBuffer)
 
 	if (count <= 0) {
-		// A decode with nothing to decode is what flushes a character the
-		// input ended in the middle of, as the replacement character.
+		// Flushes a character the input ended inside, as the replacement
+		// character.
 		input.pending += input.decoder.decode()
 		input.ended = true
 
@@ -697,14 +490,8 @@ function pull(): void {
 	})
 }
 
-// The three breaks `String::lines` splits on, so that reading a text line
-// by line and splitting the same text into lines answer the same lines.
-//
-// The search starts where the last one stopped rather than at the
-// beginning of the buffer. A line arrives in as many reads as it needs, and
-// searching all of what has arrived after each of them makes ONE long line
-// quadratic: a single twenty megabyte line measured 192 ms read with the
-// search starting at the beginning and 5.2 ms with it starting here.
+// The first `\n` or `\r` from `from` on. The search resumes where the last
+// stopped, so a long line arriving over many reads stays linear.
 function firstBreakIn(text: string, from: number): number {
 	let feed = text.indexOf("\n", from)
 	let carriage = text.indexOf("\r", from)
@@ -720,14 +507,8 @@ function firstBreakIn(text: string, from: number): number {
 	return feed < carriage ? feed : carriage
 }
 
-// `readLine()` — the next line, without the break that ends it, and
-// `#Empty` when there is no next line. The end of the input is not a failure
-// and not an empty line either, which is what the Optional is for.
-//
-// A `\r` at the very end of what has been pulled is the one character
-// that can not be read yet: it is a break on its own AND the first half of
-// `\r\n`, and which one it is is the next byte's to say. So the loop pulls
-// again rather than deciding, and decides once the input has ended.
+// The next line without its break, or `#Empty` at the end of the input. A
+// final `\r` waits for the next byte, which may make it `\r\n`.
 export function readLine(): OptionalType<StringType> {
 	while (true) {
 		let breakAt = firstBreakIn(input.pending, input.scanned)
@@ -774,9 +555,7 @@ export function readLine(): OptionalType<StringType> {
 	}
 }
 
-// `readAll()` — everything left, unchanged. The break a text ends with is
-// part of the answer, which is what makes this the reading side of `write`: a
-// Program that reads its input and writes it back writes what it was given.
+// Everything left, final break included, so echoing input writes it unchanged.
 export function readAll(): StringType {
 	while (!input.ended) {
 		pull()

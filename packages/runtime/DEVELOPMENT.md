@@ -291,3 +291,82 @@ changed, so the remembered form can not go stale. Callers only read it, so it is
 The arithmetic natives work on the reduced parts, and the bigint core in `bigRational.ts` answers in lowest terms.
 `createReducedRational` stores those parts and remembers them as the reduced form at once, so a sum holds `1/1`
 rather than `4/4`. Nothing can tell the difference, since every reader reduces anyway.
+
+## Terminal
+
+`Terminal.ts` holds the natives of the `Terminal` Namespace: `write`, `inspect`, `describe`, `readLine` and `readAll`.
+`print` and `ask` are written in Essence on those.
+
+### The structural rendering
+
+`getStringRepresentation` renders any value. `Terminal.inspect` and `Terminal.describe` ask for the structural
+rendering, which shows what a value is. `Record.toString` asks for the printable one, since a Record is `Printable`.
+The two differ in two places, and the caller hands in both. A Rational renders through `rationalForm`: the structural
+form keeps `5/1`, and the printable form writes `5`. A List's brackets take `listPadding` inside them: the structural
+form writes `[ 1, 2 ]`, and the printable form writes `[1, 2]`, as `List.toString` does. The Rational form is a
+Function rather than a flag, so a Program that never prints a Record never carries the second formatter.
+
+`boundRecordToString` also hands in `memberRenderers`, for declared members whose own Namespace prints them
+differently. A routed member renders through its own `toString`, so the renderers are not passed further down. Each
+renderer answers at indent zero, like the recursive call, so the layout rules stay the same for every member.
+
+A child is rendered once, at indent zero, and re-indented by `indented` when its parent breaks over lines. That works
+because every arm writes newlines followed only by indentation: a String is quoted, so its own newlines are escaped.
+Rendering each child again at its own depth would double the work at every level of nesting.
+
+A Case renders as `Choice#Case`, without the Module its tag carries. A Case with one member writes its payload bare
+in parentheses, as the language writes `#Value(5)` for `#Value({ item = 5 })`. A Case with more writes its payload
+as a Record. A Function and a source of randomness render as one fixed word, since neither has anything a reader
+could use. A value no arm knows asks the kind registry, and failing that renders as `<unknown value: tag>` rather
+than throwing.
+
+### Output sinks and input sources
+
+`withOutputSink` sends a Program's output somewhere other than the host for the length of one call. The test runtime
+uses it to show what a test wrote with that test's report. The binding is dynamically scoped: it is installed for the
+call and put back after. Where the call answers a promise, it is put back when the promise settles. So output written
+after a test's first `complete` still belongs to that test. The runner runs one test at a time, so one test's output
+can not reach another's capture. A test body runs under a context of its own, stopped when the body settles. So
+work a test walked away from has nothing left to print. `withInputSource` stages a test's input the same way.
+
+A promise is recognised by its `then` rather than awaited, so a synchronous run costs no turn of the microtask queue.
+
+### Writing to the host
+
+`write` is the primitive under all output, and adds nothing to the text: `print` puts its newline in the String
+itself. A sink takes the text first. Otherwise `write` uses `process.stdout.write` or `process.stderr.write`, since
+`console.log` always appends a newline of its own. A host without streams, such as a browser, gets the console
+instead, with one trailing newline taken off for the one the console adds back. Text that ends without a newline
+still becomes a line of its own there, since a console can not continue a line.
+
+`inspect` writes through `console.log`, since a structural rendering is always a whole line. The golden and sweep
+harnesses capture `inspect` output from the console. A sink is handed the newline `console.log` would add, so a
+capture holds what a terminal would have shown.
+
+The host's streams and reader are looked up on every call rather than once at load. A top-level read of `process`
+is a statement esbuild can not shake, and the specs swap the host's streams around a single call. The checks use
+`typeof process`, since a bare `process` throws on a host without one. They test the stream's `write`, since a
+bundler's `process` shim may carry an empty `stdout`.
+
+### Reading input
+
+A Program reads a line at a time, and a host answers bytes at whatever boundary it has them. So `Terminal.ts` keeps
+one buffer over the input. `pending` is text no call has taken yet, and `ended` says the host has no more. `scanned`
+is how far a search for a break has already looked. One buffer only, since a second over the same descriptor would
+take bytes the first one needs. A streaming `TextDecoder` holds a character split across two reads until the rest
+arrives. It is built on the first read, so a Program that never reads constructs none.
+
+Every host is reduced to a `ByteReader`. Deno has `Deno.stdin.readSync`, which answers `null` at the end. Bun and
+Node read descriptor 0 through `readSync` from `node:fs`, reached with `process.getBuiltinModule` at the first read.
+A static import would have to resolve in a bundle built for the browser. `process.stdin` is not used, because its
+reads are asynchronous and a Method has nothing to answer while it waits.
+
+Two descriptor errors are answers. `EOF` is how a Windows console reports the end of its input. `EAGAIN` means the
+descriptor is in non-blocking mode, which a parent process can hand to a child that never asked for it. The read
+then waits ten milliseconds with `Atomics.wait` and tries again, so waiting for a person to type does not spin a
+core.
+
+`readLine` splits on the breaks `String::lines` splits on: `\n`, `\r` and `\r\n`. A `\r` at the very end of the
+buffer can not be decided yet, since the next byte may be its `\n`. So `readLine` pulls again first. The search for a
+break resumes where the last one stopped, so a long line arriving over many reads stays linear. `readAll` answers
+everything left, its final break included, so a Program that echoes its input writes what it was given.

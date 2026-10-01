@@ -464,7 +464,6 @@
 	"packages/runtime/src/Started.ts": {"sentence-length": 6, "em-dash": 3, "all-caps": 5, "block-length": 2, "counts": 1},
 	"packages/runtime/src/Stream.ts": {"sentence-length": 2, "em-dash": 2, "all-caps": 2},
 	"packages/runtime/src/String.ts": {"sentence-length": 237, "em-dash": 133, "all-caps": 287, "history": 11, "position": 22, "block-length": 56, "stacked": 1, "counts": 1},
-	"packages/runtime/src/Terminal.ts": {"sentence-length": 58, "em-dash": 34, "all-caps": 34, "position": 8, "block-length": 14},
 	"packages/runtime/src/Testing.ts": {"sentence-length": 190, "em-dash": 128, "all-caps": 119, "position": 5, "block-length": 21},
 	"packages/runtime/src/bigRational.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 1, "history": 1, "block-length": 1},
 	"packages/runtime/src/functions.ts": {"sentence-length": 2, "em-dash": 4, "all-caps": 2, "counts": 1},
