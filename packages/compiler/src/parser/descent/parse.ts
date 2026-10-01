@@ -1,8 +1,7 @@
 import { type common, lexer, type parser } from "@essence-lang/interfaces"
 
-// Hand-written recursive descent parser — the compiler's parser,
-// re-exported through src/parser. It builds its ASTs through the shared
-// node generators in ../nodeGenerators.
+// The compiler's hand-written recursive descent parser. It builds its ASTs
+// through the node generators in ../nodeGenerators.
 import {
 	collectDiagnostics,
 	inSourceOrder,
@@ -44,34 +43,8 @@ type NamespaceBodyNode = Parameters<
 	typeof generators.namespaceDefinitionStatement
 >[4][number]
 
-// These token types form the Identifier rule of the grammar: every
-// Keyword in the Set is a valid Identifier. The Module keywords are on it for
-// the same reason the rest are: `from` and `as` are Argument labels the
-// standard library already writes (`slice(from 1, to 3)`,
-// `normalize(as #ComposedCanonical)`), so they can only ever be Keywords where
-// a Module section is being read.
-//
-// `otherwise` is here and `define` is not, though the two words arrived
-// together. An `otherwise` only ever stands where an Expression has already
-// ENDED — none of the three Tokens that carry one on is a word — so the arm
-// loop tells the terminator from a name by the place it stands in, and no text
-// that parses today reads differently for it. `define` has no such footing: an
-// Identifier with a `{` behind it already parses, as a name and the Record
-// literal below it, so a contextual `define` would quietly turn two Statements
-// into one block. And `otherwise` is a name somebody will want —
-// `Optional::otherwise` was a Method of the standard library's own until it
-// was renamed — which reserving the word outright would forbid forever.
-//
-// `start` and `complete` are here for the reason `expect` and `require`
-// are: each opens its own form only where an Expression follows it and nothing
-// carries the word itself on, and is a name everywhere else. The two are a
-// harder case than the assertions, because their form is an EXPRESSION rather
-// than a Statement — see `opensAsynchrony` for the two narrowings that takes
-// and the name and the reading it still costs.
-//
-// A Set rather than an Array, here and for every other Token-type list in
-// this file. Each is asked of a Token, in a loop over every Token, and a
-// membership test written as a scan pays for every entry on every question.
+// The Identifier rule of the grammar: every Keyword here is also a valid
+// Identifier. See "Contextual keywords" in DEVELOPMENT.md.
 const identifierTokenTypes = new Set([
 	TokenType.Identifier,
 	TokenType.KeywordWith,
@@ -98,10 +71,9 @@ function isIdentifierToken(token: Token | undefined): boolean {
 	return token !== undefined && identifierTokenTypes.has(token.type)
 }
 
-// Every Token type an Expression can begin with — exactly the cases
-// `parsePrimaryExpression` answers, and nothing else. A Token type added there
-// belongs here too; one that is here and not there would make
-// `parseArgument` read a label where the Expression reading was meant.
+// INVARIANT: exactly the Token types `parsePrimaryExpression` answers.
+// An extra one would make `parseArgument` read a label where an Expression
+// was meant.
 const expressionStartTokenTypes = new Set([
 	...identifierTokenTypes,
 	TokenType.SymbolHash,
@@ -125,15 +97,9 @@ function startsExpression(token: Token | undefined): boolean {
 	return token !== undefined && expressionStartTokenTypes.has(token.type)
 }
 
-// Every way an Expression CARRIES ON past a Token that has already been
-// read — the three postfix forms `parseExpressionLevels` loops over, plus the
-// `#` that makes an Identifier the Choice half of `Choice#Case` when the two
-// are written flush together. A Keyword that is also an Identifier (`expect`,
-// `require`) opens its Statement form only where none of these follows it:
-// `expect(true)` is a call of a Function named `expect`, `expect.first` reads a
-// member off one, and `expect#Win` names a Case of one. `::` needs no case here
-// — a `:` can not start an Expression, so `expect::isEmpty()` never reached the
-// question.
+// Whether `following` continues an Expression past `token`: a `.`, a `(`,
+// or a `#` written flush. A contextual Keyword opens its own form only where
+// none follows. See "Contextual keywords" in DEVELOPMENT.md.
 function continuesExpression(
 	token: Token,
 	following: Token | undefined,
@@ -155,10 +121,8 @@ function continuesExpression(
 	)
 }
 
-// The Token types that begin an Expression of their own and yet only ever
-// stand where one has ENDED. They are read by `opensAsynchrony` below, whose
-// NOTE says what each of them closes and why leaving them out of the prefix
-// reading costs nothing written.
+// The Token types that begin an Expression and yet only stand where one has
+// ended. See "Asynchrony keywords" in DEVELOPMENT.md.
 const afterExpressionTokenTypes = new Set([
 	TokenType.SymbolLeftBrace,
 	TokenType.SymbolDash,
@@ -170,55 +134,10 @@ function standsAfterExpression(token: Token): boolean {
 	return afterExpressionTokenTypes.has(token.type)
 }
 
-// Whether one of the two asynchrony Keywords stands where it opens its
-// prefix Expression rather than naming something — the `expect`/`require` rule,
-// asked in expression position instead of in statement position, with two
-// narrowings of its own. `complete` reads as the Keyword in
-// `complete headline(url)` and as a name in `complete::isEmpty()`,
-// `complete.first`, `complete(1)`, `complete#Win`, `{ complete = 1 }` and
-// `Terminal.print(complete)`.
-//
-// The first narrowing is the LINE. An operand that begins on a later line
-// than the word is no operand at all, because Essence ends a Statement at the
-// end of its Expression and at no Token of its own — without the line, these
-// two Statements would read as one and nothing would report it:
-//
-//     constant held = start        § the value called `start` is what is meant
-//     Terminal.print(held)         § and this is a Statement of its own
-//
-// It costs nothing anybody writes. Both words take the whole postfix chain
-// behind them, so an operand whose Arguments are broken over lines still
-// BEGINS on the Keyword's own line, and `esfmt` prints the two words with
-// exactly one space behind them and no other way.
-//
-// The second is a short list of Tokens that begin an Expression and yet
-// only ever stand where one has ENDED, so a value named `start` or `complete`
-// can be the Expression they stand behind. `{` opens the block of an `if`, a
-// `match` or a Guard (`if start { … }`), `otherwise` closes a `define` arm
-// (`as complete otherwise`), `with` carries a Record or Dictionary base on
-// (`[held with "a" = 1]`) and `-` opens the `->` of a `match`'s answer Type
-// (`match start -> Integer {`). Excluding them costs nothing either: the only
-// Expression a `{` opens is a Record literal, `-` a negative number, and
-// neither is a Future or a Started, so the Keyword reading of those was a
-// `needless-start` in every case.
-//
-// What the rule still costs is one name and one reading, and both are
-// worth writing down because nothing reports either. The name: an Argument's
-// LABEL may not be spelled with either word. A label stands directly in front
-// of its value, which is exactly where the prefix form opens, so
-// `compute(start 1)` is a `start` of `1` — and `Terminal.print(complete
-// headline(url))` is what that buys. `argumentIsLabelled` says the same thing
-// from the other side; the Language Server's rename refuses the two words as
-// label names because of it.
-//
-// The reading: a CONTEXTUAL word standing behind a value named `start` or
-// `complete` is taken as the operand, because a contextual word is an
-// Identifier and an Identifier begins an Expression. `expect complete matches
-// snapshot` waits for a value called `matches` rather than matching the value
-// called `complete` against a snapshot. The Keyword reading wins there for the
-// same reason it wins in Argument position, and what the Program gets is a
-// Diagnostic about the operand — `matches` is not declared — rather than
-// silence.
+// Whether `start` or `complete` opens its prefix Expression rather than
+// naming a value. The operand must begin on the same line, and not with a
+// Token that only follows an Expression.
+// See "Asynchrony keywords" in DEVELOPMENT.md.
 function opensAsynchrony(token: Token, following: Token | undefined): boolean {
 	if (
 		token.type !== TokenType.KeywordStart &&
@@ -238,21 +157,16 @@ function opensAsynchrony(token: Token, following: Token | undefined): boolean {
 	)
 }
 
-// The words that open a form of their own where they stand and are
-// ordinary names everywhere else — the same rule `where` follows in a Guard.
-// None of them is a Keyword, so `constant across = 1` and `matches::isEmpty()`
-// are still what they say.
+// Words that open a form of their own where they stand and are ordinary
+// names everywhere else, as `where` is in a Guard.
 const ACROSS = "across"
 const ANY = "any"
 const MATCHES = "matches"
 const SNAPSHOT = "snapshot"
 
-// The Token types that begin a literal Matcher — `case 0`, `case 1/2`,
-// `case "a"`. Everything else in Matcher position is read as a Type.
-// `LiteralStringStart` is here only so an interpolated String reaches
-// `parseLiteralMatcherValue`, which refuses it with a message about why a
-// String with holes can not be matched — rather than the generic "expected a
-// Type" a Type parse would give.
+// The Token types that begin a literal Matcher, as in `case 0`, `case 1/2`
+// and `case "a"`. `LiteralStringStart` is here so `parseLiteralMatcherValue`
+// can say why a String with holes can not be matched.
 const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralNumber,
 	TokenType.SymbolDash,
@@ -262,19 +176,9 @@ const literalMatcherTokenTypes = new Set([
 	TokenType.LiteralFalse,
 ])
 
-// Every Token type a Matcher can begin with where an assertion opens —
-// a name (a Type, or the Choice half of `Choice#Case`), a `{` Pattern, a `#`
-// Case, a written value, or `_`. It is what `parseAssertionStatement` asks
-// before it reads the Matcher of `require MATCHER = EXPR` speculatively: an
-// assertion whose subject begins with anything else — `@`, `[`, `<`, `.`,
-// `match` — has no Matcher reading at all, and never pays for one.
-//
-// The `(` a Function-Type Matcher begins with is not here, because that
-// reading never arises: `continuesExpression` makes `require (` a call of a
-// Function named `require` before an assertion is considered at all, so
-// `require (Integer) -> String = f` never reaches this question. A
-// Function-Type Matcher can not open an assertion, and is not meant to — what
-// it would prove is a shape a test already has from the Type of what it wrote.
+// Every Token type a Matcher can begin with. `parseAssertionStatement` asks
+// before it tries `require MATCHER = EXPR`, so other subjects never pay for a
+// Matcher reading. A `(` is absent: `require (` is a call.
 const matcherStartTokenTypes = new Set([
 	...identifierTokenTypes,
 	...literalMatcherTokenTypes,
@@ -287,11 +191,10 @@ function startsMatcher(token: Token | undefined): boolean {
 	return token !== undefined && matcherStartTokenTypes.has(token.type)
 }
 
-// The Token types that can begin a Statement — these are the
-// resynchronisation points after a parse error. Every Keyword
-// `parseImplementationNode` dispatches on belongs here: one that is missing
-// is not a Statement start to the recovery, so the whole Declaration it opens
-// — braces and all — is skipped without a word.
+// The Keywords that open a Statement, where recovery resynchronises. A
+// Statement that begins with a name is skipped with the broken one.
+// INVARIANT: every Keyword `parseImplementationNode` dispatches on is here,
+// or recovery silently skips the Declaration it opens.
 const statementStartTokenTypes = new Set([
 	TokenType.KeywordConstant,
 	TokenType.KeywordVariable,
@@ -313,9 +216,8 @@ const statementStartTokenTypes = new Set([
 	TokenType.KeywordRequire,
 ])
 
-// The Keywords a Declaration opens with, each followed by the name it
-// declares. `overload function` and `static` reach their name one Token further
-// in, which is why the walk below skips rather than indexes.
+// The Keywords a Declaration opens with. `overload function` and `static`
+// reach their name one Token further in.
 const declarationKeywordTokenTypes = new Set([
 	TokenType.KeywordConstant,
 	TokenType.KeywordVariable,
@@ -340,11 +242,8 @@ function positionHolds(span: common.Position, cursor: common.Cursor): boolean {
 	return afterStart && beforeEnd
 }
 
-// The openings whose Declaration is HOISTED — the same list `isHoistable`
-// in the Enricher is written over, which is where the rule lives. A run opening
-// with one of them may have declared a name that was in scope ABOVE its own
-// line, so the silence it buys can not be bounded from above; a `constant`, a
-// `variable` or a `static` is in scope from its own line down and nowhere else.
+// The openings whose Declaration hoists, as the enricher's `isHoistable`
+// decides. See "Abandoned Statements" in DEVELOPMENT.md.
 const hoistableKeywordTokenTypes = new Set([
 	TokenType.KeywordFunction,
 	TokenType.KeywordOverload,
@@ -354,16 +253,8 @@ const hoistableKeywordTokenTypes = new Set([
 	TokenType.KeywordProtocol,
 ])
 
-// A Parameter is declared by the name in front of its `:`, and a
-// Parameter list goes down with the head it is written on — so `text` in
-// `function exclaimed(_ text: NonEmptyString)` is as undeclared as `exclaimed`
-// itself once that head is dropped, and every line of the body reading it would
-// say so.
-//
-// Inside the brackets and outside every brace, which is where a Parameter's own
-// name is and where nothing else is: a `{ x: Integer }` written as a Parameter's
-// TYPE names members rather than bindings, and a `type Point = { x: Integer }`
-// has no brackets at all.
+// The Parameters a dropped head declared: each name before a `:` inside the
+// brackets and outside every brace, where a `{ x: Integer }` Type names members.
 function abandonedParameterNames(tokens: Array<Token>): Array<string> {
 	let names: Array<string> = []
 	let parens = 0
@@ -391,12 +282,8 @@ function abandonedParameterNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
-// Whether an abandoned run could have OPENED A BODY, which is the only
-// way a `<-` ends up standing outside a Function — see
-// `parser.Recovery.headLines`. `function` and `overload` open one directly,
-// `static` opens one for a static Method, and the bare `NAME(` is the shape a
-// Method inside a Namespace body is written in, which is exactly what
-// `abandonedDeclarationNames` already recognises as a Declaration.
+// Whether an abandoned run could have opened a body, the only way a `<-`
+// ends up outside a Function. See `parser.Recovery.headLines`.
 function abandonedRunOpensBody(tokens: Array<Token>): boolean {
 	let opening = tokens[0]
 
@@ -413,23 +300,8 @@ function abandonedRunOpensBody(tokens: Array<Token>): boolean {
 	)
 }
 
-// The names a Statement the Parser abandoned would have declared, read
-// off its Tokens — see `parser.Recovery`. Empty where its opening says nothing
-// about a name, which is every Statement that declares none and a few that do:
-// the point is to be RIGHT about the names it answers, never to answer about
-// all of them. A name this misses is a name read exactly as it always was.
-//
-// A Method written in a Namespace body opens with its own name and a `(`,
-// which no Statement outside a Namespace does — a bare `name(…)` at the top
-// level is a call, and a call declares nothing. So the shape is only read as a
-// Declaration where it can be one: behind a `(`, and with no Keyword in front
-// of it that would have claimed the name itself.
-//
-// A dropped `namespace`, `protocol` or `choice` takes its MEMBERS down
-// with it, and each of those is a name the rest of the file reads. They are
-// collected from the body's own level and no deeper — a `NAME(` one brace
-// further in is a CALL the body makes, and a name a body calls is a name this
-// has no business answering for.
+// The names an abandoned Statement would have declared, read off its
+// Tokens. See "Abandoned Statements" in DEVELOPMENT.md.
 function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	let index = 0
 
@@ -465,10 +337,8 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 		return names
 	}
 
-	// One brace in from where the Declaration was written, which is the
-	// body's own level. The `{ … }` of a Type written in a signature, and every
-	// block a Method body opens, are deeper than that and are stepped over
-	// whole.
+	// Members stand one brace in, at the body's own level. A Type's braces in
+	// a signature and every block a Method body opens are deeper.
 	let depth = 0
 
 	for (let step = index + 1; step < tokens.length; step++) {
@@ -515,8 +385,7 @@ function abandonedDeclarationNames(tokens: Array<Token>): Array<string> {
 	return names
 }
 
-// The span a key was written across — the whole path where it is one,
-// and the name alone where it is not.
+// The span a key was written across: the whole path, or the name alone.
 function keyPosition(pair: {
 	name: parser.IdentifierNode
 	steps: Array<parser.IdentifierNode> | null
@@ -531,8 +400,8 @@ function keyPosition(pair: {
 	}
 }
 
-// Whether two written keys write the same member — the same spelling, or
-// one a prefix of the other at a step boundary.
+// Whether two written keys write the same member: the same spelling, or one
+// a prefix of the other at a step boundary.
 function keysClash(left: string, right: string): boolean {
 	if (left === right) {
 		return true
@@ -544,10 +413,8 @@ function keysClash(left: string, right: string): boolean {
 	return longer.startsWith(`${shorter}.`)
 }
 
-// Whether two Positions are written flush against each other, with
-// neither whitespace nor a line break between them. Some of the grammar reads
-// several Tokens as one lexeme — `1_000`, `1/2` — and only their adjacency
-// tells that apart from the same Tokens written as separate things.
+// Whether two Positions are written flush, with nothing between them. The
+// grammar reads some Token runs as one lexeme, such as `1/2`, only when flush.
 function isAdjacent(left: common.Position, right: common.Position): boolean {
 	return (
 		left.end.line === right.start.line &&
@@ -555,14 +422,12 @@ function isAdjacent(left: common.Position, right: common.Position): boolean {
 	)
 }
 
-// What a Dictionary entry is, said once for the three sites that say it.
+// What a Dictionary entry is, in one wording for every report.
 const dictionaryEntryNote =
 	"An entry is 'key = value', and a Dictionary is a bracket list of them: '[\"a\" = 1, \"b\" = 2]'."
 
-// A key's separator written the way another language writes one. Spelled
-// here for the two sites that meet one: the Dictionary reader, which gets there
-// with the key already read, and the Expression tail, where a `=>` is refused
-// before the brackets are ever understood to hold entries at all.
+// A key's separator written the way another language writes one. Both the
+// Dictionary reader and the Expression tail, which meets a `=>`, refuse it.
 function dictionaryEntryRefusal(
 	separator: string,
 	position: common.Position,
@@ -577,11 +442,8 @@ function dictionaryEntryRefusal(
 	}
 }
 
-// Whether the Expression a `=>` was written behind can only have been a
-// Dictionary's KEY. No language writes a Parameter list as a String or a Number,
-// so `"kim" => 7` is the hash rocket however much the arrow looks like a
-// Function literal's. A NAME is left out on purpose: `x => x` is a Function in
-// one language and a key in another, and there is no telling which was meant.
+// Whether the Expression before a `=>` can only be a Dictionary key: a String
+// or a Number. A name is left out, since `x => x` may be a Function literal.
 function writtenDictionaryKey(node: parser.ExpressionNode): boolean {
 	return (
 		node.nodeType === "StringValue" ||
@@ -590,11 +452,8 @@ function writtenDictionaryKey(node: parser.ExpressionNode): boolean {
 	)
 }
 
-// What a reader wrote between a key and its value when they did not write
-// `=`. Only the two spellings other languages use are named — `:` and `->` —
-// because those are the ones somebody reaches for on purpose; every other Token
-// standing there is a Program that went wrong somewhere else, and claiming it
-// meant to write an entry would send the reader after the wrong edit.
+// The separator another language writes between a key and its value, `:`
+// or `->`. Any other Token there is a mistake of some other kind.
 function writtenSeparatorLexeme(
 	found: Token,
 	next: Token | undefined,
@@ -614,11 +473,8 @@ function writtenSeparatorLexeme(
 	return null
 }
 
-// One refusal's worth of account for text that is not Essence — built
-// where the habit is RECOGNISED and thrown where it stands. Coded, never
-// `syntax-error`, so that it survives speculation: `a == b` is `a == b` under
-// every reading of the text around it, and handing that back for a second
-// reading answers it in worse words. See the NOTE on `speculate`.
+// A refusal of text written in another language's habit. It is coded, so it
+// survives speculation. See "Refusals of the text" in DEVELOPMENT.md.
 type ForeignRefusal = {
 	code: common.DiagnosticCode
 	message: string
@@ -629,11 +485,8 @@ type ForeignRefusal = {
 	data?: common.DiagnosticData
 }
 
-// What a Token contributes to a foreign lexeme, or null where it
-// contributes nothing. Two sources, because the Lexer splits an operator between
-// them: the Symbols it knows (`=`, `<`, `-`) are Tokens of their own, and
-// everything else — `+`, `&`, `!`, `;`, `?` — ends no name and so arrives inside
-// an Identifier, together with whatever was written flush behind it.
+// What a Token contributes to a foreign lexeme, or null. A Symbol such as `=`
+// is a Token of its own, while `+` or `;` arrives inside an Identifier.
 function foreignTokenLead(token: Token): string | null {
 	switch (token.type) {
 		case TokenType.SymbolEqual:
@@ -655,17 +508,12 @@ function foreignTokenLead(token: Token): string | null {
 	}
 }
 
-// The lexemes that are made of the same characters as a habit and are
-// Essence — the two arrows, and the `->`'s halves written on their own. Asked of
-// the WHOLE joined text rather than of each Token, which is what keeps
-// `match x -> T` and `<- value` out of this entirely while leaving `a - b` and
-// `a < b` in.
+// The lexemes made of a habit's characters that are Essence. Asked of the
+// whole joined text, so `<- value` is Essence while `a < b` is a habit.
 const essenceLexemes: ReadonlySet<string> = new Set(["->", "<-", "=", "|", "~"])
 
-// What Essence writes in place of a habit that is not an operator. Each is
-// its own shape rather than its own code: `foreign-syntax` is the verdict "this
-// is another language's spelling", and which spelling it was is what the message
-// and the `essence-spelling` payload carry.
+// What Essence writes in place of a habit that is not an operator. All share
+// the code `foreign-syntax`; the message and `essence-spelling` data differ.
 function foreignSyntaxRefusal(
 	text: string,
 	position: common.Position,
@@ -690,10 +538,8 @@ function foreignSyntaxRefusal(
 			message: "A Comment is written with '§'",
 			label: "Essence writes '§' here",
 			position,
-			// No `essence-spelling`, because a block Comment is two
-			// spellings and the second of them is nowhere in hand — a `§` written
-			// over the `/*` would leave the `*/` standing at the end of whatever
-			// line it was written on.
+			// No `essence-spelling`: a `§` over the `/*` would leave its `*/`
+			// standing.
 			notes: [
 				"There is no block Comment: a '§' runs to the end of its line, and a block is written one line at a time.",
 			],
@@ -710,18 +556,9 @@ function foreignSyntaxRefusal(
 			notes: [
 				"A Function literal is its Parameter list, its answer Type and a block, and a value leaves one only through '<-'.",
 			],
-			// A WHOLE literal, annotations and all. A Help that wrote
-			// only the braces around a body — `'(n) { <- n::add(1) }'` — left
-			// `uninferable-parameter-type` and `missing-return-type` standing
-			// behind the edit it offered, which is the same refusal twice more
-			// for a reader who followed it.
-			//
-			// And the Parameter is written `_ n` rather than `n`, because
-			// a Parameter with no `_` in front of it is LABELLED: a reader who
-			// followed `'(n: Integer) -> Integer { <- n }'` and then called what
-			// they had written was answered `This Argument is not labelled 'n'`.
-			// The name it takes inside the body is the same either way, so the
-			// `_` costs the Help nothing and saves the call.
+			// A whole annotated literal, so following the Help leaves no
+			// inference refusal. `_ n` is unlabelled, so a plain call of the
+			// result works.
 			helps: ["Write '(_ n: Integer) -> Integer { <- n }'."],
 		}
 	}
@@ -750,12 +587,9 @@ function foreignSyntaxRefusal(
 	return null
 }
 
-// The value in front of the brackets spelled back out, where it is a name
-// or a path of names — `primes`, `box.items`, `@.items`. Null for everything
-// else, which is every shape whose spelling the Parser does not hold: a call, a
-// Literal, a Method chain. A Help built on one of those would have to invent the
-// text it named, and a schematic name says "yours goes here" where an invented
-// one says nothing at all.
+// The value before the brackets spelled back, where it is a name or a path
+// of names such as `box.items`. Null otherwise, and the Help then writes a
+// schematic name.
 function writtenReceiver(node: parser.ExpressionNode): string | null {
 	switch (node.nodeType) {
 		case "Identifier":
@@ -772,42 +606,21 @@ function writtenReceiver(node: parser.ExpressionNode): string | null {
 	}
 }
 
-// `primes[0]`, `ages["ada"]`, `matrix[0][1]` — reading an item by writing
-// its position in brackets, which is the one habit here that is a SHAPE rather
-// than a lexeme: every character of it is Essence, and what is foreign is that
-// one value stands flush in front of another.
-//
-// `receiver` is the value in front of the brackets as it was WRITTEN, where
-// that is a name or a path of them — `primes`, `box.items`, `@.items` — and
-// null where an Expression stands there instead. `key` is what was written
-// INSIDE them where that is a single value, and null where it is anything else.
-// The Helps put both back in front of the reader, and write a schematic name
-// where there is none to put.
-//
-// No `essence-spelling`. Which Method reads an item is decided by the
-// receiver's TYPE — `item(at:)` for a List, `value(at:)` for a Dictionary,
-// `character(at:)` for a String — and the Parser knows no Types at all. A fix
-// that guessed one of the three would trade this refusal for an
-// `unknown-method` two thirds of the time, so the three are offered as Helps
-// and the reader picks the one they meant.
+// `primes[0]`: reading an item by its position in brackets, a habit that is a
+// shape rather than a lexeme. Which Method reads an item depends on a Type the
+// Parser does not know, so there is no `essence-spelling`.
 function indexRefusal(
 	receiver: string | null,
 	key: { text: string; keyed: boolean } | null,
 	position: common.Position,
 ): ForeignRefusal {
-	// `collection` rather than `value` for the value that has no name of
-	// its own, because one of the three Methods offered below is itself called
-	// `value` and `'value::value(at 0)'` reads as a rule about a Keyword rather
-	// than as a name to substitute.
+	// Not `value`, since `'value::value(at 0)'` reads like a rule rather
+	// than a name to substitute.
 	let written = receiver ?? "collection"
 	let subject =
 		receiver === null ? "the value it stands behind" : `'${receiver}'`
-	// A written String key says the collection is a Dictionary and says
-	// it loudly, because a List and a String are read by POSITION and a
-	// position is an Integer and nothing else. So the Helps are ordered by what
-	// was written, and the position Methods are never handed the String key: a
-	// Help that offers a call which resolves to nothing sends a reader from one
-	// refusal to the next.
+	// A written String key means a Dictionary, since a List and a String
+	// are read by Integer position. The position Methods never get the key.
 	let keyed = key?.keyed === true
 	let at = keyed ? "0" : (key?.text ?? "0")
 
@@ -833,20 +646,9 @@ function indexRefusal(
 	}
 }
 
-// `primes[0] = 5` — the same habit with an `=` behind it, which is a
-// different mistake and was answered as two: the refusal about the brackets, and
-// then `Expected an Expression but found '='` from the Statement loop reading
-// what was left. Every Help it printed named a Method that READS.
-//
-// Nothing in this language changes a collection in place, so the answer is a
-// whole Statement rather than a call: the Method answers a new collection, and
-// the name is written again. `at` and `value` are what was written where that is
-// one value each, and a `…` where the reader's own goes — the same rule the
-// reading refusal follows about the key.
-//
-// No `essence-spelling` here either, and for the reason there is none there: a
-// List is rebuilt with `replace(_:at:)` and a Dictionary with `set(_:to:)`, and
-// which of the two this is depends on a Type the Parser does not have.
+// `primes[0] = 5`: writing into a collection by position. Nothing changes a
+// collection in place, so each Help reassigns the name from a Method's new
+// collection. There is no `essence-spelling`, as for `indexRefusal`.
 function indexWriteRefusal(
 	receiver: string | null,
 	key: { text: string; keyed: boolean } | null,
@@ -879,12 +681,8 @@ function indexWriteRefusal(
 	}
 }
 
-// The value the `require` line was written over, spelled back. A name and
-// a run of members read off one are the two shapes that ARE their own spelling,
-// and between them they are what almost every such line has on its right. This
-// stage holds Nodes rather than the text they were read from, so anything else
-// is written as the schematic it is — `…::is(3)` says "your value here" without
-// naming something the reader did not write.
+// The value a `require` line was written over, spelled back where it is a
+// name or a member path, and `…` otherwise.
 function writtenValueText(value: parser.ExpressionNode): string {
 	if (value.nodeType === "Identifier") {
 		return value.content
@@ -899,15 +697,9 @@ function writtenValueText(value: parser.ExpressionNode): string {
 	return "…"
 }
 
-// The text a span was read from, which is what a Help that tells the
-// reader to WRITE something back has to be built out of. A Node is not the text
-// it came from: a String Node holds the value the escapes stand for, so writing
-// one back out escapes what the reader escaped and leaves what they did not —
-// `require "\{…\}" = body` came back as `body::is("{…}")`, where the `{` opens
-// an interpolation hole and the line no longer closes its String.
-//
-// Empty where the span reaches past the text, which nothing in a parsed Program
-// does; the caller answers that with a schematic rather than with a lie.
+// The text a one-line span was read from, for a Help that spells the
+// reader's text back. A String Node holds decoded escapes, so it can not.
+// Empty where the span reaches past the text.
 function writtenText(lines: Array<string>, position: common.Position): string {
 	if (position.start.line !== position.end.line) {
 		return ""
@@ -922,11 +714,9 @@ function writtenText(lines: Array<string>, position: common.Position): string {
 	return line.slice(position.start.column - 1, position.end.column - 1)
 }
 
-// An Expression that can only ever be a VALUE, which is what tells a
-// Dictionary's key from a Record's member name. Everything else — a name, a
-// member read, a call — may be either the base of an update or, for a name, a
-// member whose value simply did not parse, and neither is a mistake this can
-// speak about. See `parseRecordLiteralOrCombination`.
+// An Expression that can only be a value, which tells a Dictionary's key
+// from a Record's member name. A name may be either. See
+// `parseRecordLiteralOrCombination`.
 function writesAValueKey(node: parser.ExpressionNode): boolean {
 	switch (node.nodeType) {
 		case "StringValue":
@@ -944,12 +734,8 @@ function writesAValueKey(node: parser.ExpressionNode): boolean {
 	}
 }
 
-// The numerator of a decimal — the two written digit runs read as one
-// number over a power of ten. Normalised through `BigInt` so what comes out is
-// plain digits: no leading zeros (`0.05` is `5/100`) and no sign on a zero
-// (`-0.0` is `0/10`). Every stage behind the Parser reads these strings as
-// digits and nothing else — the Optimiser folds them by a `/^-?[0-9]+$/` test,
-// and the Rewriter hands them straight to `BigInt`.
+// The numerator of a decimal, over a power of ten. Later stages read it as
+// plain digits, so `BigInt` drops leading zeros and the sign of a zero.
 function decimalNumerator(whole: string, fraction: string): string {
 	let negative = whole.startsWith("-")
 	let magnitude = BigInt(`${negative ? whole.slice(1) : whole}${fraction}`)
@@ -957,57 +743,38 @@ function decimalNumerator(whole: string, fraction: string): string {
 	return magnitude === 0n ? "0" : `${negative ? "-" : ""}${magnitude}`
 }
 
-// The parser reads nesting by recursion, one call level per written
-// level, so a Program that nests deeply enough would overflow the call stack
-// and crash without a report. The guard refuses it with one instead, well
-// before the stack runs out — 1024 levels is far past anything written by
-// hand while leaving room for a machine-generated file (a serialized tree
-// nests one level per node, and the budget is SHARED across Expressions,
-// Types and blocks, so the per-construct headroom is what a file actually
-// gets). Measured end to end, the toolchain survives nested blocks to about
-// 2,000 levels and nested Lists to about 10,000 before some stage's own
-// recursion gives out, so 1024 keeps a real margin under the worst of them.
+// The parser recurs once per written level, so deep nesting would overflow
+// the call stack. `nesting-too-deep` refuses it well before, leaving room for
+// machine-generated files.
 const maximumNestingDepth = 1024
 
 export type ParserOptions = {
-	// Opt-in that says the Statements about to be read stand in a test's
-	// body, which is what makes `expect` and `require` legal in them. Only the
-	// `@example` blocks of a `§§` Documentation block set it: what is written
-	// under one is a test body, and it is parsed on its own rather than as part
-	// of the file it was written in.
+	// Reads the Statements as a test body, where `expect` and `require` are
+	// legal. `parseTestBody` sets it for an `@example` block.
 	insideTestBody?: boolean
-	// Opt-in that lets a Program open with `declarations { … }` — the
-	// standard library sets it, every user file leaves it off so that a
-	// `declarations` block there is diagnosed rather than parsed. It is also
-	// what refuses both Module sections: the files that set it are one shared
-	// declaration space rather than Modules, and none of them may import or
-	// export.
+	// Lets a Program open with `declarations { … }`. The standard library sets
+	// it; in a user file the block is diagnosed.
 	allowDeclarationsHeader?: boolean
 }
 
-// One `import { … }` or `export { … }` block as it was read, with the
-// side of the implementation it stood on and the Keyword's own Position. The
-// node spans the whole block, which is what the Formatter and the Language
-// Server need; a Diagnostic about the side a block was written on wants to
-// point at the Keyword alone.
+// One `import { … }` or `export { … }` block as read, with the side of the
+// implementation it stood on. A Diagnostic about the side points at the
+// Keyword alone.
 type ModuleSectionRead = {
 	node: parser.ImportSectionNode | parser.ExportSectionNode
 	keywordPosition: common.Position
 	side: "above" | "below"
 }
 
-// The brackets that CLOSE something. A list reader that has just stepped
-// over a `,` is looking for its next member, and none of these begins one: the
-// list is short of its own closing bracket, and one of these is the bracket that
-// arrived in its place. See `refuseListContinuation`.
+// The closing brackets. After a `,` one of these says the list is short of
+// its own closing bracket. See `refuseListContinuation`.
 const closingBracketTokenTypes = new Set([
 	TokenType.SymbolRightParen,
 	TokenType.SymbolRightBracket,
 	TokenType.SymbolRightBrace,
 ])
 
-// The Tokens a Statement that begins with a bare name goes on with —
-// a reassignment, a Method call, a member read, a call, an index. See
+// The Tokens a Statement that begins with a bare name continues with. See
 // `parseOptionalRefinementPredicate`.
 const STATEMENT_CONTINUATIONS = new Set([
 	TokenType.SymbolEqual,
@@ -1021,79 +788,35 @@ class DescentParser {
 	protected tokens: TokenStream
 	protected suppressDiagnostics: boolean
 	protected allowDeclarationsHeader: boolean
-	// Parser state set from the header — `declarations` unlocks the
-	// body-less native Method signatures and value-less static Properties that
-	// `parseNamespaceBodyNode` produces. In `implementation` mode those branches
-	// are simply never reached, so the absence of a body stays a parse error
-	// exactly as before.
+	// Set from the header. `declarations` unlocks body-less native Method
+	// signatures and value-less static Properties in `parseNamespaceBodyNode`.
 	protected mode: parser.Program["kind"] = "implementation"
-	// How many levels of Expressions, Types and blocks the parser is
-	// currently inside — `enterNesting` counts them against
-	// `maximumNestingDepth`. One shared budget, because the three recur into
-	// each other and it is the call stack they share that the limit protects.
+	// The levels of Expressions, Types and blocks being read. One shared
+	// budget, since all three recur into each other on one call stack.
 	protected nestingDepth = 0
-	// Whether the Statement being read stands in a test's own body — set
-	// by `parseTest` and cleared again by every Function body written inside
-	// one, which is what makes `expect` a Statement of the test and not of the
-	// closure it was handed to. A `suite` body does NOT set it: the Statements
-	// directly in a suite are its setup, and there is no test there for an
-	// assertion to belong to.
+	// Whether the Statement being read stands in a test's own body. A
+	// Function body inside clears it, and a `suite` body, which is setup,
+	// never sets it.
 	protected insideTestBody = false
-	// Whether the Expression being read stands in an ARGUMENT list, which
-	// is the one position that hands a Function literal its Types. A literal
-	// passed to a Method reads its Parameter and return Types off the Parameter
-	// it is passed to; the same literal written into a Declaration reads them
-	// off nothing, and a Help that spelled the untyped form there sent the
-	// reader to `uninferable-parameter-type`. Cleared inside every block, so a
-	// path written in a literal's BODY is judged by where that body stands
-	// rather than by the call around it.
+	// Whether the Expression being read stands in an Argument list, the one
+	// position that hands a Function literal its Types. Every block clears it,
+	// so a literal's body is judged where it stands.
 	protected insideArgumentList = false
-	// The value an update being read is written ON — the `config` of
-	// `{ config with … }` — spelled, or null where it is not one a Help can
-	// print back. The key readers are several calls below the `with` and the
-	// Expression in front of it is nowhere in their reach, and a descend that
-	// updates nothing is answered by naming it: dropping the only key drops the
-	// update, and what is left is that value on its own.
+	// The `config` of `{ config with … }` while the update is read, spelled for
+	// a Help, or null. The key readers are far below the `with`.
 	protected updatedValue: string | null = null
-	// How many speculations are on the stack. It is what tells the
-	// readings of ONE piece of text — the alternatives a construction is tried
-	// as — from the readings of the text inside one of them, which is the whole
-	// of what `furthestFailure` below needs to know. See `forgetFailuresFrom`.
+	// How many speculations are on the stack, which tells sibling readings of
+	// one text from readings inside one of them.
 	private speculationDepth = 0
-	// The failure that reached FURTHEST into the input among the readings
-	// a speculation threw away, and which is reported instead of the failure of
-	// the reading that was kept last.
-	//
-	// A speculation asks the same text to be read several ways and keeps the
-	// first reading that holds together. Where NONE of them does, the failure a
-	// reader used to be told about was the LAST one's — the fallback's — which
-	// is the reading that got least far by construction, because the fallback is
-	// tried where the readings in front of it have already failed. So a call
-	// missing its `)` was answered at the `::` of its receiver, where the
-	// Argument's label reading died two Tokens in, and the Record Literal
-	// holding a stray `)` four lines down was answered with "Expected 'with'" at
-	// its first member, where the update reading died. The mistake is at the
-	// Token the readings AGREE about, which is as far as the furthest of them
-	// got.
-	//
-	// A coded refusal never lands here. It is raised out of the
-	// speculation by `refusesTheText` rather than given back, so it is never a
-	// reading that was thrown away — and it keeps its precedence over everything
-	// this records, which is what a verdict about written text is owed.
+	// The failure that reached furthest among the readings a speculation
+	// threw away, the level it was recorded at and its Token offset.
+	// See "The furthest failure" in DEVELOPMENT.md.
 	private furthestFailure: ParseError | null = null
 	private furthestFailureOffset = 0
-	// The `speculationDepth` the speculation that recorded it was ENTERED
-	// at, which is the level its sibling readings stand on.
 	private furthestFailureDepth = 0
-	// What the recovery walked past, which is handed to the Program as its
-	// `Recovery` — see `recordAbandoned`. The lines are a Set, because one
-	// Statement is dropped once however many Tokens it was written across; the
-	// Declarations are a list, because the same name dropped in two different
-	// bodies is two different silences and each is owed its own span.
-	//
-	// `enclosing` is null while the record is PENDING — the block it stands in
-	// has not closed yet, and the block that claims it is the first one to close
-	// around it, which is the innermost. See `claimAbandonedDeclarations`.
+	// What the recovery walked past, for the Program's `Recovery`. A record's
+	// `enclosing` is null while it is pending.
+	// See "Abandoned Statements" in DEVELOPMENT.md.
 	private abandonedDeclarations: Array<{
 		name: string
 		position: common.Position
@@ -1102,15 +825,11 @@ class DescentParser {
 		atSectionLevel: boolean
 	}> = []
 	private abandonedLines = new Set<number>()
-	// The lines of the abandoned runs that could have opened a BODY — see
-	// `parser.Recovery.headLines`.
+	// See `parser.Recovery.headLines`.
 	private abandonedHeadLines = new Set<number>()
 
-	// The source, kept as its lines, for the Helps that spell a piece of
-	// the reader's own text back at them. A Node is not the text it was read
-	// from — every escape a String holds is already gone by the time it is one —
-	// so a Help built out of Nodes tells the reader to write something they did
-	// not write. See `writtenText`.
+	// The source lines, for Helps that spell the reader's text back. See
+	// `writtenText`.
 	private sourceLines: Array<string>
 
 	constructor(source: string, options: ParserOptions = {}) {
@@ -1119,9 +838,8 @@ class DescentParser {
 		this.allowDeclarationsHeader = options.allowDeclarationsHeader ?? false
 		this.insideTestBody = options.insideTestBody ?? false
 
-		// A Lexer error truncates the Token stream, so every
-		// end-of-input error after it would only be a cascade of the already
-		// reported problem.
+		// A Lexer error truncates the Token stream, so every end-of-input
+		// error after it would be a cascade.
 		this.suppressDiagnostics = this.tokens.hadLexerError
 	}
 

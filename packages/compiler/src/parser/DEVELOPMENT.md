@@ -144,3 +144,118 @@ braces is short of the innermost one first. `reportUnclosedBlock` asks it only w
 Where `outdentedClose` answers, `unclosed-block` stands on that block's `{`, with the outdented `}` as the second
 Label. Where it does not, the report stands at the end of the input about the outermost block. Only the innermost
 torn-open block reports, since one missing `}` tears open every enclosing block too.
+
+## Contextual keywords
+
+`identifierTokenTypes` is the Identifier rule of the grammar. Every Keyword in it is also a valid Identifier, and
+opens its own form only in that form's position.
+
+- `from` and `as` are Argument labels the standard library writes, as in `slice(from 1, to 3)` and
+  `normalize(as #ComposedCanonical)`. They are Keywords only where a Module section is being read.
+- `otherwise` is contextual and `define` is reserved. An `otherwise` only stands where an Expression has already
+  ended, so the arm loop tells the terminator from a name by its place. `define` has no such footing. An Identifier
+  followed by a `{` already parses as a name and a Record literal. A contextual `define` would silently turn those
+  two Statements into one block. Leaving `otherwise` contextual keeps it free as a name.
+- `expect` and `require` open an assertion only in Statement position and where nothing continues an Expression
+  past them. `continuesExpression` lists what does: a `.`, a `(`, or a `#` written flush. So `expect(true)` is a
+  call, `expect.first` a member read and `expect#Win` a Case. A `:` can not start an Expression, so
+  `expect::isEmpty()` never reaches the question.
+- `start` and `complete` follow the same rule, asked in Expression position. See "Asynchrony keywords".
+
+The words `across`, `any`, `matches` and `snapshot` are no Keywords at all. Each opens a form only where it stands,
+as `where` does in a Guard, so `constant across = 1` and `matches::isEmpty()` mean what they say.
+
+### Asynchrony keywords
+
+`opensAsynchrony` decides whether `start` or `complete` opens its prefix Expression or names a value. `complete`
+is the Keyword in `complete headline(url)`. It is a name in `complete::isEmpty()`, `complete.first`, `complete(1)`,
+`complete#Win`, `{ complete = 1 }` and `Terminal.print(complete)`. Two narrowings go beyond the assertion rule.
+
+The first is the line. An operand that begins on a later line than the word is no operand. Essence ends a Statement
+at the end of its Expression, with no terminator Token, so without this rule these two Statements would read as one:
+
+```
+constant held = start
+Terminal.print(held)
+```
+
+The rule costs nothing anybody writes. Both words take the whole postfix chain after them, so an operand whose
+Arguments break over lines still begins on the Keyword's line. The formatter prints each word with exactly one
+space after it.
+
+The second is `afterExpressionTokenTypes`, the Tokens that begin an Expression yet only stand where one has ended.
+A value named `start` or `complete` can stand before them:
+
+- `{` opens the block of an `if`, a `match` or a Guard, as in `if start { … }`.
+- `otherwise` closes a `define` arm, as in `as complete otherwise`.
+- `with` continues a Record or Dictionary base, as in `[held with "a" = 1]`.
+- `-` opens the `->` of a `match`'s answer Type, as in `match start -> Integer {`.
+
+Leaving them out of the prefix reading costs nothing either. A `{` there could only open a Record literal and a `-`
+a negative number. Neither is a Future or a Started, so the Keyword reading would always be a `needless-start`.
+
+The rule still costs one name and one reading, and nothing reports either:
+
+- An Argument's label can not be spelled `start` or `complete`. A label stands directly before its value, where
+  the prefix form opens, so `compute(start 1)` passes a `start` of `1`. `argumentIsLabelled` agrees, and the
+  language server's rename refuses the two words as label names.
+- A contextual word after a value named `start` or `complete` is taken as the operand, since it is an
+  Identifier. `expect complete matches snapshot` waits for a value called `matches`. The Program then gets a
+  Diagnostic about the undeclared `matches` rather than silence.
+
+## Error recovery
+
+The parser always returns a Program. `parseStatementList` reads a block's elements one at a time. When an element
+throws a `ParseError`, `recoverFromError` reports one Diagnostic for it, resynchronises, and drops the element from
+the AST. No error nodes are invented: the enricher already tolerates missing declarations.
+
+`resynchronise` skips to the next Keyword that opens a Statement, a `<-`, or a `}`, at the brace depth the broken
+element started on. A Statement that begins with a name, such as a call or an assignment, is skipped along with the
+broken one. Braces the broken element opened are skipped whole. `statementStartTokenTypes` lists the
+starts, so a Keyword missing from it makes recovery skip the whole Declaration it opens. If the element consumed no
+Token and resynchronisation stopped at once, the loop steps over one Token so it always makes progress.
+
+When resynchronisation reaches the end of the input, the parser sets `suppressDiagnostics`. Every later error
+would be a cascade of the one just reported. A Lexer error that truncates the Token stream sets it from the start.
+
+### Abandoned Statements
+
+A dropped Statement leaves two holes for later stages: the names it would have declared, and the lines it was
+written across. `recordAbandoned` writes both down, and `recovery` hands them to the Program as `parser.Recovery`.
+They are read off the Tokens the recovery walked past, because the Node is exactly what a dropped Statement does
+not leave. Only the Statement loops record, and they run outside every speculation, so a reading given back for
+another attempt records nothing.
+
+`abandonedDeclarationNames` reads the names. It aims to be right about the names it returns, not to find all of
+them. A name it misses reads as it would without the record.
+
+- The name after the declaring Keywords, such as `overload function`.
+- A `NAME(` opening the run, the shape of a Method in a Namespace body. At the top level that shape is a call, but
+  a call declares nothing that the rest of the file reads.
+- The Parameters of a dropped head, by `abandonedParameterNames`: a name before a `:` inside the brackets and
+  outside every brace. A `{ x: Integer }` written as a Parameter's Type names members, not bindings.
+- The members of a dropped `namespace`, `protocol` or `choice`, read at the body's own level only. A `NAME(` one
+  brace further in is a call the body makes.
+
+`abandonedRunOpensBody` marks the runs that could have opened a body: those starting with `function`, `overload`,
+`static`, or a bare `NAME(`. Only those can leave a `<-` outside a Function, so their lines go to `headLines` too.
+
+A record starts pending. `claimAbandonedDeclarations` runs as each block closes, through `parseClosingBrace`, and
+claims every pending record the block holds. Nested blocks close first, so the innermost enclosing block claims a
+record. A block that closes does not claim a record outside it, such as a Statement dropped at the top level before
+a Function's body closes. `section` marks an `implementation`, `declarations` or `tests` block, whose own
+Statements are the only ones hoisted. It rides on the record because later stages can not see a Statement's
+depth. A record no block claimed stands outside every block that closed, and covers the whole file at section
+level.
+
+`hoistable` says the run opened with a Keyword whose Declaration hoists, `hoistableKeywordTokenTypes`, the same list
+the enricher's `isHoistable` follows. A hoisted name is in scope above its own line, so its silence can not be
+bounded from above. A `constant`, `variable` or `static` is in scope only from its own line down.
+
+A refused Pattern binder, such as `as name` naming the whole value, is recorded as abandoned with no abandoned
+text. The body after it still reads the name. The binder stands before the arm's `{`, so the `match` block claims
+it. That also silences a read of the same name in a sibling arm. The alternative is a claim by a block that has not
+opened yet.
+
+`recovery` answers `undefined` where nothing was abandoned. It sorts every list, so one source always parses to one
+Program and a snapshot of a broken file is stable.
