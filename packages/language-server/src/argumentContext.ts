@@ -1,13 +1,13 @@
 import {
 	argumentPairingInverse,
 	pairArguments,
-	parameterDefaults,
 } from "@essence-lang/compiler/helpers"
+import {
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "./assertionChildren"
-import { defineConditions, defineValues } from "./defineArmChildren"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { typedProgramBodies } from "./sections"
 
@@ -56,7 +56,9 @@ export function findArgumentContext(
 	}
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body, null, state)
+		for (let node of body) {
+			visitNode(node, null, state)
+		}
 	}
 
 	return state.best
@@ -82,18 +84,8 @@ function consider(
 	state.bestPosition = position
 }
 
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	expected: common.Type | null,
-	state: State,
-) {
-	for (let node of nodes) {
-		visitNode(node, expected, state)
-	}
-}
-
 function visitNode(
-	node: common.typed.ImplementationNode,
+	node: TypedNode,
 	expected: common.Type | null,
 	state: State,
 ) {
@@ -101,245 +93,144 @@ function visitNode(
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 			// An annotation names the Record Type a literal is written for.
-			visitNode(node.value, node.declaredType ?? node.type, state)
+			visitExpecting(node, "value", node.declaredType ?? node.type, state)
 			return
 		case "VariableAssignmentStatement":
-			visitNode(node.value, node.value.type, state)
-			return
-		case "FunctionStatement":
-			visitDefaults(node.value.parameters, state)
-			visitBody(node.value.body, null, state)
-			return
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				visitNode(property.value, null, state)
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitDefaults(method.value.parameters, state)
-					visitBody(method.value.body, null, state)
-				}
-			}
-
-			for (let shim of node.nativeShims) {
-				visitDefaults(shim.parameters, state)
-			}
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitDefaults(method.value.parameters, state)
-					visitBody(method.value.body, null, state)
-				}
-			}
-
-			return
-		case "IfStatement":
-			visitNode(node.condition, null, state)
-			visitBody(node.body, null, state)
-			return
-		case "IfElseStatement":
-			visitNode(node.condition, null, state)
-			visitBody(node.trueBody, null, state)
-			visitBody(node.falseBody, null, state)
+			visitExpecting(node, "value", node.value.type, state)
 			return
 		case "ReturnStatement":
-			visitNode(node.expression, expected, state)
-			return
-		// An assertion holds its Expressions directly; see `assertionChildren.ts`.
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, null, state)
-			}
-
+			visitExpecting(node, "expression", expected, state)
 			return
 		case "RecordValue":
 			visitRecordValue(node, expected, state, true)
 			return
-		case "FunctionInvocation": {
-			let calleeType = node.name.type
-
-			if (calleeType.type === "Function") {
-				consider(
-					node.position,
-					{
-						kind: "arguments",
-						parameters: calleeType.parameterTypes,
-						usedLabels: node.arguments
-							.map((argument) => argument.name)
-							.filter((name): name is string => name !== null),
-					},
-					state,
-				)
-			}
-
-			visitNode(node.name, null, state)
-			visitArguments(
-				node.arguments,
-				calleeType.type === "Function"
-					? calleeType.parameterTypes
-					: null,
-				state,
-			)
-			return
-		}
-		case "MethodInvocation":
-			// No labels for Methods: overload resolution is often still open while
-			// typing, so no single signature has them. Record Arguments still work.
-			visitNode(node.base, null, state)
-			visitArguments(node.arguments, null, state)
-			return
-		case "Lookup":
-			visitNode(node.base, null, state)
-			return
-		// The operand is a Future or a Started, which expects no Record shape.
-		case "Start":
-		case "Complete":
-			visitNode(node.expression, null, state)
-			return
-		case "RefusedValue":
-			visitNode(node.base, null, state)
+		// Only a Function Invocation offers labels. A Method's overload resolution
+		// is often still open while typing, so no single signature has them.
+		case "FunctionInvocation":
+			visitFunctionInvocation(node, state)
 			return
 		case "Combination": {
-			visitNode(node.lhs, expected, state)
-
 			// An update's right-hand side is held to the left side's Type: every member
 			// it names must exist there, even in an unannotated Constant.
 			let base = asRecordType(node.lhs.type) ?? expected
 
-			if (node.rhs.nodeType === "RecordValue") {
-				visitRecordValue(
-					node.rhs,
-					base,
-					state,
-					opensOnBrace(node.rhs, state),
-				)
+			forEachTypedChild(
+				node,
+				(child, state, field) => {
+					if (field !== "rhs") {
+						visitNode(
+							child,
+							field === "lhs" ? expected : null,
+							state,
+						)
+					} else if (child.nodeType === "RecordValue") {
+						visitRecordValue(
+							child,
+							base,
+							state,
+							opensOnBrace(child, state),
+						)
+					} else {
+						visitNode(child, base, state)
+					}
+				},
+				state,
+			)
 
-				return
-			}
-
-			visitNode(node.rhs, base, state)
 			return
 		}
+		// A Handler's body answers the whole `match`. A Guard and a Matcher's
+		// literals expect no Record shape.
 		case "Match":
-			visitNode(node.value, null, state)
-
-			for (let handler of node.handlers) {
-				// A Guard and a Matcher's literals expect no Record shape.
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, null, state)
-				}
-
-				visitBody(handler.body, expected, state)
-			}
-
+			visitExpecting(node, "body", expected, state)
 			return
 		// Every arm answers the whole `define`, so it is held to what the position
 		// expects. A Condition, like a Guard, expects no Record shape.
 		case "Define":
-			for (let value of defineValues(node)) {
-				visitNode(value, expected, state)
-			}
-
-			for (let condition of defineConditions(node)) {
-				visitNode(condition, null, state)
-			}
+			visitExpecting(node, "value", expected, state)
+			return
+		case "ListValue":
+			visitExpecting(
+				node,
+				"values",
+				expected?.type === "List" ? expected.itemType : null,
+				state,
+			)
 
 			return
-		case "ListValue": {
-			let itemType = expected?.type === "List" ? expected.itemType : null
-
-			for (let value of node.values) {
-				visitNode(value, itemType, state)
-			}
-
-			return
-		}
 		case "DictionaryValue": {
 			let dictionary = expected?.type === "Dictionary" ? expected : null
 
-			for (let entry of node.entries) {
-				visitNode(entry.key, dictionary?.keyType ?? null, state)
-				visitNode(entry.value, dictionary?.valueType ?? null, state)
-			}
+			forEachTypedChild(
+				node,
+				(child, state, field) =>
+					visitNode(
+						child,
+						field === "key"
+							? (dictionary?.keyType ?? null)
+							: (dictionary?.valueType ?? null),
+						state,
+					),
+				state,
+			)
 
 			return
 		}
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, null, state)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			visitDefaults(node.value.parameters, state)
-			visitBody(node.value.body, null, state)
-			return
+		// The payload is expected to be the Case's Record.
 		case "CaseValue":
-			if (node.value !== null) {
-				// The payload is expected to be the Case's Record.
-				visitNode(
-					node.value,
-					node.type.type === "Case"
-						? { type: "Record", members: node.type.members }
-						: null,
-					state,
-				)
-			}
+			visitExpecting(
+				node,
+				"value",
+				node.type.type === "Case"
+					? { type: "Record", members: node.type.members }
+					: null,
+				state,
+			)
 
 			return
+		// A payload default is held to the payload's own Record, as a construction's
+		// payload is.
 		case "ChoiceDeclarationStatement":
-			// A payload default is held to the payload's own Record, as a construction's
-			// payload is.
-			for (let choiceCase of node.cases) {
-				if (choiceCase.defaultValue !== null) {
+			forEachTypedChild(
+				node,
+				(child, state, field, key) =>
 					visitNode(
-						choiceCase.defaultValue,
-						{ type: "Record", members: choiceCase.type.members },
+						child,
+						field === "defaultValue"
+							? {
+									type: "Record",
+									members:
+										node.cases[key as number]!.type.members,
+								}
+							: null,
 						state,
-					)
-				}
-			}
+					),
+				state,
+			)
 
-			return
-		// A predicate is a Boolean, which expects no Record shape.
-		case "TypeAliasStatement":
-			visitPresent(node.predicate, state)
-			return
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
 			return
 	}
+
+	forEachTypedChild(node, visitExpectingNothing, state)
 }
 
-function visitPresent(
-	node: common.typed.ImplementationNode | null,
+function visitExpectingNothing(child: TypedNode, state: State) {
+	visitNode(child, null, state)
+}
+
+// The children in `field` are held to `expected`; the rest expect nothing.
+function visitExpecting(
+	node: TypedNode,
+	field: string,
+	expected: common.Type | null,
 	state: State,
 ) {
-	if (node !== null) {
-		visitNode(node, null, state)
-	}
+	forEachTypedChild(
+		node,
+		(child, state, childField) =>
+			visitNode(child, childField === field ? expected : null, state),
+		state,
+	)
 }
 
 // One member list, a Record Literal or an update's key list. Only a Literal
@@ -365,9 +256,16 @@ function visitRecordValue(
 		state,
 	)
 
-	for (let [name, member] of Object.entries(node.members)) {
-		visitNode(member, recordType.members[name] ?? null, state)
-	}
+	forEachTypedChild(
+		node,
+		(member, state, _field, name) =>
+			visitNode(
+				member,
+				recordType.members[name as string] ?? null,
+				state,
+			),
+		state,
+	)
 }
 
 // Whether a member list is its own Record Literal, read off the character its
@@ -386,53 +284,84 @@ function opensOnBrace(
 	return line?.[node.position.start.column - 1] === "{"
 }
 
-// A call in a Parameter default offers the same labels and members as one in
-// a body.
-function visitDefaults(
-	parameters: Array<common.typed.ParameterNode>,
-	state: State,
-) {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		visitNode(defaultValue, null, state)
-	}
-}
-
 // Arguments pair with Parameters by label once any may be left out:
 // `f(to 3)` belongs to the second. `pairArguments` is the Compiler's walk.
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	parameterTypes: common.BaseFunction["parameterTypes"] | null,
+function visitFunctionInvocation(
+	node: common.typed.FunctionInvocationNode,
 	state: State,
 ) {
-	let parameterForArgument = pairedParameters(nodeArguments, parameterTypes)
+	let calleeType = node.name.type
+	let parameterTypes =
+		calleeType.type === "Function" ? calleeType.parameterTypes : null
 
-	nodeArguments.forEach((argument, argumentIndex) => {
-		let parameter =
-			parameterTypes?.[
-				parameterForArgument[argumentIndex] ?? argumentIndex
-			]
-		let parameterType = parameter?.type ?? null
-		let expected =
-			parameterType !== null && parameterType.type !== "GenericUse"
-				? parameterType
-				: null
+	if (parameterTypes !== null) {
+		consider(
+			node.position,
+			{
+				kind: "arguments",
+				parameters: parameterTypes,
+				usedLabels: node.arguments
+					.map((argument) => argument.name)
+					.filter((name): name is string => name !== null),
+			},
+			state,
+		)
+	}
 
-		// The only place a Record Literal learns which members a default fills: the
-		// Argument's own Parameter.
-		if (argument.value.nodeType === "RecordValue") {
-			visitRecordValue(
-				argument.value,
-				expected,
+	let parameterForArgument = pairedParameters(node.arguments, parameterTypes)
+
+	forEachTypedChild(
+		node,
+		(child, state, field, index) => {
+			if (field !== "arguments" || child.nodeType !== "Argument") {
+				visitNode(child, null, state)
+				return
+			}
+
+			let argumentIndex = index as number
+
+			visitArgument(
+				child,
+				parameterTypes?.[
+					parameterForArgument[argumentIndex] ?? argumentIndex
+				],
 				state,
-				true,
-				parameter?.defaultMembers ?? [],
 			)
+		},
+		state,
+	)
+}
 
-			return
-		}
+// The only place a Record Literal learns which members a default fills: the
+// Argument's own Parameter.
+function visitArgument(
+	argument: common.typed.ArgumentNode,
+	parameter: common.Parameter | undefined,
+	state: State,
+) {
+	let parameterType = parameter?.type ?? null
+	let expected =
+		parameterType !== null && parameterType.type !== "GenericUse"
+			? parameterType
+			: null
 
-		visitNode(argument.value, expected, state)
-	})
+	forEachTypedChild(
+		argument,
+		(value, state) => {
+			if (value.nodeType === "RecordValue") {
+				visitRecordValue(
+					value,
+					expected,
+					state,
+					true,
+					parameter?.defaultMembers ?? [],
+				)
+			} else {
+				visitNode(value, expected, state)
+			}
+		},
+		state,
+	)
 }
 
 // Exported for the path-key probe, which needs an Argument's Parameter to

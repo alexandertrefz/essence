@@ -260,13 +260,14 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    does `mutation/index.ts`.
 9. Rewriter: `rewriter/rewrite.ts`.
 10. Formatter: `packages/formatter/src/printer.ts`.
-11. Language server, in `packages/language-server/src`: `argumentContext.ts`, `completion.ts`, `hover.ts`,
-    `rename.ts` and `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`, `lookups.ts`,
-    `matchOnValue.ts`, `payloads.ts` and `typedLookups.ts`. `callHierarchy.ts`, `documentSymbols.ts`,
+11. Language server, in `packages/language-server/src`: `completion.ts`, `hover.ts`, `rename.ts` and
+    `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts`,
+    `payloads.ts` and `typedLookups.ts`. `argumentContext.ts`, `callHierarchy.ts`, `documentSymbols.ts`,
     `foldingRanges.ts`, `inlayHints.ts`, `selectionRanges.ts`, `semanticTokens.ts` and `signatureHelp.ts`
     descend through the visitor. They need an edit only where a kind declares something callable or outlined,
-    is a call, writes something a Hint annotates, folds, or names a Case. A new Expression or Statement joins
-    the levels of `selectionRanges.ts`, and the type checker asks for it there.
+    is a call, writes something a Hint annotates, folds, or names a Case. `argumentContext.ts` needs one for a
+    kind that holds a child to an expected Type. A new Expression or Statement joins the levels of
+    `selectionRanges.ts`, and the type checker asks for it there.
 12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
 13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,

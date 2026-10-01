@@ -208,3 +208,205 @@ describe("Argument context inside a refinement predicate", () => {
 		)
 	})
 })
+
+// The members offered at the cursor, and those already written there.
+function membersAt(source: string, cursor: common.Cursor) {
+	let context = contextAt(source, cursor)
+
+	return context?.kind === "record"
+		? {
+				members: Object.keys(context.memberTypes),
+				present: context.presentMembers,
+			}
+		: null
+}
+
+// Each place holds its child to a Type of its own. A partial literal shows
+// which: only that Type names the members the literal leaves out.
+describe("Argument context at each place that expects a Record", () => {
+	it("should hold a Record in a List Argument to the List's item Type", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tfunction centre (of points: List<Point>) -> Integer {",
+			"\t\t<- 0",
+			"\t}",
+			"",
+			"\tconstant middle = centre(of [{ x = 1 }])",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 8, column: 39 })).toEqual({
+			members: ["x", "y"],
+			present: ["x"],
+		})
+	})
+
+	it("should hold a Case's payload to the Case's Record", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tchoice Shape {",
+			"\t\tDot { at: Point, size: Integer },",
+			"\t}",
+			"",
+			"\tconstant dot = Shape#Dot({ size = 1 })",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 8, column: 37 })).toEqual({
+			members: ["at", "size"],
+			present: ["size"],
+		})
+	})
+
+	describe("a define arm inside a Case payload", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tchoice Shape {",
+			"\t\tDot { at: Point },",
+			"\t}",
+			"",
+			"\tconstant dot = Shape#Dot({ at = define {",
+			"\t\tas { x = 1 } if { y = 2 }",
+			"\t\tas { x = 0, y = 0 } otherwise",
+			"\t} })",
+			"}",
+		].join("\n")
+
+		it("should hold an arm's value to the payload member's Type", () => {
+			expect(membersAt(source, { line: 9, column: 14 })).toEqual({
+				members: ["x", "y"],
+				present: ["x"],
+			})
+		})
+
+		it("should hold an arm's Condition to nothing", () => {
+			expect(membersAt(source, { line: 9, column: 27 })).toEqual({
+				members: ["y"],
+				present: ["y"],
+			})
+		})
+	})
+
+	// The Handler's `<-` hands on what the `match` expects.
+	it("should hold a Handler's answer to what the match expects", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tconstant amount: Integer | String = 4",
+			"\tconstant at: Point = match amount -> Point {",
+			"\t\tcase Integer { <- { x = 1 } }",
+			"\t\tcase String { <- { x = 0, y = 0 } }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 6, column: 29 })).toEqual({
+			members: ["x", "y"],
+			present: ["x"],
+		})
+	})
+
+	describe("a Dictionary inside a Record member", () => {
+		let source = [
+			"implementation {",
+			"\ttype Name = { first: String, last: String }",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"\ttype Atlas = { places: Dictionary<Name, Point> }",
+			"",
+			'\tconstant atlas: Atlas = { places = [{ first = "a" } = { x = 1 }] }',
+			"}",
+		].join("\n")
+
+		it("should hold a key to the key Type", () => {
+			expect(membersAt(source, { line: 6, column: 52 })).toEqual({
+				members: ["first", "last"],
+				present: ["first"],
+			})
+		})
+
+		it("should hold a value to the value Type", () => {
+			expect(membersAt(source, { line: 6, column: 64 })).toEqual({
+				members: ["x", "y"],
+				present: ["x"],
+			})
+		})
+	})
+
+	it("should hold a Case payload's default to the payload's Record", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tchoice Shape {",
+			"\t\tDot { at: Point, size: Integer } = { size = 1 },",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 5, column: 49 })).toEqual({
+			members: ["at", "size"],
+			present: ["size"],
+		})
+	})
+
+	it("should hold an update's left-hand Record to the annotation", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tconstant moved: Point = { { x = 1 } with x = 2 }",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 4, column: 36 })).toEqual({
+			members: ["x", "y"],
+			present: ["x"],
+		})
+	})
+
+	it("should hold an assigned value to its own Type", () => {
+		let source = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"",
+			"\tconstant amount: Integer | String = 4",
+			"\tvariable at: Point = { x = 0, y = 0 }",
+			"\tat = match amount -> Point {",
+			"\t\tcase Integer { <- { x = 1 } }",
+			"\t\tcase String { <- { x = 0, y = 0 } }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(membersAt(source, { line: 7, column: 29 })).toEqual({
+			members: ["x", "y"],
+			present: ["x"],
+		})
+	})
+
+	it("should say which members a Record Argument's Parameter default fills", () => {
+		let source = [
+			"implementation {",
+			"\ttype Options = { host: String, retries: Integer }",
+			"",
+			"\tfunction connect (using options: Options = { retries = 3 }) -> String {",
+			"\t\t<- options.host",
+			"\t}",
+			"",
+			'\tconstant reply = connect(using { host = "local" })',
+			"}",
+		].join("\n")
+
+		expect(contextAt(source, { line: 8, column: 50 })).toMatchObject({
+			presentMembers: ["host"],
+			omittableMembers: ["retries"],
+		})
+	})
+})
