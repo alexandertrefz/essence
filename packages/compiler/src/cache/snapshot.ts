@@ -11,58 +11,27 @@ import {
 	writeAtomicSync,
 } from "./index"
 
-// A snapshot is a whole in-memory value written to disk with
-// `v8.serialize`, so that a process which would otherwise BUILD it reads it
-// instead. Two things in the Compiler are built identically by every process
-// that starts and are expensive enough to be most of what a small compile
-// costs: the enriched standard library, and the simplified-and-optimised
-// prelude derived from it. Neither depends on the user's Program at all.
-//
-// `v8.serialize` rather than JSON because these graphs hold Sets and Maps
-// and shared sub-objects, and because it is an order of magnitude faster in
-// both directions — a snapshot deserialises in under two milliseconds against
-// the seventy the standard library takes to enrich.
-//
-// Nothing here can make an answer wrong and nothing here can stop a
-// compile. Every read is a guess that is checked, every failure falls through
-// to building from source, and a value that was built is offered back to disk
-// on the way out. The one thing that WOULD make an answer wrong is a key that
-// does not change when the answer would — which is what the fingerprint below
-// exists for.
+// A snapshot is a whole value written to disk with `v8.serialize`, so that a
+// process reads it instead of building it. A snapshot can neither make an
+// answer wrong nor stop a compile. See "Snapshots" in DEVELOPMENT.md.
 
 const AREA = "compiler"
 
-// In the name, so a format change can not be read back as the shape it
-// replaced. The Compiler fingerprint below already covers that — this file is
-// one of the sources it digests — so this is belt to that braces, and the one
-// signal that survives a Compiler shipped as a bundle whose fingerprint is
-// coarser.
+// In the key, so a changed format is never read back as the old one, even
+// where the compiler's fingerprint is coarse.
 const FORMAT = "essence-snapshot-2"
 
-// How many snapshots of one kind are kept. The key changes on every edit
-// to the Compiler, so a development session would otherwise leave a megabyte of
-// dead snapshots behind per edit, forever, in a directory nobody ever looks in.
-// More than one is kept because more than one is LIVE: the prelude is keyed by
-// the Optimiser Options too, and a test suite that turns a pass off and on
-// again wants both, not each evicting the other.
+// More than one, since the prelude is keyed by the optimiser options and a
+// test suite uses several at once.
 const KEPT_PER_KIND = 4
 
-// Length-prefixed, exactly as `embed/hash.ts` mixes, so that no two
-// different sequences of parts can spell the same bytes.
+// Length-prefixed, so no two sequences of parts spell the same bytes.
 function mix(hash: Hash, text: string): void {
 	hash.update(`${text.length}:${text}`)
 }
 
-// What a snapshot is OF, in one name: the format, what the toolchain
-// compiles from and by, what the Compiler's own code is, and whatever the kind
-// adds — the Optimiser Options, for the prelude.
-//
-// `toolchainKey()` is deliberately not enough on its own — it says
-// nothing about the Compiler's own code, and a snapshot is SHAPED by it: edit
-// the Enricher and the enriched standard library is a different object, edit a
-// pass and the prelude is different code, with no version bump and no `.es`
-// file touched. `compilerFingerprint()` is the half that notices, and says at
-// its own definition what it costs and why there is no escape hatch from it.
+// The compiler's own code shapes a snapshot, so `compilerFingerprint` joins
+// `toolchainKey`. See "The compiler fingerprint" in DEVELOPMENT.md.
 function snapshotKey(kind: string, variant: string): string {
 	let hash = createHash("sha256")
 
@@ -79,34 +48,25 @@ function snapshotPath(kind: string, key: string): string {
 	return path.join(cacheDirectory(AREA), `${kind}-${key}.v8`)
 }
 
-// Off when the user says so, and off when the Compiler could not say what
-// it is — a key that can not tell two Compilers apart is worse than no key.
+// Off as well when the compiler has no fingerprint, since that key could not
+// tell two compilers apart.
 function isEnabled(): boolean {
 	return !isCacheDisabled(AREA) && compilerFingerprint() !== ""
 }
 
 export type Snapshot<Value> = {
-	// The leading half of the file name, and the unit the prune below
-	// counts in — one kind is one thing being remembered.
+	// The leading half of the file name, and the unit `prune` counts in.
 	kind: string
-	// What else the value depends on, beyond the toolchain and the
-	// Compiler's own code. The prelude's Optimiser Options are the only one.
+	// What the value depends on beyond the toolchain and the compiler's code.
 	variant: string
-	// Not optional. What comes back is bytes some other process wrote, and
-	// `v8.deserialize` will happily answer with an object of the wrong shape
-	// rather than throwing — a file truncated by a full disk that deserialises
-	// anyway, a snapshot from a Compiler whose fingerprint somehow collided. A
-	// kind that can not say what its own value looks like has no business
-	// trusting one off disk.
+	// Required, since `v8.deserialize` can answer a truncated file with an
+	// object of the wrong shape rather than throwing.
 	isValid: (value: unknown) => boolean
 	build: () => Value
 }
 
-// What a caller does with a snapshot: ask for one, and if there is none,
-// build the value and hand it back to be written. Both halves are one call so
-// that no caller can key the read and the write differently, and so that the
-// guard, the failure handling and the pruning are in one place rather than at
-// every kind.
+// Reads the snapshot, or builds the value and writes it. One call does both so
+// that no caller keys the read and the write differently.
 export function throughSnapshot<Value>({
 	kind,
 	variant,
@@ -127,9 +87,7 @@ export function throughSnapshot<Value>({
 			return restored as Value
 		}
 	} catch {
-		// No file, a half-written one, bytes a different V8 wrote — every
-		// one of them means the same thing here, which is that there is nothing
-		// to read. Building is always available and always correct.
+		// Any failure to read means building, which is always correct.
 	}
 
 	let value = build()
@@ -138,21 +96,15 @@ export function throughSnapshot<Value>({
 		writeAtomicSync(file, v8.serialize(value))
 		prune(kind, file)
 	} catch {
-		// A value holding something `v8.serialize` refuses — a Function
-		// reached a shape that used to be plain data — is a snapshot that can
-		// not be taken, and the caller already has its answer. It is caught
-		// rather than left to throw so that the day somebody puts a Function in
-		// the Enricher's output is a day the cache stops working, not a day the
-		// Compiler stops.
+		// A value `v8.serialize` refuses, such as one holding a Function, is
+		// not stored. The caller already has its answer.
 	}
 
 	return value
 }
 
-// Only ever after a write, so a process that finds what it came for
-// touches no directory but its own file. Failure is ignored throughout:
-// Windows refuses to unlink a file another process has open, and a snapshot
-// that outlives its welcome costs disk rather than correctness.
+// Only after a write, so a process that finds its snapshot touches nothing
+// else. Failures are ignored, since Windows refuses to delete an open file.
 function prune(kind: string, keep: string): void {
 	try {
 		let directory = cacheDirectory(AREA)
@@ -169,6 +121,6 @@ function prune(kind: string, keep: string): void {
 			rmSync(file, { force: true })
 		}
 	} catch {
-		// Nothing pruned is nothing wrong.
+		// A file left behind costs disk, not correctness.
 	}
 }
