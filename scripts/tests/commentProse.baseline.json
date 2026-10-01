@@ -36,7 +36,6 @@
 	"packages/compiler/src/tests/listPerformance.spec.ts": {"sentence-length": 23, "em-dash": 12, "all-caps": 16, "history": 3, "position": 3, "block-length": 2},
 	"packages/compiler/src/tests/matchHelps.spec.ts": {"sentence-length": 13, "em-dash": 12, "all-caps": 7, "position": 4},
 	"packages/compiler/src/tests/matchLowering.spec.ts": {"sentence-length": 24, "em-dash": 19, "all-caps": 7, "history": 1, "position": 2, "block-length": 5},
-	"packages/compiler/src/tests/modules.spec.ts": {"sentence-length": 70, "em-dash": 59, "all-caps": 30, "history": 2, "position": 7, "block-length": 6, "counts": 1},
 	"packages/compiler/src/tests/mutation.spec.ts": {"sentence-length": 21, "em-dash": 13, "all-caps": 15, "block-length": 2, "counts": 1},
 	"packages/compiler/src/tests/natives.spec.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 2},
 	"packages/compiler/src/tests/numericAdditions.spec.ts": {"sentence-length": 11, "em-dash": 6, "all-caps": 1, "position": 1},

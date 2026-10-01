@@ -30,16 +30,12 @@ import { rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// A project on disk, in a directory of its own that is removed again. The
-// files are written rather than taken from `packages/fixtures`, because what is
-// under test is resolution — which is about where files sit relative to each
-// other, and a test that has to be read alongside a directory listing
-// elsewhere is a test nobody can check.
+// A project written into a directory of its own and removed again, so each
+// spec shows where its files sit.
 //
-// The directory is canonicalised before anything is built out of it.
-// `mkdtempSync` answers under `/var/folders/…` on macOS, which is a symlink to
-// `/private/var/folders/…`, so every path a test compares against has to be the
-// spelling the resolver answers in.
+// The directory is canonicalised first: on macOS `mkdtempSync` answers under
+// `/var/folders/…`, a symlink to `/private/var/folders/…`, which the resolver
+// answers in.
 function withProject<T>(
 	files: Record<string, string>,
 	work: (directory: string) => T,
@@ -53,9 +49,8 @@ function withProject<T>(
 	}
 }
 
-// The same, for the tests that BUILD what they wrote — bundling and
-// running are asynchronous, and a `finally` that removed the directory around a
-// Promise would take the sources away while esbuild was still reading them.
+// The same for specs that build, awaiting the work before the directory is
+// removed, since esbuild reads the sources asynchronously.
 async function withBuiltProject<T>(
 	files: Record<string, string>,
 	work: (directory: string) => Promise<T>,
@@ -83,9 +78,8 @@ function writeProject(
 	return realpathSync.native(directory)
 }
 
-// The other kind of host: files that are not on disk at all, which is what
-// the Language Server hands over for a document the Editor holds unsaved. It
-// records what it was asked for, so that "one file is read once" is observable.
+// A host of files not on disk, as the Language Server has for unsaved
+// documents. It records what it was asked for, so single reads show.
 function memoryHost(files: Record<string, string>): ModuleHost & {
 	reads: Array<string>
 } {
@@ -149,10 +143,8 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// Above the importer's directory is an ordinary place for a dependency
-	// to sit — `"../math/Math.es"` is in the language's own examples. There is no
-	// root a specifier may not leave: a Module names files, and a file that
-	// exists is a file that can be imported.
+	// A specifier may leave the importer's directory. There is no root it may
+	// not leave.
 	it("resolves a specifier that leaves the importer's directory", () => {
 		withProject({ "src/Main.es": moduleProgram() }, (directory) => {
 			expect(
@@ -167,9 +159,8 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// The Language Server resolves against documents that have never been
-	// saved, so resolution may not ask whether the file exists. Whether anything
-	// can be READ there is the host's answer, and the graph's Diagnostic.
+	// The Language Server resolves against unsaved documents, so resolution
+	// does not ask whether the file exists. Reading it is the host's job.
 	it("resolves a specifier naming a file that is not on disk", () => {
 		withProject({ "Main.es": moduleProgram() }, (directory) => {
 			expect(
@@ -221,8 +212,7 @@ describe("Module Resolution", () => {
 			})
 
 			// The same file spelled the long way round. A self-import is
-			// which FILE the path lands on, not whether the two spellings look
-			// alike.
+			// decided by the file the path lands on.
 			expect(resolveSpecifier("../src/Main.es", importer)).toEqual({
 				kind: "rejected",
 				reason: "self-import",
@@ -230,11 +220,8 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// Derived from `STDLIB_DIRECTORY` rather than spelled out, so this
-	// holds under both layouts that constant answers for — the sources in a
-	// workspace checkout, and the copy written beside the bundled Language
-	// Server in the VS Code extension. Written out, the test would quietly stop
-	// naming the standard library and pass anyway.
+	// Derived from `STDLIB_DIRECTORY`, so the spec holds under both layouts
+	// that constant answers for: a checkout and the bundled extension.
 	it("rejects a specifier naming a standard library source", () => {
 		withProject({ "Main.es": moduleProgram() }, (directory) => {
 			let importer = path.join(directory, "Main.es")
@@ -250,9 +237,8 @@ describe("Module Resolution", () => {
 		})
 	})
 
-	// One file reached through a symlink and directly is ONE Module. Two
-	// spellings of one path would be parsed twice, enriched twice, and their
-	// Types would not be interchangeable — a Rectangle that is not a Rectangle.
+	// One file reached through a symlink and directly is one Module, so its
+	// Types stay interchangeable.
 	it("answers with one path for a file reached through a symlink", () => {
 		withProject(
 			{
@@ -277,9 +263,8 @@ describe("Module Resolution", () => {
 })
 
 describe("Module Graph", () => {
-	// Dependencies first, the entry last. Every stage after this one runs
-	// over the Modules in this order, and a Module may only be enriched once
-	// everything it imports has been.
+	// Dependencies first, the entry last, since a Module is enriched only
+	// after everything it imports.
 	it("orders a chain of Modules dependency first", () => {
 		withProject(
 			{
@@ -311,7 +296,7 @@ ${moduleProgram()}`,
 				expect(graph.entryPath).toBe(path.join(directory, "Main.es"))
 				expect(graph.diagnostics).toEqual([])
 
-				// Nothing is grouped — a chain is one Module per group.
+				// A chain is one Module per group.
 				expect(groupNamesOf(directory, graph.groups)).toEqual([
 					[path.join("math", "Math.es")],
 					["Geometry.es"],
@@ -321,10 +306,8 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// A re-export is a dependency. A facade that only forwards names never
-	// mentions the Module it forwards them from anywhere but its `export` block,
-	// and reading edges off the imports alone leaves it with none at all — the
-	// file it depends on would not be loaded, enriched, or bundled.
+	// A re-export is a dependency. A facade names the Module it forwards from
+	// only in its `export` section.
 	it("takes a dependency from an export section's 'from' entry", () => {
 		withProject(
 			{
@@ -359,9 +342,8 @@ export {
 		)
 	})
 
-	// The whole point of keying on the canonical path: a diamond binds one
-	// Module, whichever importer reached it first, so its body runs once and its
-	// Types are the same Types on both sides.
+	// Keyed by the canonical path, a diamond binds one Module, so its body runs
+	// once and its Types are shared.
 	it("reads a Module two importers name exactly once", () => {
 		let directory = canonicalPath(
 			path.join(tmpdir(), `essence-diamond-${process.pid}`),
@@ -403,10 +385,8 @@ ${moduleProgram()}`,
 		])
 	})
 
-	// Two entries naming one Module are one dependency and one entry in
-	// the resolution table, keyed by the specifier as written — which is what an
-	// Import or Export entry has in hand when it goes looking for the Module it
-	// named.
+	// Two entries naming one Module are one dependency and one entry in the
+	// resolution table, keyed by the specifier as written.
 	it("names a Module once however many entries mention it", () => {
 		withProject(
 			{
@@ -439,10 +419,8 @@ export {
 		)
 	})
 
-	// A cycle is one group, because nothing in it can be enriched before
-	// the rest of it — the hoisting pass has to see every Module in the group at
-	// once. Which member runs first is not something the source states, which is
-	// why the group is the unit rather than an order inside it.
+	// A cycle is one group, because the hoisting pass must see all of it at
+	// once. The source states no order inside it.
 	it("groups a cycle into one Strongly Connected Component", () => {
 		withProject(
 			{
@@ -470,9 +448,7 @@ ${moduleProgram()}`,
 					["A.es", "B.es"],
 				])
 
-				// The flattened order is the groups in order — a Module
-				// inside a cycle is not ahead of the ones it imports, and cannot
-				// be.
+				// The flattened order is the groups in order.
 				expect(
 					relativePathsOf(directory, [...graph.modules.keys()]),
 				).toEqual(["Leaf.es", "A.es", "B.es"])
@@ -512,10 +488,8 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// Per Module, because the dedup key is severity, code, message and
-	// Position with NO file in it — two Modules with the same mistake on the
-	// same line are two Diagnostics, and one shared collection would report the
-	// first and swallow the second.
+	// Per Module, because the deduplication key holds no file. Two Modules
+	// with the same mistake on the same line make two Diagnostics.
 	it("keeps each Module's parse Diagnostics on that Module", () => {
 		withProject(
 			{
@@ -547,9 +521,8 @@ implementation {
 					]).toEqual([name, ["invalid-number"]])
 				}
 
-				// The source each Diagnostic is rendered against travels
-				// with the Module — a report about a dependency is printed
-				// against the dependency's own text.
+				// A report about a dependency renders against the dependency's
+				// own text, which travels with the Module.
 				expect(
 					moduleAt(directory, graph, "Broken.es").sourceText,
 				).toContain("constant y")
@@ -581,9 +554,7 @@ ${moduleProgram()}`,
 					"Main.es",
 				).diagnostics
 
-				// Two groups, two Diagnostics — one per specifier written,
-				// however many names the group holds, and the second is not
-				// deduplicated away, because each underlines its own specifier.
+				// One Diagnostic per specifier written, each underlining its own.
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
 				).toEqual(["module-not-found", "module-not-found"])
@@ -654,8 +625,7 @@ ${moduleProgram()}`,
 					expect(diagnostic.helps).not.toEqual([])
 				}
 
-				// Nothing was reachable, so nothing else was loaded — a
-				// refused specifier is not an edge.
+				// A refused specifier is not an edge, so nothing else loads.
 				expect(
 					moduleAt(directory, graph, "Main.es").dependencies,
 				).toEqual([])
@@ -664,12 +634,9 @@ ${moduleProgram()}`,
 		)
 	})
 
-	// Appending '.es' is an answer for exactly one of the shapes that
-	// reaches this report. A specifier already carrying an extension names a
-	// file of another kind, and './clock.js.es' is a file nobody has — so the
-	// Help says what is true and spells no edit, which is also what keeps the
-	// Editor from offering one: `moduleSpecifierActions` reads the fix back out
-	// of the Help text.
+	// A specifier that already carries another extension gets no edit, since
+	// './clock.js.es' is no file. `moduleSpecifierActions` reads the fix out of
+	// the Help text.
 	it("offers an extension only where appending one could be right", () => {
 		let helpFor = (specifier: string): string =>
 			withProject(
@@ -702,20 +669,16 @@ ${moduleProgram()}`,
 			"Name the file itself, ending in '.es'.",
 		)
 
-		// One edit, one Diagnostic. A package specifier only told to begin
-		// with './' is sent to `./lodash`, which is refused a second time for
-		// the extension — so both halves of the path are named at once and what
-		// follows the edit is `module-not-found`, a different thing to know.
+		// A package specifier is told both halves at once, so one edit leads
+		// to `module-not-found` rather than a second refusal.
 		expect(helpFor("lodash")).toBe(
 			"Write the path from this Module to the file, beginning with './' or '../' and ending in '.es'.",
 		)
 	})
 
-	// "Remove the entry" loops on both of these: they are reported on the
-	// SPECIFIER, and an entry in this language is a NAME — a reader who deletes
-	// one is left with the same group and the same report. The export side wants
-	// the opposite edit besides, because the Module DECLARES those names and
-	// dropping the group would take its whole public surface with it.
+	// These are reported on the specifier, and deleting one name leaves the
+	// same group, so the Help names the group. An export group's Module
+	// declares its names, so the edit there differs.
 	it("asks for the whole group where the group is what is wrong", () => {
 		let helpFor = (source: string): string =>
 			withProject(
@@ -774,9 +737,8 @@ export {
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"invalid-module-specifier",
 			])
-			// The group, for the reason the two above are: deleting the
-			// one name this entry asks for leaves `from "…" { }` behind and
-			// reports the very same thing again.
+			// Deleting the one name would leave `from "…" { }` and the same
+			// report.
 			expect(diagnostics[0].helps[0]).toBe(
 				`Remove the whole 'from "${specifier}" { … }' group — every name it asks for is a builtin.`,
 			)
@@ -787,9 +749,8 @@ export {
 		})
 	})
 
-	// The entry has no Program to point a Diagnostic into, so this is the
-	// one placeless report the stage makes — and the graph is empty rather than
-	// half-built, because there is nothing to be half-built out of.
+	// An unreadable entry has no Program to point into, so the report has no
+	// Position and the graph is empty.
 	it("reports an unreadable entry without a Position", () => {
 		withProject({}, (directory) => {
 			let graph = loadModuleGraph(
@@ -807,9 +768,8 @@ export {
 		})
 	})
 
-	// One Module, reached twice. The graph is keyed by the canonical path,
-	// so a symlinked spelling of a file is the file — not a second Module
-	// declaring second Types of every name in it.
+	// The graph is keyed by the canonical path, so a symlinked spelling of a
+	// file is the same Module.
 	it("binds one Module for a file reached through a symlink", () => {
 		withProject(
 			{
@@ -836,8 +796,7 @@ ${moduleProgram()}`,
 						relativePathsOf(directory, [...graph.modules.keys()]),
 					).toEqual([path.join("real", "Geometry.es"), "Main.es"])
 
-					// Both spellings answer with the one Module, so an
-					// entry finds it under the specifier IT wrote.
+					// Each entry finds the one Module under the specifier it wrote.
 					expect([
 						...moduleAt(directory, graph, "Main.es").resolutions,
 					]).toEqual([
@@ -851,17 +810,16 @@ ${moduleProgram()}`,
 						],
 					])
 				} finally {
-					// The link is unlinked first and on its own, before
-					// anything recursive runs over the directory holding it.
+					// The link is removed on its own, before the recursive removal
+					// of its directory.
 					rmSync(link, { force: true })
 				}
 			},
 		)
 	})
 
-	// The Language Server's half of the host contract: a graph whose files
-	// only ever existed in an Editor. Nothing here touches disk, and the entry
-	// is a document that has never been saved.
+	// A graph whose files exist only in an Editor, as for the Language Server.
+	// Nothing touches disk.
 	it("loads a graph entirely from a host that reads no files", () => {
 		let directory = canonicalPath(
 			path.join(tmpdir(), `essence-unsaved-${process.pid}`),
@@ -889,9 +847,8 @@ ${moduleProgram()}`,
 	})
 })
 
-// The whole stage, entry in and one linked Module per file out — the graph
-// and the linker are never used apart, and a test that ran only half of it would
-// be testing an arrangement no caller makes.
+// The whole stage: entry in, one linked Module per file out. The graph and the
+// linker are never used apart.
 function linkProject(directory: string, entry: string) {
 	return linkModuleGraph(
 		loadModuleGraph(path.join(directory, entry), diskModuleHost),
@@ -914,8 +871,8 @@ function linkedAt(
 	return module
 }
 
-// One Module's Diagnostics once the whole graph has been analysed, which
-// is where the Validator has run over it too.
+// One Module's Diagnostics once the whole graph is analysed, the Validator
+// included.
 function analysedAt(
 	directory: string,
 	entry: string,
@@ -931,9 +888,8 @@ function analysedAt(
 	return diagnostics
 }
 
-// A Protocol's identity carries its Module's path, and neither what a
-// reader is shown nor a name a fix writes may. `data.modulePath` is the
-// canonical path by design.
+// A Protocol's identity carries its Module's path, which neither a message
+// nor a fix may show. `data.modulePath` holds the canonical path on purpose.
 function expectNoPathShown(
 	diagnostics: Array<common.Diagnostic>,
 	directory: string,
@@ -967,9 +923,8 @@ function reportsOf(diagnostics: Array<common.Diagnostic>) {
 }
 
 describe("Module Linking", () => {
-	// One entry carries its name across every table it is bound in, so a
-	// `type Shape` and a Namespace `Shape` travel as one — which is what makes
-	// `Shape.of(…)` and `shape: Shape` both work off a single import.
+	// One entry carries its name across every table, so a `type Shape` and a
+	// Namespace `Shape` travel together off one import.
 	it("reads an export surface off the Module's own declarations", () => {
 		withProject(
 			{
@@ -1104,9 +1059,8 @@ export {
 		)
 	})
 
-	// A facade never binds what it forwards — `Rectangle` is not in scope
-	// inside `Facade.es` at all, and a chain of them still answers with the one
-	// Type the declaring Module made.
+	// A facade does not bind what it forwards, and a chain of them answers with
+	// the declaring Module's own Type.
 	it("forwards a name through a chain of re-exports", () => {
 		withProject(
 			{
@@ -1179,8 +1133,8 @@ export {}
 						).diagnostics,
 					),
 				).toEqual([
-					// `absent` first, although `hidden` was written first
-					// — the entries are read in canonical order.
+					// `absent` first, although `hidden` was written first: the
+					// entries are read in canonical order.
 					[
 						"unknown-export",
 						"./Library.es declares nothing named 'absent'",
@@ -1194,11 +1148,9 @@ export {}
 		)
 	})
 
-	// Three shapes, three answers. A declaration the block publishes under
-	// ANOTHER name is asked for by that name — adding this one would publish one
-	// function twice. A Module publishing nothing has no block to add to. And a
-	// name that is no declaration at all is a near miss against what the Module
-	// really exports, which nothing but the linker holds.
+	// A declaration published under another name is asked for by that name. A
+	// Module publishing nothing has no block to add to. Any other name is a near
+	// miss against the real exports.
 	it("answers a refused entry from the dependency's own surface", () => {
 		let library = (exports: string) =>
 			`implementation {
@@ -1238,10 +1190,8 @@ ${exports}`
 		])
 	})
 
-	// And the Note says the `as` rule out loud where that rule is the
-	// answer — a reader looking at a block that plainly lists the declaration
-	// has no other way of knowing why it is still private here. A block that
-	// simply leaves the name out gets the one Note it always had.
+	// Where the block lists the declaration under another name, the Note
+	// states the `as` rule.
 	it("names the 'as' rule in the not-exported Note", () => {
 		withProject(
 			{
@@ -1317,11 +1267,8 @@ export {
 		)
 	})
 
-	// All three collisions are the one Diagnostic, because they are the one
-	// mistake: the name an entry binds is taken. The entry is what gives way, so
-	// whatever held the name still means what it did — a builtin stays the
-	// builtin, and the local declaration is not reported as a duplicate of the
-	// import that lost.
+	// All three collisions are one mistake, a taken name, so one Diagnostic.
+	// The entry gives way, so whatever held the name keeps its meaning.
 	it("refuses an import that shadows a builtin, a declaration or another import", () => {
 		withProject(
 			{
@@ -1390,19 +1337,16 @@ export {
 				).toEqual([
 					"'String' is already declared here",
 					"'local' is already declared here",
-					// The entry that loses is the one read LATER, which is
-					// the aliased one — `first` itself binds, and `second as
-					// first` is what collides with it.
+					// The entry read later loses: `first` binds, and `second as
+					// first` collides with it.
 					"'first' is already declared here",
 				])
 			},
 		)
 	})
 
-	// The Rewriter emits a Method call as `<Namespace name>.method(…)`, so
-	// an alias has to reach the emitted code: the import binds a shallow copy of
-	// the Namespace Type carrying the local name. The declaring Module's own copy
-	// keeps its own name, which is what its emission needs.
+	// A Method call is emitted under the Namespace's name, so an aliased import
+	// binds a copy of the Namespace Type under the local name.
 	it("binds an aliased Namespace under the name the import gave it", () => {
 		withProject(
 			{
@@ -1475,10 +1419,8 @@ export {
 		)
 	})
 
-	// The single hoisting pass over the whole group, which is the only way
-	// this resolves: `A` needs `halved` typed to type `averaged`, and `B` needs
-	// `Amount` and `doubled` to type `halved`. Neither can go first, so the rounds
-	// bind the entries as the declarations they name come up.
+	// Neither Module can go first, so one hoisting pass over the group binds
+	// the entries as their declarations come up.
 	it("enriches a cycle of hoistable declarations in one pass", () => {
 		withProject(
 			{
@@ -1542,15 +1484,9 @@ export {
 		)
 	})
 
-	// The shape every checked refinement is written in — a `type` and the
-	// `namespace` targeting it, under ONE name — carried across a cycle. The two
-	// halves do not hoist in the same round: the refined Alias hoists as a
-	// skeleton, and the Namespace lands only once the predicate has been filled.
-	// A cycle seeds its imports between rounds, so an entry that bound whatever
-	// was in Scope and called itself done kept the Type and never saw the
-	// Namespace. What pins it is the ANSWER rather than the Type: `marked()` is
-	// declared on `Balanced` alone, so a Module holding only the Type reports
-	// that no Method of that name was found and falls to `Integer`.
+	// A refinement's `type` and `namespace` share one name and hoist in
+	// different rounds, so an imported entry must bind both. `marked()` exists
+	// only on `Balanced`, so the answer shows it.
 	it("binds both halves of a name imported across a cycle", () => {
 		withProject(
 			{
@@ -1750,9 +1686,8 @@ export {
 		)
 	})
 
-	// The one kind a cycle can not carry, because it is the one kind that
-	// does not hoist — and it is genuinely broken at runtime, not merely
-	// unsupported: the emitted binding is read in its temporal dead zone.
+	// A Constant does not hoist, so across a cycle its emitted binding would be
+	// read in its temporal dead zone.
 	it("refuses a Constant imported across a cycle", () => {
 		withProject(
 			{
@@ -1799,9 +1734,7 @@ export {
 					],
 				])
 
-				// The name is bound as an Error, so the body that reads it
-				// is not a second Diagnostic about a name the Program does
-				// declare.
+				// The name is bound as an Error, so reading it reports nothing more.
 				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
 				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
 					[],
@@ -1810,8 +1743,7 @@ export {
 		)
 	})
 
-	// The same Constant, imported from OUTSIDE a cycle, is ordinary — the
-	// rule is about the cycle rather than about Constants.
+	// The same Constant imported from outside a cycle is ordinary.
 	it("allows a Constant imported down a chain", () => {
 		withProject(
 			{
@@ -1886,8 +1818,7 @@ export {
 				expect(a.diagnostics[0]?.severity).toBe("warning")
 				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
 
-				// `B.es` declares and nothing more, so nothing there runs
-				// in an order anyone could notice.
+				// `B.es` only declares, so no order of its own shows.
 				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
 					[],
 				)
@@ -1939,11 +1870,8 @@ export {
 		)
 	})
 
-	// And silent about a Module the Parser did not read whole. Every use
-	// the check counts is read off a tree, and a Statement the recovery dropped
-	// is in neither of them — so the one line reading an import can go missing
-	// and leave the entry looking unread. It only became reachable once the
-	// Enricher started running over a Program the Parser had reported on.
+	// Silent about a Module the Parser did not read whole, since a dropped
+	// Statement may be the one that reads the import.
 	it("says nothing about an import when the Parser dropped a Statement", () => {
 		withProject(
 			{
@@ -1980,11 +1908,8 @@ export {
 		)
 	})
 
-	// And the other side of that stand-down. A Recovery is also written
-	// for a refused Pattern binder, which abandons a NAME while the Matcher
-	// around it parses whole — no text went missing, so every line that reads an
-	// import is still there to be counted. Asking whether the RECORD existed
-	// switched the Warning off for a Module the Parser read from end to end.
+	// A refused Pattern binder abandons only a name, and no line goes missing, so
+	// imports are still counted.
 	it("still counts an import in a Module that only dropped a binder", () => {
 		withProject(
 			{
@@ -2036,10 +1961,8 @@ export {
 		)
 	})
 
-	// The case the check exists for. An imported Namespace used only through
-	// `shape::area()` has no Identifier occurrence anywhere in the file — the only
-	// trace of it is the Namespace name on the resolved Invocation, and reading
-	// Identifiers alone would warn about the import that makes the call resolve.
+	// A Namespace used only through `shape::area()` appears in no Identifier, only
+	// on the resolved Invocation, which counts as a use.
 	it("counts implicit dispatch as a use of an imported Namespace", () => {
 		withProject(
 			{
@@ -2084,9 +2007,8 @@ export {
 		)
 	})
 
-	// A Type used only in an annotation leaves no Identifier in the TYPED
-	// tree — the annotation resolved to a Type object — so the written tree has to
-	// be read as well.
+	// A Type used only in an annotation leaves no Identifier in the typed tree, so
+	// the written tree is read as well.
 	it("counts an annotation as a use of an imported Type", () => {
 		withProject(
 			{
@@ -2123,14 +2045,9 @@ export {
 		)
 	})
 
-	// The shape the Warning used to be WRONG about. `Problem` is written
-	// nowhere in `Main.es` but the import entry: it reaches the file as a Type
-	// ARGUMENT of an imported Function's answer, and the `::is` below derives
-	// its Equatable off the Choice — which `choiceTypeOf` finds by looking the
-	// name up in THIS Module's Scope. Remove the entry the Warning asked to
-	// remove and the file stops compiling, which is the one thing an
-	// `unnecessary` tag and a preferred "remove it" fix may never be attached
-	// to.
+	// `Problem` reaches the file only as a Type Argument, but `::is` derives its
+	// Equatable through this Module's Scope. Removing the import would break the
+	// file, so it counts as a use.
 	it("counts a Type reached only as a Type Argument as a use", () => {
 		withProject(
 			{
@@ -2180,10 +2097,7 @@ export {
 		)
 	})
 
-	// And the other side of it — a Type import nothing in the file reads,
-	// through an annotation or through a resolved Type, is still reported. The
-	// rule above over-collects on purpose, and this is what says it does not
-	// over-collect everything.
+	// A Type import nothing in the file reads is still reported.
 	it("still warns about a Type import nothing reaches", () => {
 		withProject(
 			{
@@ -2231,13 +2145,8 @@ export {
 		)
 	})
 
-	// And the shape it was wrong about in the OTHER direction. A Type
-	// whose values merely flow through the file — `make()` answers a `Standing`
-	// and nothing here ever names one — was counted as a use, because every
-	// resolved Type object anywhere in either tree carries a name and the rule
-	// above read all of them. Nothing derives a conformance off `Standing`, so
-	// removing the entry compiles, and an import a reader can delete is exactly
-	// what this Warning is for.
+	// A Type whose values only flow through the file is no use. Nothing derives a
+	// conformance off `Standing`, so removing the entry compiles.
 	it("warns about a Type import whose values only flow through", () => {
 		withProject(
 			{
@@ -2322,12 +2231,8 @@ export {
 		)
 	})
 
-	// Nothing writes to `counter` above, so rewriting the Declaration is a
-	// real answer and the Help offers it. The moment something does, it stops
-	// being one: `constant-reassignment` answers every assignment and asks for
-	// the `variable` back, which closes a loop between the two codes with the
-	// Quick Fix as its only door. The clause is withheld rather than reworded,
-	// and the fix reads this text back, so withholding it withholds the fix.
+	// Where the Variable is assigned, making it a Constant would only bring
+	// `constant-reassignment`, so the clause and its fix are withheld.
 	it("withholds the Constant Help where the Variable is assigned", () => {
 		let helpsFor = (body: string): Array<string> =>
 			withProject(
@@ -2346,9 +2251,7 @@ export {
 			"Declare it as a Constant, or export a Function that answers with its value.",
 		])
 
-		// Inside a Function body, which is an assignment as much as one at
-		// the top level is — and the shape a Module that publishes a counter
-		// actually has.
+		// An assignment inside a Function body counts too.
 		expect(
 			helpsFor(
 				"\tfunction bump() -> Integer {\n\t\tcounter = counter::add(1)\n\t\t<- counter\n\t}\n",
@@ -2356,9 +2259,8 @@ export {
 		).toEqual(["Export a Function that answers with its value."])
 	})
 
-	// A `from "…" { … }` group is an answer only where there is something
-	// to forward FROM — and then the specifier is in hand, so it is spelled
-	// rather than left as a `…` the reader has to fill from nowhere.
+	// Forwarding is offered only where a dependency has the name, and then the
+	// specifier is spelled out.
 	it("offers forwarding only where a dependency has the name", () => {
 		withProject(
 			{
@@ -2412,10 +2314,8 @@ export {
 		)
 	})
 
-	// The canonical order — by specifier, then by name — rather than the
-	// written one, which is exactly the order `esfmt` writes the block in. The
-	// "searched Namespaces" listing is where that order is observable, and it is
-	// the same order Completion dedupes members in.
+	// The canonical order, by specifier and then by name, is the order the
+	// formatter writes. The searched Namespaces listing shows it.
 	it("seeds imported Namespaces in canonical order, not written order", () => {
 		withProject(
 			{
@@ -2463,21 +2363,9 @@ export {
 					(diagnostic) => diagnostic.code === "unknown-method",
 				)
 
-				// The builtins come first — they are the parent of every
-				// import — and `Alpha` precedes `Zulu` although `Zulu` was
-				// written first. Only the Namespaces an Integer can actually
-				// reach are listed: `Optional` used to appear here as well,
-				// because `Optional<ItemType>` was a Type Alias for
-				// `ItemType | Nothing` and an Integer is a member of
-				// `Integer | Nothing`. Now that `Optional` is a nominal Choice
-				// an Integer is not one, so its Namespace is not searched.
-				//
-				// The receiver is a written `2`, which proves it is
-				// neither zero nor negative — so the refined Namespaces are in
-				// the search too, in the same table order the rest are in.
-				// `Scalar` and `Number` are the two Union Namespaces an Integer
-				// is a member of, and they come after the Integer ones for the
-				// reason `builtinMemberOrder` gives.
+				// The builtins come first, and `Alpha` precedes `Zulu` although `Zulu` was
+				// written first. A written `2` proves itself non-zero and positive, so the
+				// refined Namespaces are searched too.
 				expect(unknownMethod?.notes[0]).toContain(
 					"'Integer', 'NonZeroInteger', 'NonNegativeInteger', 'PositiveInteger', 'Scalar', 'Number', 'Alpha', 'Zulu'",
 				)
@@ -2485,10 +2373,8 @@ export {
 		)
 	})
 
-	// The Diagnostic a forgotten Namespace import produces on its own says
-	// only that no Method of that name exists, which is indistinguishable from a
-	// typo. The graph knows better, and the help is what the auto-import Quick Fix
-	// keys off.
+	// Without the import the report would read like a typo. The Help names the
+	// Module, and the auto-import Quick Fix keys off it.
 	it("names the unimported Namespace and its Module in the no-such-Method help", () => {
 		withProject(
 			{
@@ -2583,8 +2469,7 @@ export {
 		)
 	})
 
-	// A single file compile has no graph at all, and its Diagnostics must be
-	// the ones it always had — no help about a Namespace nobody could import.
+	// A single file compile has no graph, so no Help names a Namespace to import.
 	it("says nothing about unimported Namespaces where there is no graph", () => {
 		withProject(
 			{
@@ -3025,9 +2910,9 @@ implementation {
 		)
 	})
 
-	// `Halved` provides a `z` answering a Number and `Counted` one
-	// answering an Integer, and `Main.es` hands a value bounded by an extension
-	// of one or both on to a bound on `Halved`.
+	// `Halved` provides a `z` answering a Number, and `Counted` one answering an
+	// Integer. `Main.es` hands a value bounded by an extension of either or both
+	// to a bound on `Halved`.
 	const apartProtocols = (
 		extension: string,
 		name: string,
@@ -3504,8 +3389,8 @@ implementation {
 		)
 	})
 
-	// A bound is resolved where it is written, so `Main.es` has to import a
-	// Protocol it names itself, and the Module that declares one is the answer.
+	// A bound is resolved where it is written, so `Main.es` must import the
+	// Protocol it names. The Help names the Module that declares it.
 	it("names the Module that declares a Protocol a bound names unimported", () => {
 		withProject(
 			{
@@ -3734,10 +3619,8 @@ export {
 		)
 	})
 
-	// Per Module, because the dedup key is severity, code, message and
-	// Position with NO file in it — the two files below make the same mistake on
-	// the same line, and one shared collection would report the first and swallow
-	// the second.
+	// Per Module, because the deduplication key holds no file, and these files make
+	// the same mistake on the same line.
 	it("attributes each Module's Diagnostics to that Module", () => {
 		withProject(
 			{
@@ -3769,9 +3652,7 @@ export {
 				let other = linkedAt(directory, linked, "Other.es")
 				let main = linkedAt(directory, linked, "Main.es")
 
-				// The same code, the same message and the same Position in
-				// both files — which is exactly what one shared collection would
-				// deduplicate down to a single report.
+				// The same code, message and Position in both files.
 				for (let module of [other, main]) {
 					let unknownName = module.diagnostics.find(
 						(diagnostic) => diagnostic.code === "unknown-name",
@@ -3795,11 +3676,8 @@ export {
 		)
 	})
 
-	// An entry naming something that IS exported and could not be typed
-	// binds an Error rather than nothing. The Module that declares it has said
-	// what is wrong with it; leaving the name unbound would bury that under one
-	// `unknown-name` per use, in a file whose author can see the import written
-	// at the top.
+	// An entry naming an export that could not be typed binds an Error, so its
+	// uses report nothing more. The declaring Module reports the mistake.
 	it("stays quiet about an import whose declaration the other Module could not type", () => {
 		withProject(
 			{
@@ -3838,8 +3716,8 @@ export {
 		)
 	})
 
-	// A facade that only forwards names did not compile when what it
-	// forwards did not, so the file importing it through the facade is told so.
+	// A facade does not compile when what it forwards does not, so a file
+	// importing through it is told.
 	it("reports a broken Module through a facade that re-exports it", () => {
 		withProject(
 			{
@@ -3976,9 +3854,8 @@ export {
 		)
 	})
 
-	// `Loop.es` is the broken one. Its failure comes back to it round the
-	// cycle through `Circle.es`, which is no second mistake for it to fix, while
-	// the file importing the cycle from above is told.
+	// `Loop.es` is the broken one. Its failure returns to it through `Circle.es`
+	// unreported, while the file importing the cycle is told.
 	it("reports a broken member of a cycle to the cycle's importers alone", () => {
 		withProject(
 			{
@@ -4120,12 +3997,8 @@ export {
 		)
 	})
 
-	// What the Module's canonical path is FOR: a Choice takes its nominal
-	// identity from the Module that declares it, so two files each declaring
-	// `choice Outcome` declare two Types — and linking is where that path is
-	// supplied. Without it the two would be interchangeable at compile time and
-	// carry the same runtime tag, and `is` would confuse them with no Diagnostic
-	// anywhere.
+	// A Choice takes its identity from its Module's canonical path, which linking
+	// supplies. Two files each declaring `choice Outcome` declare two Types.
 	it("identifies a Choice by the Module that declares it", () => {
 		withProject(
 			{
@@ -4167,12 +4040,8 @@ export {
 				).toEqual([])
 				expect(main.diagnostics).toEqual([])
 
-				// Same spelling, same Case, two Types — because the two
-				// declarations are in two Modules. Unqualified they would be
-				// interchangeable here AND carry the same runtime tag. A free
-				// Function's Arguments are the Validator's stage, which is a
-				// stage linking does not run: it links, and the caller decides
-				// what to run over what came back.
+				// Same spelling, same Case, two Types. A free Function's Arguments are
+				// the Validator's to check, which linking does not run.
 				expect(codesOf(validate(main.program))).toEqual([
 					"argument-type-mismatch",
 				])
@@ -4180,10 +4049,8 @@ export {
 		)
 	})
 
-	// The fixtures the rest of the Modules work is verified against, linked
-	// end to end — five files, a cycle among them, every Diagnostic stage run.
-	// They are the one Module Programs in the repository that are meant to be
-	// clean, so this is where "clean" is pinned.
+	// The Module fixtures, with a cycle among them, linked end to end with every
+	// Diagnostic stage run. They are meant to be clean.
 	it("links the Module fixtures without a single Diagnostic", () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
@@ -4223,9 +4090,8 @@ export {
 	})
 })
 
-// Every Module of a linked graph, through the stages the CLI runs after
-// linking. A Module that reported anything fails HERE, naming itself, rather
-// than emitting JavaScript nobody can account for.
+// Every Module of a linked graph through the stages the CLI runs after
+// linking. A Module that reported anything fails here, naming itself.
 function generateModules(linked: LinkedGraph): ModuleSources {
 	return rewriteModules(
 		[...linked.modules.values()].map((module) => {
@@ -4247,13 +4113,9 @@ function generateModules(linked: LinkedGraph): ModuleSources {
 	)
 }
 
-// Bundles the whole graph and imports the result, so its top-level
-// `Terminal` calls run — the same shape `fixtureSweep.spec.ts` uses for a lone
-// Program, and both doors are held for the same reason: `inspect` ends its line
-// through `console.log`, `print` writes its own to the stream, and a harness
-// holding one of the two reads half a Program as silent. The bundle is
-// standalone: the runtime is inlined into it, so it runs from wherever it is
-// written.
+// Bundles the graph and imports the result, capturing both `console.log` and
+// the stream, as `inspect` and `print` use one each. The bundle inlines its
+// runtime.
 async function runBundle(
 	sources: ModuleSources,
 	directory: string,
@@ -4294,27 +4156,23 @@ async function runBundle(
 }
 
 describe("Module Code Generation", () => {
-	// The end of the road for the fixtures: five files, a cycle among
-	// them, an aliased Constant, a re-export and a Namespace reached only
-	// through implicit dispatch — compiled into ONE standalone bundle and run.
-	// The three lines are the ones the fixture annotates itself with.
+	// The fixtures, with a cycle, an aliased Constant, a re-export and a Namespace
+	// reached only through dispatch, compiled into one bundle and run.
 	it("compiles the Module fixtures into one bundle and runs it", async () => {
 		let linked = linkModuleGraph(
 			loadModuleGraph(fixturePath("modules", "Main.es"), diskModuleHost),
 		)
 		let sources = generateModules(linked)
 
-		// A rename travels as an ESM `as`, on either side — the emitted
-		// name is always the one the DECLARATION wrote, so the two Modules
-		// agree without either having to know what the other called it.
+		// A rename travels as an ESM `as`, and the emitted name is always the
+		// declaration's own.
 		expect(sources.sources.get("essence:./math/Math.es")).toContain(
 			"squared as square",
 		)
 		expect(sources.sources.get("essence:./Main.es")).toContain("PI as Pi")
 
-		// A re-export is forwarded straight from the Module it names, not
-		// bound here and exported again: `Rectangle` is never a binding of
-		// `Main.es`.
+		// A re-export is forwarded straight from the Module it names, so
+		// `Rectangle` is never a binding of `Main.es`.
 		expect(sources.sources.get("essence:./Main.es")).toContain(
 			'} from "essence:./Geometry.es"',
 		)
@@ -4328,11 +4186,8 @@ describe("Module Code Generation", () => {
 		})
 	})
 
-	// A Module whose every exported name ERASES still has to run. There
-	// is nothing to import from it — a Type Alias is no binding — so the edge
-	// that orders the two bodies would be gone with it, and the dependency
-	// would run wherever the bundler happened to place it, or not at all. A
-	// bare `import "…"` is what keeps it.
+	// A Module whose exported names all erase still runs, ordered by a bare
+	// `import "…"`.
 	it("runs a Module it imports nothing bindable from", async () => {
 		await withBuiltProject(
 			{
@@ -4380,12 +4235,8 @@ export {
 		)
 	})
 
-	// A Protocol's PROVIDED Method is one const for the whole graph, and
-	// it belongs in the shared prelude Module for the reason a standard library
-	// Method does: a copy per Module would be a bundle carrying as many
-	// `describe` bodies as there are Modules that reach it. Two Modules conform
-	// here and a third calls, so the const is reached from two files and
-	// declared in neither.
+	// A Protocol's provided Method is one const in the shared prelude for the
+	// whole graph, declared in none of the Modules that reach it.
 	it("emits one const for a provided Method the whole graph shares", async () => {
 		await withBuiltProject(
 			{
@@ -4869,11 +4720,8 @@ export {
 		)
 	})
 
-	// A Module body runs ONCE, on first import, however many Modules
-	// reach it — which is what an emitted ESM graph gives for free and a
-	// concatenation of the bodies would not. The diamond is what makes it
-	// observable: `Shared.es` is named by both arms and by the entry, and its
-	// line appears once, ahead of everything that imports it.
+	// A Module body runs once, on first import, however many Modules reach it.
+	// In the diamond `Shared.es` prints once, ahead of its importers.
 	it("runs a Module body once however many Modules import it", async () => {
 		await withBuiltProject(
 			{
@@ -4947,16 +4795,9 @@ export {
 		)
 	})
 
-	// What the Module-qualified nominal identity buys, run rather than
-	// type checked: two Modules each declaring `choice Colour { Red, Green }`
-	// are two Types, so a value of one must not be claimed by a check written
-	// for the other. Unqualified they carried the same runtime tag, and this
-	// Program printed "mine" twice with no Diagnostic anywhere.
-	//
-	// The check is `$type.isValueOfType` against the emitted Case
-	// descriptors, which is the same comparison an `is` makes — and the one
-	// place the tag a value was stamped with and the tag a descriptor names have
-	// to agree, both being rendered against the entry's directory.
+	// Two Modules each declaring `choice Colour` declare two Types, so a value
+	// of one is not claimed by a check written for the other. Value tags and
+	// descriptors both render against the entry's directory.
 	it("keeps two Modules' same-named Choices apart at run time", async () => {
 		await withBuiltProject(
 			{
@@ -5008,8 +4849,7 @@ export {
 				)
 				let sources = generateModules(linked)
 
-				// The two tags differ by the Module they were declared
-				// in, and neither names the machine that compiled.
+				// The tags differ by their declaring Module and name no machine path.
 				expect(sources.sources.get("essence:./Main.es")).toContain(
 					'$type.createCase("./Main.es#Colour#Red")',
 				)
@@ -5025,11 +4865,9 @@ export {
 		)
 	})
 
-	// The reason a Case payload's default travels on the Case Type, and the
-	// reason it is held to a literal: the merge happens where the Case is BUILT,
-	// and that may be a Module that never named the Choice — `Main.es` below
-	// imports one Function and no Type at all. There is no import to hang a value
-	// off, so a default that read a name would read one that is not there.
+	// A payload default merges where the Case is built, which may be a Module
+	// that never named the Choice. So the default travels on the Case Type as a
+	// literal. See "Payload defaults" in packages/compiler/src/simplifier/DEVELOPMENT.md.
 	it("fills a payload default in a Module that never named the Choice", async () => {
 		await withBuiltProject(
 			{
@@ -5071,10 +4909,8 @@ export {
 				)
 				let sources = generateModules(linked)
 
-				// The filled member is emitted INTO the construction, in
-				// the Module that wrote it — the only import is the Function,
-				// and the default's `0` is pooled with `Main.es`'s own
-				// constants, which is what a copy per site buys.
+				// The filled member is emitted into the construction, and its `0` is pooled
+				// with `Main.es`'s own constants.
 				let main = sources.sources.get("essence:./Main.es") as string
 
 				expect(main).toContain(
@@ -5096,11 +4932,8 @@ export {
 		)
 	})
 
-	// What a path key reaches into is a fact about the DEFAULT, so it has
-	// to travel the way every other fact about one does — on the Type. A Module
-	// that merges into a default declared elsewhere is the only place that can
-	// go wrong, and it is the place a Record Parameter's merge happens at the
-	// callee while a Case payload's happens at the construction.
+	// What a path key reaches into is a fact about the default. It travels on
+	// the Type to a Module merging into a default declared elsewhere.
 	it("merges a path key into a default declared in another Module", async () => {
 		await withBuiltProject(
 			{
@@ -5174,11 +5007,8 @@ export {
 		)
 	})
 
-	// A Case payload default may name a Constant of the Module the Choice
-	// is declared in, and what travels is the VALUE — resolved there, baked into
-	// the Case Type as data. This is the test that says so: the Module that
-	// constructs the Case imports the Choice and never the Constant, and gets the
-	// Constant's value all the same.
+	// A payload default may name a Constant of the Choice's own Module, baked into
+	// the Case Type as its value. The constructing Module never imports it.
 	it("bakes a Constant into a payload default read in another Module", async () => {
 		await withBuiltProject(
 			{
@@ -5212,11 +5042,8 @@ export { Fetch }
 				)
 				let sources = generateModules(linked)
 
-				// `Fetch#Get`, with no Module in front of it. The tag
-				// carries the Module that declares the Choice and a structural
-				// rendering no longer prints it — see `caseText` in the
-				// runtime's `registry.ts`. What this test is about is the baked
-				// default, which is the `headers` member.
+				// The structural rendering prints no Module before `Fetch#Get`. The
+				// baked default is the `headers` member.
 				expect(await runBundle(sources, directory)).toEqual([
 					'Fetch#Get { url = "/x", headers = [ "Accept" ] }',
 				])
@@ -5224,10 +5051,8 @@ export { Fetch }
 		)
 	})
 
-	// The other direction, and the reason the rule is written about the
-	// DECLARING Module: a Type crosses an import edge, an Expression does not, so
-	// the Module writing the Choice has the imported Constant's Type in hand and
-	// nothing to bake.
+	// A Type crosses an import edge and an Expression does not, so a default may
+	// not name an imported Constant.
 	it("refuses a payload default that names an imported Constant", () => {
 		withProject(
 			{
@@ -7032,8 +6857,8 @@ export {
 		)
 	})
 
-	// The report spells the bound's Protocol by the alias, so the file's
-	// own `Sized` is no reading of it, while its conformer is still worth naming.
+	// The report spells the bound's Protocol by the alias. The file's own `Sized`
+	// is no reading of it, but its conformer is still named.
 	it("leaves a namesake unsaid where the report spells the bound by an alias", () => {
 		withProject(
 			{
@@ -7915,9 +7740,8 @@ implementation {
 		)
 	})
 
-	// Whether the import needs a name of its own is asked of the name it
-	// binds, `Measurable`, and not of the declared one, which a Type here may
-	// take without colliding with anything.
+	// Whether the import needs a name of its own is asked of the name it binds,
+	// `Measurable`. A Type here may take the declared name without colliding.
 	it("asks for the import of a provided Method's Protocol by the name it is exported under", async () => {
 		let main = (entries: string, declared: string) => `import {
 	from "./Sized.es" {
