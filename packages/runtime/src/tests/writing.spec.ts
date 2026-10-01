@@ -5,31 +5,24 @@ import { createString } from "../String"
 import { write } from "../Terminal"
 import { typeKeySymbol } from "../type"
 
-// `write` is the one primitive under everything a Program puts in front
-// of a person, and the one runtime Function whose behaviour depends on what
-// HOST it runs on: Bun, Node and Deno give it `process.stdout` and
-// `process.stderr`, a browser gives it nothing but a console made of lines.
-// Each of these tests stages one host around a call and reads back what the
-// host received — the real streams are intercepted rather than written, since
-// the text would otherwise land in the test runner's own output.
+// Each test stages one host around a call to `write` and reads back what the
+// host received. The real streams are intercepted so the text stays out of the
+// runner's output. See "Writing to the host" in packages/runtime/DEVELOPMENT.md.
 
 const output: StreamType = { [typeKeySymbol]: "Stream#Output" }
 const error: StreamType = { [typeKeySymbol]: "Stream#Error" }
 
-// Three hosts. `streams` is Bun, Node and Deno: both streams present and
-// writable. `shim` is a bundler's `process` polyfill: a `process` exists, but
-// its `stdout` is an empty object and its `stderr` is null, so neither can be
-// written to. `none` is a browser: no `process` at all, and a bare `process`
-// is a ReferenceError there, which is what `typeof` guards.
+// `streams` is Bun, Node and Deno. `shim` is a bundler's `process` polyfill,
+// whose `stdout` is an empty object and `stderr` null. `none` is a browser,
+// with no `process` at all.
 type Host = "streams" | "shim" | "none"
 
 type Seen = {
-	// Raw text per stream, concatenated: what is asserted is as often
-	// the ABSENCE of a newline as its presence.
+	// Raw text per stream, since a missing newline matters as much as one.
 	stdout: string
 	stderr: string
-	// One entry per console call, so a newline inside an entry and a
-	// newline the console would add between two can not be confused.
+	// One entry per console call, so a newline inside an entry stays apart from
+	// the one the console adds.
 	logged: Array<string>
 	errored: Array<string>
 }
@@ -82,9 +75,8 @@ function observe(host: Host, body: () => void): Seen {
 
 		body()
 	} finally {
-		// Undone in the reverse order, and every branch restores exactly
-		// what it replaced — the runner's own reporting writes to these
-		// streams the moment the test returns.
+		// Each branch restores exactly what it replaced: the runner writes its
+		// report to these streams as soon as the test returns.
 		if (host === "none") {
 			;(globalThis as { process?: unknown }).process = originalProcess
 		} else if (host === "shim") {
@@ -132,9 +124,8 @@ describe("writing to a host with streams", () => {
 })
 
 describe("writing to a host without streams", () => {
-	// `print` hands `write` the value and a newline; the console ends
-	// every line it is handed itself. So the newline `print` appended comes
-	// off, and a printed line is one console line — not a line and a blank.
+	// The console ends every line itself, so the newline `print` appended comes
+	// off.
 	test("a printed line is one console line", () => {
 		let seen = observe("none", () => {
 			write(createString("a line\n"), output)
@@ -147,9 +138,7 @@ describe("writing to a host without streams", () => {
 		expect(seen.stderr).toBe("")
 	})
 
-	// Exactly one newline, never all of them: `print("")` is a blank
-	// line and has to stay one, and a text ending in two is a line and a
-	// blank line after it.
+	// `print("")` is a blank line and must stay one.
 	test("exactly one trailing newline comes off", () => {
 		let seen = observe("none", () => {
 			write(createString("\n"), output)
@@ -159,9 +148,6 @@ describe("writing to a host without streams", () => {
 		expect(seen.logged).toEqual(["", "two\n"])
 	})
 
-	// The console has no way to continue a line, so a text without a
-	// newline becomes a line of its own there — unchanged, rather than
-	// dropped or held back until something ends it.
 	test("text without a newline is a line of its own", () => {
 		let seen = observe("none", () => {
 			write(createString("no newline"), output)
@@ -170,9 +156,8 @@ describe("writing to a host without streams", () => {
 		expect(seen.logged).toEqual(["no newline"])
 	})
 
-	// A `process` whose streams can not be written to is the same as no
-	// `process` — it is the stream's `write` that is looked for, not the
-	// global, since a bundler's shim has the one without the other.
+	// `write` looks for the stream's `write` rather than the `process` global,
+	// since a shim has the one without the other.
 	test("a process shim without writable streams counts as no streams", () => {
 		let seen = observe("shim", () => {
 			write(createString("a line\n"), output)

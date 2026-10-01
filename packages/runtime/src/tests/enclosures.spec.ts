@@ -3,19 +3,15 @@ import { describe, expect, test } from "bun:test"
 import { decimalExponentOnEnclosure, roundedOnDecimalGrid } from "../Algebraic"
 import { createCase } from "../type"
 
-// The refinement both irrationals hand a reader digits through, driven
-// over a SYNTHETIC enclosure rather than over π or √2. What is asserted here is
-// the contract of the refinement itself — when it decides, when it refuses, and
-// how many enclosures it asked for before either — and a synthetic one is the
-// only way to count those and to reach the cutoff without a 32,768-digit
-// enclosure. What the real enclosures answer is `irrationals.spec.ts`.
+// The refinement under both irrationals, driven over synthetic enclosures that
+// count what they are asked for and reach the limit cheaply. `irrationals.spec.ts`
+// covers the real ones. See "Reading digits off an enclosure" in
+// packages/runtime/DEVELOPMENT.md.
 
 const nearest = createCase("Rounding#Nearest") as never
 
-// An enclosure of `numerator / denominator` scaled by 10^digits, one unit
-// of the last place loose on each side, which is the shape both real ones have.
-// The counter is what the refusal tests read: the point of an absolute cutoff is
-// that a width already past it costs no enclosure at all.
+// An enclosure of `numerator / denominator` scaled by 10^digits, one unit of the
+// last place loose on each side. `taken` counts the enclosures asked for.
 function enclosureOf(
 	numerator: bigint,
 	denominator: bigint,
@@ -52,13 +48,8 @@ describe("rounding on a decimal grid", () => {
 		expect(third.taken()).toBe(1)
 	})
 
-	// The limit is on the WIDTH of the enclosure, not on how far past the
-	// requested grid the refinement was pushed — which is what `Number.es`
-	// documents the cutoff as, and what the two sign decisions in
-	// `Transcendental.ts` test the same way. So a caller asking for a grid whose
-	// first guard already lands past it is refused before an enclosure is taken,
-	// and the message it reports says which width it asked for rather than
-	// claiming two values agreed to a depth.
+	// The limit is on the enclosure's width, not on how far the refinement went
+	// past the grid. A grid whose first guard passes it takes no enclosure.
 	test("a width past the limit is refused before any enclosure", () => {
 		let third = enclosureOf(1n, 3n)
 
@@ -66,11 +57,8 @@ describe("rounding on a decimal grid", () => {
 		expect(third.taken()).toBe(0)
 	})
 
-	// A value sitting exactly on a step of the grid is what a refinement
-	// can not decide — a half for the nearest rules — so this is the one shape
-	// that reaches the limit by refining rather than by asking for too much. A
-	// real irrational never takes this path, which is why every caller but the
-	// several-base Transcendental passes no limit at all.
+	// A value on a step of the grid, here a half under a nearest rule, never
+	// decides, so it reaches the limit by refining.
 	test("a value on a step refines until the limit stops it", () => {
 		let half = enclosureOf(1n, 2n)
 
@@ -102,9 +90,6 @@ describe("reading a decimal exponent", () => {
 		)
 	})
 
-	// The sign is read off the far end of the interval, so a negative
-	// value answers the power its distance from zero falls on, exactly as the
-	// positive one does.
 	test("a negative value answers the power its magnitude falls on", () => {
 		expect(decimalExponentOnEnclosure(enclosureOf(-7n, 5n).at, null)).toBe(
 			0n,
@@ -114,10 +99,8 @@ describe("reading a decimal exponent", () => {
 		).toBe(-3n)
 	})
 
-	// A value far below the first enclosure's width encloses zero at
-	// eight digits, and one just under a power of ten straddles the band, so
-	// both ask for more digits before they decide. Neither can loop forever on
-	// a real receiver: an irrational is neither zero nor a power of ten.
+	// A tiny value encloses zero at eight digits. One just under a power of ten
+	// straddles two digit counts. Both ask for more digits.
 	test("a value the first enclosure can not place asks for more digits", () => {
 		let tiny = enclosureOf(3n, 10n ** 20n)
 
@@ -130,9 +113,7 @@ describe("reading a decimal exponent", () => {
 		expect(underOne.taken()).toBe(2)
 	})
 
-	// The same absolute cutoff the grid reading takes, for the same
-	// caller — a Transcendental over several bases sitting exactly on a power
-	// of ten would settle the same open problem.
+	// A power of ten never decides, so only the limit stops it.
 	test("a value on a power of ten is refused at the limit", () => {
 		let ten = enclosureOf(10n, 1n)
 
