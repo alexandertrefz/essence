@@ -221,9 +221,9 @@ export function proseFindings(): Array<Finding> {
 	return findings
 }
 
-// The Types the sources declare, each with whether the Comment run above it
-// holds a `§§` block. The walk passes over `§` notes too, though the Parser
-// attaches only a `§§` block with no note between it and the Declaration.
+// The Types the sources declare, each with whether a `§§` line stands directly
+// above it. The Parser attaches only such a run, so a `§` note or a blank line
+// between the block and the Declaration leaves it undocumented.
 export function declaredTypes(): Array<{
 	file: string
 	line: number
@@ -250,21 +250,8 @@ export function declaredTypes(): Array<{
 				continue
 			}
 
-			let documented = false
-
-			for (let above = index - 1; above >= 0; above--) {
-				let comment = commentPattern.exec(lines[above] ?? "")
-
-				if (comment === null) {
-					break
-				}
-
-				if (comment[1] === "§§") {
-					documented = true
-
-					break
-				}
-			}
+			let documented =
+				commentPattern.exec(lines[index - 1] ?? "")?.[1] === "§§"
 
 			declarations.push({
 				file,
