@@ -751,10 +751,8 @@ describe("A unit Choice", () => {
 // A Union whose bare Cases collide is refused. See "Bare Cases" in
 // DEVELOPMENT.md.
 describe("A position two spellings would collide in", () => {
-	// The way OUT of a refused position, which is the only way it can be
-	// reached at all — the way in refuses the value before any Function is
-	// called, so nothing the Module answers with ever gets there through a
-	// round trip.
+	// The way out of a refused position. The way in refuses before any call,
+	// so a round trip never reaches it.
 	function refusedOut(name: string, value: unknown): EssenceMarshalError {
 		return marshalError(() =>
 			marshaller.toJS(value, "return value", returnType(name)),
@@ -765,10 +763,8 @@ describe("A position two spellings would collide in", () => {
 		return module.bridge.case("./Marshal.es#Direction#Up")
 	}
 
-	// The collision the whole rule exists for, and the same sentence in
-	// both directions — the position has no spelling, which is a fact about the
-	// SHAPE rather than about any value of it, so it holds whichever way one is
-	// crossing.
+	// A bare Case beside a String, refused with one sentence in both
+	// directions.
 	it("refuses a bare Case standing beside a String", () => {
 		expect(
 			marshalError(() => called("directionOrText", "Up")).message,
@@ -780,9 +776,7 @@ describe("A position two spellings would collide in", () => {
 		)
 	})
 
-	// And the same collision without a String in it — one Choice's `#Up`
-	// is spelled exactly like another's, and neither the value nor the position
-	// says which was meant.
+	// Two Choices' `#Up` are spelled alike.
 	it("refuses two unit Choices sharing a Case name", () => {
 		expect(
 			marshalError(() => called("directionOrVertical", "Up")).message,
@@ -794,17 +788,13 @@ describe("A position two spellings would collide in", () => {
 		)
 	})
 
-	// Per Case NAME, not per pair of unit Choices. Two of them in one
-	// position are perfectly spellable while no name is written twice, and
-	// refusing the pair rather than the name would refuse a shape that works.
+	// Unit Choices sharing no Case name are fine.
 	it("takes two unit Choices sharing no Case name", () => {
 		expect(called("directionOrSign", "Up")).toBe("Up")
 		expect(called("directionOrSign", "Minus")).toBe("Minus")
 	})
 
-	// And per unit CASE. A Choice with a payload anywhere in it crosses
-	// as a `$case` object whatever its payload-less Cases are called, and an
-	// object is not a string.
+	// A Choice with a payload crosses as objects, which no string is.
 	it("takes a unit Choice beside one that keeps the object form", () => {
 		expect(called("directionOrShape", "Up")).toBe("Up")
 		expect(called("directionOrShape", { $case: "Shape#Blank" })).toEqual({
@@ -812,18 +802,8 @@ describe("A position two spellings would collide in", () => {
 		})
 	})
 
-	// The two places an `Optional` can stand between a position and a
-	// collision, and neither hides one. It is spelled by ABSENCE, so what it
-	// holds stands in the position beside everything else: `Optional<String> |
-	// Direction` collides through it, and `Optional<Direction | String>`
-	// collides inside it and keeps the sentence rather than being answered with
-	// its own Type. What `Optional` contributes of its own is `undefined`,
-	// which is nobody else's spelling and collides with nothing — which is why
-	// the `Optional<Direction>` above is ordinary.
-	//
-	// A project of its own because `Marshal.es` is a table of the shapes
-	// that CROSS, and these two are here to be refused. One compile answers
-	// both.
+	// An `Optional` beside or around a collision hides nothing, since its item
+	// stands in the position. Its own `undefined` collides with nothing.
 	it("refuses a collision an Optional stands in the way of", async () => {
 		await withProject(
 			{
@@ -869,18 +849,14 @@ export {
 				expect(marshalError(() => wrapped("Up")).message).toBe(
 					`argument 1: 'Direction | String' has no unambiguous JavaScript spelling — a Direction#Up crosses as the string "Up", which a String is too. Wrap one side in a Record or give the Case a payload.`,
 				)
-				// And the absence still crosses, because the position it
-				// crosses into is the one shape in there that has a spelling.
+				// The absence still crosses.
 				expect(wrapped(undefined)).toBeUndefined()
 			},
 		)
 	})
 
-	// At VALUE time and never at bind time. A Module with one unspellable
-	// position in it is still a Module and every other name it exports still
-	// works — the same stance `nestedOptional` is refused under, and the reason
-	// the refusal is COMPILED into a reader rather than thrown while compiling
-	// one.
+	// The refusal comes when a value crosses, not at binding, so every other
+	// export still works.
 	it("still binds the Module and every other name in it", () => {
 		expect(typeof module.exports.directionOrText).toBe("function")
 		expect(typeof module.exports.directionOrVertical).toBe("function")
@@ -890,24 +866,20 @@ export {
 })
 
 describe("Numbers", () => {
-	// What `0.1` HOLDS, not what its decimal spelling suggests. Going by
-	// `toString` would answer `1/10` and claim a precision the double never had.
+	// What `0.1` holds, not `1/10`.
 	it("reads a double's exact dyadic value", () => {
 		expect(EssenceRational.fromNumber(0.1).toString()).toBe(
 			"3602879701896397/36028797018963968",
 		)
 		expect(EssenceRational.fromNumber(0.5).toString()).toBe("1/2")
 		expect(EssenceRational.fromNumber(-0.75).toString()).toBe("-3/4")
-		// A whole value prints its numerator alone, the way
-		// `Rational::toString` answers. The parts are still the pair below.
+		// A whole value prints its numerator alone.
 		expect(EssenceRational.fromNumber(0).toString()).toBe("0")
 		expect(EssenceRational.fromNumber(3).toString()).toBe("3")
 		expect(EssenceRational.fromNumber(3).denominator).toBe(1n)
 	})
 
-	// A subnormal carries no implicit leading bit and shares the smallest
-	// normal's exponent — the one reading the bits has to special-case, and the
-	// one an off-by-one in the scale is invisible anywhere else.
+	// A subnormal has no implicit leading bit, the case the reading special-cases.
 	it("reads a subnormal double exactly", () => {
 		let smallest = EssenceRational.fromNumber(Number.MIN_VALUE)
 
@@ -927,19 +899,14 @@ describe("Numbers", () => {
 		expect(new EssenceRational(1n, 3n).toNumber()).toBe(1 / 3)
 		expect(EssenceRational.fromNumber(0.1).toNumber()).toBe(0.1)
 		expect(new EssenceRational(0n, 5n).toNumber()).toBe(0)
-		// Parts far too large for a double to hold — the magnitude still
-		// comes back rather than a `NaN` out of `Infinity / Infinity`.
+		// Parts too large for a double still give the magnitude, not `NaN`.
 		expect(
 			new EssenceRational(10n ** 400n, 3n * 10n ** 400n).toNumber(),
 		).toBeCloseTo(1 / 3, 15)
 	})
 
-	// Both parts past 2 ** 53 are already rounded by the mere reading, so
-	// dividing the two readings rounds three times and lands an ulp off the
-	// nearest double — these pairs are known to. The last is a part small
-	// enough to read exactly over one so large the answer is subnormal, which
-	// the hardware division answers in its one correctly rounded step and a
-	// 53-bit intermediate would double-round.
+	// Pairs that a division of rounded parts lands an ulp off, and one whose
+	// subnormal answer a 53-bit intermediate would round twice.
 	it("rounds to the nearest double, down to the last ulp", () => {
 		expect(
 			new EssenceRational(
@@ -958,22 +925,19 @@ describe("Numbers", () => {
 		)
 	})
 
-	// The scale back is a power of two far outside a double's own exponent
-	// — `2 ** -1088` for the first of these — and `2 ** -1088` IS `0`. Applied in
-	// one multiplication it answered `0` for a value that is a perfectly ordinary
-	// subnormal: not the magnitude, not a `NaN`, a wrong finite number.
+	// A huge denominator gives a subnormal answer, rounded once to a multiple
+	// of `2 ** -1074`. See "Rounding a Rational to a double" in DEVELOPMENT.md.
 	it("answers a small Rational with a huge denominator exactly", () => {
 		expect(new EssenceRational(1n, 2n ** 1024n).toNumber()).toBe(2 ** -1024)
 		expect(new EssenceRational(-1n, 2n ** 1024n).toNumber()).toBe(
 			-(2 ** -1024),
 		)
-		// The smallest double there is, and the first value below it.
+		// The smallest double, and the first value under it.
 		expect(new EssenceRational(1n, 2n ** 1074n).toNumber()).toBe(
 			Number.MIN_VALUE,
 		)
 		expect(new EssenceRational(1n, 2n ** 1100n).toNumber()).toBe(0)
-		// And the other end, where `Infinity` is the right answer rather
-		// than the one that got away.
+		// At the other end, `Infinity` is the right answer.
 		expect(new EssenceRational(2n ** 2000n, 3n).toNumber()).toBe(Infinity)
 		expect(new EssenceRational(2n ** 1200n, 2n ** 1199n).toNumber()).toBe(2)
 	})
@@ -984,8 +948,7 @@ describe("Numbers", () => {
 		expect(() => EssenceRational.fromNumber(Infinity)).toThrow(RangeError)
 	})
 
-	// A host writes the pair, and asking it for `1n` and `2n` where `1`
-	// and `2` say the same thing buys nothing.
+	// Safe integer parts are taken as numbers.
 	it("takes whole numbers as the parts they are", () => {
 		expect(new EssenceRational(1, 2).toString()).toBe("1/2")
 		expect(new EssenceRational(3).toString()).toBe("3")
@@ -994,36 +957,24 @@ describe("Numbers", () => {
 		).toBe(true)
 	})
 
-	// `reduced` is the RUNTIME's canonicaliser, and the runtime is typed
-	// code that trusts the Enricher. Handed a number where a bigint belongs it
-	// answers nothing a host can use: beside a bigint it throws out of `a % b`,
-	// from a stack that names the runtime rather than the call that was
-	// written, and beside another number it reduces to parts nobody meant. A
-	// host reaches it through this constructor and nowhere else, so this is
-	// where a mistyped part is answered for.
+	// The runtime's `reduced` trusts typed code, so the constructor refuses a
+	// part that is not a whole number.
 	it("refuses a part that is not a whole number", () => {
 		expect(() => new EssenceRational(1.5)).toThrow(TypeError)
 		expect(() => new EssenceRational(1n, 2.5)).toThrow(TypeError)
-		// A double past 2 ** 53 has already lost the value it was written
-		// as, so taking it would hand back a Rational of a number nobody meant.
+		// A double past 2 ** 53 may already have lost its value.
 		expect(() => new EssenceRational(2 ** 53)).toThrow(TypeError)
 	})
 
-	// There is no Rational of `NaN` or of an infinity at all, which is
-	// what `fromNumber` says of them as well — so they are refused on the same
-	// ground and with the same Error it refuses them with, rather than sent to
-	// a door that turns them away too.
+	// `NaN` and the infinities get the `RangeError` `fromNumber` throws.
 	it("refuses a part that is not finite, as 'fromNumber' does", () => {
 		expect(() => new EssenceRational(Number.NaN)).toThrow(RangeError)
 		expect(() => new EssenceRational(Infinity)).toThrow(RangeError)
 		expect(() => new EssenceRational(1n, -Infinity)).toThrow(/finite/)
 	})
 
-	// Two numbers is the one pair that gets PAST the mixing every case
-	// above dies on, since `a % b` of two numbers is a number: `reduced` runs
-	// to the end of its loop on it and answers a Rational whose parts are
-	// `NaN`, and before that loop was written to fall out of such a pair it ran
-	// forever. These throws are the only thing standing in front of it.
+	// Two numbers would pass `reduced` without a throw and leave number parts,
+	// so only the constructor's checks refuse a pair of fractions.
 	it("refuses a pair that is two numbers", () => {
 		expect(() => new EssenceRational(Number.NaN, 2)).toThrow(RangeError)
 		expect(() => new EssenceRational(0.1, 0.3)).toThrow(TypeError)
@@ -1037,8 +988,7 @@ describe("Numbers", () => {
 		expect(() => new EssenceRational(undefined as never)).toThrow(TypeError)
 	})
 
-	// Named in the message, because a host that wrote `0.1` wants the
-	// value the double HOLDS and there is no other door to it.
+	// The message names `fromNumber`, which answers what a double holds.
 	it("names 'fromNumber' where a double was meant", () => {
 		expect(() => new EssenceRational(0.1)).toThrow(
 			/EssenceRational\.fromNumber/,
@@ -1059,12 +1009,8 @@ describe("Numbers", () => {
 })
 
 describe("Strings", () => {
-	// String equality in Essence is normalised, so letting both spellings
-	// of `é` in would put two values into the Module it insists are one.
-	//
-	// Spelled by code point rather than typed, because the DIFFERENCE
-	// between the two spellings is what is under test — an editor, a formatter or
-	// a `git` filter normalising this file would quietly erase it.
+	// Essence compares Strings normalised. The two spellings are written as code
+	// points, so no tool normalising this file erases the difference.
 	it("normalises to NFC on the way in", () => {
 		let composed = "\u00e9"
 		let decomposed = "e\u0301"
@@ -1107,24 +1053,17 @@ describe("The exports of a Module", () => {
 			$case: "Result#Failure",
 			reason: "gone",
 		})
-		// A constant is read through a door of its own — compiled once
-		// against what was DECLARED, with no call around it — so a unit Choice
-		// reaches this side here without a Parameter or a return having named
-		// it. `plus` is the Case standing alone for a Type, which is what an
-		// unannotated one is inferred as, and it crosses by the same rule.
+		// A constant crosses against its declared Type. The unannotated `plus`
+		// has the lone Case for a Type and crosses the same way.
 		expect(module.exports.heading).toBe("Up")
 		expect(module.exports.plus).toBe("Plus")
 	})
 
-	// And every Function beside them, marshalling both ways around the
-	// call — which is what makes `exports` JavaScript all the way down rather
-	// than JavaScript until the first call.
+	// Every Function marshals both ways around its call.
 	it("hands back every Function as a JavaScript one", () => {
 		expect(typeof module.exports.integer).toBe("function")
 		expect(Object.keys(module.exports).sort()).toEqual([
-			// The Choices among them, which the bundle binds no name for
-			// — what is under those is one constructor per Case, spelled on
-			// this side.
+			// The Choices, whose constructors are built on this side.
 			"Direction",
 			"Shape",
 			"Sign",
@@ -1224,12 +1163,8 @@ describe("Values built through the bridge", () => {
 		).toEqual({ name: "a", size: 1n })
 	})
 
-	// The raw door is the only place a host reaches a constructor
-	// directly, so it is the only place a value that is not an Integer at all
-	// can get under an Integer's tag. `createInteger` itself does not ask —
-	// every caller inside the runtime and in emitted code is already holding an
-	// integer, and it is the hottest construction path there is — so the door
-	// asks instead.
+	// `createInteger` trusts its callers, so the bridge's constructor checks
+	// what a host hands it.
 	it("refuses a number that is not an Integer a double holds", () => {
 		let bridge = module.bridge
 
@@ -1260,17 +1195,12 @@ describe("Values built through the bridge", () => {
 		expect(marshaller.toJS(bridge.case("Optional#Empty"))).toBeUndefined()
 	})
 
-	// A Function is the one Essence value carrying no tag, so it is the
-	// one that has to pass through rather than be read apart.
+	// A Function carries no tag, so with nothing declared it passes through.
 	it("passes a Function through untouched", () => {
 		expect(marshaller.toJS(module.raw.integer)).toBe(module.raw.integer)
 	})
 
-	// The interpreter is a door of its own — `prebuilt` hands one over,
-	// and a host reaching it holds Descriptors rather than Types. A host with
-	// none for the value in hand has two ways to say so and means the same thing
-	// by both: `null` out of a variable that holds no Descriptor is not a Type
-	// declaration of `null`.
+	// `undefined` and `null` both mean no Descriptor.
 	it("reads a value against no Descriptor, however that is spelled", () => {
 		let interpreter = createInterpreter(
 			module.bridge,
@@ -1295,9 +1225,7 @@ describe("Errors", () => {
 		expect(error.path).toBe("argument 1")
 	})
 
-	// The path is the point — an Error naming only the Type would say
-	// `expected Integer` about a value four levels down and leave the finding of
-	// it to the reader.
+	// The path says where inside the value it failed.
 	it("spells where inside the value the failure was", () => {
 		let error = marshalError(() =>
 			marshaller.fromJS(
@@ -1367,9 +1295,7 @@ describe("Errors", () => {
 		expect(error.path).toBe("argument 1")
 	})
 
-	// Every arm of a Union refuses the value, so the Union itself is what
-	// went wrong — but only one arm got INSIDE the value before refusing, and
-	// what it found there is the only sentence that says what is actually wrong.
+	// The one arm that got inside the value gives the reason.
 	it("keeps the one arm's reason where a Union has only one", () => {
 		let error = marshalError(() =>
 			marshaller.fromJS(
@@ -1398,8 +1324,7 @@ describe("Errors", () => {
 		)
 	})
 
-	// And where no arm got inside, the Union is the only honest answer —
-	// `Optional<Integer>` handed a Boolean is not a near miss at either of them.
+	// With no arm inside, the Union names itself.
 	it("names the Union where no arm reached inside", () => {
 		let error = marshalError(() =>
 			marshaller.fromJS(true, parameterType("maybe"), "argument 1"),
@@ -1410,8 +1335,7 @@ describe("Errors", () => {
 		)
 	})
 
-	// A number that is not exactly an integer is refused rather than
-	// rounded — a boundary that rounds is a boundary that loses.
+	// Refused rather than rounded.
 	it("refuses a number that is not exactly an Integer", () => {
 		expect(
 			marshalError(() => marshaller.fromJS(1.5, parameterType("integer")))
@@ -1433,8 +1357,7 @@ describe("Errors", () => {
 		)
 	})
 
-	// An Essence value handed back IN is a common enough mistake to be
-	// worth naming as what it is rather than as a list of hidden members.
+	// An Essence value handed in is named as one.
 	it("says so when an Essence value arrives where JavaScript was wanted", () => {
 		let error = marshalError(() =>
 			marshaller.fromJS(
@@ -1448,10 +1371,7 @@ describe("Errors", () => {
 		)
 	})
 
-	// The mirror of every other row of the table: a Function goes IN, and
-	// the values it is then handed come OUT. `integer` is `(Integer) -> Integer`,
-	// so the callback is called with one of the Module's Integers and answers
-	// with a `bigint` the boundary builds one back out of.
+	// A callback for `(Integer) -> Integer` gets a `bigint` and answers one.
 	it("takes a Function where the Type declares one", () => {
 		let signature = module.surface.values.integer as common.Type
 		let callback = marshaller.fromJS(
@@ -1462,9 +1382,7 @@ describe("Errors", () => {
 		expect(marshaller.toJS(callback(module.bridge.integer(41n)))).toBe(42n)
 	})
 
-	// A refusal inside a callback is spelled from where the callback
-	// ARRIVED, because that is the Function a reader has to go and fix — the one
-	// they passed, not one of the Module's.
+	// Spelled from where the callback arrived.
 	it("says where inside a callback a value did not fit", () => {
 		let signature = module.surface.values.integer as common.Type
 		let callback = marshaller.fromJS(
@@ -1487,10 +1405,8 @@ describe("Errors", () => {
 		).toBe("value: expected (_ Integer) -> Integer, got the bigint 12.")
 	})
 
-	// A misspelled payload member has to be as findable as a misspelled
-	// Record member. A Choice always reaches `fromJS` as the Union of its Cases,
-	// so a refusal raised at the value's own path is one the Union throws away —
-	// which left `argument 1: expected Shape` as the whole answer.
+	// A misspelled payload member is named, as a Record's would be. The Case
+	// marks its refusal so the Union keeps it.
 	it("keeps a Case's own reason where its tag matched", () => {
 		let error = marshalError(() =>
 			marshaller.fromJS(
@@ -1505,8 +1421,7 @@ describe("Errors", () => {
 		)
 	})
 
-	// Bounded, because the object being described is one a host got wrong,
-	// and a parsed JSON document with a thousand keys is exactly that.
+	// Only the first few keys are named.
 	it("does not spell out every key of a wide object", () => {
 		let wide: Record<string, unknown> = {}
 
@@ -1523,9 +1438,7 @@ describe("Errors", () => {
 })
 
 describe("The Types a Surface actually carries", () => {
-	// An applied Alias is already substituted by the time it reaches an
-	// Export Surface, which is why `fromJS` meets a Record where the source
-	// wrote `Box` and a Union of two Cases where it wrote `Optional<Integer>`.
+	// The Export Surface holds applied Aliases substituted.
 	it("meets an applied Alias already substituted", () => {
 		expect(parameterType("box").type).toBe("Record")
 		expect(parameterType("maybe").type).toBe("UnionType")
@@ -1543,10 +1456,7 @@ describe("The Types a Surface actually carries", () => {
 		)
 	})
 
-	// A Case tag is qualified by the Module that declared the Choice, and
-	// a bundle spells that Module relative to its entry — so the tag a value
-	// carries is neither the bare `Shape#Circle` a host writes nor the absolute
-	// path the Surface holds.
+	// The tag is qualified by the declaring Module, relative to the entry.
 	it("stamps a Case with the tag the bundle's own values carry", () => {
 		let built = marshaller.fromJS(
 			{ $case: "Shape#Circle", radius: 1n },
@@ -1563,10 +1473,8 @@ describe("The Types a Surface actually carries", () => {
 		).toBe(`${module.entryPath}#Shape`)
 	})
 
-	// The entry is not the only Module that can declare a Choice, and a
-	// Case declared in a DEPENDENCY is spelled relative to the entry's directory
-	// — `./shapes/Shapes.es#Shape#Circle`. Nothing about the entry's own Choices
-	// would have caught a tag built from the wrong base.
+	// A Case from a dependency is spelled relative to the entry's directory, as
+	// `./shapes/Shapes.es#Shape#Circle`.
 	it("stamps a Case declared in a dependency with its relative spelling", async () => {
 		await withProject(
 			{
@@ -1627,10 +1535,8 @@ export {
 	})
 })
 
-// What the boundary can not describe, refused in both directions. The rule
-// this file holds is that a value the mapping has no spelling for is REFUSED
-// rather than answered wrongly — silently turning `#Value(#Empty)` into `#Empty`
-// is the one thing a boundary called lossless may not do.
+// What the boundary can not spell is refused in both directions rather than
+// answered wrongly.
 describe("What the boundary refuses", () => {
 	let refused: EssenceModule
 	let refusedMarshaller: Marshaller
@@ -1649,17 +1555,14 @@ describe("What the boundary refuses", () => {
 		return signature.parameterTypes[0]!.type as common.Type
 	}
 
-	// `Optional<T>` is `T | undefined` here, and `undefined` does not
-	// nest: `#Value(#Empty)` and `#Empty` would both be `undefined`, so a round
-	// trip through a host would turn the first into the second and say nothing.
-	// `Optional.es` states the opposite invariant outright.
+	// `#Value(#Empty)` and `#Empty` would both be `undefined`.
 	it("refuses an Optional inside an Optional coming out", () => {
 		let error = marshalError(() => refused.exports.deep)
 
 		expect(error.message).toContain(
 			"an Optional inside an Optional has no JavaScript spelling",
 		)
-		// One level is still perfectly ordinary.
+		// One level is ordinary.
 		expect(refused.exports.shallow).toBeUndefined()
 	})
 
@@ -1680,10 +1583,8 @@ describe("What the boundary refuses", () => {
 		).toContain("an Optional inside an Optional")
 	})
 
-	// `$` is an ordinary Essence identifier character, so a Choice CAN
-	// declare a payload member named after the tag. Coming out it was already
-	// refused; going in it used to read the tag string as the member's value —
-	// a corrupted value the boundary accepts and can then never describe.
+	// A payload member called `$case` collides with the tag, so it is refused
+	// in both directions.
 	it("refuses a Case whose payload is named after the tag", () => {
 		let error = marshalError(() =>
 			refusedMarshaller.fromJS(
@@ -1710,8 +1611,7 @@ describe("What the boundary refuses", () => {
 		).toContain("declares a member named '$case'")
 	})
 
-	// A Case of the same Choice that declares no such member is untouched
-	// — the refusal is about the Case, not about the Choice.
+	// The Choice's other Cases are untouched.
 	it("still takes a Case of that Choice that does not collide", () => {
 		expect(
 			(refused.exports.nameOf as (value: unknown) => unknown)({
@@ -1720,10 +1620,7 @@ describe("What the boundary refuses", () => {
 		).toBe("plain")
 	})
 
-	// One export the Marshaller has no mapping for used to take the whole
-	// Module with it — `exports`, `raw`, `bridge` and `marshaller` all
-	// unreachable over a constant nobody asked for. Bound on read, the refusal
-	// lands on the export that caused it.
+	// An unmappable constant refuses only itself, when it is read.
 	it("keeps the rest of the Module reachable past an export it can not marshal", () => {
 		expect(marshalError(() => refused.exports.root).message).toBe(
 			"root: Algebraic values can not be marshalled yet.",
@@ -1735,10 +1632,7 @@ describe("What the boundary refuses", () => {
 		expect(typeof refused.raw.root).toBe("object")
 	})
 
-	// What `exports` hands out is what `marshaller.toJS(raw.…)` hands out,
-	// which means a fresh value on every read. One shared Array is one a host can
-	// push onto, and every other holder of the same Module sees the push —
-	// while `Object.freeze(exports)` says, wrongly, that it cannot.
+	// Each read hands out a fresh value, so a push changes no other reader's.
 	it("hands out a constant a reader can not corrupt for the next one", () => {
 		let names = module.exports.names as Array<string>
 
@@ -1750,21 +1644,15 @@ describe("What the boundary refuses", () => {
 	})
 })
 
-// The item Type of a `Leaves.es` Parameter, read off ITS Surface — the
-// same rule the helpers above are written under, for the Module that has each
-// leaf twice.
+// The item Type of a `Leaves.es` Parameter, read off its Surface.
 function leafType(name: string): common.Type {
 	let signature = leaves.surface.values[name] as common.FunctionType
 
 	return signature.parameterTypes[0]!.type as common.Type
 }
 
-// What the boundary did with one value, as something two calls can be
-// compared by: the value it answered with, or the sentence it refused with —
-// minus the path, which is the one thing the two spellings below are SUPPOSED
-// to disagree about. Any other Error is compared whole, because a leaf that
-// stops refusing a value the boundary should have refused reaches the runtime's
-// own constructors instead, and that difference is the one most worth seeing.
+// What the boundary did with one value: its answer, or its refusal without the
+// path, which the two spellings may differ in. Other Errors compare whole.
 type Admission = { got: unknown } | { refused: string }
 
 function admission(work: () => unknown): Admission {
@@ -1800,17 +1688,10 @@ function asItem(name: string, value: unknown): Admission {
 	})
 }
 
-// A hole is not a value, and an Array with one in it is not a List with
-// one in it: every position of a List holds something. `Array.prototype.map`
-// SKIPS a hole, so a walk written with it left the position holding a raw
-// JavaScript `undefined` — a value carrying no Type tag at all, which every
-// Method that reached it would find untyped. The loop reads the position
-// instead, and the item's own shape decides, which is the same rule an absent
-// Record member is read by.
+// A hole is read as `undefined`, and the item's shape decides. See "List
+// loops" in DEVELOPMENT.md.
 describe("An Array with a hole in it", () => {
-	// A HOLE at position 1 rather than a written `undefined`, which is a
-	// different Array — `1 in [1, undefined, 3]` is true and `1 in [1, , 3]` is
-	// not. Spelled once, so the one place this has to be said is this one.
+	// A hole, not a written `undefined`: `1 in [1, , 3]` is false.
 	// oxlint-disable-next-line no-sparse-arrays -- the hole is the subject
 	let holed = (before: unknown, after: unknown) => [before, , after]
 
@@ -1838,8 +1719,7 @@ describe("An Array with a hole in it", () => {
 		).toBe("argument 1 → [1]: expected String, got nothing.")
 	})
 
-	// And crosses it where the items admit absence, because there the
-	// position holding nothing is a position holding `#Empty`.
+	// Where the items admit absence, the hole is `#Empty`.
 	it("carries the hole as nothing where the items admit it", () => {
 		expect(
 			leaves.marshaller.toJS(
@@ -1853,19 +1733,10 @@ describe("An Array with a hole in it", () => {
 	})
 })
 
-// `runIn` spells the Integer, String and Boolean admissions a second time,
-// beside the `buildIn` branches that compile the same leaves alone — one rule in
-// two places, because a loop that calls a converter it was handed can not see
-// what it is calling, and the measurement that bought the duplication is in
-// `BENCH.md`. Two spellings of ONE rule, though: a value met on its own and the
-// same value met inside a List are the same value, so a difference between them
-// is a bug and never a decision. This is what checks that rather than promising
-// it — without it, a change to one spelling applies to values met alone and not
-// to the same values met inside a List, and every leaf test keeps passing.
+// `runIn` repeats the leaf admissions of `buildIn`, and the two must agree.
+// See "List loops" in DEVELOPMENT.md.
 describe("A leaf met alone and met inside a List", () => {
-	// Deliberately adversarial and deliberately not all valid — what the
-	// two spellings have to agree about is the REFUSALS as much as the values,
-	// and a corpus of things that fit would check the easy half.
+	// Not all valid, since the refusals must agree as much as the values.
 	const CORPUS: Array<unknown> = [
 		5,
 		5n,
@@ -1881,8 +1752,7 @@ describe("A leaf met alone and met inside a List", () => {
 		Number.POSITIVE_INFINITY,
 		"",
 		"hi",
-		// The same String decomposed and composed — NFC is part of the
-		// admission, so both spellings have to normalise or neither does.
+		// Decomposed and composed, since NFC is part of the admission.
 		"é",
 		"é",
 		true,
@@ -1909,9 +1779,7 @@ describe("A leaf met alone and met inside a List", () => {
 		})
 	}
 
-	// And a value that came from the MODULE, which is the one kind of
-	// value neither spelling builds: a tagged Integer is a JavaScript object,
-	// and an object is not what any leaf admits.
+	// A tagged Integer is an object, which no leaf admits.
 	it("refuses one of the Module's own values the same way either way", () => {
 		let tagged = leaves.bridge.integer(5n)
 
@@ -1920,11 +1788,8 @@ describe("A leaf met alone and met inside a List", () => {
 	})
 })
 
-// The one position asynchronous work crosses at — a call's ANSWER, as a
-// `Promise` of what the work answers with — and the positions it does not,
-// which are every other one. Both halves are here together because they are one
-// rule: a Future is a DESCRIPTION, and a position that holds one has to be a
-// position that says when it should run.
+// Work crosses only as a call's answer, as a `Promise`, and is refused at
+// every other position.
 describe("Asynchronous work", () => {
 	function call(name: string, ...args: Array<unknown>): unknown {
 		return (async.exports[name] as (...args: Array<unknown>) => unknown)(
@@ -1939,27 +1804,20 @@ describe("Asynchronous work", () => {
 		expect(await answer).toBe(42n)
 	})
 
-	// A run in flight rather than a description of one. `running` starts
-	// the work itself and answers the run, so what crosses is the promise that
-	// run already holds — nothing here starts it again.
+	// `running` answers a Started, whose promise crosses without a new start.
 	it("hands back the promise a run in flight holds", async () => {
 		expect(await call("running", 21n)).toBe(42n)
 	})
 
-	// What a Future answers with is a value like any other, walked by the
-	// item's own reader — the Dictionary door included, which is why the door
-	// question walks through work to what it answers with.
+	// What the work answers is marshalled like any value.
 	it("marshals what the work answers with", async () => {
 		expect(await call("counted", new Map([["a", 1n]]))).toEqual(
 			new Map([["a", 1n]]),
 		)
 	})
 
-	// The IN door, and the whole of why it is a callback rather than a
-	// Promise: a callback declared to answer a Future is called at every START,
-	// so the Module can run it again. `attempted` runs it twice while it fails,
-	// and a Promise handed over instead would have been one answer awaited
-	// twice.
+	// A callback that answers a Future is called at every start, so
+	// `attempted` can run it again after a failure.
 	it("calls a host callback at every start", async () => {
 		let calls = 0
 		let answer = await call("attempted", "key", (key: string) => {
@@ -1978,9 +1836,7 @@ describe("Asynchronous work", () => {
 		})
 	})
 
-	// And the other half of the same claim: building a future runs
-	// nothing, so a callback whose work the Module never starts is never called
-	// at all.
+	// Work never started never calls its callback.
 	it("never calls a callback whose work is not started", () => {
 		let calls = 0
 
@@ -1994,9 +1850,7 @@ describe("Asynchronous work", () => {
 		expect(calls).toBe(0)
 	})
 
-	// The host is called with the Arguments the MODULE handed over, and
-	// what it answers with is marshalled IN against what the Future was declared
-	// to answer with — both directions of an ordinary callback, one start later.
+	// Both directions of a callback, at the start.
 	it("marshals both directions of a callback that answers work", async () => {
 		expect(
 			await call("loaded", "key", (key: string) => Promise.resolve(key)),
@@ -2015,9 +1869,7 @@ describe("Asynchronous work", () => {
 		)
 	})
 
-	// Work at a Parameter, which is the position a host has nothing to
-	// build for: a Promise is an answer that has not arrived, not a description
-	// that can be run.
+	// A Promise can not be a Future Argument.
 	it("refuses work handed in", () => {
 		let refused = marshalError(() => call("ran", Promise.resolve(1n)))
 
@@ -2026,15 +1878,14 @@ describe("Asynchronous work", () => {
 		)
 	})
 
-	// The same refusal one level along — the position is the item of a
-	// List rather than the Argument itself, and the path says which.
+	// Nor a List's item.
 	it("refuses a List of work", () => {
 		expect(
 			marshalError(() => call("together", [Promise.resolve(1n)])).message,
 		).toContain("argument 1 → [0]: a Future<Integer> can not be built")
 	})
 
-	// And inside a Record, where the member is what is named.
+	// Nor a Record member.
 	it("refuses work inside a value", () => {
 		expect(
 			marshalError(() => call("queued", { work: Promise.resolve(1n) }))
@@ -2042,11 +1893,8 @@ describe("Asynchronous work", () => {
 		).toContain("argument 1 → .work: a Future<Integer> can not be built")
 	})
 
-	// The way OUT of the same rule, which can only be met past the one
-	// position that crosses: `nested` answers work that answers work, so the
-	// outer future is a promise and the inner one is a value inside it. The
-	// refusal therefore arrives as a REJECTION — the value did not exist when
-	// the call answered, which is the whole reason the position is a promise.
+	// `nested` answers work that answers work, so the inner one is refused as
+	// a rejection of the outer promise.
 	it("refuses work a promise answers with", async () => {
 		let thrown = await (call("nested", 3n) as Promise<unknown>).then(
 			() => null,
@@ -2059,23 +1907,15 @@ describe("Asynchronous work", () => {
 		)
 	})
 
-	// A constant is not a call, so there is nothing to have asked for the
-	// work — reading the name is refused rather than answered with a run nobody
-	// asked to start. It is refused where it is READ, like every other constant
-	// the boundary has no mapping for, so the rest of the Module is reachable.
+	// A constant holding work is refused when read, since no call asked for it.
 	it("refuses a constant that holds work", () => {
 		expect(marshalError(() => async.exports.work).message).toContain(
 			"work: a Future<Integer> is work rather than a value",
 		)
 	})
 
-	// A run the Module walked away from. `start` in Statement position is
-	// fire-and-forget, so a host callback that throws, rejects or answers the
-	// wrong Type has nobody on this side to hand the failure to — and the
-	// boundary's own refusal of a host mistake may not become a process the host
-	// can not catch. Node raises on an unhandled rejection and ends there; Bun
-	// prints a stack and exits 1. There is no call for the host to wrap, because
-	// the failing promise is one it never receives.
+	// A `start` nobody waits for must not raise an unhandled rejection, which
+	// ends the process under Node and Bun. The host never holds that promise.
 	it("keeps a failing run nobody waits for off the host's hook", async () => {
 		await withProject(
 			{
@@ -2134,9 +1974,7 @@ export {
 		)
 	})
 
-	// A Promise handed where a value was declared, named as what it is.
-	// Every other object with no keys of its own reads as "an empty object",
-	// which says nothing about the one mistake worth naming here.
+	// A Promise is named as one, not as an empty object.
 	it("names a Promise handed where a value was declared", () => {
 		expect(
 			marshalError(() => call("doubled", Promise.resolve(2n))).message,
@@ -2146,16 +1984,8 @@ export {
 	})
 })
 
-// The host's own stop. A binding given an `AbortSignal` makes it the ROOT
-// of every run the boundary starts, rather than a second mechanism beside the
-// one the language has: `::within` and `::race` stop their losers through a
-// child of the context they were written in, and this is the top of that same
-// tree.
-//
-// One controller and one binding PER test, rather than one shared by the
-// four. A stop is pulled once and never put back, so a shared one would make
-// each test depend on the order the others ran in — and a test run on its own
-// would be a test run against a signal nobody had aborted.
+// A host's `AbortSignal` is the root of every run the boundary starts. Each
+// test has its own controller, since an abort can not be undone.
 describe("A host's signal", () => {
 	function bound(signal: AbortSignal): Promise<EssenceModule> {
 		return loadModule(asyncFixture, { cacheDirectory, signal })
@@ -2170,19 +2000,14 @@ describe("A host's signal", () => {
 		)("hi", after)
 	}
 
-	// The control. The same work, under a binding that was given a signal,
-	// answers exactly as it does without one — a stop that is never pulled
-	// changes nothing.
+	// A signal never aborted changes nothing.
 	it("leaves an unstopped run alone", async () => {
 		let module = await bound(new AbortController().signal)
 
 		expect(await greeted(module, 0n)).toBe("hi")
 	})
 
-	// A run stopped while it is going on. The wait is signalled, its timer
-	// is cleared and the promise is left unsettled: a Future can not fail, so a
-	// stopped run answers nothing at all rather than rejecting — which is what
-	// the language means by cancellation everywhere else.
+	// A run stopped mid-wait never settles, since a Future can not fail.
 	it("stops the runs a call started", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
@@ -2195,10 +2020,7 @@ describe("A host's signal", () => {
 		expect(settled()).toBe(false)
 	})
 
-	// And a signal that is aborted ALREADY is a host that wants nothing
-	// started. The call BUILDS a future and runs none of it, so the boundary has
-	// nothing to stop: it simply does not start it, and what the host holds is
-	// the promise a stopped run answers with, which is none at all.
+	// Under an aborted signal nothing starts, and the promise never settles.
 	it("answers nothing under a signal that is already aborted", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
@@ -2212,10 +2034,7 @@ describe("A host's signal", () => {
 		expect(settled()).toBe(false)
 	})
 
-	// The half that is not about a wait. `doubled` completes an
-	// `Async.deferred`, which has nothing to stop partway — so before, it ran
-	// to its end and the host was handed the answer it had said it no longer
-	// wanted. Nothing is started at all now.
+	// `doubled` has nothing to stop partway, so it must not start at all.
 	it("runs nothing at all under a signal that is already aborted", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
@@ -2233,9 +2052,7 @@ describe("A host's signal", () => {
 		expect(settled()).toBe(false)
 	})
 
-	// And a host callback is not called either, for the same reason: a
-	// callback declared to answer a Future is called at every START, and there
-	// is no start here.
+	// Nor is a host callback called, since there is no start.
 	it("calls no host callback under a signal that is already aborted", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
@@ -2262,10 +2079,7 @@ describe("A host's signal", () => {
 		expect(settled()).toBe(false)
 	})
 
-	// A Started is NOT stopped by it. `Started::within` states the same
-	// rule from inside the language: one run belongs to whoever started it and
-	// may be waited for from anywhere, so a stop written by one holder may not
-	// take the answer away from the others.
+	// A Started belongs to whoever started it, so the signal does not stop it.
 	it("leaves a run in flight to whoever started it", async () => {
 		let stopping = new AbortController()
 		let module = await bound(stopping.signal)
