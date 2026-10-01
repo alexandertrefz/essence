@@ -1790,12 +1790,20 @@ describe("construction", () => {
 		).toBe(1)
 	})
 
-	// A duplicate List key is caught too.
+	// A Record holding a Dictionary has no encoding, so only asking each slot
+	// finds the second key.
 	test("createDictionaryFrom catches a duplicate the scan path finds", () => {
+		let tagged = () =>
+			createRecord({
+				id: integer(1),
+				tags: dictionary([text("a"), integer(1)]),
+			})
+
+		expect(encodeKey(tagged(), equality)).toBeNull()
 		expect(
 			createDictionaryFrom([
-				[createList([integer(1), integer(2)]), text("first")],
-				[createList([integer(1), integer(2)]), text("second")],
+				[tagged(), text("first")],
+				[tagged(), text("second")],
 			]),
 		).toBe(1)
 	})
