@@ -10,19 +10,12 @@ import {
 import type { CodeActionEntry } from "./index"
 import { findHandler, findMatch, findMatchHolding } from "./lookups"
 
-// The Diagnostics a Match's SHAPE carries — a Match on values that does
-// not end in a Case for the rest of them, a Case of one that can still decline
-// what it named, and the two Warnings about an empty container crossing over
-// into an earlier Case.
-//
-// Each of them is reported at a span the Handler owns, and none of them at the
-// span the edit goes at: what a fix here writes is an arm the Match does not
-// have, or a Guard on an arm that is not the one the Diagnostic underlines. So
-// each starts from the Node and measures the edit off that.
+// Fixes for a Match's shape. Its values may lack a last Case, a Case naming
+// a value may carry a Guard, or an earlier Case may catch an empty container.
+// Each edit lands away from the Diagnostic's span, so each starts from a Node.
 
-// Which of the two Warnings this is decides which question the Guard
-// asks, and the pair is written once — the Diagnostic's own wording is prose
-// this file reserves the right not to read.
+// The Guard each empty-container Warning asks for, by code rather than from
+// the Diagnostic's wording.
 const emptyGuards: Partial<
 	Record<common.DiagnosticCode, { method: string; container: string }>
 > = {
@@ -33,15 +26,9 @@ const emptyGuards: Partial<
 	"empty-list-overlap": { method: "hasItems", container: "List" },
 }
 
-// One of four `literal-match-shape` sites, told apart by what the
-// Diagnostic was reported AGAINST: this is the only one reported at the Match
-// itself, since it is about the Match having no last Case rather than about a
-// Case being wrong. The other three name a Handler's Matcher, which no Match
-// ever shares a span with.
-//
-// Not preferred: the arm it writes is empty, so a `missing-return` behind it is
-// the reader's to fill in. What the fix buys is a visible hole rather than a
-// Match that answers for nothing.
+// Adds a `case _` to a Match on values that has no last Case. Of the
+// `literal-match-shape` reports, only this one spans the Match itself. Not
+// preferred: the arm is a hole to fill.
 export function catchAllCaseAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -53,9 +40,8 @@ export function catchAllCaseAction(
 		return null
 	}
 
-	// The `match` Keyword rarely opens its line — `<- match n -> …` is
-	// the common shape — so the arm lines up with the line's indentation rather
-	// than with the Keyword's column, exactly as `missing-case` writes its own.
+	// Indented by the `match` line, since `<- match n -> …` rarely starts
+	// with the keyword, as the `missing-case` fix does.
 	let indentation = indentationOf(lines, match.position.start.line)
 
 	return {
@@ -75,15 +61,9 @@ export function catchAllCaseAction(
 	}
 }
 
-// The site that refuses a Guard on a Case naming a value, told apart from
-// the site beside it — which shares its Position — by the primary Label: this
-// one underlines the GUARD, and a Case that names no value underlines its
-// Matcher. Nothing else distinguishes the two, and answering the wrong one
-// would take a Guard off a Case whose problem is something else entirely.
-//
-// Not preferred, and the Help says why: the question the Guard asked still has
-// to be asked, with an `if` inside the Handler, and no edit to this span can
-// write it.
+// Drops a Guard on a Case naming a value. A neighbouring report shares the
+// Position but underlines the Matcher, so the primary Label must be the Guard.
+// Not preferred: the Guard's question still needs an `if` in the body.
 export function dropGuardAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -109,9 +89,8 @@ export function dropGuardAction(
 
 	let range = { start: handler.matcher.position.end, end: guard.position.end }
 
-	// `where` is contextual, so what says the span is a Guard is that the
-	// word opens it — and a Guard written under its Matcher is deleted with the
-	// break that carried it.
+	// `where` is contextual, so the span must open with it. A Guard on the
+	// next line goes with its line break.
 	if (!/^\s*where\b/.test(sliceOf(lines, range))) {
 		return null
 	}
@@ -126,24 +105,12 @@ export function dropGuardAction(
 	}
 }
 
-// The Warning is reported on the LATER Case and the edit goes on the
-// earlier one — the secondary Label is what points at it, saying "this Case
-// runs first". Guarding the earlier Case is what stops it answering for an
-// empty container, which is the first half of what the Help asks for.
+// Guards the earlier Case the secondary Label points at, so it declines an
+// empty container. Not preferred, since it changes what the Program does.
 //
-// The same Warning is reported about a Method Invocation's dispatch branches,
-// where its secondary Label points at the receiver rather than at a Matcher.
-// There is no arm to edit there, and the lookup answering nothing is what says
-// so: a receiver's Expression never shares a span with a Handler's Matcher.
-//
-// Never preferred, because it changes what the Program does.
-//
-// It writes the trailing `case _ {}` as well, and that is not a
-// convenience. A Guard makes the Case it is on decline the empty container, and
-// the Match then answers for nothing at all when one arrives: a WARNING's fix
-// left an ERROR behind — `missing-case`, whose own first Help is to write the
-// Cases this Guard just stopped claiming. Withheld entirely where the arm can
-// not be written, since half of this edit is worse than none of it.
+// It also writes a `case _ {}`, or the guarded Match would answer nothing for
+// an empty container, a `missing-case` Error. Without that arm nothing is
+// offered.
 export function guardEmptyAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -160,19 +127,15 @@ export function guardEmptyAction(
 
 	let match = findMatchHolding(program, earlier)
 
-	// The same Warning is reported about a Method Invocation's dispatch
-	// branches, where the secondary Label points at the receiver. There is no
-	// Match to edit there, and the lookup answering nothing is what says so.
+	// For a Method Invocation's dispatch, the Label points at a receiver,
+	// which no Handler shares, so nothing is offered.
 	if (match === null || findHandler(program, earlier) === null) {
 		return null
 	}
 
-	// EVERY Case that names a container of this kind, not just the one the
-	// Label points at — guarding one and leaving the next reports the same
-	// Warning one Case further down, which is the loop a reader walked a Case at
-	// a time. The Matchers are told apart by what they READ: `List<…>` is a List
-	// Matcher and anything else is left alone, because `@::hasItems()` on a
-	// value that is no List is a Method that does not exist.
+	// Every Case naming a container of this kind, or the next would earn the
+	// same Warning. A Matcher must read `List<…>` or `Dictionary<…>`, since
+	// other values lack the Method.
 	let guarded = match.handlers.filter((handler) => {
 		if (handler.guard !== null) {
 			return false
@@ -186,10 +149,8 @@ export function guardEmptyAction(
 			return false
 		}
 
-		// A Guard is written between the Matcher and the body, so what has
-		// to stand at the insertion point is the body's brace — read back off
-		// the buffer, as every edit here is. A Handler laid out over two lines
-		// is the one shape this turns away rather than guessing at.
+		// The body's brace must follow the Matcher on its line, where the
+		// Guard goes.
 		return /^[ \t]*\{/.test(
 			lineAt(lines, handler.matcher.position.end.line).slice(
 				handler.matcher.position.end.column - 1,
@@ -201,13 +162,8 @@ export function guardEmptyAction(
 		return null
 	}
 
-	// A Match that already ends in a wildcard has somewhere for the empty
-	// container to land, and a second `case _` under it would be an unreachable
-	// Case — a Warning traded for a Warning. The rest need one written, and
-	// without it a WARNING's fix leaves an ERROR: the Guards make the Match
-	// answer for nothing at all when an empty container arrives, which is
-	// `missing-case`, whose own first Help is to write back the Cases these
-	// Guards just stopped claiming.
+	// A Match ending in an unguarded wildcard already catches the empty
+	// container; a second `case _` would be unreachable.
 	let last = match.handlers[match.handlers.length - 1]
 	let closes =
 		last !== undefined &&
@@ -223,8 +179,7 @@ export function guardEmptyAction(
 				indentation,
 			)
 
-	// Half this edit is worse than none of it, so a Match whose closing
-	// brace could not be found is left alone entirely.
+	// Without the arm, the Guards alone would leave an Error.
 	if (!closes && arm === null) {
 		return null
 	}
@@ -237,9 +192,7 @@ export function guardEmptyAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: false,
-		// The arm goes first and the Guards follow in source order, so
-		// every Position is still measured against the text it was computed
-		// from.
+		// Every range refers to the text before any edit.
 		edits: [
 			...(arm === null ? [] : [arm]),
 			...guarded.map((handler) => ({

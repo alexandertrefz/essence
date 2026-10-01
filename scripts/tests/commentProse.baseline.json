@@ -114,7 +114,6 @@
 	"packages/language-server/src/codeActions/inlineConstant.ts": {"sentence-length": 18, "em-dash": 14, "all-caps": 11, "position": 3, "block-length": 2},
 	"packages/language-server/src/codeActions/literalFixes.ts": {"sentence-length": 24, "em-dash": 16, "all-caps": 14, "block-length": 5},
 	"packages/language-server/src/codeActions/lookups.ts": {"sentence-length": 44, "em-dash": 29, "all-caps": 27, "position": 1, "block-length": 9},
-	"packages/language-server/src/codeActions/matchFixes.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 8, "block-length": 4},
 	"packages/language-server/src/codeActions/matchOnValue.ts": {"sentence-length": 17, "em-dash": 15, "all-caps": 6, "block-length": 2},
 	"packages/language-server/src/codeActions/moveModule.ts": {"sentence-length": 38, "em-dash": 28, "all-caps": 18, "block-length": 4},
 	"packages/language-server/src/codeActions/tableTest.ts": {"sentence-length": 21, "em-dash": 21, "all-caps": 16, "block-length": 1},
