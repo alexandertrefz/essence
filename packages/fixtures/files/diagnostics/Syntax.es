@@ -16,7 +16,7 @@ implementation {
 	§ redundant-pattern-binder — inside an arm '@' is the scrutinee narrowed to
 	§ what the Matcher established, which is what this would name a second
 	§ time. Reported and then dropped, so the arm still parses.
-	constant point: { x: Integer } | { key: String } = { x = 1 }
+	constant point: { x: Integer, y: Integer } | { key: String } = { x = 1, y = 2 }
 
 	constant read = match point -> Integer {
 		case { x, y } as whole { <- x }

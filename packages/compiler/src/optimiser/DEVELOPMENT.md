@@ -443,7 +443,9 @@ since `.value` does not decide it, and a Match over a Boolean is refused by the 
 the Handler, since `elide-final-match-test` reads it and a build without this pass emits from it.
 
 A Case Matcher's payload Pattern requires Types of members, and `memberTypes` holds them by member path. Each
-becomes a test of the member read, decided by the same rules against the Type the value declares at that path.
+becomes a test of the member read, decided by the same rules against the Type the value declares at that path. A
+member the Case does not declare may be absent, so its test is always the runtime's check, which answers false for
+the `undefined` the read gives.
 Member literals and Guards are ANDed onto the Matcher's test, so they stay as they are. An assertion such as
 `require #Value(first) = x` is a Handler too, and is compiled the same way.
 

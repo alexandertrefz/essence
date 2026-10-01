@@ -343,12 +343,25 @@ The payload's requirements stand beside the Matcher rather than inside it (`reso
 Matcher says which arm this is, and the validator reads it for coverage and reachability. Narrowing it would call
 the Case partly handled and the Handler dead. A requirement the declared Type already guarantees is dropped. So
 `case #Rectangle({ width, height })` stays unconditional, and only a Pattern asking more than the Case promises
-makes its arm decline values. A payload member no arm carries is reported here (`unknown-member`), because the
-validator reads only the tag and the arm would silently never run.
+makes its arm decline values.
 
 Bindings are read at what the arm proved, not at what the Case declared, so `case #Some({ value: Integer })` binds
 an Integer as the equivalent Record Matcher does. The shorthand reading's one step was never written, so it stands
 at the binder's position.
+
+A Matcher over a Union discriminates by members only some arms carry. A member no arm declares is read by how it
+is written (`resolvePatternMatcherType`). Records are open, so a value may carry members its Type leaves out. A
+member written with its Type or its value is a structural test the value may pass, and its binding has the written
+Type. A bare member no arm declares is a misspelling, as it is in every other Pattern position. It is
+`unknown-member` at the member, with the closest member as a Help. It stands as the Error Type in the Matcher's
+Record, so the validator gives the Match no verdict, and its binding holds the Error Type (`typeAtPath`), so nothing
+the body does with it is reported again.
+
+The typed spelling is offered as a second Help only where the member is read against a Record or a Case, since
+nothing else could pass the test. Under a Case payload's Record reading that holds, and a payload may carry members
+its Case leaves out too. `resolvePayloadRequirements` always keeps the requirement for such a member, since nothing
+guarantees a payload has it. Under the one-member shorthand the member is read against that member's value, which
+may be no Record at all.
 
 ## Undecided slots
 

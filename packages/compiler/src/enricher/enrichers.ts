@@ -99,6 +99,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { reportUnknownPatternMember } from "./patternMembers"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -14666,21 +14667,18 @@ function joinCaseInstantiations(
 
 // The Type a value has for one member, asked silently, since a Pattern on a
 // Union names members only some arms carry. No arm carrying it answers
-// `Unknown`; the validator reports the unreachable arm.
+// `Unknown`, which `resolvePatternMatcherType` reports as `unknown-member`.
 function memberTypeOf(type: common.Type, name: string): common.Type {
 	let found: Array<common.Type> = []
 
 	for (let arm of unionArmsOf(type)) {
 		// `Object.hasOwn`, so a member named like a prototype property is not
 		// read off the prototype.
-		let member =
+		if (
 			(arm.type === "Record" || arm.type === "Case") &&
 			Object.hasOwn(arm.members, name)
-				? arm.members[name]
-				: undefined
-
-		if (member !== undefined) {
-			found.push(member)
+		) {
+			found.push(arm.members[name]!)
 		}
 	}
 
@@ -14688,9 +14686,12 @@ function memberTypeOf(type: common.Type, name: string): common.Type {
 }
 
 // The Type at the end of a Pattern binding's path, such as
-// `["state", "total"]`, walked from the value the Pattern took apart.
+// `["state", "total"]`, walked from the value the Pattern took apart. A bare
+// member no arm carries is reported at the member, so it binds the Error Type.
 function typeAtPath(type: common.Type, path: Array<string>): common.Type {
-	return path.reduce(memberTypeOf, type)
+	let reached = path.reduce(memberTypeOf, type)
+
+	return reached.type === "Unknown" ? { type: "Error" } : reached
 }
 
 // What a value proves by passing a Pattern: each arm that could pass, with the
@@ -14732,22 +14733,33 @@ function provenPatternType(
 // What a Pattern in Matcher position establishes: every member contributes a
 // Type, so `@.name` works in the Handler. `literals` collects the
 // value-constrained members keyed by their dotted path, which the rewriter
-// walks to build its test.
+// walks to build its test. A member no arm declares is refused only when bare.
+// See "Matcher Patterns" in DEVELOPMENT.md.
 function resolvePatternMatcherType(
 	pattern: parser.PatternNode,
 	valueType: common.Type,
 	scope: enricher.Scope,
 	literals: Record<string, common.typed.ExpressionNode>,
 	path: Array<string> = [],
-	// Set only where a member the value lacks is a mistake. A Matcher over a
-	// Union discriminates by members, but a Case payload's arm would silently
-	// never run.
-	reportUnknownIn: parser.PatternNode | null = null,
 ): common.Type {
 	let members: Record<string, common.Type> = {}
 
 	for (let [name, member] of Object.entries(pattern.members)) {
 		let memberPath = [...path, name]
+		let carried = memberTypeOf(valueType, name)
+		// Only a bare member, since one written with its Type or its value is a
+		// structural test. Reported before a nested Pattern is walked, which
+		// would otherwise report its own members against `Unknown`.
+		let unknown =
+			member.kind !== "Value" &&
+			member.type === null &&
+			carried.type === "Unknown" &&
+			valueType.type !== "Unknown" &&
+			!typeContainsError(valueType)
+
+		if (unknown) {
+			reportUnknownPatternMember(member.name, valueType)
+		}
 
 		if (member.kind === "Value") {
 			let enrichedValue = enrichExpression(member.value, scope)
@@ -14765,21 +14777,9 @@ function resolvePatternMatcherType(
 						resolveType(member.type, scope),
 						member.type.position,
 					)
-
-		let memberType = declaredType ?? memberTypeOf(valueType, name)
-
-		// Checked before a nested Pattern is walked, which would otherwise
-		// report its own members against `Unknown`.
-		if (
-			reportUnknownIn !== null &&
-			declaredType === null &&
-			memberType.type === "Unknown" &&
-			!typeContainsError(valueType)
-		) {
-			reportUnknownPayloadMember(member.name, valueType)
-
-			memberType = { type: "Error" }
-		}
+		let memberType: common.Type = unknown
+			? { type: "Error" }
+			: (declaredType ?? carried)
 
 		if (member.binder?.nodeType === "Pattern") {
 			// A written annotation is what the arm narrows to. The nested
@@ -14791,7 +14791,6 @@ function resolvePatternMatcherType(
 				scope,
 				literals,
 				memberPath,
-				reportUnknownIn === null ? null : member.binder,
 			)
 
 			members[name] = provenPatternType(memberType, nested)
@@ -15018,42 +15017,6 @@ function resolveMatcherBindings(
 	]
 }
 
-// A payload Pattern naming a member no arm of the payload carries, reported as
-// `reportUnknownMember` reports it for a Lookup.
-function reportUnknownPayloadMember(
-	name: parser.IdentifierNode,
-	valueType: common.Type,
-): void {
-	let memberNames = [
-		...new Set(
-			unionArmsOf(valueType).flatMap((arm) =>
-				arm.type === "Record" || arm.type === "Case"
-					? Object.keys(arm.members)
-					: [],
-			),
-		),
-	]
-	let suggestion = closestMatch(name.content, memberNames)
-
-	reportError(
-		`'${describeType(valueType)}' has no member '${name.content}'`,
-		name.position,
-		{
-			code: "unknown-member",
-			labels: [primary(name.position, "no such member")],
-			notes:
-				memberNames.length === 0
-					? [`'${describeType(valueType)}' has no members.`]
-					: [
-							`'${describeType(valueType)}' has ${memberNames
-								.map((member) => `'${member}'`)
-								.join(", ")}.`,
-						],
-			helps: suggestion === null ? [] : [`Did you mean '${suggestion}'?`],
-		},
-	)
-}
-
 // What a Case Matcher's payload Pattern requires, keyed by dotted path, beside
 // the Matcher rather than inside it. See "Matcher Patterns" in DEVELOPMENT.md.
 type PayloadRequirements = {
@@ -15084,9 +15047,6 @@ function resolvePayloadRequirements(
 		scope,
 		literals,
 		subject.path,
-		// A payload member no arm carries is reported here, since the validator
-		// reads only the tag and the arm would never run.
-		node.binding,
 	)
 
 	if (required.type !== "Record") {
@@ -15102,8 +15062,15 @@ function resolvePayloadRequirements(
 	// Type already guarantees is dropped, so naming declared members stays
 	// unconditional.
 	let requirements: Record<string, common.Type> = {}
+	// A member the Case does not declare is always required, since nothing
+	// guarantees a payload carries it.
 	let require = (path: string, requiredType: common.Type) => {
-		if (!matchesType(requiredType, typeAtPath(caseType, path.split(".")))) {
+		let declared = path.split(".").reduce(memberTypeOf, caseType)
+
+		if (
+			declared.type === "Unknown" ||
+			!matchesType(requiredType, declared)
+		) {
 			requirements[path] = requiredType
 		}
 	}

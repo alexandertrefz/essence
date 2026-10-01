@@ -1038,8 +1038,9 @@ describe("Validator", () => {
 		// The Enricher refuses an Alias hiding a refinement as a Matcher before
 		// this analysis sees it. `enricher.spec.ts` pins that refusal.
 
-		it("should warn about a Pattern naming a member only Object.prototype has", () => {
-			let diagnostics = diagnosticsFor(`implementation {
+		it("should refuse a Pattern naming a member only Object.prototype has", () => {
+			let { diagnostics } = enrich(
+				parse(`implementation {
 				type A = { x: Integer }
 				type B = { y: Integer }
 
@@ -1049,12 +1050,15 @@ describe("Validator", () => {
 					case { hasOwnProperty } { <- "?" }
 					case _ { <- "ok" }
 				})
-			}`)
+			}`),
+			)
 
-			expect(diagnostics).toHaveLength(1)
-			expect(diagnostics[0].severity).toBe("warning")
-			expect(diagnostics[0].code).toBe("unreachable-case")
-			expect(diagnostics[0].position?.start.line).toBe(8)
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([["unknown-member", 8]])
 		})
 
 		it("should not warn about callback Cases told apart by another member", () => {

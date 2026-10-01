@@ -2337,6 +2337,54 @@ function isLessSpecific(left: common.Type, right: common.Type): boolean {
 	return false
 }
 
+// The Matcher without the members no candidate of its shape declares, at any
+// depth. Records are open, so a value may still carry such a member, and the
+// arm's reach is judged on the rest. See "Runtime overlap" in
+// packages/compiler/src/validator/DEVELOPMENT.md.
+export function withoutUndeclaredMembers(
+	matcher: common.Type,
+	candidates: Array<common.Type>,
+): common.Type {
+	if (matcher.type !== "Record" && matcher.type !== "Case") {
+		return matcher
+	}
+
+	let shaped = candidates
+		.flatMap((candidate) =>
+			candidate.type === "UnionType"
+				? flattenUnionMembers(candidate)
+				: [candidate],
+		)
+		.filter(
+			(candidate): candidate is common.RecordType | common.CaseType =>
+				matcher.type === "Record"
+					? candidate.type === "Record"
+					: candidate.type === "Case" &&
+						candidate.choice === matcher.choice &&
+						candidate.name === matcher.name,
+		)
+
+	if (shaped.length === 0) {
+		return matcher
+	}
+
+	let members: Record<string, common.Type> = {}
+
+	for (let [name, memberMatcher] of Object.entries(matcher.members)) {
+		let declared = shaped.flatMap((candidate) =>
+			Object.hasOwn(candidate.members, name)
+				? [candidate.members[name]!]
+				: [],
+		)
+
+		if (declared.length > 0) {
+			members[name] = withoutUndeclaredMembers(memberMatcher, declared)
+		}
+	}
+
+	return { ...matcher, members }
+}
+
 // Builds a Union from a list of members. Members that subsume one another
 // collapse, so `Integer` beside `Number` is `Number`. Anonymous nested Unions are
 // flattened in, and named ones stay whole.

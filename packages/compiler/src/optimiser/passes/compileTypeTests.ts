@@ -138,8 +138,10 @@ function compileMemberTests(
 			unionMembersOf(declared),
 		)
 
+		// A member the Case does not declare may be absent, which only the
+		// runtime's check reads safely.
 		tests[path] =
-			residual.kind === "tag"
+			residual.kind === "tag" && declared.type !== "Unknown"
 				? tagTestOf(read, residual.tag)
 				: typeTestOf(read, required)
 	}

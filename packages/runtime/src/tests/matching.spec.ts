@@ -67,6 +67,18 @@ describe("matching against inherited members", () => {
 			}),
 		).toBe(false)
 	})
+
+	// A payload Pattern's test for a member its Case leaves out reads the
+	// member off the value, and an absent one reads `undefined`.
+	test("an absent member is no value of any Type", () => {
+		let value = asValue(createCase("Shape#Rect"))
+
+		expect(
+			isValueOfType(asValue(Reflect.get(value, "tag")), {
+				type: "String",
+			}),
+		).toBe(false)
+	})
 })
 
 // The boxes are built by hand, so the check is held to the box shape rather than

@@ -140,7 +140,7 @@ Name `y` in the pattern, `case { x = 0, y }`, and read it as `y`.
 
 `@` already names the whole value, so an arm's own pattern takes no `as whole`. `case { x, y } as click` is [`redundant-pattern-binder`](/docs/reference/diagnostics#redundant-pattern-binder), and its Help says to write `@` where `click` was meant.
 
-A pattern that names a member none of the union's types has can never match. Over a `Click | KeyPress`, the arm `case { kye }` is the Warning [`unreachable-case`](/docs/reference/diagnostics#unreachable-case), labelled `{ kye: Unknown } is not a member of the matched Union`.
+A pattern may name a member only some of the union's types have, which is how an arm tells them apart. A member none of them declares is read by how it is written. A record may carry members its type leaves out, so a member written with its type, as in `case { label: String }`, is a test the value may pass, and `label` is a `String` in the arm. A bare member none of them declares is taken for a misspelling. Over a `Click | KeyPress`, the arm `case { kye }` is [`unknown-member`](/docs/reference/diagnostics#unknown-member) at `kye`, with the Help `Did you mean 'key'?`, and a second Help that offers writing its type.
 
 ## In a case payload
 
@@ -184,6 +184,8 @@ implementation {
 A case matcher's binder, the part in parentheses after the case name, may be a pattern. `#Rectangle({ width, height })` takes the payload apart and binds its members. A payload pattern is partial and may check values, as in any other matcher: `#Rectangle({ width = 0 })` matches only a rectangle whose `width` is `0`, and binds nothing.
 
 `{ width, height } as box` binds the parts and the whole. For a payload record, the whole is the case value: `box` is a `Shape#Rectangle`, the type `@` has in that arm. It passes where a `Shape` is wanted, as in `area(of box)`. A function that takes `{ width: Integer, height: Integer }` refuses it with [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch), labelled `this is a Shape#Rectangle`. To pass such a function a record, build one from the bindings: `{ width, height }`.
+
+A payload is a record too, so it may carry a member its case leaves out. `#Rectangle({ tag: String })` tests for one and binds `tag` as a `String`, while a bare `#Rectangle({ tag })` is [`unknown-member`](/docs/reference/diagnostics#unknown-member). On a case with one member, the pattern is read against that member's value instead, as the next example shows.
 
 On a case with one member, the binder may be a single name, because the case's constructor takes that member's value:
 

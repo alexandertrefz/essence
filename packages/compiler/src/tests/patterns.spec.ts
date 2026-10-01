@@ -196,6 +196,201 @@ describe("Patterns", () => {
 				}`),
 			).toEqual([`"shadowed 0"`, `"0, not 99"`])
 		})
+
+		// The member is reported where it is written, so its binding raises
+		// nothing further, whatever the body asks of it.
+		it("reports a member no arm carries once, at the member", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${input}
+
+				function twice(_ n: Integer) -> Integer {
+					<- n::multiply(with 2)
+				}
+
+				Terminal.inspect(match input -> String {
+					case { zq as column } {
+						Terminal.print(column)
+						Terminal.print(column::toString())
+						constant n: Integer = column
+						Terminal.print(twice(column))
+						if column {
+							Terminal.print("yes")
+						}
+						<- "{column}"
+					}
+					case _ { <- "other" }
+				})
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.position?.start,
+				]),
+			).toEqual([
+				[
+					"unknown-member",
+					"'Click | KeyPress' has no member 'zq'",
+					{ line: 12, column: 13 },
+				],
+			])
+		})
+
+		it("offers the member a misspelled one meant", () => {
+			expect(
+				helpsOf(`implementation {
+					${input}
+
+					Terminal.inspect(match input -> String {
+						case { kye } { <- kye }
+						case _       { <- "other" }
+					})
+				}`),
+			).toEqual([
+				"Did you mean 'key'?",
+				"Or write its Type, as in 'kye: …', to test for a member the Type leaves out.",
+			])
+		})
+
+		// A Record may carry members its Type leaves out, so a member written with
+		// its Type is a test the value may pass. It compiles, binds the written
+		// Type, and is no unreachable arm.
+		it("tests for a typed member no candidate declares", async () => {
+			let source = `implementation {
+				type Point = { x: Integer, y: Integer }
+
+				function named(_ value: Record | Integer) -> String {
+					<- match value -> String {
+						case { name: String } { <- "named {name::uppercase()}" }
+						case _                { <- "other" }
+					}
+				}
+
+				function labelled(_ value: Point | Integer) -> String {
+					<- match value -> String {
+						case { label: String } { <- "labelled {label}" }
+						case _                 { <- "other" }
+					}
+				}
+
+				Terminal.inspect(named({ name = "ada" }))
+				Terminal.inspect(labelled({ x = 1, y = 2, label = "p" }))
+				Terminal.inspect(labelled({ x = 1, y = 2 }))
+			}`
+
+			expect(codesOf(source)).toEqual([])
+			expect(await run(source)).toEqual([
+				`"named ADA"`,
+				`"labelled p"`,
+				`"other"`,
+			])
+		})
+
+		it("tests for a typed nested member no candidate declares", async () => {
+			let source = `implementation {
+				type Wrapped = { payload: { x: Integer } }
+				type Other = { tag: String }
+
+				function read(_ value: Wrapped | Other) -> String {
+					<- match value -> String {
+						case { payload as { note: String } } { <- note }
+						case _                               { <- "other" }
+					}
+				}
+
+				Terminal.inspect(read({ payload = { x = 1, note = "kept" } }))
+				Terminal.inspect(read({ tag = "t" }))
+			}`
+
+			expect(codesOf(source)).toEqual([])
+			expect(await run(source)).toEqual([`"kept"`, `"other"`])
+		})
+
+		// A member no candidate declares may pass, so each arm is judged on the
+		// rest. Here the rest contradicts `Point`, or an earlier arm takes it.
+		it("keeps an arm unreachable that its declared members rule out", () => {
+			let point = `type Point = { x: Integer, y: Integer }`
+
+			expect(
+				codesOf(`implementation {
+					${point}
+
+					function contradicting(_ value: Point | Integer) -> String {
+						<- match value -> String {
+							case { x: String, label: String } { <- "string x" }
+							case _                            { <- "other" }
+						}
+					}
+
+					function nested(_ value: { pos: Point } | Integer) -> String {
+						<- match value -> String {
+							case { pos as { x: String, z: Integer } } { <- "nested" }
+							case _                                    { <- "other" }
+						}
+					}
+
+					function taken(_ value: Point | Integer) -> String {
+						<- match value -> String {
+							case { x: Integer }                { <- "point" }
+							case { x: Integer, label: String } { <- "labelled" }
+							case _                             { <- "other" }
+						}
+					}
+				}`),
+			).toEqual([
+				"unreachable-case",
+				"unreachable-case",
+				"unreachable-case",
+			])
+		})
+
+		// The control: a typed member over a Union with no Record in it is a test
+		// no value passes.
+		it("keeps a typed member over a Union with no Record unreachable", () => {
+			expect(
+				codesOf(`implementation {
+					constant value: Integer | String = 5
+
+					Terminal.inspect(match value -> String {
+						case { name: String } { <- name }
+						case _                { <- "other" }
+					})
+				}`),
+			).toEqual(["unreachable-case"])
+		})
+
+		it("reports a nested member no arm carries once, at the member", () => {
+			expect(
+				codesOf(`implementation {
+					type Wrapped = { payload: { x: Integer } }
+					type Other = { tag: String }
+
+					constant value: Wrapped | Other = { tag = "t" }
+
+					Terminal.inspect(match value -> String {
+						case { payload as { zq } } { <- "{zq}" }
+						case _                     { <- "other" }
+					})
+				}`),
+			).toEqual(["unknown-member"])
+		})
+
+		// The control: `key` is a member an arm carries, and the earlier arm has
+		// taken every value the later one could.
+		it("keeps an arm the earlier arms leave nothing to a Warning", () => {
+			expect(
+				codesOf(`implementation {
+					${input}
+
+					Terminal.inspect(match input -> String {
+						case { key } { <- key }
+						case { key } { <- "again" }
+						case _       { <- "other" }
+					})
+				}`),
+			).toEqual(["unreachable-case"])
+		})
 	})
 
 	describe("in a Case payload", () => {
@@ -711,6 +906,52 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("unknown-member")
+		})
+
+		// A payload is a Record, so it may carry a member its Case leaves out, and
+		// a member written with its Type tests for one.
+		it("test for a typed member the payload's Case leaves out", async () => {
+			let source = `implementation {
+				choice Progress {
+					Going { state: Integer, total: Integer },
+					Stopped,
+				}
+
+				function described(_ progress: Progress) -> String {
+					<- match progress -> String {
+						case #Going({ label: String }) { <- "labelled {label}" }
+						case _                         { <- "other" }
+					}
+				}
+
+				constant carried = { state = 1, total = 2, label = "x" }
+
+				Terminal.inspect(described(#Going(carried)))
+				Terminal.inspect(described(#Going({ state = 1, total = 2 })))
+			}`
+
+			expect(codesOf(source)).toEqual([])
+			expect(await run(source)).toEqual([`"labelled x"`, `"other"`])
+		})
+
+		// On a one-member Case the Pattern is read against that member's value,
+		// an Integer here, which no typed member could pass.
+		it("offer no typed spelling where the member is read against a value with no Record", () => {
+			expect(
+				helpsOf(`implementation {
+					choice Shape {
+						Rect { width: Integer },
+						Empty,
+					}
+
+					constant shape: Shape = #Rect({ width = 2 })
+
+					Terminal.inspect(match shape -> String {
+						case #Rect({ tag }) { <- "tagged" }
+						case _              { <- "other" }
+					})
+				}`),
+			).toEqual([])
 		})
 
 		// The nested Pattern reads members of a value the payload has not got,

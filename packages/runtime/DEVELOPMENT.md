@@ -156,6 +156,8 @@ so it looks at what a value holds.
   Function-typed members therefore ask the same question.
 - A Type Parameter and the wildcard's `Unknown` match anything. Matchers are tried in order, so the concrete ones
   come first.
+- An absent member, `undefined`, matches nothing. A payload Pattern's test for a member its Case leaves out reads
+  one where the payload does not carry it.
 - Any other descriptor is a Compiler bug, and the test throws rather than take a wrong branch.
 
 A Match that no Handler accepts ends in `noCaseMatched`. The Validator refuses a Match that does not cover its Union,

@@ -46,6 +46,7 @@ import {
 	mergedRecordType,
 	missingRecordMembers,
 	type MatchableArgument,
+	withoutUndeclaredMembers,
 	typeContainsError,
 	typeContainsUnknown,
 } from "../helpers/types"
@@ -1331,6 +1332,9 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		) {
 			let handler = node.handlers[handlerIndex]
 			let runtimeMatcher = runtimeMatchers[handlerIndex]
+			// A member no candidate declares may still be carried, since Records
+			// are open, so the arm's reach is judged without it.
+			let reach = withoutUndeclaredMembers(runtimeMatcher, memberTypes)
 			// The members some value of which passes this Handler's test.
 			// Overlap, since a narrowing test still runs for what passes it.
 			let matchedMemberIndices: Array<number> = []
@@ -1340,9 +1344,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				memberIndex < memberTypes.length;
 				memberIndex++
 			) {
-				if (
-					overlapsAtRuntime(runtimeMatcher, memberTypes[memberIndex])
-				) {
+				if (overlapsAtRuntime(reach, memberTypes[memberIndex])) {
 					matchedMemberIndices.push(memberIndex)
 				}
 			}

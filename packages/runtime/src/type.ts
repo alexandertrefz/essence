@@ -308,6 +308,12 @@ export function liveEntriesOf(
 }
 
 export function isValueOfType(value: AnyType, type: common.Type): boolean {
+	// A payload member its Case does not declare may be absent, and a test for
+	// it reads `undefined`, which is no value of any Type.
+	if (value === undefined) {
+		return false
+	}
+
 	if (type.type === "Randomness") {
 		return value[typeKeySymbol] === "Randomness"
 	} else if (type.type === "Boolean") {

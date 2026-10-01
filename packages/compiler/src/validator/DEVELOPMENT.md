@@ -131,7 +131,10 @@ cause and a fix.
 A Handler is dead in two ways:
 
 - It overlaps no member of the Union. `unreachable-case` is a Warning tagged `unnecessary`, so editors grey it out,
-  and removing it is always safe.
+  and removing it is always safe. A bare member no candidate declares is reported by the enricher
+  (`unknown-member`), and the hole it leaves stands this verdict down. A typed one may be carried, since Records are
+  open, so the Handler's reach is judged without it (`withoutUndeclaredMembers`). A contradiction in the members it
+  shares with a candidate still makes it dead.
 - Every member it could match was claimed by an earlier Handler. The first Handler that fits runs, so this one never
   does, whatever its own Guard says.
 

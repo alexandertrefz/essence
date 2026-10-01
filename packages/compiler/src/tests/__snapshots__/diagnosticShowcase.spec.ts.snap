@@ -3098,20 +3098,6 @@ Error: Expected '=' but found '42'.
     │                      ╰── expected '='
 ────╯
 
-[unreachable-case]
-Warning: This Case can never match
-    ╭─┤ Syntax.es:22:8 │
-    │
- 21 │     constant read = match point -> Integer {
-    │                           ──┬──  
-    │                             ╰──── this is a { x: Integer } | { key: String }
- 22 │        case { x, y } as whole { <- x }
-    │             ────┬───  
-    │                 ╰───── { x: Integer, y: Unknown } is not a member of the matched Union
-    │ 
-    │ Help: Remove this Case, or name a member of { x: Integer } | { key: String }.
-────╯
-
 [redundant-pattern-binder]
 Error: A Matcher's Pattern can not name the whole value
     ╭─┤ Syntax.es:22:17 │
@@ -3218,7 +3204,7 @@ Error: This block is never closed
     │ Help: Add the missing '}'.
 ────╯
 
-─── 9 errors, 1 warning
+─── 9 errors
 "
 `;
 

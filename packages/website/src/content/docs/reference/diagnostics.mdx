@@ -1545,6 +1545,8 @@ Error: { x: Integer, y: Integer } has no member 'z'
 
 Use one of the listed members.
 
+A bare member in a [pattern](/docs/language/patterns) that no arm of the value declares lands here too, at the member, in a `case` as in a declaration or a parameter. Over `Click | KeyPress`, `case { kye }` is refused with `Did you mean 'key'?`, and a second Help offers writing its type where a record could carry the member. A `case` naming a member only some arms carry is fine: that is how a match tells the arms apart. So is a member written with its type, as in `case { label: String }`: a record may carry members its type leaves out, so that is a test the value may pass.
+
 Quick Fix: **Change to 'x'** when a member name is close.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
