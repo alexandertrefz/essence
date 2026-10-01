@@ -11,29 +11,20 @@ import { loadModuleGraph } from "../modules/graph"
 import { diskModuleHost } from "../modules/host"
 import { linkModuleGraph } from "../modules/link"
 
-// The files in `packages/fixtures/files/diagnostics/` are deliberately
-// broken — they are the one place where the Compiler's error output can be
-// read end to end. Snapshotting it here is what keeps it that way: a
-// Diagnostic that loses its labels, its notes or its code shows up as a
-// snapshot diff rather than as output nobody looked at.
+// The files in `packages/fixtures/files/diagnostics/` are deliberately broken,
+// so the Compiler's error output can be read end to end. A Diagnostic that
+// loses its labels, notes or code shows up as a snapshot diff.
 
 const SHOWCASE_DIRECTORY = fixturePath("diagnostics")
 
-// The SHARED analysis, which is what `esc` and the Editor run — a
-// showcase of the Compiler's output that ran a pipeline of its own would
-// showcase a report nobody is ever handed.
-//
-// Analysed WITH the tests, which is what `essence test` asks for and no
-// other command does — a showcase of what a tests section may not say needs the
-// one compile mode that reads one. Every file that writes no `tests { … }`
-// block is unaffected: the flag decides whether a section is enriched, and
-// there is nothing to enrich.
+// The shared analysis the command line and the Editor run, with the tests as
+// `essence test` asks for. A file without a `tests { … }` block is unaffected.
 function analyse(source: string): Array<common.Diagnostic> {
 	return analyseSource(source, undefined, { tests: true }).diagnostics
 }
 
-// A file may showcase SEVERAL stages at once, because every one of them
-// runs whatever the one before it found — which is what `Staged.es` is for.
+// A file may showcase several stages at once, because each stage runs
+// whatever the one before it found. `Staged.es` does.
 let showcaseFiles = readdirSync(SHOWCASE_DIRECTORY)
 	.filter((fileName) => fileName.endsWith(".es"))
 	.sort()
@@ -52,13 +43,9 @@ describe("Diagnostic Showcase", () => {
 			let diagnostics = analyse(source)
 
 			it("should stay broken", () => {
-				// The file exists to produce Diagnostics. A clean run
-				// means the showcase quietly stopped showcasing anything.
-				// Diagnostics rather than errors, because a showcase may be
-				// Warnings throughout — `Documentation.es` is, since a `§§`
-				// block that describes the wrong thing still compiles. The
-				// snapshot below pins each severity, so a file that decays
-				// from an error to a Warning is still a diff.
+				// Diagnostics rather than errors, because a showcase such as
+				// `Documentation.es` may be Warnings throughout. The snapshot
+				// pins each severity.
 				expect(diagnostics.length).toBeGreaterThan(0)
 			})
 
@@ -81,29 +68,22 @@ describe("Diagnostic Showcase", () => {
 	}
 })
 
-// The Module showcases sit in a subdirectory of their own, because a
-// Module Diagnostic takes more than one file to provoke: a name is only
-// `not-exported` relative to the Module that kept it private. They are reached
-// through the graph and the linker rather than through `enrich`, which is the
-// only way an entry resolves to anything at all, and every Module the entry
-// reaches is rendered against its own source — the report a reader gets.
+// A Module Diagnostic takes more than one file to provoke, so these showcases
+// go through the graph and the linker. Each Module is rendered against its own
+// source.
 const MODULE_SHOWCASES: Array<{ entry: string; reports: Array<string> }> = [
 	{
 		entry: "Main.es",
 		reports: ["Shapes.es", "Main.es"],
 	},
-	// The two of them are one group, and a group has no order inside it —
-	// the entry is not last here, because nothing in a cycle is behind the rest
-	// of it.
+	// A cycle is one group with no order inside it, so the entry is not last.
 	{
 		entry: "Ping.es",
 		reports: ["Ping.es", "Pong.es"],
 	},
-	// The three refusals an import BLOCK earns on its own — a Module
-	// asking itself for a name, a name the other Module does not declare, and a
-	// name asked for twice. All three are reported where the entry is written
-	// rather than where the name lives, which is how one file showcases them
-	// all.
+	// The import block alone earns three refusals: a name asked of its own
+	// Module, an undeclared name, and a name asked for twice. All are reported
+	// in the importing file.
 	{
 		entry: "Mirror.es",
 		reports: ["Shapes.es", "Mirror.es"],
@@ -146,10 +126,8 @@ describe("Module Diagnostic Showcase", () => {
 				}
 			})
 
-			// No absolute path may appear in a report — a canonical path
-			// names a place on the machine that compiled, so a Diagnostic
-			// carrying one would read differently for every reader, and this
-			// snapshot could not be committed at all.
+			// No absolute path may appear in a report: it would differ on every
+			// machine that compiled it.
 			it("should render the same report every time", () => {
 				for (let module of modules) {
 					let fileName = path.basename(module.module.filePath)

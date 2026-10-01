@@ -7,12 +7,9 @@ import { parse } from "../parser/index"
 import { printType } from "../printType"
 import { validate } from "../validator/index"
 
-// Two Records that disagree are not two Types to print — they are one
-// member, and the whole of this file is about which member the report names and
-// what it calls the Record it was measured against. End to end, because both
-// halves are decided in two stages: the Enricher stamps the Alias name onto the
-// Type and the Validator writes most of the reports, and a spec that stubbed
-// either would be testing itself.
+// A Record mismatch reports one member and names the Record it was measured
+// against. The Enricher stamps the Alias name and the Validator writes most
+// reports, so these specs run both.
 function errorsFor(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -33,10 +30,8 @@ function labelsOf(diagnostic: common.Diagnostic): Array<string> {
 	return diagnostic.labels.map((label) => label.message)
 }
 
-// The text a Label actually stands over, cut out of the source the report
-// was made from — an assertion on the span itself only says the numbers agree
-// with each other, and what is being claimed here is that the arrow lands on the
-// member and not on the two hundred characters around it.
+// The text a Label stands over, cut out of the source. An assertion on it
+// shows the arrow lands on the member rather than the text around it.
 function spansOf(source: string, diagnostic: common.Diagnostic): Array<string> {
 	let lines = source.split("\n")
 
@@ -58,10 +53,8 @@ const standing = `	type Team = { name: String, code: String }
 	type Standing = { team: Team, played: Integer, points: Integer }`
 
 describe("a Record that does not fit another", () => {
-	// `points` is deliberately NOT written here, only near-missed. A near
-	// miss is offered against the members the value has left alone — the block
-	// below says why — so a shape writing both would be testing the withheld
-	// Help rather than the offered one.
+	// `points` is near-missed but not written. A near miss is offered only
+	// against members the value leaves out, so writing both would withhold it.
 	describe("the finding this was written for", () => {
 		let source = implementation(`${standing}
 	function blank(of team: Team) -> Standing {
@@ -111,10 +104,8 @@ describe("a Record that does not fit another", () => {
 		})
 	})
 
-	// A near miss is a member the reader MEANT to write, and one they have
-	// written already is not that. The Quick Fix reads this Help's `data`, so
-	// offering `points` where `points` is standing on the line above wrote the
-	// member twice: the mismatch stayed and a `duplicate-member` joined it.
+	// A member the value already writes is no near miss. The Quick Fix reads
+	// the Help's `data`, so offering it would write the member twice.
 	describe("a near miss the value already writes", () => {
 		let source = implementation(`${standing}
 	constant twice: Standing = { team = { name = "a", code = "b" }, points = 0, point = 1 }`)
@@ -138,9 +129,8 @@ describe("a Record that does not fit another", () => {
 	constant blank: Standing = { team = { name = "a", code = "b" } }`)
 		let error = onlyError(source)
 
-		// Nothing inside the Literal is wrong, so there is nothing inside
-		// it to point at — and the Literal printed back at the reader is what
-		// this whole report exists to stop.
+		// Nothing inside the Literal is wrong, so the Label names the missing
+		// members instead of printing the Literal back.
 		it("labels the Literal with the members it does not write", () => {
 			expect(labelsOf(error)).toEqual(["'played', 'points' are missing"])
 		})
@@ -164,9 +154,8 @@ describe("a Record that does not fit another", () => {
 	constant blank: Standing = { team = { name = "a", code = 1 }, played = 0, points = 0 }`)
 		let error = onlyError(source)
 
-		// The path is spelled from the outside in and the Type is the one
-		// that DECLARES the member — `Team` rather than `Standing`, which is the
-		// Declaration a reader would open to check.
+		// The Type named is the one that declares the member, `Team` rather
+		// than `Standing`.
 		it("names the member at the depth it is wrong at", () => {
 			expect(labelsOf(error)).toEqual([
 				"this is an Integer, and Team declares a String",
@@ -188,9 +177,8 @@ describe("a Record that does not fit another", () => {
 	})
 
 	describe("a Record a default fills in", () => {
-		// A member the default writes is not one the Argument is missing,
-		// which is the rule `missingRecordMembers` answers for the report beside
-		// this one and is asked again here.
+		// A member the default writes is not missing from the Argument, the
+		// rule `missingRecordMembers` answers.
 		it("counts a defaulted member as written", () => {
 			let error = onlyError(
 				implementation(`	type Options = { host: String, retries: Integer }
@@ -208,8 +196,8 @@ describe("a Record that does not fit another", () => {
 			expect(error.notes).toEqual(["Parameter 'using' is Options."])
 		})
 
-		// An update and a payload default are PARTIALS — leaving members
-		// out is what they are for — so only what they write can be wrong.
+		// An update and a payload default are partials, so only what they
+		// write can be wrong.
 		it("calls nothing missing from an update", () => {
 			let error = onlyError(
 				implementation(`	type Options = { host: String, retries: Integer }
@@ -265,10 +253,8 @@ describe("a Record that does not fit another", () => {
 	})
 
 	describe("what it says nothing about", () => {
-		// An empty List Literal leaves a blank, and a blank fits the List
-		// it is written into — the sentences about one are
-		// `undecidedSlotEvidence`'s, and a member holding one is not a member
-		// that differs.
+		// An empty List Literal leaves an undecided slot, which fits the List
+		// it is written into. `undecidedSlotEvidence` reports on such slots.
 		it("leaves an undecided slot out of the diff", () => {
 			let error = onlyError(
 				implementation(`	type Row = { form: List<String>, points: Integer }
@@ -281,10 +267,8 @@ describe("a Record that does not fit another", () => {
 			expect(error.notes).toEqual(["'row' is declared as Row."])
 		})
 
-		// Record assignability is width subtyping, so a member the Type
-		// does not declare refuses nothing OUTSIDE a partial position. Pinned
-		// because the diff would otherwise be reporting a refusal there is none
-		// of.
+		// Record assignability is width subtyping, so a member the Type does
+		// not declare refuses nothing outside a partial position.
 		it("reports nothing for an extra member where one is allowed", () => {
 			expect(
 				errorsFor(
@@ -318,9 +302,8 @@ describe("a Record under the name its Alias gave it", () => {
 		expect(error.notes).toEqual(["'broken' is declared as Pair<Integer>."])
 	})
 
-	// The name is DISPLAY. Two Aliases of one shape are one Type, and a
-	// value of either fits the other — which is what keeps this a change to what
-	// a reader is shown and to nothing else.
+	// The name is for display. Two Aliases of one shape are one Type, and a
+	// value of either fits the other.
 	it("changes nothing about what fits what", () => {
 		expect(
 			errorsFor(
@@ -353,8 +336,8 @@ describe("a Record under the name its Alias gave it", () => {
 		])
 	})
 
-	// A Record the PROGRAM builds carries no name, which is what keeps the
-	// spelling from going stale rather than anybody remembering to clear it.
+	// A Record the Program builds carries no name, so the name can not go
+	// stale.
 	it("gives a written Literal no name of its own", () => {
 		let { program } = enrich(
 			parse(
@@ -367,9 +350,8 @@ describe("a Record under the name its Alias gave it", () => {
 			(node) => node.nodeType === "ConstantDeclarationStatement",
 		)
 
-		// The LITERAL's own Type is anonymous on both lines — a written
-		// Record is a Record the Program built — and only the Declaration that
-		// annotated one carries the Alias.
+		// The Literal's own Type is anonymous on both lines. Only the
+		// annotated Declaration carries the Alias.
 		expect(declarations.map((node) => printType(node.value.type))).toEqual([
 			"{ x: Integer }",
 			"{ x: Integer }",
@@ -383,10 +365,8 @@ describe("a Record under the name its Alias gave it", () => {
 		).toEqual([null, "Point"])
 	})
 
-	// A Pattern proves a shape with the members it required written over
-	// the ones the Alias declares, and a shape with a member the Alias never
-	// mentions is not that Alias. Read off a refusal INSIDE the Handler, which
-	// is the only place the narrowed Type is named.
+	// A Pattern narrows to a shape whose members it rewrote, which is not the
+	// Alias. A refusal inside the Handler is where the narrowed Type is named.
 	it("drops the name where a Pattern narrows one", () => {
 		let error = onlyError(
 			implementation(`	type Point = { x: Integer }

@@ -11,10 +11,8 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The ordering vocabulary is Essence — `Comparable` provides the four
-// inequalities over `compare`, and `Ordering::then` composes two answers — so
-// what each of them says is only visible when a Program RUNS. Every claim here
-// compiles AND executes rather than only type-checking.
+// The ordering vocabulary is written in Essence, so what it answers shows
+// only when a Program runs. Every claim here compiles and executes.
 function generate(source: string): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -52,10 +50,8 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// The four moved from `Orderable` to `Comparable`, so the Types that
-// carry the smaller promise answer them now. A String and a List each write
-// none of the four: every answer here is the Protocol's body over that Type's
-// own `compare`.
+// `Comparable` provides the inequalities over `compare`. A String and a List
+// write none of them, so every answer here is the Protocol's body.
 describe("Comparable's provided inequalities", () => {
 	it("orders two Strings", async () => {
 		expect(
@@ -74,10 +70,9 @@ describe("Comparable's provided inequalities", () => {
 		).toEqual(["true", "false", "true", "true", "true", "false"])
 	})
 
-	// `List::compare` is lexicographic and the shorter List comes first
-	// on an equal prefix, so the four read that way too — through the
-	// conditional conformance, whose item witness the provided body never
-	// names itself.
+	// `List::compare` is lexicographic, with the shorter List first on an
+	// equal prefix. The inequalities reach it through the conditional
+	// conformance.
 	it("orders two Lists lexicographically", async () => {
 		expect(
 			await run(
@@ -94,9 +89,8 @@ describe("Comparable's provided inequalities", () => {
 		).toEqual(["true", "true", "true", "true", "true"])
 	})
 
-	// A String is `Comparable` and nothing more, so the two Methods a
-	// number line makes meaningful are still out of reach — which is the whole
-	// of what the split keeps apart.
+	// A String is `Comparable` but not `Orderable`, so the Methods a number
+	// line makes meaningful are out of reach.
 	it("leaves isBetween and clamp on Orderable", () => {
 		let parsed = parseWithDiagnostics(
 			[
@@ -113,8 +107,7 @@ describe("Comparable's provided inequalities", () => {
 		).toEqual(["unknown-method"])
 	})
 
-	// The Namespace spelling a written Method has, on a Method no
-	// Namespace writes.
+	// A provided Method answers the Namespace spelling too.
 	it("answers the Namespace spelling", async () => {
 		expect(
 			await run(
@@ -128,9 +121,8 @@ describe("Comparable's provided inequalities", () => {
 		).toEqual(["true", "true"])
 	})
 
-	// A bounded call reaches the same bodies through the witness it was
-	// handed, which is what the four being in the SMALLER Protocol buys: a
-	// Function bounded `is Comparable` can ask them now.
+	// A Function bounded `is Comparable` reaches the same bodies through the
+	// witness it is handed.
 	it("answers a call bounded by Comparable", async () => {
 		expect(
 			await run(
@@ -152,9 +144,9 @@ describe("Comparable's provided inequalities", () => {
 	})
 })
 
-// The only spelling a two-key sort has. `Ordering::then` answers the
-// first ordering wherever it decides anything, and the second where the first
-// is `#Equal` — with a `computedBy` twin whose Function runs only there.
+// `Ordering::then` answers the first ordering where it decides, and the second
+// where the first is `#Equal`. Its `computedBy` twin runs its Function only
+// there.
 describe("Ordering::then", () => {
 	it("answers the first ordering where it decides", async () => {
 		expect(
@@ -193,9 +185,8 @@ describe("Ordering::then", () => {
 		).toEqual(["Ordering#Less", "Ordering#Greater"])
 	})
 
-	// What the `computedBy` entry is FOR, and the one claim about it a
-	// value can not carry: the Function is written to PRINT, so a run that
-	// never reaches it leaves nothing on the stream.
+	// The Function prints, so a run that never reaches it leaves nothing on
+	// the stream.
 	it("leaves the lazy tie-breaker unrun where the first decides", async () => {
 		expect(
 			await run(
@@ -232,9 +223,7 @@ describe("Ordering::then", () => {
 		).toEqual(['"computed"', "Ordering#Greater"])
 	})
 
-	// The shape the whole Method exists for — the league example's
-	// ranking rule, which was a List of orderings searched for the first
-	// decisive one.
+	// The shape the Method exists for: a ranking rule over several keys.
 	it("orders a sort on a second key", async () => {
 		expect(
 			await run(
@@ -262,8 +251,7 @@ describe("Ordering::then", () => {
 		).toEqual(['"Ali Bo, Ott Al, Ott Zoe"'])
 	})
 
-	// Three keys chain, and the third is reached only where the first
-	// two both left the pair equal.
+	// The third ordering is reached only where the first two are equal.
 	it("chains a third ordering", async () => {
 		expect(
 			await run(
@@ -282,10 +270,8 @@ describe("Ordering::then", () => {
 	})
 })
 
-// `false` before `true` is the order Swift, Rust, Haskell and SQL all
-// sort a Boolean key in, and a Boolean key is an ordinary one. `Boolean`
-// declares `Comparable` and writes `compare`; the four inequalities arrive with
-// the conformance.
+// `false` sorts before `true`, as in Swift, Rust, Haskell and SQL. `Boolean`
+// writes `compare`, and the inequalities arrive with `Comparable`.
 describe("Boolean's ordering", () => {
 	it("orders false before true", async () => {
 		expect(
@@ -336,8 +322,8 @@ describe("Boolean's ordering", () => {
 		).toEqual(["[ false, true, true ]", "[ true, false ]"])
 	})
 
-	// The shape the conformance is FOR — a Boolean member read as a sort
-	// key, where `false` first puts the unfinished work at the top.
+	// A Boolean member as a sort key: `false` first puts the unfinished work
+	// at the top.
 	it("sorts on a Boolean key", async () => {
 		expect(
 			await run(
@@ -360,8 +346,8 @@ describe("Boolean's ordering", () => {
 		).toEqual(["[ 2, 1, 3 ]"])
 	})
 
-	// `Comparable` and nothing wider, for the reason a String stops
-	// there: nothing about two truth values makes a range.
+	// `Boolean` is `Comparable` but not `Orderable`: two truth values make no
+	// range.
 	it("reaches no isBetween", () => {
 		let parsed = parseWithDiagnostics(
 			[

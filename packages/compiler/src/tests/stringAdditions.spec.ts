@@ -14,19 +14,13 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The String vocabulary beyond the searches and the cases — the code
-// points, the four character classes, the folding searches, the cuts and the
-// rest of it — beside the two parses that read the notation the language
-// writes.
-// `stdlibStrings.spec.ts` holds the entries that were there before, and the
-// same rule decides what belongs here: an ASCII String and a String the scan
-// refuses take two different routes through the runtime, so every answer below
-// is asked over both.
+// The String vocabulary beyond the searches and the cases, beside the parses
+// of Integer and Rational. Every answer is asked over an ASCII String and a
+// String the scan refuses, since the two take different routes. See "The ASCII
+// route" in packages/runtime/DEVELOPMENT.md.
 //
-// What the golden capture can not hold is here instead. It prints a
-// value per call, so a claim ABOUT two calls — that `everyIndex` and `count`
-// agree, that a String is its own points read back — has to be written down as
-// a claim.
+// The golden capture prints a value per call, so a claim about two calls, such
+// as `everyIndex` agreeing with `count`, is written here.
 function generate(source: string, options: { tests?: boolean } = {}): string {
 	let parsed = parseWithDiagnostics(source)
 
@@ -68,9 +62,8 @@ async function run(source: string): Promise<Array<string>> {
 
 type Loaded = { $tests: typeof entryPoints }
 
-// The property tests, driven through the loaded program's OWN `$tests`
-// for the reason `testingProperties.spec.ts` gives: every Essence value carries
-// a hidden Type key belonging to the runtime instance that built it.
+// The property tests run through the loaded program's own `$tests`, because
+// every Essence value carries a Type key of the runtime instance that built it.
 async function propertyFailures(source: string): Promise<Array<string>> {
 	let javaScript = generate(source, { tests: true })
 	let directory = mkdtempSync(join(tmpdir(), "essence-string-properties-"))
@@ -98,20 +91,17 @@ async function propertyFailures(source: string): Promise<Array<string>> {
 	}
 }
 
-// A four-person family emoji — eleven code units joined by zero-width
-// joiners, ONE character — and a flag, whose two regional indicators are also
-// one. The Lexer knows no `\u` escape, so the JavaScript String carries the
-// code points in. `combining` is an `e` and a combining acute, which is one
-// character that NFC composes into one code point.
+// A family emoji of seven code points joined by zero-width joiners is one
+// character, and so is a flag of two regional indicators. `combining` is an `e`
+// and a combining acute: one character that NFC composes into one code point.
 const family = "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}"
 const flag = "\u{1F1E9}\u{1F1EA}"
 const combining = "e\u0301"
 const mark = "\u0301"
 
 describe("Character", () => {
-	// A refinement erases before anything runs, so what this shows is
-	// that a Character reaches every position a String reaches and that a
-	// written one-character Literal is its own proof.
+	// A Character reaches every position a String reaches, and a written
+	// one-character Literal is its own proof.
 	it("is a String a one-character Literal proves", async () => {
 		expect(
 			await run(`implementation {
@@ -144,8 +134,8 @@ describe("Character", () => {
 })
 
 describe("code points", () => {
-	// The level difference stated as a measurement: one character of
-	// seven points, one of two, and one that NFC composes into one.
+	// One character of seven points, one of two, and one that NFC composes
+	// into one.
 	it("reads the points below the characters", async () => {
 		expect(
 			await run(`implementation {
@@ -246,9 +236,8 @@ describe("the character classes", () => {
 		])
 	})
 
-	// A mark belongs to the letter BEFORE it, which is what the two
-	// letter patterns say. So a decomposed accent is letters and a mark
-	// standing on its own is not.
+	// A mark belongs to the letter before it, so a decomposed accent is
+	// letters and a mark standing on its own is not.
 	it("counts a combining mark as part of the letter before it", async () => {
 		expect(
 			await run(`implementation {
@@ -262,9 +251,8 @@ describe("the character classes", () => {
 	})
 })
 
-// A count is never negative, and the entries say so, so the answer
-// reaches a Parameter that asks for the proof. The refinement erases before
-// anything runs — what this reads back is that the Program compiles at all.
+// A count is never negative and the entries say so, so the answer reaches a
+// Parameter that asks for the proof. The claim is that the Program compiles.
 describe("a counted proof", () => {
 	it("spends a count where a proven Integer is asked for", async () => {
 		expect(
@@ -317,10 +305,9 @@ describe("a folded search", () => {
 		])
 	})
 
-	// The rule the `§` note above `contains` states, as the one pair of
-	// answers that tells the two foldings apart. A whole String folds a
-	// closing capital sigma to the final form and this walk does not, so `is`
-	// finds the part equal where `contains` does not find it inside.
+	// A whole String folds a closing capital sigma to the final form and the
+	// per-character walk does not. So `is` finds the two equal where `contains`
+	// does not find one inside the other.
 	it("folds each character rather than the whole String", async () => {
 		expect(
 			await run(`implementation {
@@ -332,9 +319,8 @@ describe("a folded search", () => {
 		).toEqual(["true", "false", "true", "Optional#Value(1)"])
 	})
 
-	// A position is a position of the RECEIVER, which is what folding
-	// per character buys — the answer indexes the String that was asked, not
-	// the folded copy the walk read.
+	// The answer indexes the String that was asked, not the folded copy the
+	// walk read.
 	it("answers a position of the receiver", async () => {
 		expect(
 			await run(`implementation {
@@ -551,8 +537,7 @@ describe("the rest of the vocabulary", () => {
 })
 
 describe("the two parses", () => {
-	// The claim is that the notation the language writes reads back, so
-	// each of these is a Literal the Lexer accepts, spelled as text.
+	// A sign and digit separators read back as the language writes them.
 	it("reads the sign and the separators the language writes", async () => {
 		expect(
 			await run(`implementation {
@@ -583,9 +568,8 @@ describe("the two parses", () => {
 		])
 	})
 
-	// The Lexer's rule exactly — an underscore stands between two digits
-	// and nowhere else. `1_.5` is the one the decimal arm has to read apart to
-	// refuse: joined, the two halves spell `1_5`.
+	// An underscore stands between two digits and nowhere else, as in the
+	// Lexer. The decimal arm refuses `1_.5`, whose halves joined spell `1_5`.
 	it("refuses a shape the language does not write", async () => {
 		expect(
 			await run(`implementation {
@@ -621,10 +605,8 @@ describe("the two parses", () => {
 	})
 })
 
-// What holds for EVERY String rather than for the ones written above.
-// The generator's alphabet is ASCII plus an accent, an eszett and two emoji
-// (`CHARACTERS` in `Randomness.ts`), so a drawn String exercises the grapheme
-// route as well as the ASCII one.
+// The generator's alphabet, `CHARACTERS` in `Randomness.ts`, is ASCII plus an
+// accent, an eszett and two emoji. A drawn String takes both routes.
 describe("properties", () => {
 	it("hold over generated Strings", async () => {
 		expect(
