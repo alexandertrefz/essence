@@ -1,25 +1,18 @@
 import type { common } from "@essence-lang/interfaces"
 
-// The habits of the languages people arrive from, and what Essence writes
-// in their place. One table rather than one per stage, because WHICH stage meets
-// a habit is decided by how it lexes rather than by what it is: `a && b` is three
-// Tokens and is refused where the Expression ends, while `!ready` is a single
-// Identifier that nothing refuses until a name lookup fails on it. The two sites
-// would otherwise answer the same mistake in two voices.
+// The habits of other languages, and what Essence writes in their place. The
+// Parser meets `a && b` as Tokens, and the Enricher meets `!ready` as a name it
+// can not find. One table keeps their answers alike.
 //
-// Every Help here names a Method the standard library really declares,
-// with the labels it really takes — a Help that offers a call which resolves to
-// nothing sends a reader from one refusal to the next.
+// Every Help names a Method the standard library declares, with the labels it
+// takes, so following a Help never leads to another refusal.
 
-// The shared note under every operator. It says the rule rather than the
-// spelling, because the spelling is what the Helps are for, and because the rule
-// is the one thing that makes the whole family make sense at once.
+// The note under every operator: the rule, where the Helps give the spelling.
 export const operatorNote =
 	"Arithmetic, comparison and logic are Method calls in Essence, read left to right — there are no operators, and so no precedence to remember."
 
-// Keyed by the operator EXACTLY as it is written, so that `==` and `===`
-// are two entries rather than one normalised away: a reader who wrote `===` is
-// answered about `===`.
+// Keyed by the operator as written, so a reader who wrote `===` is answered
+// about `===`, not `==`.
 const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 	[
 		"+",
@@ -70,22 +63,14 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 	],
 	["||", ["Write 'a::or(b)' — both sides are worked out."]],
 	["!", ["Write 'x::negate()'."]],
-	// The compound assignments are the one family whose table entry is a
-	// SCHEMATIC rather than a spelling: what they are short for names the
-	// binding twice, so a Help that spells it has to spell the reader's own
-	// name or none at all. `count` read as one, and `tally += 5` was answered
-	// `Write 'count = count::add(1)'` — two undeclared names and the wrong
-	// amount. Every site that meets one has the operands in hand and builds the
-	// sentence with `compoundAssignmentHelps`; these stand for the one that
-	// somehow does not, and they say `x` and `n` the way the rest of the table
-	// does.
+	// A compound assignment names its binding twice, so a site with the
+	// operands builds its Help with `compoundAssignmentHelps`. These entries,
+	// spelled with `x` and `n`, answer a site without them.
 	["+=", ["Write 'x = x::add(n)'."]],
 	["-=", ["Write 'x = x::subtract(n)'."]],
 	["*=", ["Write 'x = x::multiply(with n)'."]],
-	// `quotient`, not `divide`, because what is written here is a
-	// reassignment: `divide(by:)` answers a fraction, and a counter it is
-	// written back into is an Integer. The Help that does not type-check is the
-	// one that sends a reader from this refusal to the next.
+	// `quotient`, not `divide`: `divide(by:)` answers a Rational, which an
+	// Integer binding can not be reassigned to.
 	[
 		"/=",
 		[
@@ -104,19 +89,10 @@ const operatorHelps: ReadonlyMap<string, ReadonlyArray<string>> = new Map([
 	],
 ])
 
-// The operators that carry no Method at all. They are answered with the
-// same code as the rest, because what a reader needs to hear is the same
-// sentence: this is not how Essence says things. What is said about them is a
-// NOTE rather than a Help, though — "Essence has no bitwise operations" is a
-// rule in an action's clothes, and a reader who follows a Help is owed an edit
-// they can make where they are standing.
-//
-// `|` is not here, and neither is `?.`. A `|` written between two values
-// is Essence's own Union lexeme wherever a Type is read, so it is excluded from
-// the family outright — see `essenceLexemes` — and an entry for it would never
-// be reached. A `?.` never forms as a lexeme either: a `.` ends a name, so
-// `user?.name` arrives as `user?` and is answered by the postfix rule, which
-// has the operand in hand and can name it.
+// The operators no Method stands in for. They share the code of the rest, but
+// are answered with a note, since a Help must be an edit the reader can make.
+// `|` is a lexeme of Essence's own, in `essenceLexemes`. `user?.name` lexes as
+// `user?`, which the postfix rule answers.
 const unsupportedOperators: ReadonlySet<string> = new Set([
 	"&",
 	"^",
@@ -124,16 +100,12 @@ const unsupportedOperators: ReadonlySet<string> = new Set([
 	">>",
 ])
 
-// What stands in a Help's place for those four. It says the whole of what
-// is true — the language has none of this, and there is nothing to write
-// instead — which is what makes a Help unnecessary rather than merely absent.
+// The note that stands in place of a Help for `unsupportedOperators`.
 export const bitwiseNote =
 	"Essence has no bitwise operations, and no Method stands in for one."
 
-// Whether a written text is an operator this language deliberately has
-// none of, and what to write instead. Null for everything else, which is what
-// makes this the whole test at every site that asks it; an EMPTY list is an
-// operator that is answered with a Note alone.
+// The Helps for an operator Essence does not have, or null for any other text.
+// An empty list is an operator answered with a note alone.
 export function foreignOperatorHelps(
 	operator: string,
 ): ReadonlyArray<string> | null {
@@ -146,15 +118,10 @@ export function foreignOperatorHelps(
 	return unsupportedOperators.has(operator) ? [] : null
 }
 
-// The compound assignments, spelled with the operands the reader wrote.
-// `tally += 5` is short for `tally = tally::add(5)`, and the whole of what makes
-// that Help worth printing is that it names `tally` and `5` rather than a
-// binding nobody declared. Null for every other operator, which is what lets a
-// site ask this of whatever it met and print the table's own answer otherwise.
-//
-// `amount` is null where the right operand is not one piece of text this site
-// can hand over — a call, a parenthesised Expression, a second line — and the
-// Help writes `…` in its place rather than a number nobody wrote.
+// The Help for a compound assignment, spelled with the reader's operands:
+// `tally += 5` is answered `tally = tally::add(5)`. Null for any other operator.
+// `amount` is null where the right operand is not one piece of text, and the
+// Help writes `…` there.
 export function compoundAssignmentHelps(
 	operator: string,
 	target: string,
@@ -169,10 +136,8 @@ export function compoundAssignmentHelps(
 			return [`Write '${target} = ${target}::subtract(${written})'.`]
 		case "*=":
 			return [`Write '${target} = ${target}::multiply(with ${written})'.`]
-		// `quotient`, not `divide`, because what is written here is a
-		// reassignment: `divide(by:)` answers a fraction, and a counter it is
-		// written back into is an Integer. The Help that does not type-check is
-		// the one that sends a reader from this refusal to the next.
+		// `quotient`, not `divide`: `divide(by:)` answers a Rational, which
+		// an Integer binding can not be reassigned to.
 		case "/=":
 			return [
 				`Write '${target} = ${target}::quotient(dividingBy ${written})', which answers a whole number.`,
@@ -182,16 +147,13 @@ export function compoundAssignmentHelps(
 			return [
 				`Write '${target} = ${target}::remainder(dividingBy ${written})'.`,
 			]
-		// `??` is no assignment, and it is answered here all the same:
-		// both operands are written on the line, which is the one thing this
-		// function is for. The table's own sentence spells `x` and `d`, and a
-		// reader looking at `held ?? fallback` had to work out which was which.
+		// `??` is no assignment, but both its operands are on the line, so
+		// its Help names them too.
 		case "??":
 			return [
 				`Write '${target}::value(defaultingTo ${written})' — a value that may be missing is an Optional.`,
 			]
-		// `++` and `--` carry their amount in the operator, so the right
-		// operand is not read from the text and is never `…`.
+		// `++` and `--` carry their amount in the operator.
 		case "++":
 			return [`Write '${target} = ${target}::add(1)'.`]
 		case "--":
@@ -201,20 +163,14 @@ export function compoundAssignmentHelps(
 	}
 }
 
-// The characters an Essence name never holds and another language's
-// operators are made of. A name is everything that is not a Symbol, a blank or a
-// sigil, which is why the Lexer reads `!ready` and `a+b` as ONE Identifier each
-// — there is no other class to put them in. This is what tells them apart again.
-//
-// The Symbols are deliberately absent: `-`, `/`, `<`, `>`, `=`, `|` and `:` each
-// end a name where they stand, so an operator written out of them reaches the
-// Parser as Tokens and is answered there.
+// The characters other languages build operators of that no written Essence
+// name holds. The Lexer still reads `!ready` and `a+b` as one Identifier each,
+// since a name is anything but a Symbol, a blank or a sigil. Symbols such as
+// `-` and `<` end a name, so the Parser answers operators made of them.
 export const foreignPunctuation = new Set("!$%&'*+;?\\^`")
 
-// The run of foreign punctuation a Token OPENS with, or null where it
-// opens with none. The Lexer reads `+2` as one Identifier — a digit ends no name
-// — so the operator and the operand arrive together, and what a refusal
-// underlines is the operator alone.
+// The run of foreign punctuation a Token opens with, or null. The Lexer reads
+// `+2` as one Identifier, and a refusal underlines the operator alone.
 export function foreignPunctuationLead(value: string): string | null {
 	let end = 0
 
@@ -225,10 +181,9 @@ export function foreignPunctuationLead(value: string): string | null {
 	return end === 0 ? null : value.slice(0, end)
 }
 
-// The operator hiding inside a name that resolves to nothing — the first
-// run of punctuation in it, where that run is an operator some language has.
-// Null for a name that merely holds an odd character, which is left to report as
-// the undeclared name it is.
+// The first run of punctuation in an unresolved name, where that run is an
+// operator of another language. Null otherwise, and the name is reported as
+// undeclared.
 export function foreignOperatorIn(name: string): string | null {
 	let start = [...name].findIndex((character) =>
 		foreignPunctuation.has(character),
@@ -247,12 +202,8 @@ export function foreignOperatorIn(name: string): string | null {
 	return operator
 }
 
-// One habit's worth of account, spelled once for the two stages that meet
-// one. Which of them does is decided by how the habit lexes rather than by what
-// it is, and what differs between them is what happens NEXT — the Parser throws
-// this, the Enricher reports it — never what is said. Written twice, they drift:
-// the `;` was answered with two different Notes depending on whether the Token
-// in front of it ended a word.
+// What a Diagnostic about one habit says, whether the Parser throws it or the
+// Enricher reports it.
 export type ForeignAccount = {
 	code: common.DiagnosticCode
 	message: string
@@ -261,12 +212,8 @@ export type ForeignAccount = {
 	helps: Array<string>
 }
 
-// `leadingHelps` is what the SITE knows and the table can not — the
-// operand of a prefix operator, which only the Enricher has in hand. It
-// REPLACES the table's own Help rather than standing above it: the table's is
-// the same sentence with a placeholder where the reader's own name would go,
-// and printing both said `Write 'ready::negate()'` and then `Write
-// 'x::negate()'`.
+// `leadingHelps` names the operand of a prefix operator, which only the
+// Enricher has. It replaces the table's Help, which says the same with `x`.
 export function foreignOperatorAccount(
 	operator: string,
 	leadingHelps: ReadonlyArray<string> = [],
@@ -288,11 +235,8 @@ export function foreignOperatorAccount(
 	}
 }
 
-// The `;` is the one habit BOTH stages meet, and for a reason neither of
-// them chose: a `;` ends no name, so `total;` arrives as one Identifier and is
-// answered by the Enricher, while `1;` is two Tokens and is answered by the
-// Parser. A reader who wrote both in one file was told two different things
-// about them.
+// `total;` lexes as one Identifier and the Enricher answers it, while `1;` is
+// two Tokens and the Parser answers it. Both say this.
 export const semicolonAccount: ForeignAccount = {
 	code: "foreign-syntax",
 	message: "A Statement does not end with ';'",
@@ -303,19 +247,17 @@ export const semicolonAccount: ForeignAccount = {
 	helps: ["Remove the ';'."],
 }
 
-// What a habit written as a WORD is answered with. `spelling` is the text
-// Essence writes in its place where one word replaces one word — which is what a
-// Quick Fix rewrites — and null where the answer is a shape rather than a word:
-// nothing is written in place of `throw`, a Result is returned instead.
+// What a habit written as a word is answered with. `spelling` is the word a
+// Quick Fix writes in its place, or null where the answer is a shape. Nothing
+// replaces `throw`: a Result is returned instead.
 export type ForeignWord = {
 	spelling: string | null
 	note: string
 	helps: ReadonlyArray<string>
 }
 
-// The words. Each is a name that resolves to nothing — every one of them
-// would be an ordinary `unknown-name` — so a Program is free to declare any of
-// them and this table is never consulted for it.
+// Each word is otherwise an `unknown-name`, so a Program may declare any of
+// them, and the table is then not consulted.
 const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 	[
 		"const",
@@ -347,10 +289,8 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			],
 		},
 	],
-	// Rust's `let mut x`, which is two words where Essence writes one. The
-	// `let` is answered by its own entry, so what is left to say about the `mut`
-	// is that it goes — and the empty spelling is what a Quick Fix removes it
-	// with.
+	// Rust's `let mut x`. The `let` has its own entry, and the empty spelling
+	// makes a Quick Fix remove the `mut`.
 	[
 		"mut",
 		{
@@ -431,9 +371,8 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			helps: ["Write 'Terminal.print(…)'."],
 		},
 	],
-	// The same word in four more languages. `println!` is keyed with its
-	// `!`, which is what a reader wrote and what the Lexer hands over: a `!` ends
-	// no name, so the macro arrives as one Identifier.
+	// `println!` is keyed with its `!`, since a `!` ends no name and the
+	// Lexer hands over the macro as one Identifier.
 	[
 		"println",
 		{
@@ -468,9 +407,8 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			helps: ["Write 'Terminal.print(…)'."],
 		},
 	],
-	// No spelling. `fmt.Println(…)` would become `Terminal.Println(…)`,
-	// which is a Method the Namespace does not declare — a fix that trades one
-	// refusal for another.
+	// No spelling, since `fmt.Println(…)` would become `Terminal.Println(…)`,
+	// which the Namespace does not declare.
 	[
 		"fmt",
 		{
@@ -570,10 +508,8 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			],
 		},
 	],
-	// The word three more languages declare a Function with. One word
-	// replaces one word, and what a reader then has to add is the annotations —
-	// which the Help writes out, because a signature is where every Type in
-	// Essence is written down.
+	// The Help writes out a whole signature, since a reader replacing the
+	// word still has to add every annotation.
 	[
 		"def",
 		{
@@ -606,9 +542,8 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			helps: ["Write 'else if' in place of 'elif'."],
 		},
 	],
-	// Swift's early exit. Nothing leaves a block early in Essence, so the
-	// answer is a shape rather than a word: the value is taken apart, and both
-	// Cases answer.
+	// Swift's early exit. The answer is a shape rather than a word: a `match`
+	// that takes the value apart.
 	[
 		"guard",
 		{
@@ -775,11 +710,9 @@ const foreignWords: ReadonlyMap<string, ForeignWord> = new Map([
 			helps: ["Write 'complete' in place of 'await'."],
 		},
 	],
-	// The one habit whose answer is not written where the habit stands. An
-	// `import` block goes ABOVE the implementation, and the Help read as an
-	// edit to make here — written in place of the `require` it answers, it is a
-	// `syntax-error`. So it says where the block goes, and the names in it are
-	// `…` rather than a path and a value nothing in the reader's file spells.
+	// The answer is not written where `require` stands: an `import` block
+	// goes before the implementation. So the Help says where, with `…` for the
+	// path and the names.
 	[
 		"require",
 		{

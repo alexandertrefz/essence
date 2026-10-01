@@ -8,9 +8,9 @@ import { resolveOverloadedMethodName, typeMentionsGeneric } from "./types"
 // `Self` somewhere inside it.
 type Reach = "none" | "self" | "holds"
 
-// The entries of its Protocol's witness a provided body reads: the Methods
-// it names after `::` or on `Self`, or every entry where `@` or a value of `Self`
-// may reach anything but a call of one of those, which hands the witness on.
+// The entries of its Protocol's witness a provided body reads: the Methods it
+// names after `::` or on `Self`. Where `@` or a value of `Self` may reach
+// anything else, that hands the witness on, and the body reads every entry.
 export function providedBodyReads(
 	body: parser.FunctionDefinitionNode,
 	signature: common.MethodType,
@@ -124,9 +124,9 @@ export function providedBodyReads(
 			.reduce(join)
 	}
 
-	// Anything else that takes a value of `Self`, or stands where one is
-	// expected and may work its Type Parameters out from that, may be handed
-	// the witness.
+	// Anything else that takes a value of `Self` may be handed the witness.
+	// So may a call where one is expected, since it may infer its Type
+	// Parameters from that.
 	let otherCall = (
 		wanted: boolean,
 		callee: Reach,
@@ -144,8 +144,8 @@ export function providedBodyReads(
 		return "none"
 	}
 
-	// A Function literal takes each Type it leaves out from the Function
-	// Type it is handed as, so a Parameter at a requirement's `Self` is one.
+	// A Function literal takes each Type it leaves out from the Function Type
+	// it is handed as. So a Parameter at a requirement's `Self` holds `Self`.
 	// Handed as nothing known, a Parameter may hold `Self` where it is wanted.
 	let reachOfLiteral = (
 		literal: parser.FunctionDefinitionNode,
@@ -437,8 +437,8 @@ export function providedBodyReads(
 		return found
 	}
 
-	// A name may come to hold `Self` after the point where it is first
-	// read, so the body is read again until no name holds more.
+	// A name may come to hold `Self` after it is first read, so the body is
+	// read again until no name holds more.
 	let settled = ""
 
 	while (!whole) {
@@ -493,9 +493,9 @@ export function methodsRead(
 	)
 }
 
-// The entries a typed provided body reads: the Methods it calls through
-// its witness, those of a Protocol it hands the witness on as, or every entry
-// where the witness is named anywhere this does not know.
+// The entries a typed provided body reads: the Methods it calls through its
+// witness, and those of a Protocol it hands the witness on as. Where the
+// witness is named anywhere else, every entry.
 export function typedBodyReads(
 	body: common.typed.FunctionDefinitionNode,
 	methods: Record<string, common.MethodType>,
