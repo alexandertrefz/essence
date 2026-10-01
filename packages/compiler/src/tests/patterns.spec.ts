@@ -713,6 +713,40 @@ describe("Patterns", () => {
 			expect(codesOf(source)).toContain("unknown-member")
 		})
 
+		// The nested Pattern reads members of a value the payload has not got,
+		// so they are no second mistake.
+		it("report a missing member that takes a nested Pattern at its name", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				choice Progress {
+					Going { state: { index: Integer, total: Integer } },
+					Stopped,
+				}
+
+				constant started: Progress = #Going({
+					state = { index = 1, total = 7 },
+				})
+
+				Terminal.inspect(match started -> String {
+					case #Going({ stat as { index = 1, total } }) { <- "first" }
+					case _ { <- "later" }
+				})
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.position?.start,
+				]),
+			).toEqual([
+				[
+					"unknown-member",
+					"'{ index: Integer, total: Integer }' has no member 'stat'",
+					{ line: 12, column: 20 },
+				],
+			])
+		})
+
 		// The requirement is the annotation with the nested members merged in,
 		// so the arm can decline and the Match is not exhaustive.
 		it("keep a nested binder's requirements beside a written annotation", async () => {

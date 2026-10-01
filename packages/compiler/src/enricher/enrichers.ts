@@ -14766,11 +14766,25 @@ function resolvePatternMatcherType(
 						member.type.position,
 					)
 
+		let memberType = declaredType ?? memberTypeOf(valueType, name)
+
+		// Checked before a nested Pattern is walked, which would otherwise
+		// report its own members against `Unknown`.
+		if (
+			reportUnknownIn !== null &&
+			declaredType === null &&
+			memberType.type === "Unknown" &&
+			!typeContainsError(valueType)
+		) {
+			reportUnknownPayloadMember(member.name, valueType)
+
+			memberType = { type: "Error" }
+		}
+
 		if (member.binder?.nodeType === "Pattern") {
 			// A written annotation is what the arm narrows to. The nested
 			// Pattern's requirements are merged over it, so the arm never runs
 			// for a value without the members it reads.
-			let memberType = declaredType ?? memberTypeOf(valueType, name)
 			let nested = resolvePatternMatcherType(
 				member.binder,
 				memberType,
@@ -14783,19 +14797,6 @@ function resolvePatternMatcherType(
 			members[name] = provenPatternType(memberType, nested)
 
 			continue
-		}
-
-		let memberType = declaredType ?? memberTypeOf(valueType, name)
-
-		if (
-			reportUnknownIn !== null &&
-			declaredType === null &&
-			memberType.type === "Unknown" &&
-			!typeContainsError(valueType)
-		) {
-			reportUnknownPayloadMember(member.name, valueType)
-
-			memberType = { type: "Error" }
 		}
 
 		members[name] = memberType
