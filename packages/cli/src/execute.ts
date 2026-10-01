@@ -3,21 +3,16 @@ import { type ChildProcess, spawn } from "node:child_process"
 import type { CLIContext } from "./context"
 import { formatDuration } from "./report"
 
-// The compiled output is an ES module, so it is executed by the same
-// runtime that is running the Compiler — `process.execPath` is Bun when esc
-// was started by Bun and Node when it was started by Node, which keeps `esc
-// run` working without a hardcoded runtime name.
+// The bundle runs under the runtime running the Compiler, Bun or Node, so `esc
+// run` names no runtime.
 
 type ExecutionResult = {
 	code: number
 	duration: number
 }
 
-// Node translates a stack trace through the bundle's map only when
-// asked, while Bun reads the `sourceMappingURL` comment on its own — so the
-// flag is added exactly when a map was emitted and the runtime is Node.
-// Exported for the spec: whether the flag belongs is a pure question, the
-// spawn around it is not.
+// Node maps stack traces through a source map only when asked, while Bun reads
+// `sourceMappingURL` itself. So the flag is added only for Node with a map.
 export function runtimeArguments(
 	sourceMaps: boolean,
 	runningOnBun = process.versions.bun !== undefined,
@@ -38,9 +33,8 @@ function rule(context: CLIContext, label: string | null): string {
 	)}`
 }
 
-// The form used while watching: the program keeps running, and the
-// caller stops it when the next rebuild starts. A watched program is usually a
-// server or a loop, so waiting for it to exit would mean never rebuilding.
+// The form used while watching: the program keeps running until the next rebuild
+// stops it, since servers and loops never exit.
 export function startProgram(
 	fileName: string,
 	programArguments: Array<string> = [],
@@ -55,10 +49,8 @@ export function startProgram(
 	)
 }
 
-// The program's output is inherited rather than captured, so it streams
-// as it is produced and keeps its own colours and interactivity — a program
-// that prints progress, or asks a question, behaves as it would if it had been
-// started directly.
+// The program's output is inherited, so it streams and keeps its colours and
+// interactivity.
 export function execute(
 	context: CLIContext,
 	fileName: string,
@@ -73,10 +65,8 @@ export function execute(
 			context.terminal.out(rule(context, "program output"))
 		}
 
-		// --json promises stdout carries the report as a single JSON
-		// document and nothing else — so under it the program's own stdout is
-		// routed to stderr, where it still streams as it is produced. The
-		// program runs either way; only where its output lands changes.
+		// Under `--json` stdout carries only the report, so the program's stdout goes to
+		// stderr.
 		let child = spawn(
 			process.execPath,
 			[
@@ -91,9 +81,7 @@ export function execute(
 			},
 		)
 
-		// A program that fails to start emits "error", and one that runs
-		// emits "exit" — but a program can manage both, so the result is
-		// settled exactly once.
+		// A program can emit both "error" and "exit", so the result settles once.
 		let settled = false
 		let settle = (code: number) => {
 			if (settled) {

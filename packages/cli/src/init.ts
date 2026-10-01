@@ -12,24 +12,10 @@ import { UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
 
-// What a project file looks like when a project has not said anything
-// yet. Two settings, both at their defaults, each under the sentence that says
-// what it is for — a starting point rather than an inventory: `essence help
-// test` and `essence help build` document the rest, each beside the flag it
-// mirrors, and a file listing every setting at its default is a file nobody
-// reads twice. `test.contracts` used to be the third: it is the switch for an
-// experimental mode, and the first file a project writes should not name a
-// setting the documentation does not explain.
-//
-// Written as TEXT rather than stringified from an object, because the
-// comments are half of what makes the file worth writing: a project file is
-// where the reason behind a setting gets written down, and `JSON.stringify` can
-// not carry one. The `$schema` is first so that an editor validating the file
-// finds it before anything else it holds.
-//
-// Exported for the website's spec. Two documentation pages show this
-// file as `essence init` writes it, and a copy that drifted from the template
-// would teach a file the command no longer writes.
+// A new project's file: two settings at their defaults, each under a comment
+// saying what it is for. `essence help` documents the rest. It is text, since
+// JSON cannot hold comments, with `$schema` first for editors. The website's spec
+// checks the documentation shows it as written.
 export function projectFileTemplate(): string {
 	return `{
 	"$schema": "${PROJECT_SCHEMA_URL}",
@@ -45,10 +31,8 @@ export function projectFileTemplate(): string {
 `
 }
 
-// The file marks the project, so where it is written is the whole
-// decision: the working directory becomes a project root, and everything under
-// it is that project's — what `essence test` walks with no arguments, and what
-// the editor's Problems panel speaks for.
+// The file marks the project root: what `essence test` walks with no arguments,
+// and what the editor's Problems panel covers.
 export async function runInit(
 	context: CLIContext,
 	command: CommandSpec,
@@ -58,10 +42,8 @@ export async function runInit(
 	let target = path.join(directory, PROJECT_FILE_NAME)
 	let governing = context.configuration.filePath
 
-	// Refused rather than merged or overwritten. What is in the file is a
-	// project's own decisions, comments and all, and a command that rewrote
-	// them because it was run twice would be one nobody could run without
-	// checking first.
+	// An existing file is never merged or overwritten, since it holds the project's
+	// own decisions.
 	if (governing !== null && path.dirname(governing) === directory) {
 		throw new UsageError(
 			`${displayPath(target)} already exists.`,
@@ -92,11 +74,8 @@ export async function runInit(
 		)}`,
 	)
 
-	// A project inside a project is allowed — a monorepo package that
-	// runs its own tests is one — and it is also the shape of a mistake, a file
-	// written one directory too deep. So it is written and said: from here on
-	// the outer file's settings reach nothing under this directory, which is
-	// the surprise if this was not meant.
+	// A project inside a project is allowed, as for a monorepo package, but may be a
+	// mistake. So the command says that the outer file no longer reaches here.
 	if (governing !== null) {
 		terminal.out(
 			`  ${palette.muted(

@@ -19,31 +19,19 @@ import {
 	type Theme,
 } from "./theme"
 
-// Everything a command needs that is not its own arguments: where to
-// write, how it may be styled, and how loud it should be. Resolved once at
-// startup so that no two parts of a run can disagree about whether colour is
-// available.
-
-// Read from package.json rather than duplicated here, so that
-// `esc --version` can not drift away from the version that was published.
-//
-// IMPORTED rather than read off a path counted out from this module.
-// It was read, and the path was `../../package.json` — correct while this
-// file sat one directory deeper, and silently wrong the moment it moved: the
-// read failed, the `catch` answered "unknown", and `esc --version` said so to
-// everyone who asked. An import is resolved by the module loader, so the same
-// mistake is a build error rather than a string nobody notices.
+// Imported from package.json, so `esc --version` matches what was published and
+// a wrong path fails the build.
 export const version: string = manifest.version
 
+// Everything a command needs besides its arguments: where to write, how to style
+// it and how loud to be. Resolved once, so a run agrees about colour.
 export type CLIContext = {
 	terminal: Terminal
 	theme: Theme
 	palette: Palette
 	options: OptionValues
-	// The project's own settings, read once for the whole invocation —
-	// see `projectOptions`. Every command reads them here rather than from the
-	// disk, so that the two commands a run reaches (`test` and the compile
-	// under it) can not answer to two different files.
+	// The project's settings, read once per invocation, so `test` and the compile
+	// under it read the same file. See `resolveProjectOptions`.
 	configuration: ProjectConfiguration
 	report: ReportContext
 	help: HelpContext
@@ -72,8 +60,8 @@ export function createContext(
 	terminal: Terminal = createTerminal(),
 	configuration: ProjectConfiguration = defaultConfiguration(),
 ): CLIContext {
-	// Colour support is decided from stderr rather than stdout, because
-	// stderr is where the human-facing output goes when stdout is a pipe.
+	// Colour support follows stderr, where human-facing output goes when stdout is a
+	// pipe.
 	let theme = createTheme(
 		supportsColor(colorChoiceFor(options), terminal.stderr) &&
 			!options.json,

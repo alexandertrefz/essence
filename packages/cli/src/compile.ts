@@ -28,21 +28,17 @@ import {
 } from "./report"
 import { Progress, type Task } from "./spinner"
 
-// build, check and watch differ only in what they do with the result, so
-// the work itself — resolving inputs, choosing how to run, driving the
-// progress display, printing Diagnostics and the report — happens once here.
+// build, check and watch differ only in what they do with the result, so the
+// shared work happens here.
 
-// The compile MODE is PLANNED rather than passed per file, because it
-// decides how the whole run is compiled — the Session every entry is linked
-// through opens in it. See `CompileMode`.
+// The compile mode is planned for the whole run, since every entry's Session
+// opens in it. See `CompileMode`.
 type CompilationPlan = CompileMode & {
 	inputFileNames: Array<string>
 	outputs: Map<string, string> | null
 	dispatcher: CompileDispatcher
-	// Whether every entry is also asked what mutations its Modules admit
-	// — see `CompileRequest.enumerateMutations`. Planned like the mode because
-	// it is a fact about the whole run: only a mutation run's baseline asks, and
-	// it asks of every entry of it.
+	// Whether every entry reports its mutation sites, as only a mutation run's
+	// baseline asks. See `CompileRequest.enumerateMutations`.
 	enumerateMutations?: boolean
 }
 
@@ -67,10 +63,8 @@ export async function planCompilation(
 		command,
 		context.programName,
 	)
-	// A compile that emits into the bundle cache has no output to
-	// resolve — the name is the hash of what it emits, which is not known
-	// until it has been emitted. Left to the default the source tree would
-	// collect a `.js` beside every file `esc run` was ever pointed at.
+	// A compile into the bundle cache has no output name until it has emitted.
+	// Defaulting one would leave a `.js` beside every file `esc run` was given.
 	let outputs =
 		options.emit && options.cacheOutput !== true
 			? await resolveOutputFiles(
@@ -115,9 +109,8 @@ export async function runCompilation(
 		enabled: !context.options.json && !context.options.quiet,
 	})
 
-	// The whole run's entries first, and only then the requests. A Module
-	// is compiled as a graph, and the graphs of a batch overlap: which files are
-	// going to be asked for decides how many times each of them is read.
+	// All entries begin before any request, since overlapping graphs decide how
+	// often each file is read.
 	plan.dispatcher.begin(plan.inputFileNames, plan)
 
 	let tasks = plan.inputFileNames.map<Task>((fileName) => ({
@@ -170,21 +163,16 @@ export async function runCompilation(
 	progress.stop()
 
 	return {
-		// A file two entries reach is reported by one of them. Without
-		// this a batch counts a shared dependency's errors once per entry that
-		// imports it, and prints its excerpt as many times.
+		// A file two entries reach is reported by one of them, so a shared dependency's
+		// errors print once.
 		outcomes: attributeDiagnostics(outcomes),
 		duration: performance.now() - started,
 		workers: plan.dispatcher.size,
 	}
 }
 
-// Diagnostics go to stderr and the report goes to stdout — a build whose
-// output is being read by another process should not have its Diagnostics
-// folded into that stream, and a build being watched by a human should show
-// both. Separate from the report because a command may want one without the
-// other: `essence test` reports a RUN rather than a compilation, and still has
-// to say what the compile found.
+// Diagnostics go to stderr and the report to stdout, so a process reading the
+// output gets no Diagnostics. `essence test` prints these without the build report.
 export function printDiagnostics(
 	context: CLIContext,
 	result: CompilationResult,
