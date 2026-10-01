@@ -29,9 +29,9 @@ string `"Up"`. This package calls such a Case a bare Case. It avoids "unit Case"
 without a payload. `Shape#Blank` is a unit Case without being bare, because `Shape` has Cases with payloads and
 crosses as an object.
 
-A String crosses as a string too, and one Choice's `#Up` is spelled like another's. Where a Union puts two such arms in
-one position, the position has no unambiguous JavaScript spelling, and the boundary refuses it. Deciding would turn a
-String `"Up"` handed in into a `Direction#Up` coming out, and the boundary must not lose data. Other Union arms are
+A String crosses as a string too, and one Choice's `#Up` is spelled like another's. Where a Union puts two such arms
+in one position, the position has no unambiguous JavaScript spelling, and the boundary refuses it. Deciding would turn
+a String `"Up"` handed in into a `Direction#Up` coming out, and the boundary must not lose data. Other Union arms are
 tried in declaration order, and the first that admits a value takes it. That rule does not reach bare Cases.
 
 The rule is per Case name, not per pair of Choices. `Direction | Vertical` is spellable while the two share no Case
@@ -46,11 +46,11 @@ other still declares.
 Only a Union is asked. A lone bare Case, or one inside an `Optional`, has its position to itself. A Record member or a
 List item that holds two shapes is a Union of its own, asked where it is reached.
 
-The arms compared are the ones a JavaScript value is decided between. A nested Union is flattened, since its arms stand
-in the outer position unchanged. An `Optional` is flattened too, because it is spelled by absence and `undefined`
-collides with nothing. It reaches a Descriptor in two shapes. `describeUnion` collapses a Union of exactly its two
-Cases into an `optional` node. In a larger Union the two Cases stay apart, the `#Value` carrying a String collides with
-`#Up`, and `#Empty` adds nothing.
+The arms compared are the ones a JavaScript value is decided between. A nested Union is flattened, since its arms
+stand in the outer position unchanged. An `Optional` is flattened too, because it is spelled by absence and
+`undefined` collides with nothing. It reaches a Descriptor in two shapes. `describeUnion` collapses a Union of exactly
+its two Cases into an `optional` node. In a larger Union the two Cases stay apart, the `#Value` carrying a String
+collides with `#Up`, and `#Empty` adds nothing.
 
 ## Rounding a Rational to a double
 
@@ -64,8 +64,8 @@ Past that fast path, `dividedMagnitude` still rounds exactly once:
   then reads this quotient as halfway exactly when the true quotient is halfway.
 - Converting that quotient to a double is the one rounding. Scaling it back by a power of two is exact.
 - A subnormal answer has fewer significant bits than the conversion keeps, so converting would round twice. When the
-  exponent is under -1022, `roundedShift` rounds the quotient to a multiple of `2 ** -1074` in bigint arithmetic, half to
-  even. The result converts exactly. A tie it sees is a true tie, since an inexact quotient has its low bit set.
+  exponent is under -1022, `roundedShift` rounds the quotient to a multiple of `2 ** -1074` in bigint arithmetic, half
+  to even. The result converts exactly. A tie it sees is a true tie, since an inexact quotient has its low bit set.
 
 `scaledByPowerOfTwo` multiplies in steps of at most `2 ** 1023`, the largest power of two a double holds. One
 multiplication can underflow. For `1/2 ** 1020` the quotient `2 ** 64` scales back by `2 ** -1084`, which is `0` as a
@@ -107,14 +107,14 @@ under the names the Rewriter emitted. The `bundle` view of the declarations desc
 ### The wrapper
 
 `wrapperFor` writes the module a build imports. It holds the entry's emitted Module behind the raw door, the
-interpreter, and the Descriptor that says how one reads the other. Everything the compiler knew about the boundary is in that
-JSON, so a browser marshals without a compiler. It runs the boundary `loadModule` runs, with the compiler's half
-spent at build time.
+interpreter, and the Descriptor that says how one reads the other. Everything the compiler knew about the boundary is
+in that JSON, so a browser marshals without a compiler. It runs the boundary `loadModule` runs, with the compiler's
+half spent at build time.
 
 The wrapper imports the runtime by the package specifier the served Modules use, and the host resolves both to one
-module. So the Type key the interpreter stamps on values is the key the Module's own Functions read. The interpreter is
-imported by its package name too, `@essence-lang/client/marshal-runtime`, and the host resolves it. A copy the plugin
-resolved itself would bring a second `EssenceRational`, whose values the first copy's `instanceof` refuses.
+module. So the Type key the interpreter stamps on values is the key the Module's own Functions read. The interpreter
+is imported by its package name too, `@essence-lang/client/marshal-runtime`, and the host resolves it. A copy the
+plugin resolved itself would bring a second `EssenceRational`, whose values the first copy's `instanceof` refuses.
 
 The bridge imports only the runtime files the boundary needs, as `runtimeBridgeModules` lists them. It asks the
 questions the bridge injected into a `loadModule` bundle asks. A Module whose boundary names no Dictionary brings no
@@ -179,10 +179,10 @@ script, under `bun test` and under `bun --hot`. A `preload` in `bunfig.toml` reg
 
 The two hosts offer specifiers differently. The bundler follows esbuild: a resolver sees the specifier as written and
 the namespace of the module that wrote it. The runtime offers a specifier spelled `scheme:rest` to the resolvers
-registered for that scheme as their namespace, with the scheme taken off. It offers a specifier with no `.` and no `:`,
-such as a package name, to no plugin at all. So each resolver is registered once with no namespace, for the bundler
-and for files under the runtime. It is registered once more under its scheme, for served modules under the runtime.
-`withScheme` reads a specifier with the scheme on or off.
+registered for that scheme as their namespace, with the scheme taken off. It offers a specifier with no `.` and no
+`:`, such as a package name, to no plugin at all. So each resolver is registered once with no namespace, for the
+bundler and for files under the runtime. It is registered once more under its scheme, for served modules under the
+runtime. `withScheme` reads a specifier with the scheme on or off.
 
 The packages every served module imports by name, the runtime and the interpreter, go through no hook. The plugin
 resolves them from the root and writes the resolved files into the served text. A served module has no `resolveDir`
@@ -208,8 +208,9 @@ those. Under `Bun.build` the same check finds nothing moved, at the cost of a `s
 
 ## Declaration files
 
-`generateDeclarations` in `dts.ts` prints a Module as TypeScript from the Descriptor the interpreter marshals by. Every
-rule a value crosses by is written once, on the compiler's side, and a declaration file reads it in the other language.
+`generateDeclarations` in `dts.ts` prints a Module as TypeScript from the Descriptor the interpreter marshals by.
+Every rule a value crosses by is written once, on the compiler's side, and a declaration file reads it in the other
+language.
 
 There are two views, because a bundler serves two doors into one Module. The wrapper hands over JavaScript, which the
 `javascript` view declares. Behind it, `?raw` serves the emitted Module itself, which the `bundle` view declares. A
@@ -246,9 +247,9 @@ is the one identity that survives a Descriptor being written down. Two Types tha
 TypeScript anyway, since it compares by shape. Printing the name makes a generated file read like its source.
 
 A Type Alias is declared once, in its out-form. `crossesDifferently` decides whether a Parameter may still go by the
-name. Where the two directions print differently, the shape is spelled out at the Parameter instead. A callback member, a
-nested `Optional` and a member with a default all differ. The difference then lands on the member it belongs to.
-Refusals are asked before the names, so an alias for a callback is refused where it is passed in.
+name. Where the two directions print differently, the shape is spelled out at the Parameter instead. A callback
+member, a nested `Optional` and a member with a default all differ. The difference then lands on the member it belongs
+to. Refusals are asked before the names, so an alias for a callback is refused where it is passed in.
 
 ### Unions and Cases
 
@@ -270,8 +271,8 @@ writes `Shape.Circle({ radius: 3n })` and annotates it `Shape`. A Case construct
 copies the payload with the tag added and marshals nothing. So its declaration is generic, taking any payload the
 boundary accepts and answering that payload with the tag. `Shape.Circle({ radius: 3 })` is then an `Input<Shape>`,
 since it holds a number until it crosses. The Type Parameter is named `Payload_`, and no Essence name holds an
-underscore, so it shadows nothing. Only a bare Case is `readonly`. The table is frozen either way, but a bare string is
-the one member a reader might take for a slot rather than a name.
+underscore, so it shadows nothing. Only a bare Case is `readonly`. The table is frozen either way, but a bare string
+is the one member a reader might take for a slot rather than a name.
 
 A Namespace leaves out a Case whose name it also declares, because `bindNamespace` lets the Namespace's own member
 replace the constructor.
@@ -290,23 +291,23 @@ required one when labels tell them apart. There the positional declaration keeps
 `T | undefined`, which a positional JavaScript call has to pass. The labelled form marks it optional. It is declared
 exactly where `labelsOf` lets the interpreter answer a labelled call.
 
-A Parameter is named by its label. A `_` Parameter has none, and a label TypeScript would misread, such as `first?`, is
-no better. Both fall back to `p` and the position, prefixed with `_` until no other Parameter has that name.
+A Parameter is named by its label. A `_` Parameter has none, and a label TypeScript would misread, such as `first?`,
+is no better. Both fall back to `p` and the position, prefixed with `_` until no other Parameter has that name.
 
 ## The interpreter
 
 `marshal-runtime.ts` is the run-time half of the boundary: every conversion, refusal and call, over Descriptors rather
-than Types. A bundler ships it to a browser, so it must not reach the compiler. Its imports that lead to compiler files
-are `import type`, which is erased, and `descriptor.spec.ts` checks every specifier the bundled file reaches. Beside
-`errors.ts` and `rational.ts`, its one value import is `bare-cases.ts`. That file holds a rule, imports `./descriptor`
-for types alone, and is shared with `dts.ts` so the two never disagree.
+than Types. A bundler ships it to a browser, so it must not reach the compiler. Its imports that lead to compiler
+files are `import type`, which is erased, and `descriptor.spec.ts` checks every specifier the bundled file reaches.
+Beside `errors.ts` and `rational.ts`, its one value import is `bare-cases.ts`. That file holds a rule, imports
+`./descriptor` for types alone, and is shared with `dts.ts` so the two never disagree.
 
 ### Two directions
 
 The two directions are not mirror images. Coming out, a value says what it is. Every Essence value but a Function
-carries its Type on the bundle's Type key, and `toJS` reads that tag. A Function carries nothing, so the Descriptor its
-position declared travels beside it, through Record members and List items. Where that Descriptor names exactly one
-signature, the Function crosses as a callable that marshals around its calls.
+carries its Type on the bundle's Type key, and `toJS` reads that tag. A Function carries nothing, so the Descriptor
+its position declared travels beside it, through Record members and List items. Where that Descriptor names exactly
+one signature, the Function crosses as a callable that marshals around its calls.
 
 Going in, a JavaScript value says nothing. `7` could be an Integer, a Rational, an `Optional<Integer>` or one arm of a
 Union. What the Module declared decides, so the way in is built from the Descriptor. A Function goes both ways, and
@@ -317,9 +318,9 @@ crossing in. So each direction reaches the other, and every rule is written once
 
 Every Descriptor is fixed when the Module is built. Each question the interpreter asks of a shape has one answer for
 the life of a binding. `compileIn` and `compileOut` ask them once per Descriptor node and keep the closure that
-answers, in a `WeakMap` keyed by the node. A call runs closures and touches no Descriptor. A Descriptor nobody holds any
-more takes its closures with it. A Descriptor is a tree, since `describe` answers a Type that reaches itself with a
-`refused` node. Compiling a node's children while compiling the node therefore terminates.
+answers, in a `WeakMap` keyed by the node. A call runs closures and touches no Descriptor. A Descriptor nobody holds
+any more takes its closures with it. A Descriptor is a tree, since `describe` answers a Type that reaches itself with
+a `refused` node. Compiling a node's children while compiling the node therefore terminates.
 
 An answer has a table of its own. A Future is work everywhere else and a `Promise` as an answer, and one Descriptor
 node can stand in both positions through a Type Alias. One table would hand both positions whichever rule was compiled
@@ -338,9 +339,9 @@ afterwards. It would need a Type whose Case identities are the compiling machine
 carry entry-relative tags. Translating one into the other would be a second copy of the rule `emittedIdentity` states.
 
 A Record or a payload Case the interpreter builds is tagged in place. The bridge's constructor would copy it into a
-second object. The result has the runtime's own shape, with the members and the Type key on
-one object, as the Rewriter writes a static construction. Only objects the interpreter made itself are tagged this way,
-and a host is still handed the copying constructors.
+second object. The result has the runtime's own shape, with the members and the Type key on one object, as the
+Rewriter writes a static construction. Only objects the interpreter made itself are tagged this way, and a host is
+still handed the copying constructors.
 
 A Case payload default is the one value built from nothing a host handed over. A Case is built where it is written,
 and no callee stands between the host's object and the Case to fill a default in. `buildFill` builds it once, when the
@@ -348,16 +349,16 @@ reader is compiled, and every value that leaves the member out shares it, since 
 
 The Dictionary and Future doors of the bridge exist only where the boundary names a Dictionary or work, as
 `runtimeBridgeModules` decides. Where one is missing, a Descriptor that names it comes from another compile. The shape
-then compiles to a refusal that says so, such as `noDictionaryDoor`. A Record coming out can also carry a Dictionary in
-a member its position never declared, which meets the same refusal.
+then compiles to a refusal that says so, such as `noDictionaryDoor`. A Record coming out can also carry a Dictionary
+in a member its position never declared, which meets the same refusal.
 
 ### Bare Case names
 
 Whether a Case crosses as a bare string is a fact about its Choice, and a value carries nothing that says so. A
-declared position knows it, but `toJS` with nothing declared does not. `bareCaseNames` reads every unit Choice Case the
-Module names, once, so `toJS` answers the same string either way and a host can hand it back. The table is complete for
-what a host can reach, since a value leaves only through an export, and an export names its Type. That is why an
-interpreter requires the Module.
+declared position knows it, but `toJS` with nothing declared does not. `bareCaseNames` reads every unit Choice Case
+the Module names, once, so `toJS` answers the same string either way and a host can hand it back. The table is
+complete for what a host can reach, since a value leaves only through an export, and an export names its Type. That is
+why an interpreter requires the Module.
 
 ### List boxes
 
@@ -372,10 +373,10 @@ the natives to read again. The interpreter reads it once and hands JavaScript an
 box's Array would let a host edit a value the Module still holds.
 
 A positional write changes the back run in place and counts a version up, which leaves the run's other boxes behind.
-`packages/runtime/src/listWrites.ts` is the authority. A box's `writes` holds the log of what each write overwrote, and
-the version this box views. `backRunSeenBy` undoes the writes made since, into a copy of the box's own view. It repeats
-the runtime's `caughtUp` rather than importing it, because `caughtUp` writes the replayed run back onto the box. The
-runtime repairs such a box wherever it reads one. `tests/undoReplay.spec.ts` holds this copy and the one in
+`packages/runtime/src/listWrites.ts` is the authority. A box's `writes` holds the log of what each write overwrote,
+and the version this box views. `backRunSeenBy` undoes the writes made since, into a copy of the box's own view. It
+repeats the runtime's `caughtUp` rather than importing it, because `caughtUp` writes the replayed run back onto the
+box. The runtime repairs such a box wherever it reads one. `tests/undoReplay.spec.ts` holds this copy and the one in
 `tools/bench.ts` against the runtime's own.
 
 ### List loops
@@ -385,8 +386,8 @@ calls a converter it is handed can not see what it calls. Every List would reach
 sees Integers, Strings and whole Lists in turn. The engine then makes an out-of-line call per item, and decides
 differently from run to run. So an Integer, a String and a Boolean each have a loop of their own. Their admission is
 written there as well as in the branch of `buildIn` that compiles the leaf alone. The two spellings are one rule: a
-value inside a List is the same value met alone, so a difference between them is a bug. A Rational goes through the general loop,
-because its admission outweighs the call. `BENCH.md` has the measurement.
+value inside a List is the same value met alone, so a difference between them is a bug. A Rational goes through the
+general loop, because its admission outweighs the call. `BENCH.md` has the measurement.
 
 A hole in an Array is read as the `undefined` it holds, and admitted only where the item's shape admits absence.
 `[1, , 3]` is refused where the items are Integers. It crosses with `#Empty` in the middle where they are
@@ -404,11 +405,11 @@ arm could take the `undefined` an earlier one refused. A Union whose arms collid
 with, as "Bare Cases" describes.
 
 Three shortcuts change no answer. `familiesOf` lists the JavaScript kinds each arm could take, and an arm that rules
-out the value's kind is skipped. An arm refuses by throwing, and a thrown Error captures a stack, so failing arms would
-otherwise dominate a large call. A skipped arm never recognised the value, so it could neither have taken it nor given
-the refusal worth reporting. A Union of bare Cases alone reads a string from a table built when the reader is compiled,
-under both spellings of each Case. An object whose `$case` names an arm goes to that arm alone, whose refusal is the one
-the search would report. A miss in either table falls through to the arms.
+out the value's kind is skipped. An arm refuses by throwing, and a thrown Error captures a stack, so failing arms
+would otherwise dominate a large call. A skipped arm never recognised the value, so it could neither have taken it nor
+given the refusal worth reporting. A Union of bare Cases alone reads a string from a table built when the reader is
+compiled, under both spellings of each Case. An object whose `$case` names an arm goes to that arm alone, whose
+refusal is the one the search would report. A miss in either table falls through to the arms.
 
 When every arm refuses, the refusal reported is the one from the arm that got inside the value, if exactly one did.
 `reachedInside` says so when the failure's path is deeper than the value's, or when the failure is marked `inside`. A
@@ -436,17 +437,18 @@ names the Function the host passed. The path is spelled once, when the callback 
 meets the Future door's check on arrival too, while a host can still be told.
 
 A callback declared `-> Future<T>` is how work crosses into a Module. The host writes an ordinary Function answering a
-`Promise`, and the Module gets a Future. A Future is a description, so the host is called at every start and no sooner.
-A host's `(url) => fetch(url)` handed to such a Parameter makes no request until started, and `::attempt(times 3)` over
-it makes three. The Arguments cross when the Module calls the callback, rather than when the work starts. They belong
-to the moment the Module built the Future. A `Started` answer has no door, since a host can not start a run of the
-Module's own work. It meets the refusal in `buildIn`.
+`Promise`, and the Module gets a Future. A Future is a description, so the host is called at every start and no
+sooner. A host's `(url) => fetch(url)` handed to such a Parameter makes no request until started, and `::attempt(times
+3)` over it makes three. The Arguments cross when the Module calls the callback, rather than when the work starts.
+They belong to the moment the Module built the Future. A `Started` answer has no door, since a host can not start a
+run of the Module's own work. It meets the refusal in `buildIn`.
 
 ### The way out
 
 The way out is not the mirror of the way in. A value coming out says what it is, so a compiled reader only checks the
 tag against the shape its position declared. Where the two agree, nothing inside the value needs deciding. Otherwise,
-as for a value from an arm the Descriptor did not name, the reader hands the value to the general walk, `toJS`. The compiled reader is an optimisation of that walk, not a second reading.
+as for a value from an arm the Descriptor did not name, the reader hands the value to the general walk, `toJS`. The
+compiled reader is an optimisation of that walk, not a second reading.
 
 An Integer always comes out as a bigint. The runtime holds an Integer as a number while it fits one and as a bigint
 beyond. Passing that split on would make the Type a host receives depend on the size of the answer.
@@ -456,17 +458,17 @@ An `Optional` is transparent: its Case does not appear in the answer, and the pa
 Union's `Optional` arms to that walk in the same way.
 
 For a Union, the reader compiles the choosing: one reader per Case the Union offers, under the tag its values carry.
-Every other arm goes through the general walk. A Union the way in refuses for colliding bare Cases is refused going out
-too. A host is never handed a value it could not hand back.
+Every other arm goes through the general walk. A Union the way in refuses for colliding bare Cases is refused going
+out too. A host is never handed a value it could not hand back.
 
 A Function is the one untagged value, so only the Descriptor of its position says what a call to it means.
 
 ### Work crossing out
 
 `buildAnswerOut` is the only place the boundary starts anything. A call's answer that is a Future is started there,
-once per call, since a Future describes work and two calls are two runs. Each run belongs to a root context of its own,
-with the host's signal linked above it where the binding has one. The Rewriter likewise emits a fresh root per site at
-a Program's top level.
+once per call, since a Future describes work and two calls are two runs. Each run belongs to a root context of its
+own, which the host's signal aborts where the binding has one. The Rewriter likewise emits a fresh root per
+site at a Program's top level.
 
 A Started is already in flight and is not started again: what crosses is the promise it holds. The host's signal is
 not linked to it, and an aborted host signal does not decline it. A run belongs to whoever started it and may be
