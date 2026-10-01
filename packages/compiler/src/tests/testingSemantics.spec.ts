@@ -1565,7 +1565,7 @@ describe("Tests Section Semantics", () => {
 
 		// The Namespace declares the Type Parameter it can not see.
 		it("offers a generic Function value a Namespace that infers its Types", () => {
-			let generic = `function generic<T>(_ x: T) -> T {
+			let generic = `function generic<infer T>(_ x: T) -> T {
 				<- x
 			}`
 			let snapshot = `tests {

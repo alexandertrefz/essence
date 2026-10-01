@@ -1775,7 +1775,7 @@ describe("Choices", () => {
 
 		it("tells an unbounded Type Parameter what to declare", () => {
 			let source = `implementation { ${boundedBox}
-				function wrap<Value>(_ value: Value) -> Box<Value> {
+				function wrap<infer Value>(_ value: Value) -> Box<Value> {
 					<- #Full({ value = value })
 				}
 			}`
@@ -1791,7 +1791,7 @@ describe("Choices", () => {
 		it("carries that Parameter and Protocol as data", () => {
 			expect(
 				diagnosticsOf(`implementation { ${boundedBox}
-					function wrap<Value>(_ value: Value) -> Box<Value> {
+					function wrap<infer Value>(_ value: Value) -> Box<Value> {
 						<- #Full({ value = value })
 					}
 				}`)[0].data,
@@ -2362,7 +2362,7 @@ describe("Choices", () => {
 			// the bound.
 			it("still reports an unbounded Type Parameter at the annotation", () => {
 				let source = `implementation { ${holder}
-					function bare<Item>() -> Holder<Item> { <- Holder#Bare }
+					function bare<infer Item>() -> Holder<Item> { <- Holder#Bare }
 				}`
 
 				expect(codesOf(source)).toEqual(["unsatisfied-bound"])

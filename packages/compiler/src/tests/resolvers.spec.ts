@@ -666,7 +666,7 @@ describe("Resolvers", () => {
 				diagnosticsFor(`implementation {
 					${ranked}
 
-					function take<Item>(_ item: Item) -> Ranked<Item> {
+					function take<infer Item>(_ item: Item) -> Ranked<Item> {
 						<- { value = item }
 					}
 				}`).map((diagnostic) => diagnostic.helps),

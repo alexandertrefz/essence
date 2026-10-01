@@ -16,7 +16,9 @@ implementation {
 		}
 	}
 
-	function firstOf<ItemType>(_ items: List<ItemType>) -> Optional<ItemType> {
+	function firstOf<infer ItemType>(
+		_ items: List<ItemType>,
+	) -> Optional<ItemType> {
 		<- items::firstItem()
 	}
 

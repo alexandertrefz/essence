@@ -102,6 +102,7 @@ import {
 	reportSpecifierIsNotANamespace,
 	reportSpecifierNamesNoValue,
 } from "./specifiers"
+import { inferringRefused } from "./typeParameters"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
 // Lookups and Literals from their enriched children, conformance solving, and
@@ -2167,7 +2168,11 @@ export function resolveFunctionSignatureType(
 
 	return {
 		type: "Function",
-		generics: resolveGenericDeclarations(node.generics, scope),
+		generics: inferringRefused(
+			resolveGenericDeclarations(node.generics, scope),
+			node.generics,
+			new Set(),
+		),
 		parameterTypes: resolveParameterTypes(node, functionScope),
 		returnType: resolveDeclaredType(node.returnType, functionScope),
 		documentation: resolvedDocumentation(
@@ -2187,7 +2192,11 @@ function resolveFreeFunctionEntry(
 	let functionScope = scopeWithGenerics(signature.generics, scope)
 
 	return {
-		generics: resolveGenericDeclarations(signature.generics, scope),
+		generics: inferringRefused(
+			resolveGenericDeclarations(signature.generics, scope),
+			signature.generics,
+			new Set(),
+		),
 		parameterTypes: resolveParameterTypes(signature, functionScope),
 		returnType: resolveDeclaredType(signature.returnType, functionScope),
 		documentation: resolvedDocumentation(
@@ -10533,7 +10542,11 @@ export function resolveMethodType(
 			scope,
 		)
 		let methodScope = scopeWithGenerics(split.own, scope)
-		let entryGenerics = resolveGenericDeclarations(split.own, scope)
+		let entryGenerics = inferringRefused(
+			resolveGenericDeclarations(split.own, scope),
+			split.own,
+			new Set(namespaceGenerics.map((generic) => generic.name)),
+		)
 
 		let signature = {
 			parameterTypes: [

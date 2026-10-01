@@ -3317,6 +3317,31 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("uninferred-type-parameter", () => {
+		it("should write the marker in front of a Function's Parameter", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction plain<Item>(_ item: Item) -> Item {",
+				"\t\t<- item",
+				"\t}",
+				"",
+				"\tTerminal.inspect(plain(5))",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Declare it as 'infer Item'")
+			expect(fix.isPreferred).toBe(true)
+			expect(result[1]).toBe(
+				"\tfunction plain<infer Item>(_ item: Item) -> Item {",
+			)
+
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("at-in-static-method", () => {
 		it("should drop the Keyword in front of the Method's name", () => {
 			let lines = [
@@ -7521,6 +7546,7 @@ describe("A Diagnostic the analysis did not produce", () => {
 			"literal-match-shape",
 			"unexpected-payload",
 			"uninferred-namespace-parameter",
+			"uninferred-type-parameter",
 			"unknown-modifier",
 			"where-on-protocol-extension",
 		]

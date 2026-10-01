@@ -11,7 +11,6 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
-import { oneBoundOnly } from "../helpers/bounds"
 import { providedMethodProtocol } from "../helpers/conformance"
 import {
 	asynchronyData,
@@ -188,6 +187,11 @@ import {
 	unimportedNamespacesOf,
 } from "./scope"
 import { namespaceLookupWording, specifierWasRefused } from "./specifiers"
+import {
+	namespaceParameterNames,
+	refuseDuplicateTypeParameters,
+	refuseUndecidedTypeParameters,
+} from "./typeParameters"
 
 // Hoisting resolves each order-independent declaration's Type up front, keyed
 // by its Node, and the in-order enrichment reuses it. A Node absent from the
@@ -1680,6 +1684,11 @@ export function enrichMethodFunctionDefinition(
 	// `scope` and `selfType` already carry any injected bounds. The Method's
 	// own Type Parameters are registered as GenericUses for its signature and
 	// body.
+	refuseUndecidedTypeParameters(
+		method.value.generics,
+		namespaceParameterNames(scope),
+	)
+
 	let newScope = methodScope(method.value.generics, scope, selfType, isStatic)
 
 	if (methodName !== null) {
@@ -1780,6 +1789,7 @@ function enrichFunctionDefinition(
 	scope: enricher.Scope,
 ): common.typed.FunctionDefinitionNode {
 	refuseDuplicateTypeParameters(node.generics)
+	refuseUndecidedTypeParameters(node.generics, new Set())
 
 	// Declared Type Parameters are opaque GenericUses in the body; each call
 	// site binds them through inference.
@@ -6151,62 +6161,6 @@ function enrichNamespaceDefinitionStatement(
 		]),
 		type,
 		documentation: node.documentation,
-	}
-}
-
-// One `<…>` naming a Type Parameter twice. Readers key a Generic list by name
-// and the last writing wins, so `<Item is Comparable, Item is Printable>` would
-// drop a bound silently. Checked here, not in the Parser, so the formatter
-// still handles the file. A Method's list is checked as written.
-function refuseDuplicateTypeParameters(
-	generics: Array<parser.GenericDeclarationNode>,
-): void {
-	if (generics.length < 2) {
-		return
-	}
-
-	let first = new Map<string, parser.GenericDeclarationNode>()
-
-	for (let entry of generics) {
-		let name = entry.name.content
-		let seen = first.get(name)
-
-		if (seen === undefined) {
-			first.set(name, entry)
-
-			continue
-		}
-
-		// Two bounds on one Parameter is a different mistake: the language has
-		// no spelling for both. `oneBoundOnly` words it.
-		let carried = seen.constraint?.content ?? null
-		let wanted = entry.constraint?.content ?? null
-		let bothBounded = carried !== null && wanted !== null
-
-		reportError(
-			`Type Parameter '${name}' is declared twice`,
-			entry.position,
-			{
-				code: "duplicate-type-parameter",
-				labels: [
-					primary(
-						entry.position,
-						bothBounded
-							? "this bound replaces the one above"
-							: "declared a second time here",
-					),
-					secondary(seen.position, "first declared here"),
-				],
-				notes: bothBounded ? oneBoundOnly(name, carried!, wanted!) : [],
-				helps: bothBounded
-					? [
-							`Keep the one the body needs: write '<${name} is ${carried}>' or '<${name} is ${wanted}>', not both.`,
-						]
-					: [
-							`Remove the second '${name}', or give it a name of its own.`,
-						],
-			},
-		)
 	}
 }
 

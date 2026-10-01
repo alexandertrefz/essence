@@ -437,7 +437,7 @@ describe("Contract tests", () => {
 			<- @::add(1)
 		}
 
-		wrapped<Item>(_ item: Item) -> Integer {
+		wrapped<infer Item>(_ item: Item) -> Integer {
 			<- @
 		}
 	}`)

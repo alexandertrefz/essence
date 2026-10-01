@@ -346,6 +346,7 @@ export type DiagnosticCode =
 	| "type-not-generic"
 	| "infer-on-applied-parameter"
 	| "uninferred-namespace-parameter"
+	| "uninferred-type-parameter"
 	| "zero-denominator"
 	| "invalid-refinement-predicate"
 	| "predicate-not-boolean"

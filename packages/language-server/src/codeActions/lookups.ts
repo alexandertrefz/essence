@@ -157,8 +157,8 @@ export function findVariableDeclaration(
 	return found
 }
 
-// The Type Parameter at a Position, on a Choice or Type Alias, which may not
-// mark it `infer`, or a Namespace, which must. Functions are never reported.
+// The Type Parameter at a Position. A Choice or a Type Alias may not mark it
+// `infer`, and a Namespace or a Function must.
 export function findTypeParameter(
 	program: parser.Program,
 	position: common.Position,
@@ -166,15 +166,13 @@ export function findTypeParameter(
 	let found: parser.GenericDeclarationNode | null = null
 
 	walk(program, (node) => {
-		if (
-			node.nodeType !== "NamespaceDefinitionStatement" &&
-			node.nodeType !== "ChoiceDeclarationStatement" &&
-			node.nodeType !== "TypeAliasStatement"
-		) {
+		let generics = typeParametersOf(node)
+
+		if (generics === null) {
 			return true
 		}
 
-		for (let generic of node.generics) {
+		for (let generic of generics) {
 			if (isSamePosition(generic.position, position)) {
 				found = generic
 
@@ -186,6 +184,23 @@ export function findTypeParameter(
 	})
 
 	return found
+}
+
+// The `<…>` a declaration writes, or null for a Node that writes none.
+function typeParametersOf(
+	node: parser.ImplementationNode,
+): Array<parser.GenericDeclarationNode> | null {
+	switch (node.nodeType) {
+		case "NamespaceDefinitionStatement":
+		case "ChoiceDeclarationStatement":
+		case "TypeAliasStatement":
+			return node.generics
+		case "FunctionStatement":
+		case "FunctionValue":
+			return node.value.generics
+		default:
+			return null
+	}
 }
 
 // The Case construction whose payload stands at a Position. Only the

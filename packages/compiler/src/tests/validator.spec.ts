@@ -3290,19 +3290,29 @@ describe("Validator", () => {
 					])
 				})
 
-				// An `Item` the call can not bind is the Declaration's opaque
-				// symbol. The admission answers `Filled<String>`, which ordinary
-				// assignability refuses for `Filled<Item>`.
+				// Inside the Namespace, `@` binds `Item` to the Declaration's
+				// opaque symbol. The admission answers `Filled<String>`, which
+				// ordinary assignability refuses for `Filled<Item>`.
 				it("should refuse a written List against an opaque Type Parameter", () => {
-					let diagnostics = diagnosticsFor(
-						withCountOf(
-							`Terminal.inspect(countOf(["a"]))`,
-							"<Item>",
-						),
+					let { diagnostics } = enrich(
+						parse(`implementation {
+						type Filled<Item> = List<Item> where @::hasItems()
+
+						namespace Boxes<infer Item> for List<Item> {
+							counted(_ items: Filled<Item>) -> Integer {
+								<- items::length()
+							}
+
+							again() -> Integer {
+								<- @::counted(["a"])
+							}
+						}
+					}`),
 					)
 
-					expect(diagnostics).toHaveLength(1)
-					expect(diagnostics[0].code).toBe("argument-type-mismatch")
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.code),
+					).toEqual(["no-matching-overload"])
 				})
 			})
 

@@ -417,6 +417,17 @@ witness view exist, and they still agree.
 name shadows it, and the merged list does not say which is which. An entry that only bounds the Namespace's
 Parameter declares nothing and counts as neither.
 
+## Function Type Parameters
+
+A call writes no Type Arguments, so a Function's own Type Parameter is decided by `infer` or by a default, and by
+nothing else. One with neither is refused where it is declared (`uninferred-type-parameter`, in
+`typeParameters.ts`), for a free Function, a Method and a static Method alike. A Method's entry naming its
+Namespace's Parameter is a bound, and `refuseMalformedMethodBounds` answers it instead. Only a Method's own `<…>`
+is read that way: a Function written inside a Method's body declares Parameters of its own, whatever their names.
+
+Once refused, the Parameter resolves as `infer` (`inferringRefused`). Each call is then checked as the Help would
+have it, so it reports nothing beyond the refusal.
+
 ## Parameter defaults
 
 A default, `= expression` on a Parameter, is evaluated per call in the callee's own frame. So it is checked for its

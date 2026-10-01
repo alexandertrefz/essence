@@ -1745,7 +1745,7 @@ describe("Enricher", () => {
 			// not substitute into itself.
 			expect(
 				diagnosticsFor(`implementation {
-					function myCount<State>(
+					function myCount<infer State>(
 						startingWith state: State,
 						step advance: (_: State) -> State,
 					) -> State {
@@ -1762,7 +1762,7 @@ describe("Enricher", () => {
 		// rather than `Step`'s `State`.
 		it("freshens a Choice's own Generics against a same-named caller Generic", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
-				function myCount<State>(
+				function myCount<infer State>(
 					startingWith state: State,
 					step advance: (_: State) -> State,
 				) -> State {
@@ -2622,7 +2622,7 @@ describe("Enricher", () => {
 
 		it("should reserve Self as a Generic name", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				function identity <Self>(_ value: Self) -> Self {
+				function identity <infer Self>(_ value: Self) -> Self {
 					<- value
 				}
 			}`)
@@ -4096,6 +4096,77 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual([
 				"Declare it as 'infer Item'.",
 			])
+		})
+
+		// A call writes no Type Arguments, so only `infer` or a default decides a
+		// Function's Type Parameter. The calls are checked as the Help would
+		// have them, and add nothing.
+		it("should reject Function Type Parameters written without 'infer'", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function plain<Item>(_ item: Item) -> Item {
+					<- item
+				}
+
+				namespace Boxes<infer Item> for List<Item> {
+					paired<Other>(_ other: Other) -> List<Item> {
+						<- @
+					}
+				}
+
+				Terminal.inspect(plain(5))
+				Terminal.inspect([1]::paired("a"))
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps,
+				]),
+			).toEqual([
+				["uninferred-type-parameter", ["Write 'infer Item'."]],
+				["uninferred-type-parameter", ["Write 'infer Other'."]],
+			])
+		})
+
+		// A default decides the Parameter, and a Method's entry naming the
+		// Namespace's own Parameter is a bound.
+		it("should accept a defaulted Function Type Parameter and a Method bound", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function fallback<Value = String>(_ value: Value) -> Value {
+						<- value
+					}
+
+					namespace Lists<infer Item> for List<Item> {
+						holds<Item is Equatable>(_ item: Item) -> Boolean {
+							<- @::contains(item)
+						}
+					}
+
+					Terminal.inspect(fallback("a"))
+					Terminal.inspect([1]::holds(1))
+				}`),
+			).toEqual([])
+		})
+
+		// Only a Method's own `<…>` may name the Namespace's Parameter. A
+		// Function inside the body declares one of its own by that name.
+		it("should reject a Function in a Method body that reuses the Namespace's name", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Lists<infer Item> for List<Item> {
+						described() -> String {
+							function helper<Item>(_ x: Item) -> Item {
+								<- x
+							}
+
+							<- "{helper(1)}"
+						}
+					}
+
+					Terminal.print([1]::described())
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["uninferred-type-parameter"])
 		})
 
 		// Bounds decide which Overload is selected, so the order of entries does
@@ -9462,7 +9533,7 @@ describe("Enricher", () => {
 				expect(
 					narrowedTypeOf(
 						`implementation {
-							function probe<Item>(_ items: List<Item>) -> Integer {
+							function probe<infer Item>(_ items: List<Item>) -> Integer {
 								if items::hasItems() {
 									Terminal.inspect(items)
 								}

@@ -1349,7 +1349,7 @@ declarations {
 			"Functions.es",
 			`declarations {
 				§§ Answers with the value it was given.
-				function identity <Item>(_ value: Item) -> Item {
+				function identity <infer Item>(_ value: Item) -> Item {
 					<- value
 				}
 			}`,
@@ -1717,7 +1717,7 @@ declarations {
 					"Identity.es",
 					`declarations {
 						§§ Answers with the value it was given.
-						function identity <Item>(_ value: Item) -> Item
+						function identity <infer Item>(_ value: Item) -> Item
 					}`,
 				]),
 			).toThrow()
@@ -1729,7 +1729,7 @@ declarations {
 				"Identity.es",
 				`declarations {
 					§§ Answers with the value it was given.
-					function identity <Item>(_ value: Item) -> Item {
+					function identity <infer Item>(_ value: Item) -> Item {
 						<- value
 					}
 				}`,

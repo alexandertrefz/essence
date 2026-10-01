@@ -574,6 +574,8 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"ungeneratable-type": makeGeneratableAction,
 	"uninferred-namespace-parameter": ({ diagnostic, program, lines }) =>
 		listed(inferParameterAction(diagnostic, program, lines)),
+	"uninferred-type-parameter": ({ diagnostic, program, lines }) =>
+		listed(inferParameterAction(diagnostic, program, lines)),
 	// The span is the name without its `#`, so only the title shows the `#`.
 	"unknown-case": ({ diagnostic, lines }) =>
 		listed(

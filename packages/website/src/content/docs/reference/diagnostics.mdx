@@ -2393,6 +2393,35 @@ Quick Fix: **Declare it as 'infer Item'**.
 
 Taught on: [Generics › A namespace infers from its receiver](/docs/language/generics#a-namespace-infers-from-its-receiver)
 
+### `uninferred-type-parameter`
+
+**Error.** A function or a method declares a type parameter without `infer` and without a default. A call writes no type arguments, so only `infer` lets one bind it. A method's `<Item is Comparable>` that bounds its namespace's own `Item` is a bound, not a type parameter of the method, and is not refused here. A function written inside a method declares type parameters of its own, so it is held to this like any other.
+
+<div class="error-output">
+
+```
+[uninferred-type-parameter]
+Error: Type Parameter 'Item' needs 'infer' or a default
+   ╭─┤ Plain.es:2:17 │
+   │
+ 2 │     function plain<Item>(_ item: Item) -> Item {
+   │                    ──┬─  
+   │                      ╰─── nothing can ever bind this Parameter
+   │ 
+   │ Help: Write 'infer Item'.
+   │ 
+   │ Note: A Function's Type Parameters are worked out from the Arguments at every call, which is what 'infer' says, or taken from a default. A call writes no Type Arguments.
+───╯
+```
+
+</div>
+
+Write `infer`: `function plain<infer Item>(_ item: Item) -> Item`. A call to the function is checked as if `infer` were written, so it reports nothing further.
+
+Quick Fix: **Declare it as 'infer Item'**.
+
+Taught on: [Generics › Only the arguments bind](/docs/language/generics#only-the-arguments-bind)
+
 ### `zero-denominator`
 
 **Error.** A rational literal has a denominator of zero, such as `1/0`.

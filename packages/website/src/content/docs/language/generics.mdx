@@ -74,20 +74,22 @@ implementation {
 
 `twice` binds `Value` from its one argument. `lastOr` binds `Item` from both arguments together. In `lastOr([], fallback "none")` the empty list says nothing about its items, and `"none"` binds `Item` to `String`. The calls in its body are [`lastItem`](/docs/library/list#lastItem) and [`value(defaultingTo:)`](/docs/library/optional#value).
 
-`infer` is required. In TypeScript you write `<Value>`; here you write `<infer Value>`. A type parameter written without it is not refused where it is declared. No call can bind it, so every call fails, and the error names the argument rather than the missing `infer`. With `function identity<Value>(_ value: Value) -> Value`, the call `identity(1)` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch):
+`infer` is required. In TypeScript you write `<Value>`; here you write `<infer Value>`. A type parameter written without it, and without a [default](#defaults-for-type-parameters), could never be bound by a call, so it is refused where it is declared. `function identity<Value>(_ value: Value) -> Value` is [`uninferred-type-parameter`](/docs/reference/diagnostics#uninferred-type-parameter), and its calls report nothing further:
 
 <div class="error-output">
 
 ```
-[argument-type-mismatch]
-Error: This Argument does not fit Parameter 1
-   ╭─┤ identity.es:6:26 │
+[uninferred-type-parameter]
+Error: Type Parameter 'Value' needs 'infer' or a default
+   ╭─┤ identity.es:2:20 │
    │
- 6 │     Terminal.print(identity(1))
-   │                             ▲  
-   │                             ╰── this is an Integer
+ 2 │     function identity<Value>(_ value: Value) -> Value {
+   │                       ──┬──  
+   │                         ╰──── nothing can ever bind this Parameter
    │ 
-   │ Note: Parameter 1 is Value.
+   │ Help: Write 'infer Value'.
+   │ 
+   │ Note: A Function's Type Parameters are worked out from the Arguments at every call, which is what 'infer' says, or taken from a default. A call writes no Type Arguments.
 ───╯
 ```
 

@@ -4924,7 +4924,7 @@ describe("Workspace", () => {
 						"}",
 						"",
 						"implementation {",
-						"\tfunction measured<Item is Sized>(_ item: Item) -> Integer {",
+						"\tfunction measured<infer Item is Sized>(_ item: Item) -> Integer {",
 						"\t\t<- item::size()",
 						"\t}",
 						"",

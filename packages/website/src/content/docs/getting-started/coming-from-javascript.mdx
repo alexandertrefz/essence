@@ -206,7 +206,7 @@ A function declaration writes the type of every parameter and its return type. A
 | `function f(a, b = 1)` | [`function f(_ a: Integer, b: Integer = 1)`](/docs/language/functions), called as `f(1, b 5)` | [`argument-label-mismatch`](/docs/reference/diagnostics#argument-label-mismatch) for `f(1, 5)` |
 | `(product) => product.price` | [`.price`](/docs/reference/syntax-glossary#member-path) | — |
 | overload signatures | [`overload`](/docs/reference/syntax-glossary#overload) entries inside a namespace, each with its own body | — |
-| `function first<T>(items: T[]): T` | [`function first<infer T>(…)`](/docs/language/generics); TypeScript's `infer` keyword is unrelated | [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch) at the call |
+| `function first<T>(items: T[]): T` | [`function first<infer T>(…)`](/docs/language/generics); TypeScript's `infer` keyword is unrelated | [`uninferred-type-parameter`](/docs/reference/diagnostics#uninferred-type-parameter) at the declaration |
 | `identity<string>(x)` | none; every [type argument is inferred](/docs/reference/syntax-glossary#infer) | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
 
 ## Control flow

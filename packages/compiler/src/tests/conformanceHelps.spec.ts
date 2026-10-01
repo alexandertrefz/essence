@@ -690,7 +690,7 @@ describe("A Type in want of a conformance", () => {
 	// A Type Parameter of the culprit is not in scope where the Namespace
 	// stands, so the Namespace declares it, inferred from the value.
 	it("should declare the Type Parameters a Function value's Type mentions", () => {
-		let printed = `function pair<A, B>(_ a: A, _ b: B) -> A {
+		let printed = `function pair<infer A, infer B>(_ a: A, _ b: B) -> A {
 				<- a
 			}
 
