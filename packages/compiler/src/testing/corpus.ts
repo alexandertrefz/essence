@@ -7,32 +7,17 @@ import type {
 	TestEvent,
 } from "@essence-lang/runtime/Testing"
 
-// The store's shape is the RUNTIME's, re-exported here rather than
-// spelled again — unlike `SnapshotStore`, which is one alias of `Record<string,
-// string>` and costs nothing to write twice. What a counterexample looks like is
-// nested and typed, and two spellings of it would drift apart in silence.
+// The runtime's store shape, re-exported, since a nested Type spelled twice
+// drifts.
 export type {
 	CorpusStore,
 	StoredCounterexample,
 	StoredValue,
 } from "@essence-lang/runtime/Testing"
 
-// The STORED half of a property test — every value it has ever failed on,
-// kept so that the next run asks about them before it draws anything. It is the
-// same arrangement `matches snapshot` has next door, for the same reason: the
-// runtime never touches a file, so whoever starts a run reads the entries and
-// hands them over, and writes back whatever the run said about them.
-//
-// What makes this worth keeping at all is that a random search does not
-// find the same value twice. A seed would replay the case the search STARTED
-// from rather than the one it shrank to, and the printed counterexample does
-// not read back — so the only durable answer is the shrunk value written down
-// as data, which is what `encode` in the runtime's `Generators` answers with.
-
-// Beside the source and a sibling of `__snapshots__`, so that a
-// counterexample travels with the file it belongs to — a file that moves takes
-// the values that broke it with it, and a file that is deleted leaves nothing
-// behind that nothing names.
+// The values a property test has failed on, replayed before anything is drawn,
+// kept beside the source so they travel with their file. See "The
+// failing-example corpus" in DEVELOPMENT.md.
 export const CORPUS_DIRECTORY = "__counterexamples__"
 
 export function corpusFileOf(modulePath: string): string {
@@ -43,32 +28,19 @@ export function corpusFileOf(modulePath: string): string {
 	)
 }
 
-// The one version this file has. A file written by a later Compiler is
-// read as empty rather than half-understood: a corpus is an optimisation on top
-// of a search that still works without it, so the worst a wrong version can
-// cost is the values it held.
+// A file with another schema reads as no corpus, since a corpus only speeds up
+// a search.
 export const CORPUS_SCHEMA = 1
 
-// How many failing values one test keeps. Ten is enough that a property
-// with several distinct bugs holds a case for each, and few enough that a suite
-// re-running its whole corpus still runs while a reader waits. Beyond it the
-// oldest go: a value that has been re-run and held on every run for ten
-// failures is a value the search is no longer learning anything from.
+// How many failing values one test keeps. The oldest go first.
 export const CORPUS_LIMIT = 10
 
-// THE FORMAT, and the whole of it: JSON, one object of entries keyed by
-// the test's identity without its Module step, each holding its
-// counterexamples newest FIRST. It is JSON rather than the `.snap` format
-// beside it because what is stored is DATA rather than text a value printed —
-// nested, typed and never read by eye — and JSON is the one spelling of that
-// nobody has to learn.
+// The format: JSON entries keyed by the test's identity without its Module
+// step, each newest first.
 export type CorpusFile = { schema: number; entries: CorpusStore }
 
-// Null for a file that is not a corpus at all — mangled JSON, a merge
-// conflict, the wrong schema. It is an answer rather than an empty store
-// because the two must never be confused: an empty store is a file the next
-// write may lay a value over, and a mangled one is a file the next write must
-// LEAVE, or ten stored regressions vanish because one merge went wrong.
+// Null for a file that is not a corpus, which must be left alone rather than
+// written over as an empty store would be.
 export function parseCorpusFile(text: string): CorpusStore | null {
 	let parsed: unknown
 
@@ -93,9 +65,7 @@ export function parseCorpusFile(text: string): CorpusStore | null {
 	for (let [key, stored] of Object.entries(file.entries)) {
 		let kept = readCounterexamples(stored)
 
-		// A key whose every entry was refused is left out rather than
-		// written back empty: an entry nothing can read is an entry nothing can
-		// replay, and the next write is what takes it off the disk.
+		// A key with no readable entry is left out, and the next write drops it.
 		if (kept.length > 0) {
 			entries[key] = kept
 		}
@@ -104,10 +74,7 @@ export function parseCorpusFile(text: string): CorpusStore | null {
 	return entries
 }
 
-// Only the shape a replay needs — a List of named values. What is INSIDE
-// each of them is the generator's business: `decode` is what says whether the
-// data still describes a value of the Type, and it answers nothing rather than
-// throwing wherever it does not.
+// Only the shape a replay needs. The runtime's `decode` judges what is inside.
 function readCounterexamples(stored: unknown): Array<StoredCounterexample> {
 	if (!Array.isArray(stored)) {
 		return []
@@ -130,9 +97,7 @@ function readCounterexamples(stored: unknown): Array<StoredCounterexample> {
 	})
 }
 
-// Printed with tab indentation and its keys in name order so that
-// recording one twice writes the same bytes: a diff then shows what changed
-// rather than what moved.
+// Tabs and sorted keys, so the same corpus writes the same bytes.
 export function printCorpusFile(entries: CorpusStore): string {
 	let sorted: CorpusStore = {}
 
@@ -151,30 +116,22 @@ function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
-// What a read found, in two halves: the stores a run consults, and the
-// Modules whose companion EXISTS but could not be read — which the run treats
-// as holding nothing, and the writer refuses to touch. A missing file is an
-// empty store, not an unreadable one: absence is the ordinary state of a
-// Module nothing has failed in.
+// The stores a run consults, and the Modules whose file exists but can not be
+// read, which the writer leaves alone. A missing file is an empty store.
 type CorpusReading = {
 	stores: Record<string, CorpusStore>
 	unreadable: Array<{ module: string; problem: string }>
 }
 
-// The stored counterexamples of every Module of the run, `stores` keyed
-// by the Module's canonical path — the shape the runtime's
-// `RunOptions.counterexamples` takes. A Module with no companion file has an
-// empty entry rather than none, so that looking one up is always a lookup and
-// never a question about the disk.
+// Every Module's stored counterexamples, keyed by canonical path, as
+// `RunOptions.counterexamples` takes them. Every Module has an entry.
 export async function readCorpus(
 	modules: Iterable<string>,
 ): Promise<CorpusReading> {
 	let stores: Record<string, CorpusStore> = {}
 	let unreadable: Array<{ module: string; problem: string }> = []
 
-	// Fanned out, exactly as the snapshots beside them are. The
-	// unreadable list is ordered afterwards so two runs report in one order
-	// whatever the disk answered first.
+	// Read in parallel. The unreadable list is sorted, so runs report in one order.
 	await Promise.all(
 		[...modules].map(async (module) => {
 			let filePath = corpusFileOf(module)
@@ -185,9 +142,7 @@ export async function readCorpus(
 			} catch (error) {
 				stores[module] = {}
 
-				// Only absence is ordinary. A file that is there and
-				// cannot be read is a file the writer must not rewrite from
-				// nothing.
+				// Only absence is ordinary. A file that can not be read must not be rewritten.
 				if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
 					unreadable.push({
 						module,
@@ -219,17 +174,15 @@ export async function readCorpus(
 	return { stores, unreadable }
 }
 
-// One counterexample to write down, under the Module and key the run
-// said it belongs to.
+// One counterexample to write down, under its Module and key.
 export type CorpusAddition = {
 	module: string
 	key: string
 	values: StoredCounterexample["values"]
 }
 
-// One entry the run could no longer read back, by its index in the list
-// as it was READ — which is why every removal of a key is applied before any
-// addition to it, and why nothing else may reorder a list in between.
+// An entry the run could not read back, by its index in the list as read. So
+// removals apply before additions.
 export type CorpusRemoval = { module: string; key: string; index: number }
 
 export type CorpusChanges = {
@@ -251,11 +204,7 @@ export const noCorpusWrites: CorpusWrites = {
 	problems: [],
 }
 
-// Everything a run said about the values it failed on, read out of the
-// event stream. A failure that could be written down is a value to keep; an
-// entry the generators no longer read back is one to drop. Both are on the
-// `property` event, which carries the Module and the key so that nothing out
-// here has to take an identity apart.
+// The corpus changes a run reported on its `property` events.
 export function collectCorpusChanges(events: Array<TestEvent>): CorpusChanges {
 	let additions: Array<CorpusAddition> = []
 	let removals: Array<CorpusRemoval> = []
@@ -281,18 +230,8 @@ export function collectCorpusChanges(events: Array<TestEvent>): CorpusChanges {
 	return { additions, removals }
 }
 
-// The changes a run reported, laid over the entries it read. A new
-// counterexample goes at the FRONT — the most recent failure is the one most
-// worth asking about first — and one the file already holds is not written
-// twice, because a property that fails on the same value on ten runs would
-// otherwise fill its own corpus with one value.
-//
-// A key the file holds that no test of this run claimed is KEPT, exactly
-// as an unvisited snapshot is. A run narrowed by `--filter` or by a tag has not
-// visited every test, and deleting what it did not visit would lose a
-// regression for the price of a filter. Only an entry the run READ and could
-// not decode is dropped, because that is a fact about the entry rather than
-// about which tests ran.
+// Lays a run's changes over what it read. See "The failing-example corpus" in
+// DEVELOPMENT.md.
 export async function writeCorpus(options: {
 	corpus: CorpusReading
 	additions: Array<CorpusAddition>
@@ -310,12 +249,7 @@ export async function writeCorpus(options: {
 		return noCorpusWrites
 	}
 
-	// A companion the read could not make sense of is never written
-	// over: the store this run held for it was EMPTY, and laying one new value
-	// over empty would rewrite the file whole — every counterexample a mangled
-	// file still holds in its bytes, gone for one merge conflict. The file
-	// stays as it is until somebody fixes or deletes it, and the read is what
-	// already said so out loud.
+	// An unreadable companion is never written over, since this run held it empty.
 	let unreadable = new Set(corpus.unreadable.map((entry) => entry.module))
 
 	let problems: Array<string> = []
@@ -368,9 +302,7 @@ function layOver(
 	let dropped = 0
 	let recorded = 0
 
-	// The removals first, and from the back — every index is into the
-	// list as it was read, and taking one out from the front would move every
-	// index after it.
+	// Removals first, from the back, since indices are into the list as read.
 	for (let key of new Set(removals.map((removal) => removal.key))) {
 		let indices = removals
 			.filter((removal) => removal.key === key)
@@ -398,9 +330,7 @@ function layOver(
 		let stored = store[addition.key] ?? []
 		let written = JSON.stringify(addition.values)
 
-		// By the DATA rather than by the printed value. Two values that
-		// write down the same way are one value, and two that do not are two
-		// however alike they read.
+		// Compared by data, not by printed value.
 		if (stored.some((entry) => JSON.stringify(entry.values) === written)) {
 			continue
 		}
@@ -415,9 +345,7 @@ function layOver(
 	return { store, recorded, dropped, changed: recorded + dropped }
 }
 
-// The whole companion file written afresh, or taken away where the write
-// left nothing in it. Only the FILE goes: the directory may hold a companion of
-// another Module, and a directory left empty is not litter anybody sees.
+// The companion written afresh, or removed when empty. The directory stays.
 async function writeStored(
 	module: string,
 	entries: CorpusStore,
