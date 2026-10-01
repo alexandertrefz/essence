@@ -206,10 +206,6 @@
 			"rules": { "complexity": ["error", { "max": 76 }] }
 		},
 		{
-			"files": ["packages/language-server/src/codeActions/payloads.ts"],
-			"rules": { "complexity": ["error", { "max": 57 }] }
-		},
-		{
 			"files": ["packages/language-server/src/completion.ts"],
 			"rules": {
 				"complexity": ["error", { "max": 94 }],

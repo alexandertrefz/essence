@@ -1,9 +1,9 @@
-import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
+import {
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "../assertionChildren"
-import { defineExpressions } from "../defineArmChildren"
-import { typedHandlerExpressions } from "../matchHandlerChildren"
 import { typedProgramBodies } from "../sections"
 import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
@@ -181,209 +181,26 @@ function carriedPayloads(
 	let carried = new Map<string, common.typed.CaseValueNode>()
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body, carried)
+		for (let node of body) {
+			collectPayloads(node, carried)
+		}
 	}
 
 	return carried
 }
 
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
+// The typed AST walked whole for Case values. `lookups` walks the Parser AST,
+// which differs exactly where a walk must know, such as Matchers and
+// Overloads. Its walk alone decides where the rewrite is offered.
+function collectPayloads(
+	node: TypedNode,
 	carried: Map<string, common.typed.CaseValueNode>,
 ) {
-	for (let node of nodes) {
-		visitNode(node, carried)
-	}
-}
-
-// The typed AST walked for Case values. `lookups` walks the Parser AST, which
-// differs exactly where a walk must know, such as Matchers and Overloads.
-function visitNode(
-	node: common.typed.ImplementationNode,
-	carried: Map<string, common.typed.CaseValueNode>,
-) {
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			visitNode(node.value, carried)
-			return
-		case "ReturnStatement":
-			visitNode(node.expression, carried)
-			return
-		case "FunctionStatement":
-			visitFunctionDefinition(node.value, carried)
-			return
-		case "NamespaceDefinitionStatement":
-			for (let property of Object.values(node.properties)) {
-				visitNode(property.value, carried)
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, carried)
-				}
-			}
-
-			// A native Method has no body, but its defaults are written values.
-			for (let shim of node.nativeShims) {
-				for (let defaultValue of parameterDefaults(shim.parameters)) {
-					visitNode(defaultValue, carried)
-				}
-			}
-
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, carried)
-				}
-			}
-
-			return
-		case "IfStatement":
-			visitNode(node.condition, carried)
-			visitBody(node.body, carried)
-			return
-		case "IfElseStatement":
-			visitNode(node.condition, carried)
-			visitBody(node.trueBody, carried)
-			visitBody(node.falseBody, carried)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, carried)
-			}
-
-			return
-		case "FunctionInvocation":
-			visitNode(node.name, carried)
-			visitArguments(node.arguments, carried)
-			return
-		case "MethodInvocation":
-			visitNode(node.base, carried)
-			visitArguments(node.arguments, carried)
-			return
-		case "Lookup":
-			visitNode(node.base, carried)
-			return
-		case "Start":
-		case "Complete":
-			visitNode(node.expression, carried)
-			return
-		case "RefusedValue":
-			visitNode(node.base, carried)
-			return
-		case "Combination":
-			visitNode(node.lhs, carried)
-			visitNode(node.rhs, carried)
-			return
-		case "Match":
-			visitNode(node.value, carried)
-
-			for (let handler of node.handlers) {
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, carried)
-				}
-
-				visitBody(handler.body, carried)
-			}
-
-			return
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				visitNode(expression, carried)
-			}
-
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				visitNode(member, carried)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				visitNode(value, carried)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				visitNode(entry.key, carried)
-				visitNode(entry.value, carried)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, carried)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			visitFunctionDefinition(node.value, carried)
-			return
-		case "CaseValue":
-			carried.set(positionKey(node.position), node)
-
-			if (node.value !== null) {
-				visitNode(node.value, carried)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			for (let defaultValue of caseDefaults(node.cases)) {
-				visitNode(defaultValue, carried)
-			}
-
-			return
-		case "TypeAliasStatement":
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
-	}
-}
-
-function visitFunctionDefinition(
-	definition: common.typed.FunctionDefinitionNode,
-	carried: Map<string, common.typed.CaseValueNode>,
-) {
-	for (let parameter of definition.parameters) {
-		if (parameter.defaultValue !== null) {
-			visitNode(parameter.defaultValue, carried)
-		}
+	if (node.nodeType === "CaseValue") {
+		carried.set(positionKey(node.position), node)
 	}
 
-	visitBody(definition.body, carried)
-}
-
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	carried: Map<string, common.typed.CaseValueNode>,
-) {
-	for (let argument of nodeArguments) {
-		visitNode(argument.value, carried)
-	}
+	forEachTypedChild(node, collectPayloads, carried)
 }
 
 function positionKey(position: common.Position): string {
