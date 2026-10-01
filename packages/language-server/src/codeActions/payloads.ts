@@ -9,21 +9,9 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// `#Stopped(total)` and `#Stopped({ value = total })` construct the same
-// Case: a Case of exactly ONE member takes that member's value directly, and
-// the Enricher wraps it back up in the Record before anything downstream sees
-// it. The two spellings are the author's to choose between, so the rewrite goes
-// both ways and neither is preferred — the same standing as the Record member
-// shorthand in `./refactors`, one level up.
-//
-// WHICH of the two was written is asked of the enriched Program rather than
-// worked out from the source, because the source can not answer it. A payload
-// that is itself a Record fits the Case's Record whole AND fits its one member,
-// and Record interpretation wins that ambiguity — so `#Box(point)` may already
-// BE the payload Record, and wrapping it would change what the Case carries.
-// The Enricher settles it by wrapping the value in a Record standing at the
-// value's own Position, which is a shape no written Literal has: a written
-// member sits inside its braces, never over them.
+// Rewrites between `#Stopped(total)` and `#Stopped({ value = total })` for a
+// one-member Case, both ways, neither preferred. See "One-member payloads" in
+// DEVELOPMENT.md.
 
 export function payloadActions(
 	program: parser.Program,
@@ -36,10 +24,8 @@ export function payloadActions(
 	}
 
 	let entries: Array<CodeActionEntry> = []
-	// Walked on the first payload that reaches this and not before — a
-	// Code Action request fires on every cursor move, and a second walk of the
-	// whole enriched Program is not what a cursor resting on a Statement that
-	// constructs nothing should cost.
+	// Walked only once a payload is in range, since a request comes on every
+	// cursor move.
 	let carried: Map<string, common.typed.CaseValueNode> | null = null
 
 	walk(program, (node) => {
@@ -67,14 +53,9 @@ export function payloadActions(
 
 		let [name] = names
 
-		// And never expand a payload the source ALREADY wrote as the
-		// Case's Record. `#Circle({ radius = "big" })` is refused for the
-		// String in it, and the expansion offered there wrote
-		// `{ radius = { radius = "big" } }` — the doubled shape the refusal
-		// had just finished reporting — so applying it brought the very same
-		// Diagnostic back. The enriched payload can not tell the two apart on
-		// its own: a written Record and a wrapped value are both Records by
-		// the time it sees them, and only the SOURCE says which was typed.
+		// A payload already written as the Case's Record, such as a refused
+		// `#Circle({ radius = "big" })`, is not expanded. Only the source tells
+		// it from a wrapped value.
 		entries.push(
 			...(wrapsItsPayload(payload, name)
 				? writesTheMemberItself(node.value, name)
@@ -87,10 +68,8 @@ export function payloadActions(
 	return entries
 }
 
-// Two insertions rather than one replacement, so the payload's own text —
-// a call spanning lines, a Comment inside it — is never retyped by a rewrite
-// that has no reason to read it. `wrapInHoldingCaseActions` writes its Case
-// around an Argument the same way and for the same reason.
+// Two insertions rather than one replacement, so the payload's own text is
+// never retyped, as in `wrapInHoldingCaseActions`.
 function expandActions(
 	value: parser.ExpressionNode,
 	name: string,
@@ -112,19 +91,16 @@ function expandActions(
 	]
 }
 
-// And the other way, as two deletions — the braces and the key in front
-// of the value, and the brace behind it. Both are read back off the buffer
-// first: everything either of them takes away is about to stop existing, so a
-// Comment written in there, or a second key the Node list did not show, has to
-// turn the rewrite away rather than go with it.
+// The other way, as two deletions: the brace and key before the value, and
+// the brace after it. Each span is checked first, so a Comment or an unseen
+// key turns the rewrite away.
 function shortenActions(
 	value: parser.ExpressionNode,
 	name: string,
 	lines: Array<string>,
 ): Array<CodeActionEntry> {
-	// An annotated Literal — `Point { x = 1 }` — says what it is, and
-	// nothing shortened carries that annotation. A path key and a braced
-	// descend write no value at this level at all.
+	// A shortened payload cannot keep a Literal's annotation, as in
+	// `Point { x = 1 }`. A path key or braced descend has no value here.
 	if (value.nodeType !== "RecordValue" || value.type !== null) {
 		return []
 	}
@@ -148,8 +124,7 @@ function shortenActions(
 	}
 	let closing = { start: member.value.position.end, end: value.position.end }
 
-	// A shorthand member — `{ value }` — is the name and the value at one
-	// Position, so what stands in front of the value is the brace alone.
+	// A shorthand member `{ value }` has only the brace before its value.
 	if (
 		!new RegExp(`^\\{\\s*(?:${escaped(name)}\\s*=\\s*)?$`).test(
 			sliceOf(lines, opening),
@@ -167,10 +142,8 @@ function shortenActions(
 	]
 }
 
-// Whether the SOURCE wrote the Case's member out — `{ radius = … }` — as
-// opposed to handing the member's value over on its own. Read off the Parser AST,
-// which is the only tree that still knows: the Enricher wraps a bare value in a
-// Record of exactly this shape, and after that the two read alike.
+// Whether the source wrote the member out, as `{ radius = … }`. Only the
+// Parser AST knows, since the Enricher wraps a bare value the same way.
 function writesTheMemberItself(
 	value: parser.ExpressionNode,
 	name: string,
@@ -180,11 +153,9 @@ function writesTheMemberItself(
 	)
 }
 
-// Whether the Enricher wrapped the payload, which is what says the
-// SHORTHAND was written. The Record it wraps with stands at the value's own
-// Position and holds that value under the Case's one member name — a written
-// Literal's member always stands inside the braces it is written in, so the two
-// can not be confused.
+// Whether the Enricher wrapped the payload, meaning the short spelling was
+// written. Its Record stands at the value's own Position, which no written
+// Literal's member does.
 function wrapsItsPayload(
 	node: common.typed.CaseValueNode,
 	name: string,
@@ -202,9 +173,8 @@ function wrapsItsPayload(
 	)
 }
 
-// Every constructed Case of the enriched Program, by the Position the
-// source wrote it at — which is the Position the Parser AST holds it under too,
-// since enrichment rewrites Nodes but never moves them.
+// Every constructed Case of the enriched Program, by its Position, which the
+// Parser AST shares since enrichment never moves a Node.
 function carriedPayloads(
 	program: common.typed.Program,
 ): Map<string, common.typed.CaseValueNode> {
@@ -226,11 +196,8 @@ function visitBody(
 	}
 }
 
-// The typed AST walked for one Node kind. Written out here rather than
-// shared with `lookups`, which walks the PARSER AST: the two trees differ in
-// exactly the places a walk has to know about — a Match Handler's Matcher, a
-// Namespace's Overloads, a Case payload's default — and one walk pretending to
-// cover both would be a walk that quietly covers neither.
+// The typed AST walked for Case values. `lookups` walks the Parser AST, which
+// differs exactly where a walk must know, such as Matchers and Overloads.
 function visitNode(
 	node: common.typed.ImplementationNode,
 	carried: Map<string, common.typed.CaseValueNode>,
@@ -429,9 +396,7 @@ function rewrite(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// Never, for the reason the rewrites beside it are not: the two
-		// spellings construct one value, and which of them reads better is not
-		// a decision an Editor should make unasked.
+		// Both spellings construct one value; the choice is the author's.
 		isPreferred: false,
 		edits,
 	}

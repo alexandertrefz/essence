@@ -29,3 +29,20 @@ Where the compiler decides which answers a Diagnostic has, a fix reads them off 
 working the rule out again. Working it out twice would let the two disagree, and offer a rewrite where the compiler
 has none. The Help's wording is then the contract between the two. Each such fix checks the Help's shape and offers
 nothing when it differs, so a reworded Help cannot make it write nonsense.
+
+## One-member payloads
+
+A Case of exactly one member takes that member's value directly: `#Stopped(total)` and
+`#Stopped({ value = total })` construct the same Case. The Enricher wraps the bare value back up in the Record
+before anything downstream sees it. Which spelling reads better is the author's choice, so `payloadActions` in
+`payloads.ts` rewrites both ways and prefers neither.
+
+Which spelling was written is asked of the enriched Program, because the source cannot answer it. A payload that is
+itself a Record fits the Case's Record whole and also fits its one member, and the Record reading wins. So
+`#Box(point)` may already be the payload Record, and wrapping it would change what the Case carries. The Enricher
+marks the difference: it wraps a bare value in a Record standing at the value's own Position. No written Literal
+has that shape, since a written member stands inside its braces.
+
+The enriched payload cannot tell a written Record from a wrapped value on its own, though. So a payload the source
+already wrote as the Case's Record, which the Parser AST shows, is never expanded. Expanding a refused
+`#Circle({ radius = "big" })` would write `{ radius = { radius = "big" } }` and bring the same Diagnostic back.
