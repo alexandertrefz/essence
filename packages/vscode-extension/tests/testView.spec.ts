@@ -14,19 +14,15 @@ import {
 	type StubTestRun,
 } from "./vscodeStub.js"
 
-// The half of the Test Explorer that calls VS Code, driven against a
-// stand-in for it. What `testModel.ts` decides is covered beside this; what is
-// covered here is the bookkeeping the API forces — which item was created, which
-// run was ended, what was drawn on which editor — none of which an Extension
-// Development Host makes easy to see, and every bit of which is wrong in ways
-// nobody notices until a tree stops updating.
+// The half of the Test Explorer that calls VS Code, driven against the stub.
+// These specs cover the API bookkeeping: which item was created, which run
+// ended, what was drawn on which editor.
 
 const stub = createStub()
 
 mock.module("vscode", () => stub.module)
 
-// After the mock, because a static import would evaluate `testView.js` —
-// and its `import * as vscode` — before the registration ran.
+// Imported after the mock, which a static import would evaluate before.
 const { createTestView } = await import("../testView.js")
 
 const FILE = "/repo/Season.tests.es"
@@ -145,9 +141,8 @@ type Live = {
 	}) => Answer | Promise<Answer>
 }
 
-// The Server answers a request with the cycle its results will arrive
-// under, and sends the `start` notification from inside the handler — so a
-// spec's answer is where a start belongs, exactly as it does over the wire.
+// The Server sends the `start` notification from inside the request handler,
+// before answering with the cycle, and so does a spec's answer.
 function live(
 	answer: (selection: {
 		ids: Array<string>
@@ -197,9 +192,8 @@ function profileNamed(label: string) {
 	return stub.controller.profiles.find((profile) => profile.label === label)
 }
 
-// A gutter icon is an SVG baked into a data URI, and its fill is the
-// only thing that tells one square from another — which is exactly what a reader
-// goes by.
+// A gutter icon is an SVG in a data URI, and only its fill tells one square
+// from another.
 function colourOf(decoration: { options: Record<string, unknown> }): string {
 	let icon = decoration.options.gutterIconPath as
 		| { fsPath: string }
@@ -261,8 +255,7 @@ describe("the tree it builds", () => {
 
 		let [first, suite] = children(file)
 
-		// The order they were written in, which the Explorer only keeps
-		// because it is told to — it sorts by label otherwise.
+		// Source order, which the Explorer keeps only through `sortText`.
 		expect(first!.label).toBe("is quick")
 		expect(first!.sortText! < suite!.sortText!).toBe(true)
 		// One-based Compiler Positions, zero-based VS Code ones.
@@ -274,9 +267,8 @@ describe("the tree it builds", () => {
 		expect(children(suite!).map((each) => each.label)).toEqual(["waits"])
 	})
 
-	// The identity is structural, so an edit that MOVES a test is the
-	// same test — keeping its item keeps its state, its selection and whether
-	// its suite was expanded.
+	// A moved test keeps its id, so it keeps its item, with its state,
+	// selection and expansion.
 	it("keeps the item a test already had when the file is read again", () => {
 		let session = live()
 		let one = site()
@@ -382,8 +374,7 @@ describe("what it tells VS Code a run found", () => {
 		expect(run!.ends).toBe(1)
 	})
 
-	// `expected`/`actual` are what VS Code draws as a diff, and they are
-	// a claim only an `is` makes.
+	// VS Code draws `expected` and `actual` as a diff; only `is` has them.
 	it("hands over the two sides of an is, and where to say it", () => {
 		let session = live()
 		let bad = site()
@@ -400,8 +391,7 @@ describe("what it tells VS Code a run found", () => {
 		expect(message!.location?.range).toMatchObject({ startLine: 3 })
 	})
 
-	// The Test Results panel is a terminal, and text carrying only
-	// newlines staircases down it.
+	// The Test Results panel is a terminal, where bare newlines staircase.
 	it("puts what a test printed under that test, for a terminal", () => {
 		let session = live()
 		let one = site()
@@ -477,9 +467,8 @@ describe("the marks it draws", () => {
 	})
 })
 
-// A source file the counters counted: one line that ran and one that did
-// not, both sides of a branch with only one taken, an arm nothing took, and a
-// Choice with a Case nobody built.
+// A counted source file. One line ran and one did not. A branch had one side
+// taken, and an arm and a Case were never reached.
 const SOURCE = "/repo/Season.es"
 
 function point(overrides: Partial<CoveragePoint>): CoveragePoint {
@@ -672,9 +661,8 @@ describe("the coverage it draws", () => {
 		])
 	})
 
-	// Three colours down the gutter, one per line the counters know
-	// about — green where the tests ran it, grey where nothing did, amber where
-	// it ran but not whole. VS Code's lines are 0-based.
+	// One square per counted line: green where it ran, grey where nothing
+	// did, amber where it ran but not whole. VS Code's lines are 0-based.
 	it("marks every counted line in the gutter by what ran on it", () => {
 		let session = live()
 		let editor = stub.editor(SOURCE)
@@ -763,8 +751,7 @@ describe("the profiles it offers", () => {
 				),
 		).toEqual(["Run network", "Run slow"])
 
-		// VS Code offers a profile whether or not anything would run
-		// under it, so a tag nothing carries any more must stop offering one.
+		// A tag nothing carries any more loses its profile.
 		session.view.handle(batch({ run: 2, sites: [site()] }))
 
 		expect(profileNamed("Run slow")!.disposals).toBe(1)
@@ -799,9 +786,8 @@ describe("the profiles it offers", () => {
 		])
 	})
 
-	// Debugging is not a test run: it launches the `essence` debug type
-	// over a bundle compiled WITH the file's tests section, and asks the Server
-	// for nothing at all.
+	// Debugging launches the `essence` debug type over a bundle compiled with
+	// the tests, and asks the Server for nothing.
 	it("debugs a test by launching a session over the file it is in", async () => {
 		let session = live()
 		let one = site()
@@ -827,10 +813,8 @@ describe("the profiles it offers", () => {
 		expect(session.asked).toEqual([])
 	})
 
-	// A session that would not start is the end of the walk: whatever
-	// stopped it would stop the next one, and a reader watching debuggers open
-	// one after another for a reason nobody explained is worse than a line in
-	// the channel.
+	// A session that would not start ends the walk, since whatever stopped
+	// it would stop the next one. The channel says why.
 	it("stops where a session would not start, and says so", async () => {
 		let session = live()
 		let one = site()
@@ -896,9 +880,8 @@ describe("the runs it keeps", () => {
 		expect(run.ends).toBe(1)
 	})
 
-	// "Accept snapshot" is an ordinary run, asked to RECORD what it finds.
-	// The Server does the writing — a companion file where it stands, a source
-	// as an edit — so all this end has to do is say so.
+	// "Accept snapshot" is an ordinary run that records what it finds. The
+	// Server does the writing, so the request only says `update`.
 	it("asks for a run that records what it finds", async () => {
 		let session = live()
 		let one = site({ name: "renders" })
@@ -915,12 +898,8 @@ describe("the runs it keeps", () => {
 		})
 	})
 
-	// The ids say WHICH tests and the file says where they live, and the
-	// Server works the second out from the results of a run it has already
-	// done — so a lens that sent ids alone ran nothing at all whenever the
-	// session remembers nothing: before the first run, and while
-	// `essence.tests.enabled` is off, which is the one state where a lens is
-	// the only way a test runs.
+	// The Server finds an id's file only from a run it has done, so a lens
+	// sends its file too. See "Runs and cycles" in DEVELOPMENT.md.
 	it("names the file as well as the tests a lens asks for", async () => {
 		let session = live(() => ({ run: 4 }))
 		let one = site({ name: "renders" })
@@ -944,10 +923,8 @@ describe("the runs it keeps", () => {
 		})
 	})
 
-	// Two gestures made while one cycle is in flight are deferred into the
-	// same cycle and answered with the same number. Registering over the run
-	// already showing it would leave that one spinning with nothing left holding
-	// it.
+	// Two gestures deferred into one cycle share its number, and the earlier
+	// run is ended rather than left spinning.
 	it("ends the run it displaces when a request joins a cycle", async () => {
 		let session = live(() => ({ run: 4 }))
 
@@ -962,13 +939,8 @@ describe("the runs it keeps", () => {
 		expect(stub.runs.at(-1)!.ends).toBe(0)
 	})
 
-	// A number the Server has promised is a run still owed rather than a
-	// run that died. A request deferred behind a cycle in flight is answered
-	// with the number of the cycle that will RUN it, and a gesture made in the
-	// window before that cycle starts is a cycle of its own — a higher number,
-	// started and ended first. Reading the promised number as stale there would
-	// close the reader's run over somebody else's batch, which is the whole
-	// thing the number exists to prevent.
+	// A promised cycle is still owed. A higher cycle may start and end first,
+	// and must not end the run waiting for the promised one.
 	it("keeps a run whose promised cycle has not started yet", async () => {
 		let session = live(() => ({ run: 5 }))
 
@@ -987,8 +959,8 @@ describe("the runs it keeps", () => {
 		expect(promised.ends).toBe(1)
 	})
 
-	// A cycle that never ended — a Worker died, the session was switched
-	// off — would leave VS Code spinning forever.
+	// A cycle that never ended, because a Worker died or the session was
+	// switched off, must not spin forever.
 	it("ends an older cycle when a newer one starts", () => {
 		let session = live()
 
