@@ -6790,10 +6790,8 @@ describe("Enricher", () => {
 			return aliases[aliases.length - 1]
 		}
 
-		// A GENERIC refined Alias resolves to a Generic Alias wrapping the
-		// refinement — the wrapper is what applies the Type Arguments, the
-		// refinement is what carries the evidence — so its refinement is one
-		// level in.
+		// A generic refined Alias is a Generic Alias wrapping the refinement, so
+		// its refinement is one level in.
 		function genericRefinementOf(source: string): common.RefinementType {
 			let { program, diagnostics } = enrichSource(source)
 
@@ -6825,10 +6823,8 @@ describe("Enricher", () => {
 
 			expect(refinement.name).toBe("NonZero")
 			expect(refinement.base).toEqual({ type: "Integer" })
-			// `Integer`, though `isNot` is a Protocol's PROVIDED Method —
-			// the one body every conformer shares stands on the ladder under
-			// the Namespace whose conformance put it in reach, which for an
-			// Integer receiver is Integer's own.
+			// `isNot` is a provided Method, keyed under the Namespace whose
+			// conformance put it in reach, Integer's own.
 			expect(refinement.conjuncts).toEqual([
 				{
 					namespaceName: "Integer",
@@ -6854,10 +6850,8 @@ describe("Enricher", () => {
 			).toEqual({ type: "List", itemType: { type: "String" } })
 		})
 
-		// The fourth base. `Rational` declares its own `is` and its own
-		// four comparisons, and a bound written beside one of them is a written
-		// Rational — so the conjunct keeps a fraction where an Integer's keeps
-		// digits, and the Namespace it names is Rational's own.
+		// A Rational bound keeps a fraction where an Integer's keeps digits,
+		// under Rational's own Namespace.
 		it("should refine a Rational, keeping the fraction the bound was written as", () => {
 			let refinement = refinementOf(
 				"implementation { type NonZeroRatio = Rational where @::isNot(0/1) }",
@@ -6875,11 +6869,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// A conjunct is a KEY, and `0/2` and `0/1` are one question about
-		// one number — so what the key holds is the number, in the lowest terms
-		// the runtime keeps it in, rather than the two runs of digits that were
-		// typed. Without this the two Aliases below would be different Types
-		// that admit exactly the same values.
+		// A conjunct is a key, so it holds the number in lowest terms. `0/2` and
+		// `0/1` make one Type.
 		it("should key a written Rational bound by its value", () => {
 			expect(
 				refinementOf(
@@ -6906,13 +6897,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// And an Integer bound written on a Rational is the same number
-		// and so the same key. The two spellings used to be two questions —
-		// `Rational::isNot` answers a fraction while a bare `0` finds no
-		// same-kind entry and falls to the covering `Number` — so
-		// `NonZeroRational` was reachable through one of them and not the other,
-		// and `@::isNot(0)`, the spelling the Compiler's own Help offers, was
-		// the one that missed. The RECEIVER decides it now.
+		// An Integer bound on a Rational is the same number and the same key,
+		// since the receiver decides it.
 		it("should read an Integer bound on a Rational as the Rational it is", () => {
 			expect(
 				refinementOf(
@@ -6928,9 +6914,8 @@ describe("Enricher", () => {
 				},
 			])
 
-			// The `spelling` is what was WRITTEN and stays apart — it is
-			// the half a Diagnostic reads back — so the two are compared by
-			// everything the key is taken from.
+			// `spelling` keeps what was written, for Diagnostics, so the keys are
+			// compared without it.
 			let leavesOf = (source: string) =>
 				refinementOf(source).conjuncts?.map(
 					({ spelling: _spelling, ...leaf }) => leaf,
@@ -6975,15 +6960,9 @@ describe("Enricher", () => {
 			])
 		})
 
-		// The conjunct set of a generic refinement is the point of the whole
-		// design: `hasItems` asks nothing about the items, so the key holds no Type
-		// Argument at all and `Filled<String>` differs from `Filled<Integer>`
-		// by its BASE — which `matchTypes` already compares.
-		//
-		// A Program's OWN Alias throughout this file, under a name the
-		// standard library does not use — `NonEmptyList` is a builtin now, and
-		// declaring one over again would only be a `duplicate-type`. What is under
-		// test is the mechanism, which is the same one the builtin is declared by.
+		// `hasItems` asks nothing about the items, so the key holds no Type
+		// Argument, and `matchTypes` tells `Filled<String>` from `Filled<Integer>`
+		// by base. `Filled` is used since `NonEmptyList` is a builtin.
 		it("should refine a generic applied List, keying the conjunct without the Argument", () => {
 			let refinement = genericRefinementOf(
 				"implementation { type Filled<Item> = List<Item> where @::hasItems() }",
@@ -7005,11 +6984,8 @@ describe("Enricher", () => {
 			])
 		})
 
-		// A use site applies its Arguments through the wrapper, which
-		// substitutes them into the base and stamps the applied spelling. The
-		// conjuncts come along BY REFERENCE — the same array the Declaration
-		// resolved, because a predicate that says nothing about the items has
-		// nothing to substitute.
+		// The wrapper substitutes a use site's Arguments into the base. The
+		// conjuncts come along by reference, with nothing to substitute.
 		it("should apply a generic refinement's Arguments into its base", () => {
 			let { program, diagnostics } = enrichSource(`implementation {
 				type Filled<Item> = List<Item> where @::hasItems()
@@ -7051,15 +7027,9 @@ describe("Enricher", () => {
 			expect(printType(applied)).toBe("Filled<String>")
 		})
 
-		// `isBetween` is written once, as `Orderable`'s provided Method,
-		// and it stands on the ladder under the Namespace whose conformance put
-		// it in reach — `Integer` for an Integer receiver, which is also what
-		// answers `isOdd` beside it. The conjunct records what answered, because
-		// that is what makes two conjuncts the same question.
-		//
-		// The LABEL is on the spelling and nowhere else. It decides nothing
-		// about the key, and the text a Diagnostic prints has to carry it: a
-		// `match` guard is written the way that text reads.
+		// The provided `isBetween` is keyed under `Integer` for an Integer
+		// receiver, as `isOdd` is. The label is kept on the spelling alone, for
+		// the text a Diagnostic prints.
 		it("should key a conjunct by the Namespace that answered it", () => {
 			expect(
 				refinementOf(
@@ -7100,9 +7070,7 @@ describe("Enricher", () => {
 			expect(alias.predicate?.type).toEqual({ type: "Boolean" })
 		})
 
-		// A generic Alias too, which takes reading `@` off the base INSIDE
-		// the wrapper: read off the wrapper it was a Type taking Arguments, and the
-		// Language Server got an Error where the Compiler had a Boolean.
+		// A generic Alias reads `@` off the base inside its wrapper.
 		it("should carry the enriched predicate of a generic Alias too", () => {
 			let alias = aliasOf(
 				"implementation { type Filled<Item> = List<Item> where @::hasItems() }",
@@ -7118,10 +7086,8 @@ describe("Enricher", () => {
 			).toBeNull()
 		})
 
-		// Poison recovery — a refused clause leaves the Alias meaning its
-		// base, so everything naming it stays about itself. What is asserted here
-		// is the underlined text of each refusal, which is the span an Editor
-		// puts the squiggle under.
+		// A refused clause leaves the Alias meaning its base. Each test asserts
+		// the text the refusal underlines.
 		describe("refusals", () => {
 			function refusal(source: string): {
 				code: string
@@ -7137,11 +7103,8 @@ describe("Enricher", () => {
 				}
 			}
 
-			// A generic Alias is refined like any other, and an
-			// item-dependent predicate needs no rule of its own — `Item` is
-			// opaque while the clause is read, so `@::contains(0)` is refused
-			// for the Argument it passes. Which is what keeps the conjuncts
-			// item-agnostic without anything checking that they are.
+			// `Item` is opaque while the clause is read, so `@::contains(0)` is
+			// refused for its Argument, keeping conjuncts item-agnostic.
 			it("should refuse an item-dependent predicate as the Argument mistake it is", () => {
 				expect(
 					refusal(
@@ -7233,9 +7196,8 @@ describe("Enricher", () => {
 				})
 			})
 
-			// A poisoned base says nothing about the clause, so the clause
-			// says nothing back — one Diagnostic about the name that is missing,
-			// and no second one about a Type nobody wrote.
+			// A poisoned base gets one Diagnostic, about the missing name, and
+			// none about the clause.
 			it("should stay silent about a base that is already an Error", () => {
 				expect(
 					diagnosticsFor(
@@ -7275,9 +7237,8 @@ describe("Enricher", () => {
 				expect(alias.type).toEqual({ type: "Integer" })
 			})
 
-			// A Namespace over the Alias targets the object the refusal
-			// rewrites into its base, so it answers for that base afterwards,
-			// through a receiver typed by the base or by the Alias alike.
+			// A Namespace over a refused Alias answers for its base, through a
+			// receiver typed either way.
 			it("should let a Namespace over a refused Alias answer for its base", () => {
 				let codes = [
 					`implementation {
@@ -7319,10 +7280,8 @@ describe("Enricher", () => {
 				])
 			})
 
-			// A Matcher narrows by TYPE, and a refinement's predicate is
-			// not a runtime question — the emitted check could only ask about
-			// the base, and the arm would run for values the predicate refuses,
-			// typed as evidence nothing proved.
+			// The emitted check could ask only about the base, so a refinement
+			// Matcher would admit values its predicate refuses.
 			it("should refuse a refinement in Matcher position", () => {
 				expect(
 					refusal(`implementation {
@@ -7339,10 +7298,8 @@ describe("Enricher", () => {
 				})
 			})
 
-			// The refinement need not stand at the Matcher's top level —
-			// `List<NonZeroInteger>` spells one inside a Type Argument, the
-			// emitted check could still only ask about `List<Integer>`, and
-			// the arm would bind items the predicate refuses.
+			// A refinement inside a Type Argument, as in `List<NonZeroInteger>`,
+			// is refused for the same reason.
 			it("should refuse a refinement nested inside a Matcher's Type Argument", () => {
 				expect(
 					refusal(`implementation {
@@ -7359,10 +7316,8 @@ describe("Enricher", () => {
 				})
 			})
 
-			// An Alias hiding a refinement in a member is just as much a
-			// Matcher that can not be tested for — and beside a wildcard there
-			// is no second arm for the Validator's erased-conflict analysis to
-			// notice, so the refusal has to happen here.
+			// An Alias hiding a refinement in a member can not be tested either,
+			// and beside a wildcard only this refusal catches it.
 			it("should refuse an Alias hiding a refinement in a member", () => {
 				expect(
 					refusal(`implementation {
@@ -7382,12 +7337,9 @@ describe("Enricher", () => {
 				})
 			})
 
-			// What the refusal offers INSTEAD has to be a Matcher the
-			// reader can write, and the erased Alias is not one: 'Bag' is the
-			// word they just wrote, and the shape underneath it — `count` a
-			// plain Integer — is what the emitted check could ask about.
-			// `eraseRefinements` drops a rebuilt Record's display spelling so
-			// that both sentences say the shape.
+			// The refusal offers the erased shape, which the emitted check can
+			// ask about. `eraseRefinements` drops a rebuilt Record's display
+			// spelling.
 			it("should offer the erased shape rather than the Alias it stopped being", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					type Bag = { count: NonZeroInteger }
@@ -7451,10 +7403,8 @@ describe("Enricher", () => {
 			})
 		})
 
-		// A refined receiver keeps every Method its base answers — the
-		// bucketing that makes it so is pinned in `resolvers.spec.ts`, and this is
-		// the Declaration reaching it — and it flows into its base for free, which
-		// is what makes a body written against the base compile unchanged.
+		// A refined receiver keeps every Method of its base and flows into it.
+		// `resolvers.spec.ts` pins the bucketing.
 		it("should answer a base's Methods on a refined value", () => {
 			expect(
 				diagnosticsFor(`implementation {
@@ -7471,9 +7421,8 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
-		// The refusal is reported ONCE. A refined Alias is resolved by
-		// hoisting and its predicate is enriched a second time for the typed Node,
-		// so there are two readings of one clause and only one of them may speak.
+		// A refined Alias's predicate is read in hoisting and again for the
+		// typed Node, so only one reading reports.
 		it("should report a refusal exactly once", () => {
 			expect(
 				diagnosticsFor(
@@ -7482,14 +7431,9 @@ describe("Enricher", () => {
 			).toHaveLength(1)
 		})
 
-		// A refined Alias and the Namespace answering its predicate may
-		// name each other — the Alias asks `isProper`, and a signature next to
-		// `isProper` takes a `Proper` — which no single hoisting round can
-		// resolve in one breath. The Alias hoists with its predicate unread and
-		// the conjuncts are written into the shared object once the Namespace
-		// arrives; these pin that the pair resolves, in either order, and that
-		// what the signatures bound really is the refinement rather than a
-		// poisoned base.
+		// The Alias asks `isProper`, and a signature beside `isProper` takes a
+		// `Proper`. The Alias hoists with its predicate unread, and the conjuncts
+		// are filled in when the Namespace arrives, in either order.
 		describe("self-answering Namespaces", () => {
 			function selfAnswering(body: string, aliasFirst: boolean): string {
 				let alias = "type Proper = String where @::isProper()"
@@ -7531,9 +7475,8 @@ describe("Enricher", () => {
 				expect(diagnosticsFor(selfAnswering("", false))).toEqual([])
 			})
 
-			// The proof that the signature holds the REFINEMENT — a
-			// clause that failed would poison the Alias to String, and this
-			// call would then pass without a word.
+			// A failed clause would poison the Alias to String and let this call
+			// pass, so the refusal proves the refinement.
 			it("should still demand the evidence the signature names", () => {
 				let diagnostics = diagnosticsFor(
 					selfAnswering(
@@ -7549,15 +7492,9 @@ describe("Enricher", () => {
 				).toEqual(["no-matching-overload"])
 			})
 
-			// The same pair one turn harder. A GENERIC refined Alias can not
-			// be bound by reference the way `Proper` is — applying Type Arguments
-			// substitutes them into the base, which COPIES the refinement — so the
-			// answering Namespace hoists holding copies whose predicate is still
-			// unread, and the fill finishes them along with the Alias.
-			//
-			// The predicate asks `isFilled` rather than `hasItems` because the
-			// builtin `namespace List` answers `hasItems`, which would take the
-			// clause off the Program's hands and leave nothing circular to test.
+			// Applying a generic refined Alias copies the refinement, so the
+			// Namespace holds unread copies that the fill finishes too. `isFilled`,
+			// since the builtin `List` answers `hasItems`.
 			function genericallySelfAnswering(entries: string): string {
 				return `implementation {
 					type Filled<Item> = List<Item> where @::isFilled()
@@ -7568,10 +7505,8 @@ describe("Enricher", () => {
 				}`
 			}
 
-			// The Types the two applications in the Namespace resolved to,
-			// beside the refinement the Alias itself declares — read off the typed
-			// Nodes rather than through a Scope, because what a signature ENDED UP
-			// holding is the whole question.
+			// The Types the Namespace's two applications resolved to, beside the
+			// Alias's own refinement, read off the typed Nodes.
 			function appliedInAnsweringNamespace(source: string): {
 				declared: common.Type
 				concrete: common.Type
@@ -7647,9 +7582,7 @@ describe("Enricher", () => {
 					},
 				])
 
-				// The mechanism in two lines — each copy holds the very ARRAY
-				// the fill wrote into the Alias, which no copy taken a round too
-				// early and forgotten about could be holding.
+				// Each copy holds the very array the fill wrote into the Alias.
 				expect(concrete.conjuncts).toBe(declared.conjuncts)
 				expect(generic.conjuncts).toBe(declared.conjuncts)
 
@@ -7663,12 +7596,9 @@ describe("Enricher", () => {
 				})
 			})
 
-			// The other end of the same road. A predicate nothing answers is
-			// poisoned to its base in place, and so is every copy taken of it while
-			// it was pending — each to ITS OWN base, so a signature that applied
-			// `Filled<Integer>` goes on saying `List<Integer>` rather than borrowing
-			// the Alias' `List<Item>`. One Diagnostic names the clause; the copies
-			// have nothing of their own to report.
+			// A predicate nothing answers is poisoned to its base, and each
+			// pending copy to its own base, so `Filled<Integer>` stays
+			// `List<Integer>`. Only the clause is reported.
 			it("should poison every copy of a predicate nothing answers", () => {
 				let { declared, concrete, generic, diagnostics } =
 					appliedInAnsweringNamespace(
@@ -7695,15 +7625,8 @@ describe("Enricher", () => {
 		})
 	})
 
-	// The Types every use of a name is enriched to, in the order a walk
-	// over the Program finds them — which is how a test asks what a branch
-	// narrowed a binding to without reaching through the Statements around it
-	// by hand. Reflective on purpose: what the narrowed use happens to sit
-	// inside is not what any assertion below is about.
-	//
-	// Declared at this level rather than inside one describe, because a `define`
-	// arm narrows through the very same machinery and a test of one asks exactly
-	// this question of it: what Type did this name have where it was read.
+	// The Types every use of a name is enriched to, in walk order, to ask what
+	// a branch or a `define` arm narrowed a binding to wherever the use sits.
 	function readTypesOf(source: string, name: string): Array<string> {
 		let { program, diagnostics } = enrichSource(source)
 
@@ -7747,8 +7670,7 @@ describe("Enricher", () => {
 		return types
 	}
 
-	// Every source that asks this puts the use it is about LAST, so that
-	// is the narrowed one.
+	// Every source puts the use it asks about last.
 	function narrowedTypeOf(source: string, name: string): string {
 		let types = readTypesOf(source, name)
 
@@ -7759,10 +7681,9 @@ describe("Enricher", () => {
 		return types[types.length - 1]
 	}
 
-	// What makes a doorway writable — an `if` whose condition asks a
-	// declared refinement's question narrows the binding it asked it of. Nothing
-	// here reaches the typed tree: a narrowing is a shadow declaration in an
-	// Enricher Scope, and what it is worth is the resolution it changes.
+	// An `if` whose condition asks a refinement's question narrows the binding
+	// it asked. A narrowing is a shadow declaration in an Enricher Scope. See
+	// "Narrowing" in packages/compiler/src/enricher/DEVELOPMENT.md.
 	describe("Refinement flow narrowing", () => {
 		it("should narrow a Constant the condition proved the predicate of", () => {
 			expect(
