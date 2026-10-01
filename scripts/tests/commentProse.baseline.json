@@ -55,7 +55,6 @@
 	"packages/cli/src/watcher.ts": {"sentence-length": 16, "em-dash": 7, "all-caps": 6, "block-length": 1},
 	"packages/cli/src/worker.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 1},
 	"packages/client/src/tests/marshal.spec.ts": {"sentence-length": 101, "em-dash": 77, "all-caps": 63, "history": 2, "position": 4, "block-length": 12},
-	"packages/client/src/tests/plugin.spec.ts": {"sentence-length": 47, "em-dash": 37, "all-caps": 21, "history": 2, "position": 1, "block-length": 4, "counts": 1},
 	"packages/compiler/src/analysis.ts": {"sentence-length": 11, "em-dash": 9, "all-caps": 7, "block-length": 2, "counts": 1},
 	"packages/compiler/src/cache/index.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 12, "position": 3, "block-length": 5, "counts": 1},
 	"packages/compiler/src/cache/snapshot.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 4, "history": 1, "position": 2, "block-length": 1},
