@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { findSimpleChild, type SimpleNode } from "../../visitor/typedSimple"
 import type { OptimiserPass } from "../index"
 import { isPureExpression } from "../purity"
 import { rewriteStatements } from "../walk"
@@ -174,20 +175,14 @@ const selfName = "_self"
 
 // Whether `_self` occurs anywhere in the subtree. It over-answers for a nested
 // Match's own `_self`, at the cost of one extra block.
-function mentionsSelf(value: unknown): boolean {
-	if (Array.isArray(value)) {
-		return value.some((entry) => mentionsSelf(entry))
+function mentionsSelf(node: SimpleNode): boolean {
+	if (node.nodeType === "Identifier") {
+		return node.name === selfName
 	}
 
-	if (value === null || typeof value !== "object") {
-		return false
-	}
+	return findSimpleChild(node, selfInChild) ?? false
+}
 
-	let node = value as Record<string, unknown>
-
-	if (node["nodeType"] === "Identifier" && node["name"] === selfName) {
-		return true
-	}
-
-	return Object.values(node).some((entry) => mentionsSelf(entry))
+function selfInChild(child: SimpleNode): true | undefined {
+	return mentionsSelf(child) || undefined
 }
