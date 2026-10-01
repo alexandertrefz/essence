@@ -57,11 +57,11 @@ gives the first claimant `$es_<Name>__<member>` and the n-th `$es_<Name>_<n>__<m
 spell. Bare identities, the standard library's, claim first, so its consts never depend on the graph. The
 rest claim in order of declaring Module path and Position, so every entry of a graph names them alike.
 
-A Method and a static Property of one Namespace share a const name. Nothing upstream refuses the pair,
-because the two live in separate records. The Rewriter keys its candidates by const name, so every call of
-the Method would read the Property's value. `buildStdlibArtifacts` throws on such a pair. A misrouted read is wrong whichever half
-is native, and a native member reaches no typed node. So the check reads the declared members from the
-loader's `nativeBindings`.
+A Method and a static Property of one Namespace share a const name. Nothing upstream refuses the pair, because
+the two live in separate records. The Rewriter keys its candidates by const name, so every call of the Method
+would read the Property's value. `buildStdlibArtifacts` throws on such a pair. A misrouted read is wrong
+whichever half is native, and a native member reaches no typed node. So the check reads the declared members
+from the loader's `nativeBindings`.
 
 ### Which member is which
 
@@ -112,8 +112,8 @@ The prelude is why a graph is more than one `rewrite` per Module. A bodied stand
 top-level `$es_` const, and rewriting each Module alone would give each Module its own copy. So
 `rewriteModuleGraph` rewrites every body first and runs `reachableEssenceMethods` once over all of them. The
 reached consts go into the prelude Module, and each Module imports the ones it names. The prelude exports
-every const it holds. Unimported ones are dropped by esbuild, and deciding per Module would mean running the
-fixed point once per Module.
+every const it holds. The bundler shakes away the ones nothing imports, and deciding per Module would mean
+running the fixed point once per Module.
 
 A Program's own Protocol-provided Methods join the prelude through `protocolPreludeNamespaces`, so one const
 answers for every conformer, wherever the Protocol was declared.
@@ -155,11 +155,11 @@ nothing.
 
 ## Source maps
 
-`rewriteModules` emits a map per Module when asked. `locOf` turns an Essence Position into an estree
-`loc`: estree columns count from zero, Essence columns from one. The `loc` names `currentSourcePath`, which
+`rewriteModules` emits a map per Module when asked. `locOf` turns an Essence Position into an estree `loc`:
+estree columns count from zero, Essence columns from one. The `loc` names `currentSourcePath`, which
 `withSourcePath` sets for each Module's pass. A node with no Position gets no `loc`, and neither does one
-emitted outside a Module's pass. Such code stays unmapped, which is what a debugger should see of it. `unmapped`
-asks for the same on purpose, for code the compiler emits of its own accord.
+emitted outside a Module's pass. Such code stays unmapped, which is what a debugger should see of it.
+`unmapped` asks for the same on purpose, for code the compiler emits of its own accord.
 
 `generateProgram` appends the map to the module text as an inline data URL. The bundler's esbuild reads a
 `sourceMappingURL` comment from the contents a plugin serves and composes it into the bundle's map. A map
@@ -180,11 +180,11 @@ no other string in a descriptor is changed.
 
 Outside `rewriteModules` there are no spellings, and identities are emitted as they are.
 
-`emittedIdentity` gives the same answer to a caller with one identity and an entry path but no graph. One
-such caller is `embed/describe.ts`, which builds Case values for a host. It splits at the last `#`, because a Choice
-name holds no `#`; `displayChoiceName` splits the same way. An identity with no `#` is a builtin Choice's
-bare name, such as `Optional`, and passes through unchanged. So does one whose prefix is not absolute. It takes
-the target, so a descriptor written beside a host's Modules agrees with those Modules.
+`emittedIdentity` gives the same answer to a caller with one identity and an entry path but no graph. One such
+caller is `embed/describe.ts`, which builds Case values for a host. It splits at the last `#`, because a
+Choice name holds no `#`; `displayChoiceName` splits the same way. An identity with no `#` is a builtin
+Choice's bare name, such as `Optional`, and passes through unchanged. So does one whose prefix is not
+absolute. It takes the target, so a descriptor written beside a host's Modules agrees with those Modules.
 
 ## Prelude reachability
 
@@ -254,9 +254,9 @@ other are recursion, not a cycle.
 
 Each member carries two edge sets, `EssenceMemberReferences`. `references` is every `$es_` const its body
 names, which reachability follows. `evaluatedReferences` is the subset its body needs the moment it runs. That
-is a Property read for its value, and a Function it calls rather than hands on. A Function named as a value runs
-later, as in a witness's `{ isNot: Boolean.isNot }` or `static F = Boolean.isNot`. Ordering against what such
-a Function reads would refuse a Program that runs.
+is a Property read for its value, and a Function it calls rather than hands on. A Function named as a value
+runs later, as in a witness's `{ isNot: Boolean.isNot }` or `static F = Boolean.isNot`. Ordering against what
+such a Function reads would refuse a Program that runs.
 
 `EssenceMember` carries the member's kind, because both kinds are a `VariableDeclaration` named
 `$es_<Namespace>_<member>` and arrive in discovery order.
@@ -442,8 +442,9 @@ one of three things is wrong with it:
 | a JavaScript reserved word | `new`, `default` | prefixed with `_` |
 
 `compilerOwnedNames` holds the names emitted code binds or reads for its own use. They are the runtime
-Namespace imports, the module aliases, the test and coverage bindings, `$ctx`, `Object` and `BigInt`. A Program may bind any of them, since `$` is legal in an Essence identifier and the rest are no
-keywords. JavaScript scoping would then send the emitted code's own references to the user's value.
+Namespace imports, the module aliases, the test and coverage bindings, `$ctx`, `Object` and `BigInt`. A
+Program may bind any of them, since `$` is legal in an Essence identifier and the rest are no keywords.
+JavaScript scoping would then send the emitted code's own references to the user's value.
 
 The Lexer ends an Identifier only at one of its own symbols, so `ok?` and `a+b` are single Identifiers.
 JavaScript can not spell them.
@@ -618,9 +619,9 @@ canonicalises too.
 
 A `general` walk and an early-stopping fold answer with a `Step` each turn. `steppedTarget` writes the answer
 where it is built. Where the Compiler can see the Case being built at the answering position, as in
-`<- #Done(x)`, the walk assigns and leaves. The Case is never built. `#Continue` assigns the State and
-leaves the body; `#Done` assigns the answer and breaks the walk's own label. Otherwise, as for a `Step` held under
-a name or answered by a Method, its tag is read as the driver would read it.
+`<- #Done(x)`, the walk assigns and leaves. The Case is never built. `#Continue` assigns the State and leaves
+the body; `#Done` assigns the answer and breaks the walk's own label. Otherwise, as for a `Step` held under a
+name or answered by a Method, its tag is read as the driver would read it.
 
 A `general` walk's label is emitted only where a `#Done` leaves through it. A body that never answers
 `#Done` never ends, as the driver's would not.
@@ -676,9 +677,9 @@ that name off something else all count. The counter is the `let` of a `for` head
 one. A closure the body builds captures its own turn's value.
 
 A walk's State is held raw too, as the number or bigint its Integer holds. That needs the State's Type to be
-exactly Integer in every body that receives it. A Union or a Type Parameter does not count. A refinement over Integer
-does, since `eraseRefinements` has removed it before any pass runs. The Integer is the walk's own, so the walk
-can carry the raw value and build the Integer once, where it answers. This pays only together with
+exactly Integer in every body that receives it. A Union or a Type Parameter does not count. A refinement over
+Integer does, since `eraseRefinements` has removed it before any pass runs. The Integer is the walk's own, so
+the walk can carry the raw value and build the Integer once, where it answers. This pays only together with
 `unboxedInteger`, which reads a guarded arithmetic through both arms so the box is never written.
 
 `heldRaw` decides and performs the swap:
@@ -699,7 +700,8 @@ range-checked number. An escaped one answers the value of an Integer the runtime
 canonicalises, so it need not be read together with every write to be believed.
 
 `inlinedCallback` takes the swaps in a fixed order. It checks the dropped accumulator, hands the State's body
-to the walk and swaps the counter. Only then does it try `pushedWhereBound`, on the Statements as emitted. The counter and the State are different Parameters, so neither swap disturbs the other.
+to the walk and swaps the counter. Only then does it try `pushedWhereBound`, on the Statements as emitted. The
+counter and the State are different Parameters, so neither swap disturbs the other.
 
 ## Completing bodies
 

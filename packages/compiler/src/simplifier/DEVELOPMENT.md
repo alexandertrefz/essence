@@ -10,10 +10,11 @@ The simplifier states what the Program says, not how it is tested. Fields such a
 
 ## Overload slots
 
-An overloaded Method's emitted name carries its slot, `<name>__overload$N`, from `resolveOverloadedMethodName`.
-The slot is the Overload's position in the Method Type's `overloads`, which `overloadIndices` records for
-each bodied Overload. It is not the position in the node's `methods`. A `declarations` block may bind some
-Overloads to the runtime and write the rest in Essence, and only the bodied ones reach the node.
+An overloaded Method's emitted name carries its slot, `<name>__overload$N`, from
+`resolveOverloadedMethodName`. The slot is the Overload's position in the Method Type's `overloads`, which
+`overloadIndices` records for each bodied Overload. It is not the position in the node's `methods`. A
+`declarations` block may bind some Overloads to the runtime and write the rest in Essence, and only the bodied
+ones reach the node.
 
 A call site resolves its `overloadedMethodIndex` against the full Type. Emitting under the position in
 `methods` would define a name no call uses and overwrite the native that owns it. So `simplifyMethods`
@@ -26,8 +27,9 @@ suffix would name a member nothing declares.
 
 A Parameter with a Record Type and a default merges its Argument into the default at the callee's entry;
 `hasRecordDefault` picks these out. A JavaScript default parameter can not do this. It fires only when the
-whole Argument is `undefined`, while a Record default fills in members of an Argument the caller wrote. Such a Parameter therefore gets no JavaScript default, and `recordDefaultPrologue` rebuilds it
-at the head of the body:
+whole Argument is `undefined`, while a Record default fills in members of an Argument the caller wrote. Such a
+Parameter therefore gets no JavaScript default, and `recordDefaultPrologue` rebuilds it at the head of the
+body:
 
 ```
 options = Record.createRecord({
