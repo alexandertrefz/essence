@@ -23,21 +23,14 @@ import {
 } from "@essence-lang/compiler/simplifier"
 import type { common } from "@essence-lang/interfaces"
 
-// One invocation's Modules, read once, parsed once and linked once.
-// `esc check src/*.es` hands every file it was given as an entry, and with
-// Modules a file is routinely both an entry and somebody else's dependency:
-// loaded per entry it would be type checked as many times as it is reached, and
-// its Diagnostics counted as many times. A Session is what makes "once" true —
-// every entry's graph is merged into one set of Modules, and each connected
-// piece of that set is linked exactly once, for whichever entry asks first.
+// One invocation's Modules, read, parsed and linked once. A file is often both
+// an entry and another's dependency. So every entry's graph merges into one set,
+// and each connected piece is linked once.
 
-// A Module of one connected piece of the invocation's Modules. Linking
-// runs over a piece as a whole because that is the unit `linkModuleGraph`
-// works in, and pieces share nothing: linking two of them separately answers
-// exactly what linking their union would have.
+// A Module of one connected piece of the invocation's Modules. Pieces share
+// nothing, so linking each apart answers what linking their union would.
 type Component = {
-	// The order the graphs were loaded in, which is dependency-first —
-	// every Module ahead of the ones that import it, a cycle grouped whole.
+	// Dependency-first: every Module ahead of its importers, a cycle grouped whole.
 	groups: Array<Array<Module>>
 	modules: Map<string, Module>
 	linked: Map<string, LinkedModule> | null
@@ -48,40 +41,29 @@ type SessionRead =
 	| { filePath: string; error: unknown }
 
 export type CompileSession = {
-	// The entry's own text, and the error the filesystem gave if there is
-	// none. The graph reports an unreadable DEPENDENCY as `module-not-found`;
-	// an unreadable entry is the CLI's own to report, because it is the file
-	// the caller named on the command line.
+	// The entry's text, or the filesystem's error. The graph reports an unreadable
+	// dependency as `module-not-found`, and the CLI reports an unreadable entry.
 	read: (fileName: string) => SessionRead
-	// Everything the entry reaches, dependency-first with the entry last —
-	// which is both the order the Module bodies run in and the order their
-	// Diagnostics read best in.
+	// Everything the entry reaches, dependency-first with the entry last, the order
+	// the Module bodies run in.
 	modules: (fileName: string) => Array<Module>
 	linked: (fileName: string) => Array<LinkedModule>
-	// One typed Program is reached by every entry that imports it, so
-	// each is simplified once and answers with the same simplified Program
-	// every time, which is what lets `optimise` key its cache on that Program.
+	// Each typed Program is simplified once and answers with the same simplified
+	// Program, which `optimise` keys its cache on.
 	simplify: (
 		program: common.typed.Program,
 		options?: SimplifyOptions,
 	) => common.typedSimple.Program
-	// Optimising is safe to repeat — a pass is a pure function of its
-	// input — so this cache is only about not paying twice for one answer. It is
-	// keyed by the Options as well as by the Program: what the passes make of a
-	// Program is exactly what the Options asked for, and a Session that answered
-	// one set of Options with another's work would emit a build nobody asked
-	// for.
+	// Optimising is pure, so this cache only saves repeating work. It is keyed by
+	// the Options too, so one build never gets another's passes.
 	optimise: (
 		program: common.typedSimple.Program,
 		options?: OptimiserOptions,
 	) => common.typedSimple.Program
 }
 
-// Reached over the edges the graph itself resolved, so that an entry that
-// is somebody else's dependency compiles the Modules IT reaches and no more.
-// Filtering the component's own order rather than collecting during the walk
-// keeps the answer dependency-first, and leaves the entry last: anything after
-// it in that order is not something it depends on.
+// The Modules an entry reaches over the graph's own edges. Filtering the
+// component's order keeps them dependency-first with the entry last.
 function reachableModules(
 	component: Component,
 	entryPath: string,
@@ -106,10 +88,8 @@ function reachableModules(
 	return component.groups.flat().filter((module) => seen.has(module.filePath))
 }
 
-// The compile MODE is the whole INVOCATION's — one run of `esc` is one
-// mode, so it belongs to the Session rather than to a request. It is what the
-// Session links every component under, and a linked component is cached, so a
-// Session opened in one mode may never answer for another. See `CompileMode`.
+// The compile mode belongs to the whole invocation. Linked components are cached
+// under it, so a Session answers for one mode only. See `CompileMode`.
 export function createCompileSession(
 	entryFileNames: Array<string>,
 	mode: CompileMode = {},
@@ -117,10 +97,8 @@ export function createCompileSession(
 	let texts = new Map<string, string>()
 	let errors = new Map<string, unknown>()
 
-	// One read per file for the whole invocation, and the reason a read
-	// failed kept rather than thrown away — `esc` distinguishes a missing file
-	// from a directory from an unreadable one, and the graph's host answers
-	// `undefined` to all three.
+	// One read per file per invocation, keeping why a read failed. The graph's
+	// host answers `undefined` for a missing file, a directory or an unreadable one.
 	let host: ModuleHost = {
 		readFile(filePath: string): string | undefined {
 			let text = texts.get(filePath)
@@ -155,9 +133,8 @@ export function createCompileSession(
 		Map<string, common.typedSimple.Program>
 	>()
 
-	// A group already held is a group already parsed: a Strongly
-	// Connected Component is the same set of Modules in every graph that
-	// reaches any of it, so recognising one member is recognising the group.
+	// A Strongly Connected Component is the same in every graph that reaches it,
+	// so a group with one member held is already parsed.
 	let mergeGraph = (entryPath: string): Array<string> => {
 		let graph = loadModuleGraph(entryPath, host)
 		let touched: Array<string> = []
@@ -181,10 +158,8 @@ export function createCompileSession(
 		return touched
 	}
 
-	// Which Modules belong together, answered from what was actually
-	// loaded rather than guessed at: everything one entry reaches is connected
-	// through that entry, so a load is one union and the pieces fall out of the
-	// overlaps between loads.
+	// Which Modules belong together, from what was loaded: everything one entry
+	// reaches is connected, so the pieces fall out of the overlaps between loads.
 	let assignComponents = (loads: Array<Array<string>>): void => {
 		let parents = new Map<string, string>()
 
@@ -257,9 +232,7 @@ export function createCompileSession(
 		for (let fileName of entryFileNames) {
 			let entryPath = canonicalPath(fileName)
 
-			// A standard library source is not a Module and can not be
-			// imported as one, so it never enters a graph — `esc check` on one
-			// reads it as the single declaration space it is.
+			// A standard library source is not a Module, so it never enters a graph.
 			if (isStdlibDocument(entryPath) || modules.has(entryPath)) {
 				continue
 			}
@@ -270,10 +243,8 @@ export function createCompileSession(
 		assignComponents(loads)
 	}
 
-	// A file the Session was never told about — nothing the CLI does
-	// today, since a run is planned before anything is compiled. It gets a
-	// piece of its own rather than an empty answer, which costs a second
-	// enrichment of whatever it shares with an entry and never a wrong one.
+	// A file the Session was not begun with gets a piece of its own. That may enrich
+	// a shared Module twice, but never answers wrongly.
 	let loadComponent = (entryPath: string): Component | undefined => {
 		let graph = loadModuleGraph(entryPath, host)
 
@@ -302,11 +273,8 @@ export function createCompileSession(
 		return components.get(filePath) ?? loadComponent(filePath)
 	}
 
-	// A whole piece at once, entries and dependencies alike, because
-	// linking is what a Module's imports are bound by and a piece is what is
-	// connected. The `entryPath` handed over is only carried through: what a
-	// bundle spells its Modules against is the entry the CALLER asked for, and
-	// one piece answers for as many entries as it holds.
+	// Links a whole piece at once, since linking binds imports. The `entryPath` is
+	// only carried through: bundles name their Modules against the caller's entry.
 	let linkComponent = (component: Component): Map<string, LinkedModule> => {
 		if (component.linked === null) {
 			component.linked = linkModuleGraph(
@@ -359,10 +327,8 @@ export function createCompileSession(
 			})
 		},
 
-		// Keyed by Program identity alone, Options and all: one Program
-		// is one Module's, and the Options say what that Module's text is —
-		// which can not change while a compile holds the Program parsed from
-		// it.
+		// Keyed by Program alone: the only option is the Module's source text, which is
+		// fixed for the Program parsed from it.
 		simplify: (
 			program: common.typed.Program,
 			options?: SimplifyOptions,
@@ -401,12 +367,8 @@ export function createCompileSession(
 	}
 }
 
-// Every `from "…"` a file spells, read out of its text rather than off a
-// parsed Program. This answers a SCHEDULING question and only ever that one:
-// which entries a worker should be given together, so that the graphs they load
-// overlap. A wrong answer costs a Module parsed in two workers — never a
-// Diagnostic, never a resolution — and the parent pays no parse of its own for
-// files it is not going to compile.
+// Every `from "…"` a file spells, read from its text rather than parsed. It only
+// decides which entries share a worker, so a wrong answer costs a duplicate parse.
 const SPECIFIER_PATTERN = /\bfrom\s*"([^"\n]*\.es)"/g
 
 function writtenDependencies(filePath: string): Array<string> {
@@ -431,11 +393,8 @@ function writtenDependencies(filePath: string): Array<string> {
 	return dependencies
 }
 
-// The entries of an invocation, gathered into the sets whose graphs are
-// going to overlap — one hop deep, which catches the two shapes a batch
-// actually has: an entry that imports another entry, and two entries importing
-// a third file. Workers share nothing, so entries of one set landing in one
-// worker is what keeps a shared Module from being enriched in several of them.
+// The entries grouped by overlapping graphs, one import deep: an entry importing
+// another, or two entries importing a third file. A group goes to one worker.
 export function groupEntries(fileNames: Array<string>): Array<Array<string>> {
 	let parents = new Map<string, string>()
 
