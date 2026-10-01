@@ -5,24 +5,15 @@ import { overlaps, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { walk } from "./lookups"
 
-// `.price` and `(item) { <- item.price }` are one Function written two
-// ways — the Enricher writes the literal out of the path, and nothing
-// downstream of enrichment can tell which was typed. Which of them reads
-// better is the author's to decide, so both directions are offered and neither
-// is preferred.
+// Rewrites between `.price` and `(item) { <- item.price }`, which the Enricher
+// treats as one Function. Which reads better is the author's choice, so both
+// directions are offered and neither is preferred.
 //
-// Only inside an ARGUMENT. A path needs a position that names the Type it
-// reads its members off, and while several kinds of position do name one, an
-// Argument matched against a one-Parameter Function is the one this can be
-// sure of without asking the Enricher what the position expected — everywhere
-// else a written path earns `path-without-context` instead. The literal
-// direction is offered from the same place so that the two are inverses: an
-// action that turns a path into a literal it would then refuse to turn back is
-// worse than no action.
+// Only inside an Argument, the one position certain to name the Type a path
+// reads from without asking the Enricher. Both directions use it, so each
+// rewrite can be turned back.
 
-// What the Diagnostic's own help calls the Parameter it would have
-// written — `'(_ item: SomeType) { <- item.price }'` — so the two agree on the
-// name a reader is offered.
+// The Parameter name the Diagnostic's Help writes, so both offer the same.
 const preferredName = "item"
 
 export function pathActions(
@@ -30,8 +21,7 @@ export function pathActions(
 	scopes: () => Array<ScopeRange>,
 	lines: Array<string>,
 	range: common.Position,
-	// What the Compiler said about this file, so that a path it REFUSED is
-	// not offered as a literal — see `pathWasRefused`.
+	// The file's Diagnostics, so a refused path is not offered as a literal.
 	reported: Array<common.Diagnostic> = [],
 ): Array<CodeActionEntry> {
 	let entries: Array<CodeActionEntry> = []
@@ -75,16 +65,9 @@ export function pathActions(
 	return entries
 }
 
-// Whether the Compiler refused this very path. The rewrite is a change of
-// SPELLING and nothing else — it writes the literal the Enricher would have
-// written — so over a path that does not work it writes a literal that does not
-// work either, and spells the mistake out in more places than the path did:
-// `.tags.length` became `(item) { <- item.tags.length }`, which is the same
-// refused step, plus a literal with no `-> Type` and a Type Parameter nothing
-// binds. One mistake in, three out.
-//
-// Asked of the reports rather than of the path, because what makes a step wrong
-// is what the Types say and this tree holds none of them.
+// Whether the compiler refused this path. Rewriting a refused path only
+// multiplies its errors. The Diagnostics answer this, since the Parser AST
+// holds no Types.
 function pathWasRefused(
 	node: parser.MemberPathNode,
 	reported: Array<common.Diagnostic>,
@@ -99,11 +82,8 @@ function pathWasRefused(
 	)
 }
 
-// The path a literal stands for, or null where the literal does anything
-// a path can not — a Parameter carrying a label the path could not write, a
-// default it would drop, a body that computes rather than reads, a step that is
-// a call. `<- item` alone is left out too: a path is a dot and the members
-// after it, and there is no spelling of one that reads nothing.
+// The path a literal stands for. Null where the literal has a label, a
+// default, a computed body or a call, or reads only `<- item`.
 function writtenPathOf(
 	node: parser.FunctionValueNode,
 	lines: Array<string>,
@@ -148,11 +128,8 @@ function writtenPathOf(
 		return null
 	}
 
-	// Measured against the live text, and against the WHOLE literal
-	// rather than the chain alone: everything between the brackets is about to
-	// be thrown away, so anything in there that no Node accounts for — a
-	// Comment above all — would be thrown away with it. Whitespace is the one
-	// difference the two spellings are allowed to have.
+	// The whole literal is compared with the buffer, ignoring whitespace,
+	// so nothing no Node accounts for, such as a Comment, is thrown away.
 	let written = [
 		sliceOf(lines, definition.parameterListPosition),
 		definition.returnType === null
@@ -168,10 +145,9 @@ function writtenPathOf(
 	return `.${steps.join(".")}`
 }
 
-// The literal a path stands for. The Parameter takes both its Type and
-// its label from the position the Argument fills, exactly as the path did, so
-// it is written bare — and the name is the reader's to change afterwards,
-// which is why an already taken one is stepped past rather than shadowed.
+// The literal a path stands for. The Parameter's Type and label come from the
+// Argument's position, so it is written bare. A taken name is stepped past
+// rather than shadowed.
 function writtenLiteralOf(
 	node: parser.MemberPathNode,
 	scopes: () => Array<ScopeRange>,
@@ -214,10 +190,8 @@ function isTaken(scope: Scope, name: string): boolean {
 	return false
 }
 
-// An Argument's value, which is the one position both spellings are
-// certainly read in. An `Argument` carries no Position of its own and the walk
-// hands out no parents, so the values are collected from the Invocations that
-// hold them rather than recognised on the way past.
+// Every Argument's value, collected from the Invocations, since an `Argument`
+// has no Position and the walk gives no parents.
 function argumentValues(program: parser.Program): Array<parser.ExpressionNode> {
 	let values: Array<parser.ExpressionNode> = []
 
@@ -249,9 +223,7 @@ function rewrite(
 		kind: "refactor.rewrite",
 		diagnosticCode: null,
 		diagnosticPosition: null,
-		// Never, on the author's rule: the two spellings mean the same
-		// thing and an Editor that applied one of them unasked would be making
-		// a decision about taste.
+		// The spellings mean the same, so the choice is the author's.
 		isPreferred: false,
 		edits: [{ range, newText }],
 	}
