@@ -49,9 +49,8 @@ describe("printType", () => {
 			expect(printType(done)).toBe("Step<Integer, Result>#Done")
 		})
 
-		// A DECLARED Case abstracts over its Parameters (no `typeArguments`
-		// yet); a fully unbound instantiation carries only same-named GenericUses.
-		// Neither adds a `<…>` that would just echo the header.
+		// A declared Case has no `typeArguments`, and a fully unbound one holds
+		// only same-named GenericUses. Neither prints a `<…>` that echoes the header.
 		it("should print a declared Case tersely", () => {
 			let declared: common.CaseType = {
 				type: "Case",
@@ -104,10 +103,9 @@ describe("printType", () => {
 		})
 	})
 
-	// A Case declared in a Module is identified by the Module's canonical
-	// path, and a Hover is the last place that path belongs — this is the funnel
-	// every Hover, Completion detail and Document Symbol reads a Case's head
-	// through, so the Choice is named as the declaration wrote it.
+	// A Module's Case is identified by the Module's canonical path, which
+	// readers never see. Hover, Completion and Document Symbols print a Case
+	// through these, so the Choice is named as the declaration wrote it.
 	describe("Cases of a Module's Choice", () => {
 		it("should print the Choice's name without its Module path", () => {
 			let red: common.CaseType = {
@@ -137,11 +135,9 @@ describe("printType", () => {
 		})
 	})
 
-	// An overloaded free Function such as `loop` resolves at a call site
-	// to an `OverloadedStaticMethod` callee. Hover and Signature Help both
-	// render it through these, so they must spell every Overload without
-	// collapsing or crashing. Implementation mode cannot declare one, so the
-	// fixture is built by hand.
+	// An overloaded free Function such as `loop` resolves to an
+	// `OverloadedStaticMethod` callee, which Hover and Signature Help print. A
+	// Program cannot declare one, so the fixture is built by hand.
 	describe("Overloaded free Functions", () => {
 		let overloaded: common.OverloadedStaticMethodType = {
 			type: "OverloadedStaticMethod",
@@ -187,10 +183,8 @@ describe("printType", () => {
 		})
 	})
 
-	// A checked refinement is named, never spelled out. The predicate is
-	// what the DECLARATION says — a Hover over a value is about the Type it has,
-	// and `Integer where @::isNot(0)` would answer a question nobody asked in
-	// every Signature the alias appears in.
+	// A checked refinement prints under its name, never as its predicate such
+	// as `Integer where @::isNot(0)`, which belongs to the declaration.
 	describe("Checked refinements", () => {
 		let nonZeroInteger: common.Type = {
 			type: "Refinement",
@@ -235,11 +229,9 @@ describe("printType", () => {
 			).toBe("divide(by: NonZeroInteger) -> NonZeroInteger")
 		})
 
-		// An APPLIED generic refinement prints as applied — a Hover reading
-		// `NonEmptyList` where the source says `NonEmptyList<String>` names half a Type,
-		// and the applied spelling is carried for that reason alone. An
-		// instantiation whose every Argument is still a Type Parameter stays terse,
-		// the way an unbound Case does: `NonEmptyList<Item>` echoes its own header.
+		// An applied generic refinement prints as applied, since `NonEmptyList`
+		// alone names half a Type. One whose Arguments are all Type Parameters
+		// stays terse, the way an unbound Case does.
 		describe("applied to a generic Alias", () => {
 			function nonEmptyOf(itemType: common.Type): common.Type {
 				return {
@@ -284,13 +276,9 @@ describe("printType", () => {
 		})
 	})
 
-	// The `?` marking a Parameter a call may leave out is written where a
-	// signature is READ and never where a Type could be written back into
-	// source. `?` is an ordinary letter to the Lexer, so `(from?: Integer, to:
-	// Integer) -> Integer` written back declares a Parameter labelled `from?` —
-	// and the Inlay Hint that shows an inferred Type is offered by `codeActions`
-	// as an applied edit, so what comes out of `printType` has to parse back as
-	// what it says.
+	// The `?` on a Parameter a call may leave out appears in signatures only,
+	// never in `printType`. Inlay Hints print through `printType` and are offered
+	// as edits, and to the Lexer `from?` is a label.
 	describe("A Parameter a call may leave out", () => {
 		let defaulted: common.FunctionType = {
 			type: "Function",
@@ -329,10 +317,8 @@ describe("printType", () => {
 			).toBe("(from: Integer, to: Integer) -> Integer")
 		})
 
-		// `?` says the whole Argument may be left out, which a PARTIAL
-		// Record default does not grant — the Argument is still written, and
-		// which of its MEMBERS may be left out is Hover's prose to give, not a
-		// mark in a one-line signature.
+		// A partial Record default still needs the Argument written, so it gets
+		// no `?`. Which members may be left out is for Hover's prose.
 		it("should not be marked for a partial Record default", () => {
 			let partial: common.FunctionType = {
 				type: "Function",
@@ -356,9 +342,8 @@ describe("printType", () => {
 		})
 	})
 
-	// The one Hover-facing thing a second Type Parameter changes: both
-	// slots are printed, in declaration order, and a bare Dictionary prints as
-	// its name alone the way a bare List does.
+	// Both slots print in declaration order, and a bare Dictionary prints as
+	// its name the way a bare List does.
 	describe("Dictionaries", () => {
 		it("should print both slots of an applied Dictionary", () => {
 			expect(
@@ -396,8 +381,8 @@ describe("printType", () => {
 			).toBe("Dictionary")
 		})
 
-		// A slot still holding a Type Parameter prints under the name the
-		// source wrote, which is what a Hover inside a generic Namespace shows.
+		// An open slot prints under the name the source wrote, as a Hover inside
+		// a generic Namespace shows it.
 		it("should print an open slot under its Parameter's name", () => {
 			expect(
 				printType({
@@ -409,9 +394,8 @@ describe("printType", () => {
 		})
 	})
 
-	// A Record Alias prints as the word the Declaration wrote, on the rule
-	// a named Union prints by — and the shape stays reachable, for the one
-	// Hover where the Alias itself is the subject.
+	// A Record Alias prints under its name, as a named Union does. The members
+	// stay reachable for a Hover on the Alias itself.
 	describe("a named Record", () => {
 		let team: common.RecordType = {
 			type: "Record",
@@ -451,9 +435,8 @@ describe("printType", () => {
 			expect(printType({ type: "Record", members: {} })).toBe("{}")
 		})
 
-		// The descriptive form, and one level only: a member that is an
-		// Alias of its own stays named, because expanding it would answer a
-		// Declaration the reader is not looking at.
+		// Only one level is spelled out. A member that is an Alias stays named,
+		// since expanding it describes a Declaration the reader is not looking at.
 		it("should spell its members out where it is the subject", () => {
 			expect(printRecordWithMembers(standing)).toBe(
 				"{ team: Team, points: Integer }",

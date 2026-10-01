@@ -28,13 +28,11 @@ import {
 	useStdlib,
 } from "../enricher/stdlib"
 
-// What the Compiler keeps between processes: the enriched standard
-// library and the prelude derived from it, each written whole with
-// `v8.serialize` under a key that names everything it was built from. What is
-// tested here is not that it is faster — that is measured, not asserted — but
-// that it can not be WRONG: a snapshot answers only for the value it was taken
-// of, anything unreadable falls through to building, and a library restored
-// from disk emits the same bytes the one built from source does.
+// The Compiler keeps the enriched standard library and its prelude between
+// processes, written with `v8.serialize` under a key naming their inputs. These
+// specs hold that a snapshot cannot be wrong, not that it is fast. A snapshot
+// answers only for what it was taken of, and an unreadable file means building.
+// A restored library emits the same bytes as a built one.
 
 const VARIABLE = cacheVariable("compiler")
 
@@ -51,9 +49,8 @@ afterEach(() => {
 function withCacheDirectory<Result>(
 	work: (directory: string) => Result,
 ): Result {
-	// `mkdtempSync` answers under `/var/folders/…` on macOS, which is a
-	// symlink to `/private/var/folders/…`, so the directory is canonicalised
-	// before anything is written into it.
+	// On macOS `mkdtempSync` answers under `/var/folders/…`, a symlink to
+	// `/private/var/folders/…`, so the directory is canonicalised first.
 	let directory = realpathSync.native(
 		mkdtempSync(path.join(tmpdir(), "essence-snapshot-")),
 	)
@@ -67,9 +64,8 @@ function withCacheDirectory<Result>(
 	}
 }
 
-// The two halves of a Snapshot that say nothing about what is under test
-// — every case here names its own `build`, and only the two that are about
-// keying or about validation say more.
+// The fields of a Snapshot that most specs do not care about. Each spec names
+// its own `build`.
 const anyShape = { kind: "spec", variant: "", isValid: () => true }
 
 function snapshotsIn(directory: string): Array<string> {
@@ -86,9 +82,8 @@ describe("The Cache Directory", () => {
 		expect(cacheVariable("client")).toBe("ESSENCE_CLIENT_CACHE")
 	})
 
-	// The escape hatch is a word in the same variable rather than a flag,
-	// so a bisect can compare a cached run against an uncached one without the
-	// command line changing.
+	// A word in the same variable turns the cache off. A bisect can then
+	// compare cached and uncached runs without changing the command line.
 	it("reads a disabling word as off rather than as a place", () => {
 		for (let word of ["0", "off", "false", "no", "OFF"]) {
 			process.env[VARIABLE] = word
@@ -122,8 +117,7 @@ describe("Snapshots", () => {
 
 			expect(builds).toBe(1)
 			expect(second).toEqual(first)
-			// A fresh object graph, which is the whole point — a process
-			// that reads a snapshot shares nothing with the one that wrote it.
+			// A process reading a snapshot shares nothing with the one that wrote it.
 			expect(second).not.toBe(first)
 		})
 	})
@@ -150,9 +144,8 @@ describe("Snapshots", () => {
 		})
 	})
 
-	// Every way a file can be unreadable means one thing here, which is
-	// that there is nothing to read. Building is always available and always
-	// correct, and the rebuilt value replaces what could not be read.
+	// An unreadable file means there is nothing to read. The rebuilt value
+	// replaces it.
 	it("builds again when the file on disk is not a snapshot", () => {
 		withCacheDirectory((directory) => {
 			let builds = 0
@@ -214,9 +207,8 @@ describe("Snapshots", () => {
 		})
 	})
 
-	// The key changes on every edit to the Compiler, so without this a
-	// development session would leave a megabyte of dead snapshots behind per
-	// edit, forever, in a directory nobody ever opens.
+	// The key changes with every edit to the Compiler, so without a bound a
+	// development session would pile up dead snapshots.
 	it("keeps a bounded number of snapshots of one kind", () => {
 		withCacheDirectory((directory) => {
 			for (let index = 0; index < 12; index++) {
@@ -231,10 +223,8 @@ describe("Snapshots", () => {
 		})
 	})
 
-	// A reader must see either no file or the whole of one. The temporary
-	// name carries the process id and a random suffix so that two processes
-	// racing on the same entry write two files, and the rename that follows is
-	// atomic within the directory.
+	// A reader sees no file or the whole of one. Each writer renames its own
+	// temporary file into place, which is atomic within a directory.
 	it("never leaves a partially written file behind to be read", () => {
 		withCacheDirectory((directory) => {
 			let file = path.join(directory, "written.v8")
@@ -248,10 +238,8 @@ describe("Snapshots", () => {
 })
 
 describe("A Restored Standard Library", () => {
-	// The claim the whole snapshot rests on. The Compiler is handed a
-	// library it did not build — a fresh object graph carrying no identity the
-	// one it replaced had — and what it emits has to be the same bytes under the
-	// same name, or the cache has changed the answer.
+	// The claim the snapshot rests on. A restored library shares no object
+	// identity with the built one, and must still emit the same bytes.
 	it("emits the same bundle the built one does", async () => {
 		let entry = fixturePath("Everyday.es")
 		let built = await compileToMemory(entry)
@@ -270,10 +258,9 @@ describe("A Restored Standard Library", () => {
 		}
 	})
 
-	// A library a test wrote itself is not the one the snapshot key names,
-	// so the prelude derived from it is built rather than read. Without this the
-	// snapshot of the REAL library would answer for a synthetic one — silently,
-	// because the two are the same shape.
+	// A library a spec installed is not the one the snapshot key names, so its
+	// prelude is built rather than read. The real library's snapshot would
+	// otherwise answer for it, since the two have the same shape.
 	it("is told apart from a library installed over it", () => {
 		let real = loadStdlib()
 		let clone = v8.deserialize(v8.serialize(real)) as Stdlib
@@ -287,9 +274,8 @@ describe("A Restored Standard Library", () => {
 			useStdlib(previous)
 		}
 
-		// Putting the real library back restores the identity with it —
-		// there is nothing to undo, which is what keeps a spec that swaps a
-		// library from having to know this exists.
+		// Putting the real library back restores its identity, so a spec that
+		// swaps a library has nothing to undo.
 		expect(loadStdlib()).toBe(real)
 		expect(isCanonicalStdlib(loadStdlib())).toBe(true)
 	})
