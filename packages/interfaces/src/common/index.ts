@@ -11,369 +11,223 @@ export type Position = {
 	end: Cursor
 }
 
-// What a `§§` block above a Declaration says about it. `description` is
-// Markdown, as the Language Server hands it to the Editor unchanged; the
-// tagged sections are lifted out of it so that each can be shown where it
-// belongs — a Parameter's text next to that Parameter rather than in one
-// undifferentiated blob.
+// What a `§§` block says about the Declaration under it. `description` is
+// Markdown, and each tagged section is lifted out so it can be shown where it
+// belongs.
 export type Documentation = {
 	description: string
-	// The `@param` lines in WRITTEN order. A line is matched to a
-	// Parameter by its POSITION — the first line documents the first Parameter
-	// — so the order is the meaning, and two lines can carry the same name.
+	// The `@param` lines in written order. The first line documents the first
+	// Parameter, and so on, so two lines may carry the same name.
 	parameters: Array<DocumentationParameter>
 	returns: string | null
-	// The `@example` blocks, in written order. Each is Essence that a
-	// test compile turns into a test of the file the block was written in —
-	// which is what keeps an example from drifting away from the code it
-	// documents. Empty for the hand written builtin Namespaces, and for every
-	// block that wrote none.
+	// The `@example` blocks, in written order, each of which a test compile
+	// runs as a test of its file.
 	examples: Array<DocumentationExample>
-	// Null for the hand written builtin Namespaces — they document
-	// themselves in TypeScript rather than in a `§§` block, so there is no
-	// Essence source to point back at.
+	// Null for a builtin Namespace documented in TypeScript.
 	position: Position | null
 }
 
-// One `@param` line. The `name` is what the line wrote: the Parameter's
-// label, or `_` where the Parameter carries none. A Documentation attached to
-// a resolved signature carries the DISPLAY name instead — the label, or the
-// internal name in place of `_` — so that what a Hover shows is a name the
-// signature shows too.
+// One `@param` line. `name` is the label it wrote, or `_`. On a resolved
+// signature it is the name a Hover shows: the label, or the internal name in
+// place of `_`.
 export type DocumentationParameter = {
 	name: string
 	text: string
-	// The `§§` line the tag was written on, which lets the Enricher
-	// underline the tag itself rather than the whole block. Absent once the
-	// Documentation is attached to a resolved signature, and stripped for the
-	// standard library exactly as `position` is. The Position is nested under a
-	// field of that name so that the Formatter's AST comparison, which drops
-	// every `position`, keeps dropping this one too.
+	// Where the tag was written, so a Diagnostic can underline it. Absent on a
+	// resolved signature. See "Positions under a position key" in DEVELOPMENT.md.
 	tag?: { position: Position }
 }
 
-// One `§§` line, paired with the span it occupies. It is what lets a
-// Diagnostic underline one tag rather than a whole block — and what lets an
-// `@example` be compiled at the very lines it was written on, so that
-// everything a run reports about it points into the file.
+// One `§§` line and its span, so an `@example` compiles at the lines it was
+// written on.
 export type DocumentationLine = {
 	text: string
 	position: Position
 }
 
-// One `@example` block: the lines under the tag, until the next tag or
-// the end of the block. They are kept as LINES rather than as one string
-// because each of them carries where it stands, and a test compiled out of them
-// is compiled at those very Positions.
+// One `@example` block: the lines under the tag, up to the next tag or the
+// end of the block.
 export type DocumentationExample = {
 	lines: Array<DocumentationLine>
 	position: Position
-	// The `@example` line itself, for a Diagnostic about the block rather
-	// than about anything in it. Nested under a field of that name so the
-	// Formatter's AST comparison, which drops every `position`, drops this one.
+	// The `@example` line itself, for a Diagnostic about the whole block.
 	tag?: { position: Position }
 }
 
-// One written Type annotation, paired with what it resolved to. The
-// typed AST ERASES annotations — a resolved Type carries no Position — so
-// this is the only record that a Type was written at a particular place, and
-// the only way the Language Server can answer for the cursor sitting on one.
-// Collected by the Enricher on request; see `src/enricher/annotations.ts`.
+// A written Type annotation and what it resolved to. The typed tree keeps no
+// Position for a resolved Type, so the language server reads these instead.
+// The enricher collects them on request.
 export type TypeAnnotation = {
 	position: Position
 	type: Type
 }
 
-// `information` is the quietest of the three: a remark about something
-// that is not wrong and is worth knowing — a tag exactly one test carries. It
-// renders as ariadne's "advice" in the terminal and as an Information in an
-// Editor, and it never fails a build.
+// `information` is a remark about something that is not wrong, such as a tag
+// only one test carries. It never fails a build.
 export type DiagnosticSeverity = "error" | "warning" | "information"
 
-// `unnecessary` renders the code greyed out rather than underlined —
-// for Diagnostics about code that has no effect instead of code that is
-// wrong.
+// `unnecessary` greys code out rather than underlining it, for code that has
+// no effect.
 export type DiagnosticTag = "unnecessary" | "deprecated"
 
-// An annotated span. A `primary` Label says what is wrong at the place
-// the Diagnostic is about; a `secondary` Label points at the declaration that
-// place is being judged against — the Type it was declared with, the `{` that
-// was never closed — and is what turns a claim into an explanation.
+// An annotated span. A `primary` Label says what is wrong where the
+// Diagnostic points. A `secondary` Label points at what that place is judged
+// against, such as a declared Type or an unclosed `{`.
 export type DiagnosticLabel = {
 	position: Position
-	// Required. A Label with no message is the bare underline this whole
-	// shape exists to replace.
 	message: string
 	kind?: "primary" | "secondary"
-	// Lower orders render first. Only worth setting when two Labels
-	// start at the same place and the natural order reads backwards.
+	// Lower orders render first, for two Labels starting at one place.
 	order?: number
 }
 
-// The required fields are the point of this type. `code`, `notes` and
-// `helps` are not optional, and a positioned Diagnostic must carry at least
-// one Label — the type system, rather than discipline, is what keeps the next
-// Diagnostic anyone adds from being a bare sentence over an unannotated
-// excerpt. An empty `notes` or `helps` array is a deliberate "there is
-// nothing more to say"; a missing one is an oversight, and the two must not
-// look alike at a call site. Widening any of this back is how the output
-// quietly rots.
+// `code`, `notes` and `helps` are required, and a positioned Diagnostic
+// carries at least one Label. An empty `notes` or `helps` says there is
+// nothing more to say.
 export type Diagnostic = {
 	severity: DiagnosticSeverity
-	// A short claim about what is wrong. The Types, the spans and the
-	// suggested fix belong in `labels`, `notes` and `helps` — a message that
-	// carries them itself renders as one long line above an unannotated
-	// source excerpt, which is the shape this exists to avoid.
+	// A short claim about what is wrong. Types, spans and fixes belong in
+	// `labels`, `notes` and `helps`.
 	message: string
-	// A stable identifier for the kind of Diagnostic, independent of
-	// the message wording — what a Language Server client keys Quick Fixes
-	// off, and what lets a message be reworded without breaking them. Every
-	// one of them but those only the experimental test modes report is
-	// documented at `/docs/reference/diagnostics`.
+	// A stable name for the kind of Diagnostic, which Quick Fixes key off, so
+	// a message can be reworded freely.
 	code: DiagnosticCode
-	// Context — why the rule exists, what the alternatives were.
+	// Why the rule exists.
 	notes: Array<string>
-	// Action — what to write instead.
+	// What to write instead.
 	helps: Array<string>
-	// Situational metadata. Optional because its absence is
-	// unambiguous — unlike a missing Label, it costs the reader nothing.
 	tags?: Array<DiagnosticTag>
-	// The facts a Quick Fix needs, in a form it does not have to read
-	// out of a sentence. Set by the few Diagnostics whose fix is mechanical
-	// and absent everywhere else — a Quick Fix keys off `code` first and only
-	// then asks for the payload that code implies.
-	//
-	// Re-deriving these in the Language Server was rejected twice over: the
-	// unhandled members of a Match are the output of the exhaustiveness
-	// algorithm, which would have to be written a second time and kept in step
-	// with this one, and a near miss is only recoverable from the Help that
-	// names it — whose wording this file explicitly reserves the right to
-	// change. A Quick Fix built on either would break silently.
+	// The facts a mechanical Quick Fix needs, so it reads no sentence. See
+	// "Diagnostic data" in DEVELOPMENT.md.
 	data?: DiagnosticData
 } & (
 	| {
-			// THE place the Diagnostic is about — what the Language
-			// Server underlines and what deduplication keys off. The primary
-			// Label repeats it with an explanation attached.
+			// What the language server underlines and deduplicates on. The
+			// primary Label repeats it with an explanation.
 			position: Position
 			labels: [DiagnosticLabel, ...Array<DiagnosticLabel>]
 	  }
-	// Only a placeless Diagnostic may have no Labels — an Internal
-	// Compiler Error with no Node to blame, or a duplicate declaration of a
-	// name the Compiler itself declared. The union is what makes that the
-	// sole exemption.
+	// A Diagnostic without a place, such as an internal compiler error with no
+	// node to blame, is the only one without Labels.
 	| { position: null; labels: [] }
 )
 
-// Keyed by `kind` rather than by the Diagnostic's code, because several
-// codes carry the same payload — every "did you mean" is one `suggestion`,
-// whichever kind of name was misspelled. `unhandled` holds `describeType`
-// spellings in declaration order, which is the order the Cases are written
-// in; `suggestion` holds the bare name, so the Case one renders as `#Add` and
-// replaces only `Add`.
+// Keyed by `kind`, since several codes share a payload. `unhandled` holds
+// `describeType` spellings in declaration order. `suggestion` holds the bare
+// name, so a Case's renders as `#Add` and replaces only `Add`.
 export type DiagnosticData =
 	| { kind: "missing-case"; unhandled: Array<string> }
 	| { kind: "suggestion"; suggestion: string }
-	// The Cases a value is held in — `#Value` for both `Optional` and
-	// `Result` — so that a fix which wraps an Argument in one does not have to
-	// work out which Cases of the receiver's Choice hold anything. Names are
-	// bare, as `suggestion`'s is, and the `#` is written by whoever renders one.
-	//
-	// SEVERAL, because a carrier may hold one Type in more than one Case
-	// — `choice Twin<Item> { First { item: Item }, Second { item: Item } }` —
-	// and each of them is a different question. Naming one would present one of
-	// two readings as the fix.
+	// The bare names of the Cases a value can be wrapped in, such as `Value`
+	// for `Optional`. A Choice may hold one Type in several Cases, and each is
+	// a different fix.
 	| { kind: "holding-case"; caseNames: Array<string> }
-	// The Choices that declare a bare `#Case`, in the order the Helps
-	// name them. Display names, so what a fix writes in front of the `#` is
-	// what the reader was told to write — a generic Choice's Type Arguments
-	// are not part of one and stay the reader's to add.
+	// The display names of the Choices that declare a bare `#Case`, in the
+	// order the Helps name them, without Type Arguments.
 	| { kind: "choice-candidates"; names: Array<string> }
-	// The `§§` line a Parameter is missing. `parameter` is the name the
-	// line has to write — the label, or `_` where the Parameter carries none —
-	// and `after` is the `@param` line the new one belongs under, which is the
-	// last one the block already wrote.
-	//
-	// Carried for the FIRST Parameter the run does not reach, and for no
-	// other. The lines document Parameters by POSITION, so a Parameter two
-	// short of the run has no line that can be written for it without leaving
-	// the one above it undocumented — and writing that one puts this one back
-	// in reach.
+	// The `@param` line the first undocumented Parameter is missing, with the
+	// name it writes and the last `@param` line, which it goes after. Lines
+	// match Parameters by order, so only the first gap can be filled.
 	| { kind: "documentation-line"; parameter: string; after: Position }
-	// The label a Parameter declares and the one the call WROTE, either
-	// of them null where there is none. The pair is the fact; which of the
-	// three edits it implies — write a label, change one, drop one — is the
-	// Server's reading of it, and there is no fourth pair: two equal labels
-	// are no mismatch.
+	// The label a Parameter declares and the one the call wrote, each null
+	// where there is none. The language server picks the edit.
 	| { kind: "expected-label"; label: string | null; written: string | null }
-	// The names a Matcher introduces, in written order — what
-	// `require MATCHER = EXPR` brought into scope left of the `=`. Read here
-	// rather than off the source because the Statement they were written in was
-	// refused: the Program a fix reads holds no Node that names them.
-	//
-	// SEVERAL, because a Pattern names as many as it has members, and
-	// which of them a line meant is not something a Diagnostic can say.
+	// The names a refused `require MATCHER = EXPR` introduced, in written
+	// order. The Program holds no node for the refused Statement.
 	| { kind: "introduced-names"; names: Array<string> }
-	// The members a Record Literal has to grow, in the order the
-	// Parameter's Type or the Case declares them, so that a scaffold writes
-	// them in the order the reader would have.
+	// The members a Record literal lacks, in the order its Type declares them.
 	| { kind: "missing-members"; names: Array<string> }
-	// A member a Record Literal writes that its Type does not declare,
-	// and the member it was a near miss for. Not a `suggestion`, which is the
-	// payload for a Diagnostic reported AT the name that was misspelled: a
-	// mismatch is reported at the member's VALUE, because a typed Record holds
-	// no Position for a member's name, so the fix is handed the name to find
-	// rather than a span to write over.
+	// A member a Record literal writes that its Type does not declare, and the
+	// near miss. The Diagnostic stands at the member's value, so the fix gets a
+	// name to find rather than a span.
 	| { kind: "record-member"; member: string; suggestion: string }
-	// EVERY requirement the Namespace has not written, not the one the
-	// conformance check tripped over — a check stops at the first disagreement
-	// because one is enough to refuse, and a fix that writes the stubs would
-	// otherwise have to be applied once per Method. A Method the Protocol
-	// PROVIDES is not among them: the Protocol's own body answers it, and a
-	// stub would replace a working Method with an empty one.
+	// Every requirement the Namespace has not written, not only the first one
+	// the check met. A Method the Protocol provides is left out.
 	| {
 			kind: "missing-requirements"
 			protocol: string
 			methods: Array<string>
 	  }
-	// What a call would write between the angle brackets of
-	// `value::<Name>method(…)` to pick one candidate — a Protocol's name where
-	// the candidate is a Method that Protocol PROVIDES, and the Namespace's
-	// own everywhere else. Not the declaration the notes describe: those two
-	// differ for a provided Method, and only this one is a spelling.
+	// What `value::<Name>method(…)` writes between the angle brackets to pick a
+	// candidate: the Protocol for a provided Method, else the Namespace.
 	| { kind: "namespace-candidates"; names: Array<string> }
-	// A Protocol something has to conform to, and the Type Parameter
-	// whose declaration would carry the bound — null where the Diagnostic is
-	// about a Namespace's conformance list or about a concrete Type, neither
-	// of which has a Parameter to bound.
+	// A Protocol something has to conform to, and the Type Parameter whose
+	// declaration would carry the bound, or null where there is none.
 	| {
 			kind: "required-protocol"
 			protocol: string
 			parameter: string | null
 			import?: ProtocolImport
 	  }
-	// A bound a NAMESPACE's Type Parameter needs, which is carried by the
-	// Method the call stands in rather than by a declaration — the counterpart
-	// of `required-protocol`, told apart by it because the two edits land in
-	// different places and only one of them can be right.
+	// A bound a Namespace's Type Parameter needs, written on the Method the
+	// call stands in rather than on a declaration.
 	| {
 			kind: "method-bound"
 			protocol: string
 			parameter: string
 			import?: ProtocolImport
 	  }
-	// A Method's `<…>` entry that names one of its Namespace's own Type
-	// Parameters, for the two fixes that rewrite the entry rather than the
-	// Method. The span is the entry's, so a fix has only to say what goes there:
-	// nothing, for an entry that is simply in the way, and the entry without its
-	// `infer` for one that restates the inference and has a bound to keep.
-	//
-	// It names the EDIT rather than the code that reported it — a restated
-	// `<infer Item>` carrying no bound has nothing to keep, so it is reported as
-	// the restatement it is and fixed by the removal below.
+	// A Method's `<…>` entry that names its Namespace's own Type Parameter.
+	// The kind names the edit: remove the entry, or drop its `infer` and keep
+	// its bound.
 	| { kind: "shadowed-type-parameter"; parameter: string }
 	| {
 			kind: "restated-inferred-parameter"
 			parameter: string
 			protocol: string
 	  }
-	// A Declaration another Module of the graph holds and this one has not
-	// imported, by the Module's CANONICAL path — which is what the Compiler
-	// knows about it. What an import of it would be SPELLED as is a question
-	// about the file being edited, so the specifier is worked out on the
-	// Language Server's side from the two paths.
+	// A Declaration of another Module that this one does not import, by that
+	// Module's canonical path. The language server works out the specifier.
 	| {
 			kind: "import-declaration"
 			name: string
 			modulePath: string
 	  }
-	// A Module section standing where it does not belong, with the span
-	// of the whole block. The Parser DROPS such a section rather than carry it
-	// along broken, so the Program a fix reads holds no Node for it and this is
-	// the only record of where its text stands.
+	// A misplaced Module section and the span of its block, which the Parser
+	// dropped.
 	| {
 			kind: "section-order"
 			section: "import" | "export"
 			block: Position
 	  }
-	// A mismatch that is one missing `complete` rather than a wrong value,
-	// and WHICH of the two it is: `unstarted` is a `Future<T>` where its `T` was
-	// wanted, `in-flight` a `Started<T>`. Both are the same edit — write
-	// `complete` in front of the value — which is why one fix reads this rather
-	// than the Help's sentence, whose wording this file reserves the right to
-	// change. `not-a-future` is deliberately absent: "build a future" is a
-	// judgement about the body, not an edit anything can make.
+	// A mismatch that a `complete` in front of the value fixes. `unstarted` is
+	// a `Future<T>` where `T` was wanted, and `in-flight` a `Started<T>`.
 	| {
 			kind: "asynchrony-mismatch"
 			mismatch: "unstarted" | "in-flight"
 	  }
-	// The Namespace a static Method is reached through, so a fix can
-	// write `Namespace.make(value, …)` for a `value::make(…)`. ONE name rather
-	// than every candidate: the Namespace that declares the static is the one
-	// the call has to name, and the Help names that one too.
-	// And which of the two rewrites the SIGNATURE would accept — passing
-	// the receiver along as an Argument, or dropping it. A static takes no
-	// receiver, so the value the call was written on either belongs among the
-	// Arguments or does not belong at all, and the arity is the one thing that
-	// says which: `p::origin()` reaching an `origin()` wants it gone, and
-	// `a::distance(to b)` reaching a `distance(_ a: Point, to b: Point)` wants
-	// it kept. Both were offered whatever the arity, so one of the two always
-	// ended in `argument-count-mismatch`.
+	// The Namespace declaring a static Method called as `value::make(…)`, and
+	// which rewrite the signature accepts: `Namespace.make(value, …)`, or the
+	// call without `value`.
 	| {
 			kind: "static-owner"
 			namespace: string
 			acceptsValue: boolean
 			acceptsWithoutValue: boolean
 	  }
-	// The Type Parameter a `where` condition named and the Namespace
-	// never declared — carried as written, since what a fix inserts into the
-	// Generic list is the very name the condition reads.
+	// The Type Parameter a `where` condition names and the Namespace does not
+	// declare, as written.
 	| { kind: "undeclared-parameter"; name: string }
-	// The Type a `Generatable` conformance would be DECLARED for, which
-	// is the Parameter's own Type as the source wrote it — never the Type the
-	// derivation tripped over, which may be a member several levels inside it.
-	// Absent where the Parameter names no Type a Namespace could target: a
-	// Function has nothing to hang a conformance off, and a Type Parameter is
-	// not a Type anybody declares one for.
+	// The Type a `Generatable` conformance would be declared for: the
+	// Parameter's own Type as written, not the member the derivation failed on.
 	| { kind: "ungeneratable"; typeName: string }
-	// One span and what Essence spells there instead — the whole of what a
-	// fix for a written JavaScript habit has to do, since every one of them is a
-	// word or a Symbol standing where another belongs: `const` where `constant`
-	// does, `null` where `#Empty` does, a Record member's `:` where its `=` does.
-	// An empty `spelling` is a DELETION, which is what the habits that write
-	// something Essence writes nothing for need — the `;` at the end of a
-	// Statement.
-	//
-	// The span rather than the Diagnostic's own Position, because the two
-	// differ wherever the report is about more than the text that changes: a
-	// refused `const price = 12` underlines the whole Statement and rewrites the
-	// Keyword alone. And carried rather than re-derived, for the reason
-	// `introduced-names` gives — a refused Statement is DROPPED, so the Program a
-	// fix reads holds no Node standing where the habit was written.
+	// A span written in another language's habit and Essence's spelling for
+	// it, such as `constant` for `const`. An empty `spelling` deletes, as for a
+	// trailing `;`. The span may be narrower than the Diagnostic's.
 	| { kind: "essence-spelling"; position: Position; spelling: string }
-	// A Method reached with the `.` of a member — the span of that `.`, so
-	// a fix writes `::` over it, and where the call's own `()` belongs when the
-	// reader wrote none. `call` is null where they did write one, which is the
-	// difference between `names.length()` and `names.length`: the first is one
-	// edit and the second is two.
-	//
-	// Absent where the Method takes an Argument the call would have to
-	// write. Turning `names.item` into `names::item()` answers a Method that
-	// takes an index with none, so the fix would trade one refusal for another;
-	// what to pass is the reader's to say, and the Help says so.
+	// A Method reached with a member's `.`: the span of the `.`, and where
+	// `()` goes when none was written. Absent where the call would need an
+	// Argument.
 	| {
 			kind: "method-with-dot"
 			separator: Position
 			call: Position | null
 	  }
 
-// Every Diagnostic carries one, and `/docs/reference/diagnostics`
-// documents every one of these but those only the experimental test modes
-// report — a code with no entry there is a code nobody can look up. Spellings
-// are stable API: reword a message freely, but renaming a code breaks the Quick
-// Fixes and the suppressions that are keyed off it.
+// The website documents every code but the experimental test modes'. Quick
+// Fixes key off these spellings, so renaming one breaks them.
 export type DiagnosticCode =
-	// Syntax — the Lexer and the Parser.
+	// Syntax, from the Lexer and the Parser.
 	| "syntax-error"
 	| "unexpected-token"
 	| "unclosed-string"
@@ -402,11 +256,10 @@ export type DiagnosticCode =
 	| "declarations-outside-stdlib"
 	| "overload-function-outside-stdlib"
 	| "misplaced-module-section"
-	// Habits from other languages — text that is not Essence and says plainly
-	// which language it is.
+	// Habits from other languages.
 	| "foreign-syntax"
 	| "operator-not-supported"
-	// Tests — the `tests { … }` section and what may be written in it.
+	// Tests and the `tests { … }` section.
 	| "misplaced-tests-section"
 	| "test-outside-tests"
 	| "expect-outside-test"
@@ -441,7 +294,7 @@ export type DiagnosticCode =
 	| "benchmark-for-any"
 	| "snapshot-in-property"
 	| "value-comment-outside-tests"
-	// Names — declared twice, never declared, or not what the position wants.
+	// Names declared twice, never declared, or not what the position wants.
 	| "duplicate-variable"
 	| "duplicate-type"
 	| "duplicate-protocol"
@@ -461,7 +314,7 @@ export type DiagnosticCode =
 	| "unknown-member"
 	| "type-without-members"
 	| "method-called-with-dot"
-	// Types — a value that does not fit where it was put.
+	// Types: a value that does not fit where it was put.
 	| "assignment-type-mismatch"
 	| "argument-type-mismatch"
 	| "incomplete-record-argument"
@@ -492,7 +345,7 @@ export type DiagnosticCode =
 	| "zero-denominator"
 	| "invalid-refinement-predicate"
 	| "predicate-not-boolean"
-	// Dispatch — which Method, in which Namespace, with which overload.
+	// Dispatch: which Method, in which Namespace, with which overload.
 	| "no-matching-overload"
 	| "ambiguous-namespace"
 	| "undecided-receiver-type"
@@ -521,7 +374,7 @@ export type DiagnosticCode =
 	| "recursive-generic-choice"
 	| "indistinguishable-union-arms"
 	| "undecided-type-arguments"
-	// Patterns — naming the parts of a value.
+	// Patterns.
 	| "refutable-pattern"
 	| "redundant-pattern-binder"
 	| "pattern-without-body"
@@ -534,13 +387,13 @@ export type DiagnosticCode =
 	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"
-	// Asynchrony — `start`, `complete`, and the work they are about.
+	// Asynchrony: `start` and `complete`.
 	| "complete-outside-future"
 	| "unused-future"
 	| "unobserved-started"
 	| "needless-complete"
 	| "needless-start"
-	// Define Expressions — a definition by cases.
+	// Define Expressions.
 	| "define-without-otherwise"
 	| "unreachable-define-arm"
 	| "define-without-answer-type"
@@ -571,19 +424,19 @@ export type DiagnosticCode =
 	| "incompatible-restatement"
 	| "method-not-on-protocol"
 	| "provided-method-out-of-reach"
-	// Inference — what the Compiler could not work out on its own.
+	// Inference the Compiler could not finish.
 	| "uninferable-type-parameter"
 	| "uninferable-parameter-type"
 	| "path-without-context"
 	| "uninferable-item-type"
 	| "uninferable-return-type"
 	| "missing-return-type"
-	// Documentation — the `§§` blocks above Declarations.
+	// Documentation in `§§` blocks.
 	| "missing-documentation-separator"
 	| "unknown-documentation-parameter"
 	| "misnamed-documentation-parameter"
 	| "undocumented-parameter"
-	// Modules — the specifier, the file it names, and the graph they form.
+	// Modules: specifiers, the files they name, and the graph.
 	| "invalid-module-specifier"
 	| "module-not-found"
 	| "self-import"
@@ -596,13 +449,13 @@ export type DiagnosticCode =
 	| "cyclic-side-effects"
 	| "unused-import"
 	| "dependency-has-errors"
-	// The Compiler as a program — reading files, bundling the output.
+	// Reading files and bundling the output.
 	| "file-not-found"
 	| "not-a-file"
 	| "unreadable-file"
 	| "bundle-failed"
 	| "bundler-warning"
-	// The project file — `essence.json`, read before any source.
+	// The project file, `essence.json`.
 	| "unknown-setting"
 	| "setting-shape"
 	| "moved-setting"
@@ -636,79 +489,42 @@ export type RationalType = {
 	type: "Rational"
 }
 
-// A real algebraic irrational — the quadratic slice `a + b·√d` for now,
-// designed to grow to the full set (roots of integer polynomials) without a
-// semantic change. Exactly comparable; conforms to Comparable.
+// An algebraic irrational. The runtime holds the quadratic ones, `a + b·√d`,
+// exactly, so they compare exactly.
 export type AlgebraicType = {
 	type: "Algebraic"
 }
 
-// A number that is provably NOT algebraic — rational combinations of π
-// for now. Equality is canonical-form equality; deliberately does NOT conform
-// to Comparable (deciding `Ordering#Equal` is undecidable in general), though
-// the `Number` Namespace hand-writes total cross-member comparisons.
+// A number that is not algebraic: a rational combination of named
+// transcendental constants such as π and e. It is not Comparable, since the
+// order of two such numbers can not always be decided.
 export type TranscendentalType = {
 	type: "Transcendental"
 }
 
-// A source of random values, and the one Type of the language whose
-// values nothing written in Essence can build or read. A `Randomness` is handed
-// to `Generatable::generate` by a property test's runner, its Methods answer a
-// value and advance it, and there is nothing else to do with one. It is a bare
-// tag rather than a `choice` because a Case would carry a payload a Program
-// could read, and what a source holds is the runner's business.
+// A source of random values, which a property test's runner hands to
+// `Generatable::generate`. No Essence code can build one or read what it holds.
 export type RandomnessType = {
 	type: "Randomness"
 }
 
-// A description of work that will answer with a `Value`, and the first
-// opaque Type of the language that holds another. Building one runs nothing —
-// `start` puts it in flight and `complete` waits for what it answers — so a
-// Future is as inert as the Record it could have been, and nothing a Program
-// writes can read what it describes. It is generic where `Randomness` is bare
-// because what the work ANSWERS is the whole of what a Future is worth saying
-// about; the description itself is the runtime's business.
-//
-// An UNAPPLIED `Future` is `Future<Unknown>` and not a container Type of
-// its own, which is the one place it parts from `List`. `GenericList` exists
-// because an empty List Literal has to be assignable to every List, and no
-// Expression builds a Future out of nothing — a bare `Future` is a slot nobody
-// decided, which is what `Unknown` already says. `matchTypes` then answers the
-// bare form exactly as it answers a bare `List`: it accepts every Future and is
-// accepted by none.
+// A description of work that will answer with a `valueType`. Building one runs
+// nothing, and no Essence code can read what it describes. Unlike `List`, it
+// has no generic container Type, since no Expression builds an empty Future.
 export type FutureType = {
 	type: "Future"
 	valueType: Type
 }
 
-// One execution of a Future, already in flight. `start` answers one and
-// `complete` reads it, any number of times and from anywhere, always the same
-// value — so a Started is the "run once, read many" half of the pair, and a
-// Future the "run as often as you like" half.
+// One run of a Future, already in flight. Each `complete` of it reads the
+// same value.
 export type StartedType = {
 	type: "Started"
 	valueType: Type
 }
 
-// `name` and `alias` are the two display fields a `UnionType` carries,
-// stamped on the Record a Type Alias is reached THROUGH — `type Standing = { … }`
-// stamps the first, an applied generic Alias (`Pair<Integer>`) the second. They
-// mean exactly what they mean on a Union and are ignored in exactly the same
-// places: assignability, dispatch, exhaustiveness, every emitted descriptor and
-// every structural key look straight past them, and only a Diagnostic, a Hover
-// and Signature Help ever read one. Two Aliases of one shape stay one Type — an
-// `A` fits a `B` and prints as whichever of the two it was declared under.
-//
-// A Record the Program BUILDS carries neither — a Literal, an update that
-// settles a slot, a merge, a narrowing and a Pattern's destructuring are each a
-// new object, so the spelling heals by construction rather than by anybody
-// remembering to clear it. What keeps that true is that the sites building one
-// write `{ type: "Record", members }` out rather than spreading the Record they
-// came from, and the one that does spread clears the fields where it spreads.
-//
-// Absent rather than empty, for the reason `CaseType.unitChoice` is: a
-// Type nothing named stays structurally what it was, which is what keeps
-// `matchTypes`' `lhs === rhs` fast path and the snapshot cache undisturbed.
+// `name` and `alias` are display names stamped by the Type Alias the Record
+// is reached through. See "Display names" in DEVELOPMENT.md.
 export type RecordType = {
 	type: "Record"
 	members: Record<string, Type>
@@ -719,80 +535,36 @@ export type RecordType = {
 	}
 }
 
-// The `= { … }` a Case's payload shape may carry — which of the payload's
-// members a construction is allowed to leave out, and the value each of them is
-// then filled with.
-//
-// `members` is read off what the default WRITES, so it is known at
-// resolution, where a Case Type is built. `values` are Expressions, and only the
-// Enricher types one — so they are written into this object IN PLACE afterwards,
-// the way a Refinement's conjuncts are. The object is registered once and shared
-// by reference, which is what keeps a Case Type copied before the fill pointing
-// at the same answer; nothing reads `values` before every Module has been
-// enriched, because the only reader is the Simplifier.
-//
-// Expressions on a Type, which every other Type field is deliberately
-// written to avoid. They are admitted HERE because the merge happens at the
-// CONSTRUCTION rather than at a callee, and a construction may stand in a Module
-// that never named the Choice — there is no import to hang a value off, so what
-// the value IS has to travel with the Type. What makes that sound is the rule
-// the Enricher holds a payload default to: every member is a literal, closed
-// over nothing, and evaluates to itself wherever it is written.
+// The `= { … }` a Case's payload shape carries: the members a construction
+// may leave out, and the values that fill them. See "Case payload defaults"
+// in DEVELOPMENT.md.
 export type CasePayloadDefault = {
 	members: ReadonlyArray<string>
-	// The same answer `Parameter.defaultNesting` carries, for the same
-	// reason and through the same helper — a path key in a partial payload
-	// reaches into the members the default writes as Records of their own.
+	// As `Parameter.defaultNesting`, for a path key in a partial payload.
 	nesting: DefaultNesting
 	values: Record<string, typed.ExpressionNode> | null
 }
 
-// One Case of a Choice — a *nominal* Record Type: its members are
-// accessed like any Record's, but assignability goes by (choice, name)
-// identity rather than by structure. A `choice` declaration manufactures one
-// CaseType per Case and names the Union of them.
+// One Case of a Choice, a nominal Record Type. Its members read like a
+// Record's, but assignability goes by its Choice and name. A Choice is the
+// Union of its Cases.
 export type CaseType = {
 	type: "Case"
 	choice: string
 	name: string
 	members: Record<string, Type>
-	// Set on the declared Cases of a *generic* Choice — the Type
-	// Parameters the Choice abstracts over, so an application can substitute
-	// them into `members` and stamp the applied spelling. Absent on every
-	// non-generic Choice's Cases, which keeps their identity through
-	// substitution and matchTypes' `lhs === rhs` fast path.
+	// The Type Parameters of a generic Choice, set on its declared Cases so an
+	// application can substitute them into `members`.
 	choiceGenerics?: Array<GenericDeclaration>
-	// Set on an *instantiated* Case — the Type Arguments an application
-	// bound, in declaration order — so the Case prints its `<Integer, String>`
-	// and later substitutions rewrite the spelling alongside the members. The
-	// mirror of a Union alias' `typeArguments`.
+	// The Type Arguments an application bound, in declaration order, so the
+	// Case prints as `<Integer, String>`.
 	typeArguments?: Array<Type>
-	// Set on every Case of a Choice whose Cases ALL have empty payloads —
-	// `choice Direction { Up, Down }`, `Ordering`. The fact belongs to the
-	// Choice, but it is stamped on each Case because a Case is what survives on
-	// its own: `constant up = #Up` is inferred as the Case alone and never meets
-	// its siblings again, and the embedding boundary — the only reader — is
-	// handed a Type with no scope behind it. Nothing in the language reads it:
-	// it decides that such a Case crosses to JavaScript as its bare name rather
-	// than as a `$case` object, which makes it an embedding fact that happens to
-	// be decidable at declaration.
-	//
-	// `unitChoice` and NOT `unit`, because "unit Case" already means
-	// something else here and means it everywhere — a Case with no payload,
-	// which is what `createCase`'s interning, `lower-unit-case-equality` and
-	// `collapseConstruction` are all written about. `Shape#Blank` is a unit Case
-	// by that reading and is not of a unit CHOICE, since `Shape#Circle` carries
-	// a radius; a field spelled `unit` would answer `false` for it and read as
-	// though it had answered the other question.
-	//
-	// Absent rather than `false` everywhere else, so that a Case's
-	// identity through substitution and matchTypes' `lhs === rhs` fast path are
-	// undisturbed.
+	// Set on every Case of a Choice whose Cases all lack a payload, such as
+	// `Ordering`. Such a Case crosses to JavaScript as its bare name. Each Case
+	// carries it, since a Case may travel without its siblings.
 	unitChoice?: true
-	// Set on a Case whose payload shape carries a `= { … }`. Absent
-	// everywhere else, for the same reason `unitChoice` is. Never set on a Case
-	// of a GENERIC Choice: a default can not bind the Choice's Type Parameters,
-	// so there is nothing a value written there could be checked against.
+	// Never set on a Case of a generic Choice, whose Type Parameters a default
+	// can not bind.
 	payloadDefault?: CasePayloadDefault
 }
 
@@ -806,12 +578,8 @@ export type ListType = {
 	itemType: Type
 }
 
-// The second builtin generic container, and the first taking TWO Type
-// Parameters — which is the only thing that makes it more than a List with a
-// second slot. Everywhere a List's `itemType` is read, decided or substituted,
-// a Dictionary's two slots are read, decided and substituted INDEPENDENTLY:
-// `Dictionary<Unknown, Integer>` has decided its values and not its keys, and
-// nothing may pin one slot from what the other says.
+// The Dictionary's two slots are read, decided and substituted independently:
+// `Dictionary<Unknown, Integer>` has decided its values and not its keys.
 export type GenericDictionaryType = {
 	type: "GenericDictionary"
 	generics: [
@@ -829,76 +597,36 @@ export type DictionaryType = {
 export type Parameter = {
 	type: Type | GenericUse
 	name: string | null
-	// What the Declaration's `§§` block says about this Parameter, so
-	// Signature Help can describe the Argument being typed rather than the
-	// call as a whole.
+	// What the Declaration's `§§` block says about this Parameter, for
+	// Signature Help.
 	documentation?: string
-	// Whether a call may leave this Argument out. The expression itself
-	// is deliberately not here: a Type is compared, cached and serialized, and
-	// it has no business carrying a Node. What a default IS lives on the
-	// Parameter Node the Declaration owns; what a caller may omit is all a
-	// Type needs to say.
-	//
-	// Absent rather than `false`, like `CaseType.unitChoice`, so that
-	// every Type that has no default stays structurally what it was — which is
-	// what keeps `matchTypes`' `lhs === rhs` fast path and the snapshot cache
-	// undisturbed.
+	// Whether a call may leave this Argument out. The default itself stays on
+	// the Parameter node, since a Type is compared, cached and serialized.
 	hasDefault?: true
-	// The members a Record default supplies, sorted, so a call may leave
-	// exactly these out of a Record Argument. Absent where there is no default
-	// or the Parameter is not a Record — for the same reason `hasDefault` is
-	// absent rather than false. Names, never Expressions: a Type is compared,
-	// cached and serialized.
-	//
-	// Set beside `hasDefault` and not instead of it, because the two
-	// answer different questions and `pairArguments` only ever asks the first.
-	// A COMPLETE default carries both: the whole Argument may be left out, and
-	// so may any member of one that is written. A PARTIAL default carries this
-	// alone: the Argument is required, and the members it does not fill in have
-	// to be written into it.
+	// The members a Record default supplies, sorted, which a Record Argument
+	// may leave out. A complete default also sets `hasDefault`. A partial one
+	// sets only this, so the Argument is required.
 	defaultMembers?: ReadonlyArray<string>
-	// The members a Record default writes as a Record Literal of their
-	// OWN — the ones a path key in a partial Argument may reach into, because
-	// the callee rebuilds them member by member and merges what it was handed
-	// into what the default fills in. Absent where nothing nests, for the same
-	// reason `hasDefault` is absent rather than false.
+	// The members the default writes as Record literals of their own, which a
+	// path key in a partial Argument may reach into.
 	defaultNesting?: DefaultNesting
 }
 
-// A tree of member NAMES. A member present in one is written as a Record
-// Literal by the default it describes, and its own tree says the same of ITS
-// members — so `{ server: { tls: {} } }` says a caller may write `server.port`
-// and `server.tls.enabled`, and nothing about how deep `tls` goes.
-//
-// Names, never Expressions, for the reason `Parameter.defaultMembers` gives:
-// a Type is compared, cached and serialized, and what a caller may reach into
-// is all a Type has to say about it.
+// A tree of member names, each written as a Record literal by its default.
+// `{ server: { tls: {} } }` lets a caller write `server.port` and
+// `server.tls.enabled`.
 export type DefaultNesting = { readonly [member: string]: DefaultNesting }
 
-// `documentation` is optional in the type, but every builtin Namespace
-// Method declared in `packages/standard-library/sources/*.es` does carry it —
-// the completion gate in builtins.spec.ts fails on any Method that ships
-// without documentation.
+// `documentation` is optional, but `builtins.spec.ts` requires it on every
+// standard library Method.
 export type BaseFunction = {
 	parameterTypes: Array<Parameter>
 	generics: Array<GenericDeclaration>
 	returnType: Type | GenericUse
 	documentation?: Documentation
-	// Set where this entry is a PREDICATE ALIAS — a Method that answers a
-	// Boolean and whose whole body is one call on `@`, optionally negated.
-	// `Integer::isZero` is `@::is(0)`, `List::hasItems` is
-	// `@::isEmpty()::negate()`, and `Integer::isGreaterThanOrEqualTo` is
-	// `@::isLessThan(other)` negated over the Argument it was handed. What is
-	// stored is the leaf that call resolves to, so a refinement written on the
-	// alias and one written on the Method it forwards to are the same
-	// predicate, and the opposite of either is the other.
-	//
-	// Read off the BODY rather than declared, which is what makes it true: a
-	// Namespace could declare that one Method is another's contrary and be
-	// wrong, and there is nothing to be wrong about here. Absent on every
-	// Method that is not one — a body that reads a chain (`@::length()::is(0)`)
-	// is a leaf of its own, and the standard library's emptiness Methods are
-	// exactly that.
+	// Set on a Method whose whole body is one Boolean call on `@`, maybe
+	// negated, such as `List::hasItems` as `@::isEmpty()::negate()`. It is read
+	// off the body, so a refinement on the alias and on its target agree.
 	predicateAlias?: PredicateAlias
 }
 
@@ -914,9 +642,8 @@ export type StaticMethodType = BaseFunction & {
 	type: "StaticMethod"
 }
 
-// The Overloaded kinds are not `BaseFunction`s, so a `§§` block above
-// the `overload` keyword documents the set as a whole — each Overload
-// separately documents itself, and falls back to the set's text.
+// A `§§` block on `overload` documents the whole set. Each Overload may
+// document itself and falls back to the set's text.
 export type OverloadedStaticMethodType = {
 	type: "OverloadedStaticMethod"
 	overloads: Array<BaseFunction>
@@ -959,9 +686,7 @@ export type NamespaceType = {
 	generics: Array<GenericDeclaration>
 	properties: Record<string, Type | GenericUse>
 	methods: Record<string, MethodType>
-	// The identities of the Protocols this Namespace declares conformance
-	// to via its `is` clause. Optional so the hand written builtin Namespaces
-	// stay valid until they conform.
+	// The identities of the Protocols its `is` clause names.
 	conformsTo?: Array<string>
 	// The `where` conditions of each conditional conformance, keyed by
 	// the Protocol's identity, each naming its Protocol by identity too, as in
@@ -975,31 +700,23 @@ export type NamespaceType = {
 	// pseudo Namespace a concrete receiver reaches them through. It tells a
 	// Protocol from a Namespace at emission, since `name` is the source's.
 	providedBy?: string
-	// Which members of the pseudo Namespace a Protocol-bounded receiver
-	// resolves through were provided rather than required, each under the
-	// identity of the Protocol that wrote the body. Read only where a reader
-	// has to be told whose Method they are looking at.
+	// On the pseudo Namespace of a Protocol-bounded receiver, the members
+	// that are provided, each under the identity of the Protocol that wrote it.
 	providedMembers?: Record<string, string>
 }
 
-// Deliberately NOT part of `Type` — a Protocol is not a Type. It is
-// only nameable as a Generic bound (`<infer T is Comparable>`) and in a
-// Namespace conformance clause (`is Comparable`), which keeps it out of
-// every Type position structurally. `Self` appears in its signatures as a
-// GenericUse named "Self".
+// Not part of `Type`, since a Protocol is only named as a bound or in an `is`
+// clause. Its signatures spell `Self` as a GenericUse of that name.
 export type ProtocolType = {
 	type: "Protocol"
 	// The declared name, which is what a reader is shown.
 	name: string
-	// What tells two Protocols of one name apart: the declaring Module and
-	// the name, and the Position of the name for one declared inside a body.
-	// See `protocolIdentity`.
+	// What tells two Protocols of one name apart: the declaring Module, the
+	// name, and for one declared inside a body, its Position. See
+	// `protocolIdentity`.
 	identity: string
-	// Every Method the Protocol's surface holds — its own requirements,
-	// its own provided Methods, and both of those from every Protocol it
-	// extends, merged in at declaration. One record, because everything that
-	// asks a Protocol what it can do (the conformance check, a bounded
-	// receiver's pseudo Namespace, Completion) means the whole surface.
+	// Every requirement and provided Method, its own and those of every
+	// Protocol it extends.
 	methods: Record<string, MethodType>
 	// Which of `methods` carry a body, and the identity of the Protocol
 	// that wrote it, this one or an ancestor. A name in here is not a
@@ -1009,21 +726,13 @@ export type ProtocolType = {
 	// body reads. A witness of another Protocol may stand in for it where it
 	// holds each of them under the same answer.
 	providedReads?: Record<string, Array<string>>
-	// The identities of every Protocol this one extends, directly or not,
-	// so that "does conforming to this grant that" is a lookup, not a walk.
+	// Every Protocol this one extends, directly or not, by identity.
 	conformsTo?: Array<string>
 	documentation?: Documentation
 }
 
-// `name` is set on the Union a `choice` declaration creates (and on
-// builtins like `Ordering` and `Number`, and non-generic Type Aliases) —
-// assignability ignores it entirely, it only gives Diagnostics and Hovers a
-// readable name for the Union. `alias` is its parameterized sibling, set on the
-// Union an applied Generic Alias produces (`Labelled<Integer>` for a
-// `type Labelled<T> = T | String`). Its Type Arguments are real Types, so
-// generic substitution rewrites them alongside the members and the applied
-// spelling stays accurate — a plain string name would go stale instead. Equally
-// ignored by assignability.
+// `name` and `alias` are display names. See "Display names" in
+// DEVELOPMENT.md.
 export type UnionType = {
 	type: "UnionType"
 	types: Array<Type | GenericUse>
@@ -1056,8 +765,8 @@ export type GenericUse = {
 	refusedBound?: true
 }
 
-// The unapplied form of a generic Type Alias — use sites apply Type
-// Arguments (`Maybe<Rational>`), which substitutes them into `aliasedType`.
+// A generic Type Alias before a use site applies Type Arguments, as in
+// `Maybe<Rational>`, which substitutes them into `aliasedType`.
 export type GenericAliasType = {
 	type: "GenericAlias"
 	name: string
@@ -1065,42 +774,8 @@ export type GenericAliasType = {
 	aliasedType: Type
 }
 
-// One leaf of a checked refinement's predicate — a single Method call on
-// the value being refined, resolved to the Namespace that answers it. It is a
-// KEY, not an Expression: two refinements are compared by their conjunct sets,
-// so what is stored is exactly what makes two leaves the same question and
-// nothing that only makes them the same source text. The typed predicate
-// Expression lives on the Type Alias Statement it was written on, which keeps
-// `conformanceKey` and its memo keys off the whole of it.
-//
-// A leaf is stored RESOLVED: the Method a Namespace writes as a call to another
-// one is put down as the call it makes, and `negated` is what a Method written
-// `<- @::m()::negate()` contributes. So `@::isZero()` and `@::is(0)` are one
-// key, `@::hasCharacters()` is `String::isEmpty` negated, and the OPPOSITE of a
-// leaf is that leaf with the flag flipped — which is why nothing here needs a
-// table of Methods declared to be each other's contraries.
-//
-// The Overload is NOT part of it. Two Overloads of one Method are told apart by
-// the Arguments they take, and the Arguments are stored with their kind: a
-// written String keeps its quotes, so `@::check(1)` and `@::check("1")` stay two
-// questions while the Overload that answered each stays the Enricher's business.
-// A resolved leaf could not carry the index anyway — the Method a body forwards
-// to is read before anything has resolved an Overload of it.
-//
-// An Argument is kept as a stable scalar rather than as a Type: an
-// Integer's value is a string because it is a bigint at run time and JSON has
-// no bigint, and every consumer — the canonical key, the literal evaluator, a
-// Diagnostic naming the predicate — reads it back the same way. A String keeps
-// the quotes JSON gives it, which is what tells `1` from `"1"`.
-//
-// `spelling` is the CALL the leaf was written as — the Method name and the
-// Arguments a reader gave it, which need be neither the ones the leaf resolved
-// to: `@::isPositive()` takes none where the leaf it resolves to takes `0`. A
-// Diagnostic naming the predicate says what the reader wrote.
-//
-// DISPLAY only, and no part of the key: two spellings of one question are one
-// question. Absent on a leaf nobody wrote, which is every leaf the complement
-// and the Match doorway synthesize.
+// One leaf of a refinement's predicate: a Method call on the refined value,
+// resolved and stored as a key. See "Predicate conjuncts" in DEVELOPMENT.md.
 export type PredicateConjunct = {
 	namespaceName: string
 	methodName: string
@@ -1114,47 +789,15 @@ export type PredicateSpelling = {
 	args: Array<PredicateSpellingArgument>
 }
 
-// One Argument as it was WRITTEN. A bare scalar where the call wrote one,
-// and the scalar under the LABEL in front of it where it wrote that — which is
-// what makes the text a Diagnostic prints a thing a reader can write back. A
-// `match` guard is spelled `case Integer where @::isBetween(0, and 9)`, `@` and
-// all, so a Help offering `@::isBetween(0, 9)` offers something no Overload
-// answers.
-//
-// The label is no part of the KEY. Two spellings of one question are one
-// question, and a conjunct's own `args` carry the scalars alone.
+// One Argument as written, with its label where it had one, so a Diagnostic
+// prints a call the reader can write back.
 export type PredicateSpellingArgument =
 	| string
 	| boolean
 	| { label: string; value: string | boolean }
 
-// What a Method's BODY says it asks, recorded on the entry as its
-// Namespace or its Protocol reaches Scope. It is a TEMPLATE rather than a leaf:
-// a Method that takes Arguments forwards them, so a slot is either a scalar the
-// body wrote down or the position of one of the Method's own Parameters, and
-// the call site substitutes what it was given. `isGreaterThanOrEqualTo(_ other)`
-// is `isLessThan` negated over Parameter 0, `isZero()` is `is` over the literal
-// `0`, and `isWithin(_ n)` written `@::isBetween(0, and n)` is `isBetween` over
-// the literal and Parameter 0 together.
-//
-// A call whose Argument in a forwarded slot is not written down contributes no
-// conjunct at all, exactly as a computed Argument always has.
-//
-// `namespaceName` is null where the body was read on `Self` — a Protocol's
-// PROVIDED Method, which every conformer reaches through a witness of its own.
-// The Namespace the call answered through is the conformance SOURCE, so it is
-// filled in at the call site: `x::isGreaterThanOrEqualTo(0)` keys as
-// `Integer::isLessThan(0)` negated on an Integer and as `Number::isLessThan(0)`
-// negated on a Number, which is what a `where` clause written over each base
-// keys as.
-//
-// A chain is resolved through: an alias whose target is itself one is recorded
-// as the leaf both of them mean, whichever order the two were written in, and a
-// ring of Methods defined by each other is left primitive rather than followed
-// round. What the hoist can not fold — a witness's own body under a Protocol's
-// requirement, and a target whose reading was recorded after the body naming it
-// — is followed where the leaf is read instead, so the order two declarations
-// were written in decides nothing either way.
+// What a Method's body asks, as a template whose slots the call site fills.
+// See "Predicate aliases" in DEVELOPMENT.md.
 export type PredicateAlias = {
 	namespaceName: string | null
 	methodName: string
@@ -1162,62 +805,15 @@ export type PredicateAlias = {
 	negated: boolean
 }
 
-// One slot of an alias' Arguments — a scalar spelled exactly as a
-// conjunct's own Arguments are, or the POSITION of a Parameter the body
-// forwarded. Positions are counted over the Arguments a caller writes, so the
-// receiver is no part of them.
-//
-// A position is where the Parameter was DECLARED, which is where the Argument is
-// WRITTEN only because a Method with a defaulted Parameter is refused a reading:
-// a caller leaving one out would shift every slot after it. If a call ever gets
-// to write its labelled Arguments in another order, the slots have to be paired
-// by label rather than by position, here and wherever a conjunct's own Arguments
-// are built.
+// A scalar spelled as a conjunct's Arguments are, or the index of a forwarded
+// Parameter among the Arguments a caller writes.
 export type PredicateAliasArgument =
 	| { kind: "Literal"; value: string | boolean }
 	| { kind: "Parameter"; index: number }
 
-// A checked refinement — a base Type together with the predicate every
-// value of it has been proven to satisfy. `type NonZeroInteger = Integer where
-// @::isNot(0)` is one, and the alias' name is its printing identity: a reader
-// wrote `NonZeroInteger`, so that is what a Hover and a Diagnostic say.
-//
-// Assignability is directional. A refinement flows freely into its base — the
-// evidence is simply forgotten — while the other direction needs evidence, and
-// a refinement accepts another only when its conjuncts are a SUBSET of the
-// other's: proving more than was asked is proof enough.
-//
-// Refinements are erased before emission — nothing about one survives
-// into the JavaScript, and the Optimiser stage is where they go. `base` is an
-// Integer, a Rational, a String or an applied List, and a GENERIC Alias' base is
-// an applied List whose item Type is still a Type Parameter — `List<Item>` —
-// which a use site substitutes through the Generic Alias wrapping the
-// refinement.
-//
-// `conjuncts` is null while the predicate is still UNRESOLVED — the state
-// a refined Alias hoists in when the Namespace answering its predicate has not
-// hoisted yet, which is what lets that very Namespace name the Alias in a
-// signature without the two deadlocking each other. The object is registered
-// once and shared by reference, and the conjuncts are written into it in place
-// when the answering Namespace arrives; every reader of `conjuncts` refuses the
-// null by THROWING, which the hoisting rounds read as "not this round", so no
-// answer is ever computed — or memoised — against a predicate nobody has read.
-// Hoisting guarantees the null does not survive it: a predicate still
-// unresolved after the rounds is reported and the Alias poisoned to its base.
-//
-// `typeArguments` is the applied spelling of a GENERIC refined Alias, and
-// nothing but a spelling: `NonEmptyList<String>` would otherwise print as
-// `NonEmptyList`, which is the one thing a reader did not write. It is stamped where
-// the Type Arguments are applied and substituted along with the base, so it never
-// goes stale, and it is IGNORED by every decision — assignability compares the
-// base and the conjuncts, exactly as it ignores a Union's name.
-//
-// It DOES reach the memo keys `conformanceKey` builds, and the worst that costs is
-// a miss: two refinements agreeing on their base and their conjuncts while
-// disagreeing on their spelling — the declared `NonEmptyList<Item>` beside a Namespace's
-// instantiation of it — are solved twice rather than answered wrongly once. Absent
-// on every non-generic refinement, so `NonZeroInteger` keys byte for byte as it
-// always did.
+// A base Type and the predicate its values are proven to satisfy, such as
+// `type NonZeroInteger = Integer where @::isNot(0)`. `conjuncts` is null until
+// the predicate resolves. See "Refinements" in DEVELOPMENT.md.
 export type RefinementType = {
 	type: "Refinement"
 	name: string
@@ -1226,15 +822,8 @@ export type RefinementType = {
 	typeArguments?: Array<Type>
 }
 
-// The compile-time plan a *generic* Choice's derived Equatable follows
-// at runtime — one entry per Case tag, mapping each payload member's name to
-// how that member is compared. A member mentioning no Type Parameter compares
-// structurally (`eq`); a bare Type Parameter routes through the witness at
-// index `i` — the payload-mentioned Type Parameters in declaration order, so
-// the index lines up with the hidden conformance Arguments the same order
-// produces; composites recurse. Emitted as a plain object literal the runtime
-// `boundChoiceIs` interprets, so a *non-generic* Choice — which carries none —
-// keeps emitting the byte-identical `choiceIs` with no descriptor at all.
+// How a generic Choice's derived `is` compares each payload member, per Case
+// tag. See "Derived equality descriptors" in DEVELOPMENT.md.
 export type DerivedEquatableDescriptor = Record<
 	string,
 	Record<string, DescriptorNode>
@@ -1244,29 +833,12 @@ export type DescriptorNode =
 	| { k: "eq" }
 	| { k: "w"; i: number }
 	| { k: "list"; of: DescriptorNode }
-	// Two nodes rather than one, because a Dictionary's keys and its
-	// values are separate slots and either may be the Type Parameter — a
-	// `Dictionary<T, String>` payload routes its keys through the witness and
-	// compares its values structurally. The runtime walks the box's live view
-	// and compares entry by entry, which is the reading every other Dictionary
-	// reader takes.
+	// Keys and values separately, since either may be the Type Parameter.
 	| { k: "dictionary"; key: DescriptorNode; value: DescriptorNode }
 	| { k: "record"; m: Record<string, DescriptorNode> }
 	| { k: "case"; m: Record<string, DescriptorNode> }
-	// A Union-typed payload member — its arms are claimed at runtime by
-	// the value's `typeKeySymbol` tag, and the generic arm (`tag: null`)
-	// catches everything no arm claims, so `T | Integer` compares an Integer
-	// structurally and a `T` through its witness.
-	//
-	// A tag says which KIND a value is, not which Type — every Record
-	// carries "Record", every List "List" — so where two arms share one, the
-	// tag alone claims the wrong values. `shape` is the arm's Type as the
-	// runtime can check it (`$type.isValueOfType`, the same check a Match
-	// narrows with), and it is carried by exactly the arms that need telling
-	// apart: `{ code: Integer }` claims the Records that have an Integer
-	// `code`, and a `T` bound to `{ name: String }` keeps the rest. Arms are
-	// ordered most specific first, so an Argument that is a strict refinement
-	// of a concrete arm claims its own values before that arm does.
+	// A Union-typed member, whose arm is picked by the value's tag and, where
+	// two arms share a tag, by `shape`.
 	| {
 			k: "union"
 			arms: Array<{
@@ -1276,10 +848,9 @@ export type DescriptorNode =
 			}>
 	  }
 
-// How a bounded Type Parameter's Protocol requirement is fulfilled at
-// one invocation. A `namespace` source packages the conforming Namespace's
-// Methods into a conformance value at the call site; a `parameter` source
-// forwards the enclosing bounded Function's own conformance parameter.
+// How one call fulfils a bounded Type Parameter's Protocol. A `namespace`
+// source packs the conforming Namespace's Methods into a conformance value,
+// and a `parameter` source forwards the enclosing Function's own.
 export type ConformanceSource =
 	| {
 			kind: "namespace"
@@ -1290,8 +861,8 @@ export type ConformanceSource =
 			// where there are none, so such a witness is a plain object.
 			providedMethods?: Record<string, string>
 			// For a provided Method whose body reads more than this witness
-			// holds, the index of the witness it is curried with: 0 for this one,
-			// and n for the n-th of `providedWitnesses`.
+			// holds, the witness it is curried with. Index 0 is this one, and n is
+			// the n-th of `providedWitnesses`.
 			curriedWith?: Record<string, number>
 			// This conformer's witnesses for the Protocols whose bodies
 			// `curriedWith` sends elsewhere, built together with this one.
@@ -1302,30 +873,18 @@ export type ConformanceSource =
 			// The conditions those witnesses take that the group of one of
 			// `conditions` or `groupConditions` builds, taken from that group.
 			sharedConditions?: Array<SharedCondition>
-			// The recursively solved conformances for this Namespace's
-			// own `where` conditions, ordered by its Generic declaration order
-			// so they line up with the fulfilling Methods' hidden trailing
-			// conformance Parameters. Empty for an unconditional conformance.
+			// The solved conformances for the Namespace's own `where`
+			// conditions, in Generic declaration order, which is the order of
+			// the Methods' hidden trailing conformance Parameters.
 			conditions: Array<Conformance>
-			// Set only when this source is a *generic* Choice's derived
-			// Equatable — the plan its widened runtime helper interprets to
-			// compare generic payloads through the conditions' witnesses. Absent
-			// for every written Namespace and every non-generic Choice, which
-			// keeps their witness emission byte-identical.
+			// Set only for a generic Choice's derived Equatable.
 			derivedDescriptor?: DerivedEquatableDescriptor
-			// Set only when this source is a RECORD whose DECLARED members
-			// do not all compare — or print — the way the universal structural
-			// walk does: the routed member names, in declaration order, lining up
-			// with the `conditions` beside them. The Namespace is still `Record`,
-			// because it is: a Record conforms conditionally on its members
-			// exactly as a List conforms conditionally on its items. Absent for
-			// an all-structural Record, whose witness emission is byte-identical
-			// to what it always was.
+			// Set only for a Record with a declared member that does not compare
+			// or print structurally: the routed member names, in declaration
+			// order, matching `conditions`.
 			derivedMembers?: Array<string>
-			// Set only when this source is a Choice's derived
-			// `Enumerable` — the Case tags its one Method answers with, which
-			// no Namespace holds a body for. Absent for every written
-			// Namespace and for the other two derives.
+			// Set only for a Choice's derived `Enumerable`: the Case tags its
+			// Method answers with.
 			derivedCases?: Array<string>
 	  }
 	| { kind: "parameter"; name: string }
@@ -1369,39 +928,23 @@ export type Conformance = {
 	source: ConformanceSource
 }
 
-// One branch of a Method Invocation on a Union-typed receiver. The
-// Method is resolved statically for every member Type of the Union — the
-// branch to run is picked at runtime by the receiver's actual Type, but each
-// branch's Namespace, overload and conformances are fixed at compile time.
+// One branch of a Method call on a Union-typed receiver. The receiver's Type
+// picks the branch at run time, and each branch is resolved at compile time.
 export type DispatchCase = {
 	memberType: Type
 	namespaceName: string
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
-	// Per branch, because each branch resolves to a different Method and
-	// they need not agree on what may be left out.
+	// Per branch, since the branches' Methods need not agree on what may be
+	// left out.
 	omittedParameterIndices: Array<number>
-	// The Arguments this branch alone is given, each under the position
-	// in the Invocation's own Argument list it stands in for. A Function
-	// literal that omitted its annotations takes them from the Method it is
-	// passed to, and every branch passes it to a different Method, so ONE
-	// compiled literal can not be what all of them meant — the Enricher builds
-	// a typed copy per branch instead. Empty for every Argument that does not
-	// react to its context, which is every Argument but such a literal, so a
-	// dispatch that passes none is emitted exactly as it was before.
+	// A typed copy, per branch, of each Function literal Argument that takes
+	// its annotations from the Method it is passed to, by Argument index.
 	contextualArguments: Array<{ index: number; argument: typed.ArgumentNode }>
-	// Set only when this branch resolves to a *generic* Choice's derived
-	// Equatable — the plan its widened runtime helper follows. Absent
-	// otherwise, so a non-generic Choice's dispatch branch emits the plain
-	// `choiceIs` unchanged.
 	derivedDescriptor?: DerivedEquatableDescriptor
-	// Set only when this branch's receiver is a RECORD that routes a
-	// declared member, read exactly as the field of the same name on a plain
-	// Method Invocation.
 	derivedMembers?: Array<string>
-	// The identity of the Protocol that provided this branch's Method,
-	// when one did. `namespaceName` declares no Method of that name, so this is
-	// what sends the emission to the shared const.
+	// The Protocol that provided this branch's Method, since `namespaceName`
+	// declares no Method of that name.
 	providedBy?: string
 }
 

@@ -149,3 +149,139 @@ Record member and `brackets` and `bare` on a `Combination`. The field is absent,
 not used. A tree that does not use the spelling then carries no key for it. Anything that compares two trees,
 such as the formatter's safety gate or a spec's expected tree, sees a difference only where the spelling was
 written.
+
+The same holds for optional fields on Types, such as `CaseType.unitChoice` and `Parameter.hasDefault`. A Type
+that does not use the field keeps the shape it would have without it, so structural comparisons and keys of
+Types are unaffected.
+
+## Positions under a position key
+
+The formatter's safety gate compares the tree it read with the tree of its output, after dropping every
+Position. `stripPositions` in `packages/formatter/src/index.ts` drops fields by name: `position` and a short
+list of other Position fields. It compares `documentation` rather than dropping it. A Position inside
+documentation, such as where a `@param` tag was written, therefore sits under a field named `position`. In
+`tag: { position }` the gate drops it like any other.
+
+## Diagnostic data
+
+A Quick Fix keys off a Diagnostic's `code`, then reads the payload in `data` that the code implies. Only the
+Diagnostics whose fix is mechanical set it. The language server does not work these facts out again. The
+unhandled Cases of a `match` are the output of the exhaustiveness check, which would need a second copy kept
+in step. A near miss could only be read back out of the Help that names it, and a Help's wording may change.
+
+`DiagnosticData` is keyed by `kind` rather than by code, because several codes carry the same payload. Every
+"did you mean" is one `suggestion`, whichever kind of name was misspelled. Some payloads carry a fact the
+parsed Program does not hold. The Parser drops a refused Statement or a misplaced section, so a fix reads what
+it needs from `data` instead of from the tree.
+
+## Display names
+
+A `UnionType` and a `RecordType` may carry `name` and `alias`, the spelling a reader knows the Type by. `name`
+is set on the Union a `choice` declares, on builtins such as `Ordering` and `Number`, and by a Type Alias
+without Type Parameters. `alias` is set by an applied generic Alias, such as `Labelled<Integer>` for
+`type Labelled<T> = T | String`. Its Type Arguments are Types, so substitution rewrites them with the members
+and the spelling stays accurate.
+
+The fields are for display. Assignability, dispatch, exhaustiveness and structural keys ignore them, so two
+Aliases of one shape stay one Type. An `A` fits a `B`, and prints as whichever of the two it was declared
+under.
+
+A Record the Program builds carries neither field. A literal, an update, a merge, a narrowing and a
+destructuring each build a new Record. So a spelling that stops fitting does not survive them. A site that
+builds a Record Type from another writes `{ type: "Record", members }` out rather than spreading it. Where one
+does spread, it clears both fields, so `name` and `alias` never carry over.
+
+## Case payload defaults
+
+A Case's payload shape may carry `= { … }`, the members a construction may leave out and the values that fill
+them in. `CasePayloadDefault.members` is read off what the default writes, so it is known when the Case Type
+is built. Only the enricher can type the `values`, so it writes them into the same object afterwards. The
+object is shared by reference, so a Case Type copied before that still sees the values. Two stages read
+`values`, both after every Module is enriched. The simplifier fills a construction in, and the embedding
+boundary fills in an object a host hands over, in `withPayloadDefault` in
+`packages/compiler/src/embed/describe.ts`.
+
+Every other Type field avoids holding Expressions. A payload default holds them because the default is
+merged in at the construction, not at a callee. A construction may stand in a Module that never names the
+Choice, so the value has to travel with the Type. The enricher keeps this sound by holding a payload default
+to values written down in the source. A name in one must be a Constant of the same Module that holds such a
+value. The enricher bakes that value in place of the name.
+
+## Refinements
+
+A `RefinementType` is a base Type together with the predicate every value of it is proven to satisfy, such as
+`type NonZeroInteger = Integer where @::isNot(0)`. Its `name` is what a reader wrote, so it is what a Hover and
+a Diagnostic print. The optimiser erases refinements before emission, so none reaches the JavaScript.
+
+Assignability is directional. A refinement flows into its base, and the evidence is simply forgotten. A
+refinement accepts another only when its conjuncts are a subset of the other's, since proving more than was
+asked is proof enough.
+
+### Predicate conjuncts
+
+A `PredicateConjunct` is one leaf of the predicate: a single Method call on the value refined, resolved to
+the Namespace that answers it. It is a key rather than an Expression, because two refinements are compared by
+their sets of conjuncts. The typed predicate itself stays on the Type Alias Statement.
+
+A leaf is stored resolved. A Method whose body is a call to another is stored as the call it makes, and
+`negated` records a body written `<- @::m()::negate()`. So `@::isZero()` and `@::is(0)` are one key, and the
+opposite of a leaf is the same leaf with `negated` flipped.
+
+The Overload is no part of the key. Arguments are stored with their kind instead: a written String keeps its
+JSON quotes, so `@::check(1)` and `@::check("1")` stay two questions. An Integer Argument is a string,
+because it is a bigint at run time and JSON has no bigint.
+
+`spelling` is the call as the reader wrote it, which a Diagnostic repeats. It is display only and no part of
+the key. A leaf the compiler synthesizes, such as a complement, has none. A spelling's Argument keeps its
+label, so a Help offers a call a reader can write back, such as `@::isBetween(0, and 9)`.
+
+### Predicate aliases
+
+A `PredicateAlias` records what a Method's body asks, as its Namespace or Protocol reaches Scope. It is a
+template rather than a leaf, because a Method may forward its own Arguments. Each slot is either a scalar the
+body wrote down or the index of one of the Method's Parameters, which the call site fills in. For example,
+`isGreaterThanOrEqualTo(_ other)` is `isLessThan` negated over Parameter 0. A call whose forwarded Argument is
+not written down contributes no conjunct.
+
+A Parameter's index is where it was declared. That is where its Argument is written only because a Method
+with a defaulted Parameter gets no alias. A caller leaving such an Argument out would shift every slot
+after it.
+
+`namespaceName` is null where the body was read on `Self`, in a Protocol's provided Method. The call site
+fills it in with the Namespace the call answered through. So `x::isGreaterThanOrEqualTo(0)` keys as
+`Integer::isLessThan(0)` negated on an Integer, and as `Number::isLessThan(0)` negated on a Number.
+
+An alias whose target is itself an alias is recorded as the leaf both of them mean, in whatever order the two
+were written. A ring of Methods defined by each other is left as it is rather than followed round.
+
+### Unresolved refinements
+
+`conjuncts` is null while the Namespace that answers the predicate has not hoisted yet. That lets the same
+Namespace name the refined Alias in a signature without the two waiting on each other. The object is shared
+by reference, and the enricher writes the conjuncts into it in place once the Namespace arrives.
+
+`provenConjuncts` is the only way to read them, and it refuses a null, so nothing is decided about a
+predicate nobody has read. A predicate still unresolved after hoisting is reported, and the Alias falls back
+to its base.
+
+`typeArguments` is the applied spelling of a generic refined Alias, so `NonEmptyList<String>` prints as
+written. Assignability ignores it, as it ignores a Union's name. It does reach the memo keys
+`conformanceKey` builds, which can only cost a cache miss.
+
+## Derived equality descriptors
+
+A generic Choice's derived `is` compares payloads by a plan the compiler writes at compile time, a
+`DerivedEquatableDescriptor`. It maps each Case tag to how each payload member is compared. A member that
+names no Type Parameter compares structurally. A bare Type Parameter compares through the witness at index
+`i`. The index counts the payload's Type Parameters in declaration order, the order of the hidden
+conformance Arguments. Lists, Dictionaries, Records and Cases recurse. The rewriter emits the plan as an
+object literal for the runtime's `boundChoiceIs`. A Choice without Type Parameters gets no descriptor and
+emits the plain `choiceIs`.
+
+A Dictionary node has two children, because either slot may be the Type Parameter. A `Dictionary<T, String>`
+payload compares its keys through the witness and its values structurally.
+
+A Union-typed member is matched to an arm at run time by the value's `typeKeySymbol` tag. The arm with a
+null tag takes everything no other arm claims. A tag names a kind, not a Type: every Record carries `Record`.
+Where two arms share a tag, `shape` carries the arm's Type for the runtime's `isValueOfType` check. Arms are
+ordered most specific first.
