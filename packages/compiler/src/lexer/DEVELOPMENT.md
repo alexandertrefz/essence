@@ -32,7 +32,21 @@ further down the file is reported about itself. The answer rides on `Unterminate
   reading, a quote at the end of the input, is a Note rather than a second Help: that edit reaches no Program,
   because the quotes in the lines it swallows close the String early again.
 
-In both shapes the opening quote is the first Label standing on a `"`. `closeStringAction` in the language server
+Two forgotten quotes can leave the count even, so nothing is unterminated at all. In this file the quote before
+`two` closes the String opened on line 1, and the quote before `three` opens one that line 3 closes:
+
+```
+constant a = "one
+constant b = "two
+constant c = "three"
+```
+
+What is left is the name `two`, read as a Statement of its own. `refuseNameBehindSwallowedLines` in the parser
+reports it as `unclosed-string` about the String that spans lines. Its shape is narrow: a name that opens a Statement
+right after a String spanning lines, on the line of its closing quote. Two Expressions
+never stand side by side, so nothing else has that shape.
+
+In every shape the opening quote is the first Label standing on a `"`. `closeStringAction` in the language server
 reads the String's start off that Label and writes the missing quote at the end of its line.
 
 A String whose `{` opened a hole holding a backslash, such as JSON with escaped quotes, is reported as a hole

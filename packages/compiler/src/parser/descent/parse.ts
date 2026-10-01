@@ -2190,10 +2190,8 @@ class DescentParser {
 				return this.parseFunctionStatement()
 		}
 
-		// A `test` or a `suite` is an item of the tests section, and
-		// reached here only where one was written outside it. It is read to its
-		// end before it is refused, so the Diagnostic is about the item rather
-		// than about the first Token inside a block nobody expected.
+		// A test item outside the tests section is read to its end before it is
+		// refused, so the Diagnostic is about the whole item.
 		if (this.startsTestItem(token)) {
 			this.parseTestItem()
 
@@ -2213,16 +2211,10 @@ class DescentParser {
 			)
 		}
 
-		// `expect` and `require` are Identifiers as well, so an assertion
-		// is only read where what follows the Keyword could not be the Keyword
-		// itself, read as a value: `expect = 5` stays an assignment,
-		// `expect::isEmpty()` and `expect.first` stay reads of a value called
-		// `expect`, and `expect(true)` a call of a Function called `expect`.
-		//
-		// What may follow is an Expression, or the `_` that only a Matcher can
-		// begin with — `require _ = x` is refused where it is read, and a `_`
-		// that never reached the assertion would be refused as a stray Token
-		// instead.
+		// An assertion opens only where an Expression or a Matcher's `_` follows
+		// and nothing continues the word as a value. `_` is let through so
+		// `require _ = x` is refused where it is read.
+		// See "Contextual keywords" in DEVELOPMENT.md.
 		if (
 			(token.type === TokenType.KeywordExpect ||
 				token.type === TokenType.KeywordRequire) &&
@@ -2233,9 +2225,7 @@ class DescentParser {
 			return this.parseAssertionStatement()
 		}
 
-		// `choice` is a valid Identifier, so it only opens a Choice
-		// Declaration when the Choice's name follows — `choice = 5` stays an
-		// assignment to a variable named `choice`.
+		// `choice` opens a Declaration only where a name follows it.
 		if (
 			token.type === TokenType.KeywordChoice &&
 			isIdentifierToken(this.tokens.peek(1))
@@ -2243,12 +2233,8 @@ class DescentParser {
 			return this.parseChoiceDeclarationStatement()
 		}
 
-		// `overload function …` is a free-Function Overload block, only
-		// meaningful in a `declarations { … }` Program — the standard library's
-		// alone. Anywhere else it is a tailored Diagnostic, after which the block
-		// is parsed anyway so its contents still produce Diagnostics; without
-		// that the form read as an Expression and measured a bare "Expected an
-		// Expression but found 'overload'" plus a cascade off the block's `{`.
+		// `overload function` belongs to `declarations { … }` Programs. Anywhere
+		// else it is reported and still parsed, so its contents get Diagnostics.
 		if (
 			token.type === TokenType.KeywordOverload &&
 			this.tokens.peek(1)?.type === TokenType.KeywordFunction
@@ -2307,26 +2293,9 @@ class DescentParser {
 		return expression
 	}
 
-	// The other half of a forgotten quote. A String that never closes runs
-	// to the end of the input and the Lexer says so — but where the quote it ran
-	// into was ANOTHER String's opening one, the count comes out even and
-	// nothing is unterminated at all. What is left is the name that stood behind
-	// that quote, read as a Statement of its own:
-	//
-	//     constant a = "one
-	//     constant b = "two        § `two` is all that is left of this line
-	//     constant c = "three"
-	//
-	// and `'two' is not declared` was the whole of what a file with two
-	// forgotten quotes said. The String that SPANS LINES is named here for the
-	// reason `swallowedTheLinesBelow` names it there: it is the '"' a reader has
-	// to write, and a String written to span lines is not usually followed, on
-	// the line it closes, by a name standing on its own.
-	//
-	// The shape is narrow: a name OPENING a Statement, directly behind a String
-	// whose two quotes are on different lines, on the line the second of them
-	// stands on. Two Expressions never stand side by side in this language, so
-	// there is nothing else this can be.
+	// A name left standing after a String that spans lines, where two forgotten
+	// quotes left the count even. See "Which quote is missing" in
+	// packages/compiler/src/lexer/DEVELOPMENT.md.
 	protected refuseNameBehindSwallowedLines(token: Token): void {
 		let previous = this.tokens.peek(-1)
 
@@ -2377,18 +2346,9 @@ class DescentParser {
 		)
 	}
 
-	// `const price = 12`, `let count = 3`, `return n` — a whole Statement
-	// written in another language's words, read as the Statement it was meant to
-	// be and reported once. Reported and RECOVERED rather than refused, which is
-	// the whole point: a dropped `const price = 12` leaves `price` undeclared, so
-	// every line that reads it is told so, and one mistake becomes as many
-	// Diagnostics as the Constant has readers.
-	//
-	// Narrow on purpose. The word only opens this where what follows it is
-	// the Statement it stands for — a name and an `=` for a declaration, an
-	// Expression on the same line for a return — so `constant const = 1` declares
-	// a Constant called `const`, and `Terminal.print(return)` reads a value called
-	// `return`. Neither word is reserved by this.
+	// `const price = 12`, `let count = 3`, `return n`: a Statement in another
+	// language's words, reported once and read as meant, so `price` stays
+	// declared. The word opens it only where the rest of that Statement follows.
 	protected parseForeignDeclarationStatement(
 		token: Token,
 	): parser.ImplementationNode | null {
@@ -2409,18 +2369,11 @@ class DescentParser {
 					? "variable"
 					: null
 
-		// The table's own Helps, not one written here. `let` and `var`
-		// carry two — a `variable` and, under it, the `constant` a binding
-		// nothing reassigns should be — and this site used to print the first of
-		// them and drop the second. The fix stays the one word: `variable`
-		// compiles either way, and which of the two was meant is the reader's to
-		// say.
+		// The Helps come from `foreignWord`. For `let` and `var` the fix writes
+		// `variable`, which compiles either way.
 		let word = foreignWord(token.value)
-		// `let mut total = 0` — Rust writes TWO words where this language
-		// writes one, and the name it declares stands a Token further along than
-		// `declaresAName` looks. Read as one habit over the span both words
-		// cover, so that the fix writes `variable` over the pair rather than
-		// leaving a `mut` standing between the Keyword and the name.
+		// `let mut total = 0` is one habit over two words, so the fix writes
+		// `variable` over both.
 		let mutable =
 			spelling === "variable" &&
 			this.tokens.peek(1)?.value === "mut" &&
@@ -2449,10 +2402,8 @@ class DescentParser {
 			span: written,
 		})
 
-		// The Keyword is stepped over and the rest is read by the Statement
-		// it was meant to be, so a `: Type` annotation, a Pattern and the value
-		// are all read exactly as they would have been — and whatever else is
-		// wrong with them is reported by the readers that always reported it.
+		// Steps over the word and reads the rest as the Statement it was meant
+		// to be.
 		this.tokens.next()
 
 		if (mutable) {
@@ -2464,16 +2415,8 @@ class DescentParser {
 			: this.parseDeclaredVariable(written)
 	}
 
-	// `class Money { … }`, `enum Colour { … }`, `interface Point { … }` —
-	// a word, a name and a block, which is a shape Essence has no reading for at
-	// all: two Identifiers written in a row are two Statements, and the block
-	// behind them a third. Left alone, each of the three is reported separately
-	// and the one thing that is actually wrong is said once out of four times.
-	//
-	// The BLOCK is read past before the refusal is thrown, so the Statements
-	// inside it are never read as Statements of the Program: the body of a
-	// declaration this language does not have is not a Program's business, and
-	// reporting on it would bury the one line that matters.
+	// `class Money { … }`: another language's declaration block, refused as one
+	// mistake. A closed block is skipped first, so its body is not reported on.
 	protected refuseForeignDeclarationBlock(token: Token): void {
 		let word = foreignWord(token.value)
 		let brace = this.foreignBlockBraceOffset()
@@ -2483,10 +2426,8 @@ class DescentParser {
 		}
 
 		let position = token.position
-		// A block whose `}` never arrives is left where it is. Skipping
-		// it would take the rest of the file with it and answer the whole of
-		// what is broken with one sentence about the word — the missing brace,
-		// which is the mistake that wants reporting, would never be reached.
+		// A block whose `}` never arrives is not skipped, so the missing brace
+		// is still reported.
 		let named = isIdentifierToken(this.tokens.peek(1))
 
 		if (this.foreignBlockCloses(brace)) {
@@ -2509,20 +2450,9 @@ class DescentParser {
 		)
 	}
 
-	// The `{` a block this language has no reading for opens, counted in
-	// Tokens from the word — or null where what stands here is not one of the
-	// four shapes. All four are written on ONE line:
-	//
-	//     try { … }              the word alone
-	//     class Money { … }      the word and a name
-	//     switch (x) { … }       the word and a head in parentheses
-	//     func main() { … }      the word, a name and a head
-	//
-	// `class`, `try` and `switch` are ordinary names here — a Program may
-	// declare any of them — so what makes this another language's is the shape:
-	// two Identifiers in a row, a `(…)` where nothing calls anything, a block
-	// standing behind either. The LINE is what keeps a Record Literal written
-	// under a bare name on the line below out of it.
+	// The offset of the `{` in `try {`, `class Money {`, `switch (x) {` or
+	// `func main() {`, all on one line, or null. The line keeps out a Record
+	// literal written under a bare name.
 	protected foreignBlockBraceOffset(): number | null {
 		let word = this.tokens.peek()
 
@@ -2544,8 +2474,7 @@ class DescentParser {
 		if (head) {
 			let depth = 0
 
-			// A head that does not close on its line is not this shape —
-			// the loop leaves only through its own `)`, or through here.
+			// A head that does not close on its line is not this shape.
 			while (true) {
 				let token = this.tokens.peek(offset)
 
@@ -2566,13 +2495,8 @@ class DescentParser {
 				}
 			}
 
-			// What a head in parentheses is followed by before its block:
-			// `fn double(n: i32) -> i32 {` writes its answer Type there, and so
-			// does `func greet(_ who: String) -> String {`. Read past rather than
-			// spelled out, because what is between them is another language's
-			// Type grammar and this is not the place to learn it. Only behind a
-			// head, so that `try {` still has to write its `{` where the shape
-			// says it does.
+			// Steps over an answer Type between a head and its block, as in
+			// `fn double(n: i32) -> i32 {`.
 			while (
 				onLine(this.tokens.peek(offset)) &&
 				this.tokens.peek(offset)?.type !== TokenType.SymbolLeftBrace
@@ -2588,10 +2512,7 @@ class DescentParser {
 			: null
 	}
 
-	// Whether the block at `braceOffset` has the `}` that closes it
-	// anywhere ahead. Asked before anything is read past, because what is done
-	// about a block that never closes is the opposite of what is done about one
-	// that does.
+	// Whether the block at `braceOffset` has a closing `}` anywhere ahead.
 	protected foreignBlockCloses(braceOffset: number): boolean {
 		let depth = 0
 
@@ -2614,11 +2535,8 @@ class DescentParser {
 		}
 	}
 
-	// Everything up to and including the `}` that closes the block at
-	// `braceOffset`, so that the refusal thrown behind it is resynchronised past
-	// a body rather than into it. The body of a declaration this language does
-	// not have is not a Program's business, and reporting on it would bury the
-	// one line that matters.
+	// Steps past the `}` that closes the block at `braceOffset`, so the refusal
+	// resynchronises after the body rather than inside it.
 	protected skipBalancedBlock(braceOffset: number): void {
 		for (let step = 0; step <= braceOffset; step++) {
 			this.tokens.next()
@@ -2637,10 +2555,8 @@ class DescentParser {
 		}
 	}
 
-	// What a declaration Keyword has to be followed by before the word in
-	// front of it is read as one: the name (or the Pattern) it declares, and the
-	// `=` that gives it its value. Without the `=`, `let count` is two names and
-	// this would claim the first of them.
+	// Whether a declaring word is followed by a Pattern, or by a name and an
+	// `=` or `:`. Without that, `let count` is two names.
 	protected declaresAName(from = 0): boolean {
 		let name = this.tokens.peek(1 + from)
 
@@ -2697,10 +2613,7 @@ class DescentParser {
 		})
 	}
 
-	// Reported rather than thrown, because the Statement is read on: the
-	// throw is what would drop it, and dropping it is what this exists to avoid.
-	// Suppressed exactly where every other report is — inside a speculation that
-	// is thrown away, and behind a failure that has already been reported.
+	// Reported rather than thrown, since a throw would drop the Statement.
 	protected reportForeignStatement(
 		token: Token,
 		spelling: string,
@@ -2709,9 +2622,8 @@ class DescentParser {
 			label: string
 			notes: Array<string>
 			helps: Array<string>
-			// What the one word REPLACES, where that is more than the word
-			// itself — `let mut` is two words and one habit. The word's own span
-			// wherever it is left out.
+			// What the spelling replaces where that is more than the word,
+			// such as `let mut`.
 			span?: common.Position
 		},
 	): void {
