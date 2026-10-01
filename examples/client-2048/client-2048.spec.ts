@@ -24,11 +24,9 @@ const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
-// A bundle cache of this run's own, so that a spec compiling the example
-// neither answers out of the user's cache nor fills it — and a result cache
-// beside it, for the same reason and one more: this spec runs `essence test` in
-// the example's OWN directory, so an answer left in the user's store would be
-// replayed by the next run a reader does there by hand.
+// Bundle and result caches of this run's own, so the spec neither reads nor
+// fills the user's. It runs `essence test` in the example's directory, where a
+// reader's next run would replay a stored answer.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-2048-cache-"))
 const results = mkdtempSync(path.join(tmpdir(), "essence-2048-results-"))
 
@@ -37,9 +35,9 @@ afterAll(() => {
 	rmSync(results, { recursive: true, force: true })
 })
 
-// The rules, checked through the same boundary the page calls them
-// through — `loadModule` hands over the marshalled exports, typed here by the
-// declarations the plugin generates for the page.
+// The rules, checked through the boundary the page calls them through.
+// `loadModule` hands over the marshalled exports, typed by the generated
+// declarations.
 async function rules(): Promise<typeof Rules> {
 	let module = await loadModule(path.join(EXAMPLE, "src", "Game.es"))
 
@@ -47,10 +45,8 @@ async function rules(): Promise<typeof Rules> {
 }
 
 describe("examples/client-2048", () => {
-	// The rules' own tests are Essence — `Game.es` and `Board.es` each
-	// write a `tests { … }` section — and nothing below reaches them: the specs
-	// here call the exports through the client boundary. This is the one thing
-	// a bun spec can say that they can not, and what CI runs is `bun test`.
+	// `Game.es` and `Board.es` have `tests` sections of their own, which the
+	// other specs never reach. Running them here puts them under `bun test`.
 	it("passes its own tests", async () => {
 		let run = await spawnAndWait(
 			[process.execPath, ESSENCE, "test", "src", "--no-color"],
@@ -193,9 +189,8 @@ describe("examples/client-2048", () => {
 			rmSync(directory, { recursive: true, force: true })
 		}
 
-		// The dev server writes `Game.d.es.ts` beside the source as it
-		// serves; a build does not, so the same declarations are generated here
-		// from the same Descriptor, and `tsc` reads the page against them.
+		// Only the dev server writes `Game.d.es.ts`, so the declarations are
+		// generated here from the same Descriptor for `tsc` to check against.
 		let module = await loadModule(path.join(EXAMPLE, "src", "Game.es"))
 
 		writeFileSync(

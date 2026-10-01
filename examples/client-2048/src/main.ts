@@ -1,8 +1,6 @@
-// The page. Everything that is a rule of the game lives in `Game.es` —
-// the dice included: `withNewTile` there draws its square and its tile from
-// `Randomness.entropy()`, the host's own source of randomness. What is left
-// here is drawing a Game and turning keys into pushes, which is the whole of
-// what a page is for.
+// The page. Every rule of the game lives in `Game.es`, the dice included:
+// `withNewTile` draws from `Randomness.entropy()`, the host's randomness. The
+// page only draws a Game and turns keys into pushes.
 import * as rules from "./Game.es"
 import type * as Rules from "./Game.es"
 import type { Direction, Game, Movement } from "./Game.es"
@@ -14,9 +12,9 @@ const statusElement = document.querySelector<HTMLElement>("#status")!
 const undoButton = document.querySelector<HTMLButtonElement>("#undo")!
 const newButton = document.querySelector<HTMLButtonElement>("#new")!
 
-// The whole state of the page is one Game — a plain object the Module
-// handed over. It is never changed; every event REPLACES it with the Game the
-// Module answers, and the old one is what `undo` will hand back.
+// The page's whole state is one Game, a plain object from the Module. It is
+// never changed: every event replaces it with the Module's answer, and `undo`
+// hands the old one back.
 let game: Game = rules.empty
 
 function distance(movement: Movement, row: number, column: number): number {
@@ -26,17 +24,15 @@ function distance(movement: Movement, row: number, column: number): number {
 	)
 }
 
-// `start` deals a new game its two tiles. That a game opens with two is
-// a rule of the game, so it is a rule of the Module, and the page asks for one
-// rather than dealing it.
+// `start` deals a new game its opening tiles, since that is a rule of the
+// game and so of the Module.
 function newGame(): void {
 	game = rules.start()
 	render()
 }
 
-// An arrow key names a Direction already: `"ArrowUp"` without its
-// prefix is `"Up"`, which is exactly how a payload-less Case crosses the
-// boundary. Nothing is translated — the string IS the value.
+// An arrow key names a Direction already: `"ArrowUp"` without its prefix is
+// `"Up"`, which is how a payload-less Case crosses the boundary.
 function directionOf(key: string): Direction | null {
 	let name = key.replace(/^Arrow/, "")
 
@@ -44,10 +40,8 @@ function directionOf(key: string): Direction | null {
 }
 
 function push(direction: Direction): void {
-	// `move` answers an Optional<Game>: the Game after the push, or
-	// nothing when the push would move nothing — `undefined` here — in which
-	// case no tile is placed and nothing changes, exactly as the game rules
-	// say. Not an exception, not a flag: the absence of an answer.
+	// `move` answers an `Optional<Game>`: the Game after the push, or
+	// `undefined` when the push would move nothing, and then nothing changes.
 	let moved = rules.move(game, direction)
 
 	if (moved === undefined) {
@@ -56,27 +50,25 @@ function push(direction: Direction): void {
 		return
 	}
 
-	// `movements` is the same push, told as journeys — where each tile
-	// that ended up somewhere came from. The Module already knows; the page
-	// only asks, and slides each tile in from where it was.
+	// `movements` tells the same push as journeys: where each tile came from.
+	// The page slides each tile in from there.
 	let movements = rules.movements(game, direction)
 
 	game = rules.withNewTile(moved)
 	render(movements)
 }
 
-// An animation is a class that is taken off and put back on, so that
-// the same tile can play it again on the very next move.
+// An animation is a class taken off and put back on, so a tile can replay it
+// on the next move.
 function restart(element: HTMLElement, name: string): void {
 	element.classList.remove(name)
 	void element.offsetWidth
 	element.classList.add(name)
 }
 
-// The board as it was drawn last, so that a fresh render can say what
-// each square did: a tile that slid in starts where it was and travels; one
-// that changed value under a slide — a merge — swells when it lands; one that
-// simply appeared pops in. Two values of the game side by side, nothing else.
+// The board as last drawn, so a render can tell what each square did. A tile
+// that slid in travels from where it was, a merge swells when it lands, and a
+// new tile pops in.
 let drawn: Rules.Board = rules.empty.board
 let drawnScore = 0n
 
@@ -85,8 +77,8 @@ const SLIDE_MS = 90
 function render(movements: Array<Movement> = []): void {
 	let travelled = movements.length > 0
 
-	// Integers cross as bigints — the value of a tile or a score does
-	// not depend on how big it got. `String(2048n)` is "2048".
+	// Integers cross as bigints, so no tile or score outgrows its type.
+	// `String(2048n)` is "2048".
 	boardElement.replaceChildren(
 		...game.board.flatMap((row, rowIndex) =>
 			row.map((value, columnIndex) => {
@@ -97,9 +89,9 @@ function render(movements: Array<Movement> = []): void {
 				tile.dataset.value = String(value)
 				tile.textContent = value === 0n ? "" : String(value)
 
-				// Every journey ending on this square; the tile starts
-				// out where the farthest one began, so a merge slides in from
-				// the tile that had the farther way to come.
+				// Every journey ending on this square. The tile starts where
+				// the farthest one began, so a merge slides in from the farther
+				// tile.
 				let arrivals = movements.filter(
 					({ to }) =>
 						to.row === BigInt(rowIndex) &&
@@ -157,7 +149,7 @@ function render(movements: Array<Movement> = []): void {
 	movesElement.textContent = String(rules.moves(game))
 	undoButton.disabled = rules.moves(game) === 0n
 
-	// `status` answers a payload-less Choice — one of three strings.
+	// `status` answers a payload-less Choice, which crosses as a string.
 	switch (rules.status(game)) {
 		case "Won":
 			statusElement.textContent = `You made ${String(rules.highest(game))} — keep going, or start over.`
@@ -183,19 +175,16 @@ document.addEventListener("keydown", (event) => {
 })
 
 undoButton.addEventListener("click", () => {
-	// Undo is not a feature the page implements. The Game before the last
-	// move is a value the Module kept, because nothing ever overwrote it, and
-	// `undo` hands it back — or nothing, at the very start.
+	// The page implements no undo. The Module kept the previous Game, since
+	// nothing overwrote it, and `undo` hands it back, or nothing at the start.
 	game = rules.undo(game) ?? game
 	render()
 })
 
 newButton.addEventListener("click", newGame)
 
-// Following the editor. When `Game.es` (or `Board.es` behind it) is
-// saved, Vite hands this module the fresh one, and the game in play — plain
-// JavaScript all along — is passed through the new Module's boundary and
-// carried on under the new rules. The board survives the edit.
+// Following the editor. When `Game.es` or `Board.es` is saved, Vite hands
+// over the fresh Module, and the game in play continues under the new rules.
 if (import.meta.hot) {
 	import.meta.hot.accept("./Game.es", (fresh) => {
 		if (fresh) {
