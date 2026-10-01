@@ -1516,12 +1516,8 @@ export function createInterpreter(
 		}
 
 		if (tag.includes("#")) {
-			// The one fact about a Case that its VALUE does not carry.
-			// A `Direction#Up` and a `Shape#Blank` are the same object with the
-			// same emptiness under two tags, and which of them crosses as a
-			// string is a property of the CHOICE — so it is asked of what was
-			// DECLARED here, and of the Module's own Descriptor below where the
-			// position declared nothing.
+			// Whether a Case crosses as a string belongs to its Choice, which
+			// the value does not carry. The declared position is asked first.
 			let described = caseFor(expected, tag)
 
 			if (described !== null) {
@@ -1538,12 +1534,8 @@ export function createInterpreter(
 				)
 			}
 
-			// Nothing was declared, so the Module is asked instead — the
-			// table it was built with is the same Descriptor every declared
-			// position was cut out of, which is what keeps a value crossing
-			// with nothing over it and the same value crossing a Parameter
-			// spelled alike. A tag the table does not hold is a Case this
-			// Module never named, and it crosses as the object it is.
+			// Then the Module's table. A Case the Module never named crosses as
+			// an object.
 			let named = bareCases.get(tag)
 
 			if (named !== undefined) {
@@ -1553,10 +1545,8 @@ export function createInterpreter(
 			return casedFields(value, at, step, noMembers, caseName(tag))
 		}
 
-		// A value that IS this Module's and still has no mapping — the
-		// numeric tower above Rational, for now. Saying so beats telling its owner
-		// it came from somewhere else, which is what the wording below would have
-		// claimed.
+		// This Module's value with no mapping yet, such as an Algebraic, which
+		// is not foreign.
 		let where = spell(at, step)
 
 		throw new EssenceMarshalError(
@@ -1565,10 +1555,8 @@ export function createInterpreter(
 		)
 	}
 
-	// Whether the value in hand carries THIS tag — the whole of what a
-	// compiled reader checks before it trusts the shape its Descriptor promised.
-	// Read through the bridge's key like every other tag, so a value from another
-	// bundle fails it and is handed to the general walk, which says so properly.
+	// Whether the value carries this tag under this bundle's key. A value from
+	// another bundle fails, and `toJS` names it.
 	function tagged(value: unknown, tag: string): boolean {
 		return (
 			typeof value === "object" &&
@@ -1577,8 +1565,7 @@ export function createInterpreter(
 		)
 	}
 
-	// Read through the bridge's key like every other tag, so a value from
-	// another bundle is not mistaken for one of this Module's Optionals.
+	// Read through this bundle's key, so another bundle's value is no Optional.
 	function isOptionalValue(value: unknown): boolean {
 		if (value === null || typeof value !== "object") {
 			return false
@@ -1589,16 +1576,9 @@ export function createInterpreter(
 		return tag === OPTIONAL_VALUE || tag === OPTIONAL_EMPTY
 	}
 
-	// The items a List holds, in the order it holds them — the front run
-	// backwards, then the back run — each read by the item's own compiled reader,
-	// into an Array of this side's own.
-	//
-	// The counts are fixed before the first item crosses, which is the rule
-	// the runtime's natives are written under as well: a run Array is shared, and
-	// nothing may read its `length` again once a walk has started. Nothing here
-	// can grow one — the way out only reads — but a walk that asked twice would
-	// still be a walk that could be made to disagree with itself, and the one
-	// idiom is worth more than the branch it saves.
+	// A List's items, the front run backwards and then the back run, into an
+	// Array of this side's own. As in the runtime, the counts are fixed before the
+	// walk, since run Arrays are shared.
 	function itemsOf(
 		value: object,
 		at: Path | null,
@@ -1629,17 +1609,9 @@ export function createInterpreter(
 		return items
 	}
 
-	// The entries a Dictionary holds, in the order it holds them, as a
-	// `Map` of this side's own. It is read through the BRIDGE, unlike the List
-	// above: what a box holds is decided by version stamps against a generation,
-	// and reading that here would be a second copy of a rule rather than a
-	// second reading of a layout — `liveEntriesOf` is where the runtime states
-	// it, and every native of its own reads it there too.
-	//
-	// The two halves of an entry are marshalled independently, each by the
-	// reader its own slot was compiled to, and the Map is filled in the order
-	// the walk answers — which is the order the Dictionary holds its entries,
-	// and the order a `Map` gives back.
+	// A Dictionary's entries in its order, as a `Map` of this side's own. They
+	// are read through the bridge, since which entries are live is a rule the
+	// runtime states in `liveEntriesOf`.
 	function mapOf(
 		value: object,
 		at: Path | null,
@@ -1665,12 +1637,8 @@ export function createInterpreter(
 			)
 		}
 
-		// The one way this direction can lose something, asked once at the
-		// end rather than per key. A Map tells its keys apart by `===` and a
-		// Dictionary by the key Type's own `is`, and where a Namespace wrote
-		// that `is` the two can disagree — two keys the Module holds apart
-		// landing on one JavaScript value, and an entry quietly gone. A count
-		// that does not match is the whole of what that looks like.
+		// A Namespace's own `is` may hold apart two keys that are one
+		// JavaScript value. The lost entry shows as a smaller count.
 		if (answer.size !== entries.length) {
 			throw collidingKeys(at, step, entries.length, answer.size)
 		}
@@ -1678,22 +1646,9 @@ export function createInterpreter(
 		return answer
 	}
 
-	// The VALUE's own members rather than the Descriptor's, because a
-	// Record in Essence is structural — a value of `{ width, height, depth }`
-	// crosses where `{ width, height }` was declared, and dropping the member the
-	// declaration did not name would be this side deciding what the Module meant.
-	// What the Descriptor decides is how each member it DOES name is read.
-	//
-	// Own, enumerable and string-keyed, which is exactly the members — the
-	// Type key is a Symbol, and is skipped here by the same rule that makes it
-	// hidden inside Essence.
-	//
-	// Each member read by the reader its name was compiled to, looked for
-	// at the position it was DECLARED at first — see `compiledMembers`, which is
-	// where both ways of looking are built and why the first one almost always
-	// answers. A member no name of the shape matches is read by the walk the
-	// value itself directs, which is the whole of how a structural Record keeps
-	// the member its position never named.
+	// The value's own members, since a Record is structural and may hold more
+	// than its position names. `Object.keys` skips the Symbol Type key. A member
+	// the shape does not name is read by the walk the value directs.
 	function fieldsOf(
 		value: object,
 		at: Path | null,
@@ -1722,11 +1677,8 @@ export function createInterpreter(
 		return fields
 	}
 
-	// A Case as a host reads one — its payload, and WHICH Case it is under
-	// `$case`. The tag is written last and wins the collision: which Case a value
-	// is is part of the value, and a payload member actually named `$case` would
-	// be dropped by that. Dropping one silently is the single thing a lossless
-	// boundary may not do, so it is refused instead of quietly lost.
+	// A Case's payload with `$case` added. A payload member called `$case`
+	// would be lost under the tag, so it is refused.
 	function casedFields(
 		value: object,
 		at: Path | null,
@@ -1749,21 +1701,9 @@ export function createInterpreter(
 
 	// #region Calls
 
-	// Everything a caller can get wrong before the first Argument is even
-	// looked at is an `EssenceCallError`; everything about a value is an
-	// `EssenceMarshalError`. The two are told apart because they are fixed in
-	// different places.
-	//
-	// The answer is marshalled back through the compiled reader for the
-	// DECLARED return, so a Function a call answers with comes back callable too.
-	//
-	// Everything about a call that does not depend on its Arguments is
-	// settled before it: which labels the call may be written with, what an Error
-	// calls each Argument either way, the reader for every Parameter and the
-	// reader for the answer. All of it is settled by the SIGNATURE alone, so
-	// `compiledCall` settles it once for every Function that will ever be wrapped
-	// against that signature, and what is left here is reading the Arguments and
-	// making the call.
+	// A mistake in the call's shape is an `EssenceCallError`, and one in a value
+	// an `EssenceMarshalError`. The answer is read against the declared return,
+	// so a Function answered comes back callable.
 	function wrapFunction(
 		target: EssenceFunction,
 		signature: FunctionDescriptor,
@@ -1776,12 +1716,8 @@ export function createInterpreter(
 			let ordered = readCall(args, signature, labels, name)
 			let places = ordered === args ? positional : named
 
-			// A slot the call left out is handed on as `undefined`, which
-			// is precisely what fires the emitted JavaScript default parameter
-			// — and nothing is marshalled for it, because there is nothing to
-			// marshal. The unrolled arities below skip it the same way, which
-			// is why the reads go through one helper rather than being written
-			// out three times.
+			// A slot the call left out passes `undefined`, which fires the
+			// emitted default. Every arity reads through this helper.
 			let read = (position: number): EssenceValue =>
 				ordered[position] === OMITTED
 					? (undefined as unknown as EssenceValue)
@@ -1791,11 +1727,8 @@ export function createInterpreter(
 							places[position]!,
 						)
 
-			// The Arguments a Function of this many Parameters takes,
-			// passed as that many Arguments. Everything below one line is the
-			// same call written out at the two arities almost every Function
-			// has, because handing an Array over to be spread builds a call
-			// frame out of it — which is most of what a small call costs.
+			// The common arities are written out, since spreading an Array
+			// builds a call frame, most of a small call's cost.
 			if (arity === 1) {
 				return answer(target(read(0)), null, "return value")
 			}
@@ -1822,19 +1755,8 @@ export function createInterpreter(
 
 	// #region Errors
 
-	// Whether a refusal got INSIDE the value before making it — a Case whose
-	// `$case` named this arm and whose payload was then wrong, rather than an arm
-	// that never took the value at all. `Optional<Box>` handed a Box with a String
-	// `height` fails at `.height`, where `#Empty` fails at the value itself. Where
-	// exactly one arm of a Union got that far, its Error is the useful one, and
-	// answering with the Union instead would throw away the only sentence that
-	// says what is actually wrong.
-	//
-	// A deeper path is the usual sign of that, and not the only one: a Case
-	// whose `$case` matched and whose PAYLOAD is then wrong refuses the value
-	// itself, at this very path, and says so — so it marks itself instead. Without
-	// that, every misspelled payload member of every Choice reads as "expected
-	// Shape", while the same mistake in a Record names the member.
+	// Whether a refusal got inside the value, by a deeper path or its own mark.
+	// See "Reading a Union" in DEVELOPMENT.md.
 	function reachedInside(
 		failure: EssenceMarshalError,
 		at: Path | null,
@@ -1875,10 +1797,8 @@ export function createInterpreter(
 		)
 	}
 
-	// The one shape `Optional<T> ↔ T | undefined` can not describe, in both
-	// directions, worded the same way. `null` is no help — JSON turns an
-	// `undefined` into one, so it is the same absence wearing another name — and
-	// there is no third spelling of nothing to spend on the second level.
+	// An `Optional` inside an `Optional`, refused in both directions. `null` is
+	// no second spelling, since JSON turns `undefined` into it.
 	function nestedOptional(at: Path | null, step: Step): EssenceMarshalError {
 		let where = spell(at, step)
 
@@ -1888,24 +1808,9 @@ export function createInterpreter(
 		)
 	}
 
-	// The other shape with no JavaScript spelling, worded the way
-	// `nestedOptional` is and refused in both directions for the same reason.
-	// What COLLIDES is named by `bare-cases.ts`, which is the one copy of that
-	// rule and the one the generated declarations read too; the frame is here,
-	// because only the marshaller knows that a value was about to cross.
-	//
-	// The way out of it is a change to the Essence source rather than to
-	// the JavaScript, so the sentence ends with the two that work: a Record
-	// around one side gives it a shape of its own, and a payload on the Case
-	// puts it back into the object form. Renaming the Case works as well and is
-	// left unsaid — it is the one fix a reader thinks of unprompted.
-	//
-	// Marked as having reached INSIDE the value, which is what keeps the
-	// sentence where an `Optional` stands around the position — that branch
-	// answers with its own Type for anything a value could have got right, and
-	// this is a refusal no value could have avoided. `reachedInside` is the
-	// question "is this the useful Error", and a refusal of the SHAPE is always
-	// the useful one.
+	// A Union of colliding bare Cases, as `bareCaseCollision` describes it. The
+	// fix is in the Essence source. Marked as inside, since no value could avoid
+	// a refusal of the shape.
 	function ambiguousBareCase(
 		shown: string,
 		collision: string,
@@ -1921,11 +1826,8 @@ export function createInterpreter(
 		)
 	}
 
-	// The spelling a bare Case used to cross as, met on the way in. It is
-	// told apart from every other wrong value because it is the one that is
-	// RIGHT about which Case it means and wrong only about how to write it —
-	// so it is answered with the string to write instead, rather than with the
-	// Type it already named.
+	// A bare Case written as a `$case` object, answered with the string to
+	// write instead.
 	function objectSpelledCase(
 		shown: string,
 		named: string,
@@ -1941,24 +1843,9 @@ export function createInterpreter(
 		)
 	}
 
-	// The shape a Dictionary crosses as, met where a host wrote the OTHER
-	// object JavaScript has. It is told apart from every other wrong value the
-	// way `objectSpelledCase` is: it is the one that is right about what it
-	// means and wrong only about how to write it, so it is answered with the
-	// shape to write rather than with the Type it already named.
-	//
-	// A plain object is not a second spelling on the way in, though every
-	// key of a `Dictionary<String, V>` would fit one. One shape has one spelling
-	// here: a position that took an object as well would be a position two
-	// different JavaScript values cross into, while the way out can hand back
-	// only one of them — and an object hands its integer-looking keys back
-	// first, whatever order they were written in, which is the one thing a
-	// Dictionary promises about its entries.
-	//
-	// Marked as having reached INSIDE the value, so that a Union holding a
-	// Dictionary answers with this sentence rather than with the Union — for the
-	// reason `objectSpelledCase` is marked: it is the refusal that says what to
-	// do about it.
+	// A Dictionary written as a plain object, answered with the shape to write.
+	// An object is no second spelling: it puts integer-looking keys first,
+	// whatever order they were written in.
 	function objectSpelledDictionary(
 		shown: string,
 		at: Path | null,
@@ -1973,11 +1860,8 @@ export function createInterpreter(
 		)
 	}
 
-	// Two entries of one Map that are one entry of the Dictionary they
-	// were going to become — `1` and `1n` are two Map keys and one Integer, and
-	// a String written twice in its two Unicode spellings is one String. Which
-	// entry it was is the runtime's answer; the place it stands at is this
-	// side's, which is the whole of why the two halves are apart.
+	// Two Map keys that are one Dictionary key, as `1` and `1n` are, or a String
+	// in two Unicode spellings.
 	function duplicateKey(at: Path | null, step: Step): EssenceMarshalError {
 		let where = spell(at, step)
 
@@ -1987,10 +1871,8 @@ export function createInterpreter(
 		)
 	}
 
-	// The same disagreement met from the other side: keys the Module holds
-	// apart that are one JavaScript value, which only an `is` a Namespace wrote
-	// can arrange. Refused rather than handed over short, because a Map with an
-	// entry missing is the one thing a lossless boundary may not answer with.
+	// Dictionary keys that are one JavaScript value, refused rather than
+	// handed over short.
 	function collidingKeys(
 		at: Path | null,
 		step: Step,
@@ -2007,18 +1889,8 @@ export function createInterpreter(
 		)
 	}
 
-	// A Dictionary met where the bundle carries no door for one. The door
-	// is conditional — 15 kB of store and key encoding a boundary that names no
-	// Dictionary does not pay for — and it is decided from the boundary the
-	// Module DECLARES: its exported values and its exported Types. So this is
-	// reachable from one compile after all, and the reason it names is the
-	// truthful one rather than a stale pair. A Record is structurally open and
-	// the outbound walk reads the VALUE's members, so a member the boundary
-	// never declared can carry a Dictionary the door question could not see.
-	//
-	// Said out loud for the reason `runtimeBridgeOf` says its own: a
-	// `TypeError` about `undefined` from inside a walk names nothing a reader
-	// can act on.
+	// A Dictionary where the bundle carries no door for one. See "Values from
+	// the bundle" in DEVELOPMENT.md.
 	function noDictionaryDoor(
 		at: Path | null,
 		step: Step,
@@ -2031,19 +1903,8 @@ export function createInterpreter(
 		)
 	}
 
-	// Work met anywhere but a call's answer, in both directions and in the
-	// same words, because it is one rule: a Future is a DESCRIPTION of work and
-	// the boundary starts it where it crosses, so a position that holds one has
-	// to be a position that says when it should run. A call's answer says so —
-	// the call is what asked for the work. A Record's member, a List's item and
-	// a Case's payload say nothing of the kind: starting one to spell it would
-	// run work nobody asked for, every time the value crossed, and handing the
-	// description over unstarted would hand over a JavaScript object that
-	// describes nothing.
-	//
-	// Marked as having reached INSIDE the value, so that a Union holding
-	// work answers with this sentence rather than with the Union — it is a
-	// refusal of the SHAPE, which `reachedInside` calls the useful one.
+	// Work anywhere but a call's answer, which alone says when it should run.
+	// Marked as inside, since it refuses the shape.
 	function asynchronyInsideValue(
 		shown: string,
 		at: Path | null,
@@ -2058,11 +1919,8 @@ export function createInterpreter(
 		)
 	}
 
-	// The same rule met from the other side: a host handing work IN. It is
-	// worded apart from the refusal above because the way out of it is different
-	// — there is no JavaScript value that is a Future, whatever position it is
-	// written at, so the fix is never "move it" but always "hand over what it
-	// answers with, or let the Module do the starting".
+	// Work handed in by a host. No JavaScript value is a Future, so the advice
+	// differs from `asynchronyInsideValue`.
 	function asynchronyFromHost(
 		shown: string,
 		at: Path | null,

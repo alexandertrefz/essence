@@ -348,7 +348,8 @@ reader is compiled, and every value that leaves the member out shares it, since 
 
 The Dictionary and Future doors of the bridge exist only where the boundary names a Dictionary or work, as
 `runtimeBridgeModules` decides. Where one is missing, a Descriptor that names it comes from another compile. The shape
-then compiles to a refusal that says so, such as `noDictionaryDoor`.
+then compiles to a refusal that says so, such as `noDictionaryDoor`. A Record coming out can also carry a Dictionary in
+a member its position never declared, which meets the same refusal.
 
 ### Bare Case names
 
