@@ -404,18 +404,20 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 	})
 
 	// jsonc recovers and goes on reporting about text it has lost track of.
-	// The third report here would ask for a value at the `}`, with the value
-	// written two characters to its left.
+	// The third report for `{ test: 1 }` would ask for a value at the `}`,
+	// with the value written two characters to its left.
 	it("offers the edit for the first refusal alone", () => {
-		let configuration = parse(`{ test: 1 }`)
-		let diagnostics = diagnosticsOf(configuration)
-
-		expect(
-			diagnostics.map((diagnostic) => [
+		let reports = (text: string) =>
+			diagnosticsOf(parse(text)).map((diagnostic) => [
 				diagnostic.labels[0]?.message,
 				diagnostic.helps,
-			]),
-		).toEqual([
+			])
+
+		expect(reports(`{ "a": , "b": }`)).toEqual([
+			["a value was expected here", ["Write the value the key holds."]],
+			["a value was expected here", []],
+		])
+		expect(reports(`{ test: 1 }`)).toEqual([
 			["this is not JSON", []],
 			["a quoted key was expected here", []],
 			["a value was expected here", []],
