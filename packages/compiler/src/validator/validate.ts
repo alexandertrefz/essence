@@ -2728,14 +2728,8 @@ function validateVariableAssignmentStatement(
 	if (!fitsExpectedType(node.name.type, node.value)) {
 		let declaredType = describeType(node.name.type)
 		let evidence = refinementEvidence(node.name.type, node.value)
-		// The one mismatch a reader can meet whose EXPECTED side is the
-		// Enricher's own answer rather than something written down. Every other
-		// Type a value is judged against is an annotation, and `Unknown` is
-		// unspellable — so `List<Unknown>` can only stand here, where the
-		// Variable was declared from an empty Literal and no assignment has
-		// decided it yet. Naming a blank explains nothing on its own; these two
-		// sentences are what make the refusal answerable. `partial-type-mismatch`
-		// says the same about a member, one level in.
+		// A Variable declared from an empty Literal can be undecided, as in
+		// `List<Unknown>`, which the report explains.
 		let undecided = undecidedSlotEvidence(
 			node.name.type,
 			node.value.type,
@@ -2761,8 +2755,7 @@ function validateVariableAssignmentStatement(
 							`this is ${withArticle(describeType(node.value.type))}`,
 						),
 					...record.labels,
-					// Null for a builtin, which was declared in
-					// TypeScript and has no Essence source to point at.
+					// Null for a builtin, which has no Essence source.
 					...(node.declarationPosition === null
 						? []
 						: [
@@ -2809,28 +2802,18 @@ function validateVariableAssignmentStatement(
 	return node
 }
 
-// A Method whose every returning path hands back a direct call to
-// ITSELF can never produce a value — each call only defers to another call of
-// the same Method, and no branch returns anything else, so the recursion has
-// no base case to stop it. This is the decidable core of infinite recursion:
-// it says nothing about a call that MIGHT recurse (a `match` that dispatches
-// per member Type, a guarded base case), only about one that ALWAYS does.
-// `Number.toString` collapsed to `<- @::toString()` was exactly this — on a
-// `Number` that Method IS `Number.toString`, so every path returned itself.
+// A Method whose every returning path returns a direct call to itself has no
+// base case and never returns. A call that only might recurse is not judged.
 type MethodIdentity = {
 	namespaceName: string
 	methodName: string
-	// Null for a non-overloaded Method, matching the `null`
-	// `overloadedMethodIndex` its call sites carry; an Overload carries its
-	// index in the Method Type, so a call to a *sibling* Overload (a different
-	// index) is not self-recursion and is left alone.
+	// Null for a non-overloaded Method. A call to a sibling Overload is not
+	// self-recursion.
 	overloadIndex: number | null
 }
 
-// The returns reachable at the body's own control-flow level — through
-// `if`/`else`, but NOT into a `match` Case or a nested Function literal, where
-// `@::method()` resolves against a narrowed receiver or a different `@`, and
-// so is a different Method than the one being defined.
+// The returns at the body's own level, through `if` and `else`. A `match`
+// Case or a nested literal may resolve `@::method()` to another Method.
 function collectTopLevelReturns(
 	body: Array<common.typed.ImplementationNode>,
 ): Array<common.typed.ReturnStatementNode> {
@@ -2871,14 +2854,8 @@ function checkInfiniteRecursion(
 ): void {
 	let returns = collectTopLevelReturns(definition.body)
 
-	// No return of its own — a native Method, or one that answers only
-	// from inside a `match` — says nothing here.
-	//
-	// And neither does a Method the Parser did not read whole — see
-	// `partiallyRead`. "Every returning path" is a claim about the paths that
-	// were WRITTEN, and the base case may well be the Statement that was
-	// dropped; `position` is the Method's own span, because a path that went
-	// missing leaves no Node behind to ask about.
+	// Silent without returns of its own, or where the parser dropped part of
+	// the Method, which may have been the base case.
 	if (returns.length === 0 || partiallyRead(position)) {
 		return
 	}
@@ -2915,10 +2892,8 @@ function checkInfiniteRecursion(
 	)
 }
 
-// A Choice declaration is Types, with one Expression in it: the `= { … }`
-// a payload shape may carry. It is held to what every other Expression is held
-// to — an Argument that does not fit, a bound Method handed on as a value —
-// which is what keeps a default from being the one place those go unchecked.
+// A Choice's only Expressions are its payload defaults, held to what every
+// Expression is.
 function validateChoiceDeclarationStatement(
 	node: common.typed.ChoiceDeclarationStatementNode,
 ): common.typed.ChoiceDeclarationStatementNode {
@@ -2930,10 +2905,7 @@ function validateChoiceDeclarationStatement(
 	return node
 }
 
-// A Protocol's requirements are signatures and carry nothing to check.
-// Its PROVIDED Methods are bodies, held to what a Namespace's Methods are held
-// to — every returning path fits the declared return Type, and a Method whose
-// every path calls itself is the same mistake wherever it is written.
+// A Protocol's provided Methods are held to what a Namespace's Methods are.
 function validateProtocolDeclarationStatement(
 	node: common.typed.ProtocolDeclarationStatementNode,
 ): common.typed.ProtocolDeclarationStatementNode {
@@ -2966,17 +2938,9 @@ function validateProtocolDeclarationStatement(
 function validateNamespaceDefinitionStatement(
 	node: common.typed.NamespaceDefinitionStatementNode,
 ): common.typed.NamespaceDefinitionStatementNode {
-	// A static Property's initialiser is an Expression that runs when the
-	// Program loads, so it is held to what a Constant Declaration is held to —
-	// it is the same Declaration, written in a Namespace. A native Property has
-	// no value to check and is not in the typed tree at all.
-	//
-	// The Properties are walked in the order they are written, which is
-	// the order their initialisers run in, so the ones still without a value
-	// where one of them runs are itself and everything below it — which is what
-	// `unbound` holds, shrinking as each is left behind. A native is not among
-	// them for the same reason it is not walked here: the runtime answers it,
-	// wherever it is written.
+	// A static Property's initialiser is held to what a Constant's value is.
+	// Walked in written order, so `unbound` shrinks as each is passed.
+	// See "Use before declaration" in DEVELOPMENT.md.
 	let unbound = new Map(
 		Object.entries(node.properties).map(([name, property]) => [
 			name,
@@ -3087,12 +3051,8 @@ function validateIfStatement(
 	return node
 }
 
-// Whether a run that could have opened a body was abandoned in the window
-// a `<-` on `line` could have been orphaned from: below everything the Parser
-// read at the top level, and at or above the `<-` itself. Both ends matter — a
-// head dropped BELOW the `<-` orphans nothing above it, and a head dropped above
-// a top-level Statement the Parser read whole left that Statement standing at
-// the top level, so the `<-` under it is at the top level too.
+// Whether a head was abandoned after `topLevelStatementFloor` and at or
+// before `line`. See "Top-level returns" in DEVELOPMENT.md.
 function aHeadWasAbandonedAbove(line: number): boolean {
 	for (let headLine of abandonedHeadLines) {
 		if (headLine > topLevelStatementFloor && headLine <= line) {
@@ -3108,24 +3068,8 @@ function validateReturnStatement(
 	currentFunctionContext: CurrentFunctionContext,
 ): common.typed.ReturnStatementNode {
 	if (currentFunctionContext === null) {
-		// Silent where a dropped HEAD above this `<-` could have taken
-		// the body it belongs in down with it — see `aHeadWasAbandonedAbove`.
-		// A `<-` stands outside a Function only because the head that opened
-		// one is missing, and the head is dropped a LINE ABOVE the `<-` it
-		// orphans, so asking about the Statement's own span answers no.
-		//
-		// And silent where the `<-` itself stands on a line the Parser
-		// did not read whole, which is the question every other check here
-		// asks. That is the OTHER way a `<-` ends up at the top level: a
-		// Function literal written `(n) { <- … }` with its `{` dropped leaves
-		// the Return where the Statement around it was, and the run that was
-		// abandoned opens with whatever that Statement opens with.
-		//
-		// It used to be silent wherever the Parser abandoned ANYTHING,
-		// which stood the check down for the whole file: a `constant limit 10`
-		// dropped two lines above a `<- 42` the reader really did write at the
-		// top level took the report with it, though a dropped Constant can not
-		// leave a body without a head. One mistake was hiding a second.
+		// Silent where the parser could have dropped the body this `<-`
+		// belongs in. See "Top-level returns" in DEVELOPMENT.md.
 		if (
 			!partiallyRead(node.position) &&
 			!aHeadWasAbandonedAbove(node.position.start.line)
@@ -3135,10 +3079,7 @@ function validateReturnStatement(
 				labels: [
 					primary(node.position, "this is outside any Function"),
 				],
-				// Both ends, because which one is meant is the reader's
-				// to say: a `<-` written at the top level is either a value the
-				// Program wanted to keep — a Declaration — or a body that lost
-				// its head.
+				// A top-level `<-` is a value to keep or a body without a head.
 				helps: [
 					"Drop the '<-' and write the value on its own, or as a 'constant'.",
 					"Or move the Statement into a Function, which is the only thing a '<-' answers for.",
@@ -3154,21 +3095,15 @@ function validateReturnStatement(
 			node.expression,
 		)
 	) {
-		// A completing body is written as though it answered the VALUE —
-		// the future is what the emission wraps around it — so what a `<-` is
-		// held to is the inner Type of the declared `Future<T>`. Everything
-		// below reads that same Type, so the message names what the reader has
-		// to write rather than the future they never spell in a `<-`.
+		// A completing body's `<-` is held to the inner Type of its declared
+		// `Future<T>`, which the emission wraps.
 		let expected = returnedTypeOf(
 			currentFunctionContext.returnType,
 			currentFunctionContext.completing === true,
 		)
 		let evidence = refinementEvidence(expected, node.expression)
-		// A Function literal's return Type is inferred rather than
-		// written, so this is the second place a blank can be the EXPECTED
-		// side of a refusal: a combiner whose accumulator nothing decided
-		// returns `List<Unknown>`, and every `<-` writing into it is refused
-		// against a Type the reader can not act on or even spell.
+		// An inferred return Type can be undecided, as in `List<Unknown>`,
+		// which the report explains.
 		let undecided = undecidedSlotEvidence(
 			expected,
 			node.expression.type,
@@ -3183,18 +3118,12 @@ function validateReturnStatement(
 
 		reportError(
 			"This value does not fit the declared return Type",
-			// The member that was refused, where the value is a written
-			// Record Literal and one member is what refused it — an Editor
-			// underlines the `points = "0"` rather than the two hundred
-			// characters around it. The whole value where there is no such
-			// member to name.
+			// The refused member of a written Record Literal, or the whole
+			// value.
 			record.lead?.position ?? node.expression.position,
 			{
 				code: "return-type-mismatch",
-				// The declared return Type has no Position of its own —
-				// only the Parameter list does, which is where an omitted
-				// `-> Type` would have gone — so it is stated as a note
-				// rather than pointed at.
+				// The declared return Type has no Position, so it is a Note.
 				labels: [
 					record.lead ??
 						primary(
@@ -3220,14 +3149,8 @@ function validateReturnStatement(
 					...evidence.helps,
 					...undecided.helps,
 				],
-				// The word is offered here even in a body that can not
-				// yet wait, unlike every other position. `<- Async.deferred(…)`
-				// in a `-> Integer` body is a body that has not decided to be
-				// asynchronous at all, and writing the word is the first of
-				// three steps that converge — `complete-outside-future` next,
-				// then `unused-future`, then a clean Program. That chain is
-				// tested; the other positions have no such chain, and offering
-				// the word there simply ended in a refusal.
+				// Unlike elsewhere, `complete` is offered even where the body
+				// can not wait yet: the fixes that follow converge.
 				data:
 					asynchronyData(expected, node.expression.type) ??
 					record.data,
@@ -3253,16 +3176,8 @@ function validateFunctionStatement(
 
 // #region Helpers
 
-// One check for every way a Namespace can be named — a Method's home, a
-// dispatch branch's target, a static member's base, a bare reference, a
-// conformance witness a call curries in — because what makes them wrong is the
-// same thing: the Declaration is BELOW the statement that runs the use.
-// `useLabel` is what the arrow at the use says.
-//
-// Silent for a Namespace that is not top-level (nothing records where a
-// nested one is declared) and for every builtin, none of which is in the map at
-// all — so a name the standard library owns is only ever reported where the
-// Program itself declares it, which is exactly where it can be too late.
+// Reports a use of a top-level Namespace that runs before its Declaration.
+// `useLabel` is the use's Label. See "Use before declaration" in DEVELOPMENT.md.
 function checkNamespaceIsDeclared(
 	namespaceName: string,
 	position: common.Position,
