@@ -267,7 +267,7 @@ export function scanScript(text: string): Scanned {
 			kind === SyntaxKind.ExclamationToken &&
 			previous !== null &&
 			endsValue(previous) &&
-			!scanner.hasPrecedingLineBreak()
+			!lineBreak
 		) {
 			kind = SyntaxKind.CloseParenToken
 		}

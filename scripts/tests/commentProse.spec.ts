@@ -49,6 +49,8 @@ describe("Comment Prose", () => {
 					"let path = /\\/\\/ not a comment/",
 					"let text = `/* nor ${path} this */`",
 					"let ratio = values[0]! / values[1]! // A comment.",
+					"let empty = text",
+					"!/[//]/.test(path)",
 				].join("\n"),
 			)
 
