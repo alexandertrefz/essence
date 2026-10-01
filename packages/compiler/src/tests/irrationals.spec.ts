@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, spyOn } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import * as algebraic from "@essence-lang/runtime/Algebraic"
-import { multiplyRationals } from "@essence-lang/runtime/bigRational"
+import * as bigRationals from "@essence-lang/runtime/bigRational"
 import { createBoolean } from "@essence-lang/runtime/Boolean"
 import * as integer from "@essence-lang/runtime/Integer"
 import { anyIs, anyIsNot } from "@essence-lang/runtime/internalHelpers"
@@ -361,7 +361,7 @@ describe("Irrationals", () => {
 					) as algebraic.AlgebraicType
 					const normalised = algebraic.createAlgebraic(
 						a,
-						multiplyRationals(b, bigRational(p)),
+						bigRationals.multiplyRationals(b, bigRational(p)),
 						q,
 					) as algebraic.AlgebraicType
 
@@ -584,28 +584,23 @@ describe("Irrationals", () => {
 			).toBe(0n)
 		})
 
-		// WARNING: a timing spec. Bounded trial division keeps this far under the
-		// ceiling, and unbounded division far over it. Best of three, so a loaded
-		// runner has three chances.
-		it("takes the root of a sixteen-digit prime in milliseconds", () => {
-			const prime = 10000000000000061n
-			let best = Number.POSITIVE_INFINITY
-
-			for (let attempt = 0; attempt < 3; attempt++) {
-				const started = performance.now()
-				const root = unwrap(
+		// Trial division stops at its bound, so a large prime costs a bounded
+		// search. A square of a prime past the bound stays in the radicand, which
+		// shows the search stopped there.
+		it("takes the root of a sixteen-digit prime without dividing past the bound", () => {
+			const root = (radicand: bigint) =>
+				unwrap(
 					integer.squareRoot__overload$1(
-						integer.createInteger(prime),
+						integer.createInteger(radicand),
 					),
-				)
+				) as algebraic.AlgebraicType
+			const p = primesPastTheBound[0]!
+			const q = primesPastTheBound[1]!
+			const prime = 10000000000000061n
 
-				best = Math.min(best, performance.now() - started)
-
-				expect(root[typeKeySymbol]).toBe("Algebraic")
-				expect((root as algebraic.AlgebraicType).radicand).toBe(prime)
-			}
-
-			expect(best).toBeLessThan(50)
+			expect(root(p * p * q).radicand).toBe(p * p * q)
+			expect(root(prime)[typeKeySymbol]).toBe("Algebraic")
+			expect(root(prime).radicand).toBe(prime)
 		})
 
 		// The quadratic slice is a field, so it is closed under Integer powers
@@ -642,23 +637,25 @@ describe("Irrationals", () => {
 			)
 		})
 
-		// WARNING: a timing spec. Square-and-multiply makes a large exponent
-		// cost its logarithm. Best of three.
-		it("raises to a large exponent in milliseconds", () => {
-			let best = Number.POSITIVE_INFINITY
+		// Square-and-multiply makes a large exponent cost its logarithm, so a
+		// hundredfold exponent takes about twice the products, not a hundred times.
+		it("raises to a large exponent in products that grow with its logarithm", () => {
+			const products = (exponent: bigint): number => {
+				let multiplying = spyOn(bigRationals, "multiplyRationals")
 
-			for (let attempt = 0; attempt < 3; attempt++) {
-				const started = performance.now()
+				try {
+					algebraic.raise(
+						number.GoldenRatio,
+						integer.createInteger(exponent),
+					)
 
-				algebraic.raise(
-					number.GoldenRatio,
-					integer.createInteger(10000n),
-				)
-
-				best = Math.min(best, performance.now() - started)
+					return multiplying.mock.calls.length
+				} finally {
+					multiplying.mockRestore()
+				}
 			}
 
-			expect(best).toBeLessThan(50)
+			expect(products(10000n) / products(100n)).toBeLessThan(4)
 		})
 
 		// The answer is exactly the step the value rounds to, not merely close.
