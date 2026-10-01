@@ -71,6 +71,7 @@ function visitNode(
 				}
 			}
 
+			visitNativeShims(node.nativeShims, visit)
 			return
 		case "IfStatement":
 			visitNode(node.condition, visit)
@@ -112,6 +113,10 @@ function visitNode(
 
 			return
 		case "TypeAliasStatement":
+			if (node.predicate !== null) {
+				visitNode(node.predicate, visit)
+			}
+
 			return
 	}
 
@@ -203,13 +208,30 @@ function visitFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	visit: (node: common.typed.ExpressionNode) => void,
 ) {
-	for (let parameter of definition.parameters) {
+	visitDefaults(definition.parameters, visit)
+	visitBody(definition.body, visit)
+}
+
+// A native Method's defaults stand in the shim the Compiler synthesizes for
+// it.
+function visitNativeShims(
+	shims: Array<common.typed.NativeShimNode>,
+	visit: (node: common.typed.ExpressionNode) => void,
+) {
+	for (let shim of shims) {
+		visitDefaults(shim.parameters, visit)
+	}
+}
+
+function visitDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+	visit: (node: common.typed.ExpressionNode) => void,
+) {
+	for (let parameter of parameters) {
 		if (parameter.defaultValue !== null) {
 			visitNode(parameter.defaultValue, visit)
 		}
 	}
-
-	visitBody(definition.body, visit)
 }
 
 function visitArguments(
