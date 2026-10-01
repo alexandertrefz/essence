@@ -1983,8 +1983,8 @@ describe("Code Actions", () => {
 		})
 
 		// The Diagnostic stands on the swallowing String's opening quote. The fix
-		// reads the start off the first Label on a `"`, so the quote lands at the
-		// end of line 2, where it was forgotten.
+		// reads the start off the first Label on a `"`. The quote lands where it
+		// was forgotten, at the end of line 2.
 		it("should close the String that swallowed the lines below it", () => {
 			let lines = [
 				"implementation {",
@@ -2173,8 +2173,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The fix writes the Diagnostic's own Help, for each shape the Lexer spells
-	// a rewrite for, and offers nothing for the shape it spells none for.
+	// The fix writes the Diagnostic's own Help for each shape the Lexer spells
+	// a rewrite for. Other shapes get nothing.
 	describe("the Unicode escapes", () => {
 		it("rebrackets the JavaScript habit", () => {
 			let lines = [
@@ -6610,10 +6610,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// The annotation is the Function's own, copied as it was spelled
-		// — and one written over several lines can not be copied onto the line
-		// the `define` opens. Leaving it out is a different rewrite, so nothing
-		// is offered instead.
+		// The Function's annotation is copied as spelled, and one written over
+		// several lines cannot go on the `define`'s line. Nothing is offered.
 		it("should offer nothing where the return Type spans lines", () => {
 			expect(
 				titles(
@@ -6654,8 +6652,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The Comment stands between two of the Expressions this moves,
-		// and an arm has nowhere to put it.
+		// An arm has nowhere to keep a Comment between the Expressions this
+		// moves.
 		it("should offer nothing on an if/else holding a Comment", () => {
 			expect(
 				titles(
@@ -6695,8 +6693,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// A Condition written over several lines lands in a column
-		// nobody chose, whichever way it is moved.
+		// A Condition written over several lines would land in a column nobody
+		// chose.
 		it("should offer nothing on a Condition written over two lines", () => {
 			expect(
 				titles(
@@ -6717,10 +6715,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The Record member shorthand one level up — a Case of exactly one
-	// member takes that member's value directly, and the Enricher wraps it back
-	// up. Which of the two was written is a question only the enriched Program
-	// answers, since a payload that is itself a Record fits both readings.
+	// A Case of exactly one member takes that member's value directly, and the
+	// Enricher wraps it. Only the enriched Program says which was written.
 	describe("Case payloads", () => {
 		let payloadRefactors = (
 			lines: Array<string>,
@@ -6814,9 +6810,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The payload the Enricher read as the Case's whole Record, not
-		// as its one member — shortening it would hand the Record where the
-		// member goes, which is a different value.
+		// The Enricher read this payload as the Case's whole Record, so
+		// shortening it would change the value.
 		it("should offer nothing where the payload IS the Record", () => {
 			let lines = [
 				...choice,
@@ -6829,8 +6824,7 @@ describe("Code Actions", () => {
 			expect(titles(payloadRefactors(lines))).toEqual([])
 		})
 
-		// The Comment stands inside the braces this deletes, and the
-		// shorthand has nowhere to write it.
+		// The shorthand has nowhere to keep a Comment inside the braces.
 		it("should offer nothing on a Record holding a Comment", () => {
 			expect(
 				titles(
@@ -6860,10 +6854,8 @@ describe("Code Actions", () => {
 		})
 	})
 
-	// The mirror of the `constant-reassignment` fix, on code the Compiler
-	// is happy with. The rename index is what makes it safe: it records every
-	// site that binds a value to the name, so "no write but the declaration" is
-	// a fact rather than a guess.
+	// The mirror of the `constant-reassignment` fix. The rename index records
+	// every site that writes the name, so a Variable written only once is known.
 	describe("Constant declarations", () => {
 		let constantRefactors = (
 			lines: Array<string>,
@@ -6908,10 +6900,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// The assignment is written inside a Function literal that
-		// captures the name, which the index records as a write on the very
-		// same Declaration — so a rewrite that only read the enclosing body
-		// would offer a keyword swap the Compiler then refuses.
+		// An assignment inside a capturing Function literal is a write on the
+		// same Declaration in the index.
 		it("should offer nothing where a captured Variable is assigned", () => {
 			expect(
 				titles(
@@ -6929,8 +6919,8 @@ describe("Code Actions", () => {
 			).toEqual([])
 		})
 
-		// One Declaration per name per Scope — the inner `total` is
-		// assigned and the outer one is not, and only the outer one is offered.
+		// The inner `total` is assigned and the outer one is not, so only the
+		// outer one is offered.
 		it("should tell two Variables of one name apart", () => {
 			let lines = [
 				"implementation {",
@@ -6951,8 +6941,7 @@ describe("Code Actions", () => {
 			expect(applied(lines, refactor)[1]).toBe("\tconstant total = 0")
 		})
 
-		// A Pattern binds several names at once, and `variable` there
-		// stands over the list rather than over one name.
+		// A Pattern binds several names, and `variable` stands over the list.
 		it("should offer nothing on a Variable a Pattern declares", () => {
 			expect(
 				titles(
@@ -6979,9 +6968,8 @@ describe("Code Actions", () => {
 			expect(actionsOf(lines)).toEqual([])
 		})
 
-		// The suggestion IS the fix — a Diagnostic that found nothing
-		// close enough to suggest has nothing to offer, and an action titled
-		// after a name the Compiler never proposed would be inventing one.
+		// The suggestion is the fix, so a Diagnostic with no suggestion gets
+		// none.
 		it("should offer nothing when the Compiler suggested nothing", () => {
 			let lines = [
 				"implementation {",
@@ -7031,8 +7019,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// Two edits for a member that was READ — the separator and the
-		// parentheses a call needs and a read never wrote.
+		// A member that was read gets the separator and the parentheses a call
+		// needs.
 		it("should write the call a member read never wrote", () => {
 			let lines = [
 				"implementation {",
@@ -7047,9 +7035,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A Method that takes an Argument gets no fix at all: the `()` the
-		// action would write answers it with none, which is a second refusal
-		// dressed up as a fix.
+		// A Method that takes an Argument gets no fix, since `()` would be a
+		// second refusal.
 		it("should offer nothing where the Method takes an Argument", () => {
 			let lines = [
 				"implementation {",
@@ -7154,9 +7141,7 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// Two words and one habit — the edit writes `variable` over both,
-		// because writing it over the `let` alone leaves the `mut` standing
-		// between the Keyword and the name it declares.
+		// The edit writes `variable` over both words of `let mut`.
 		it("should write one Keyword over the two 'let mut' spells", () => {
 			let lines = [
 				"implementation {",
@@ -7177,9 +7162,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// A run that closed on its own quote is one edit. A run broken
-		// into pieces by its holes is a String the reader writes out, so nothing
-		// is offered rather than a String holding a third of what they wrote.
+		// A run that closed on its own quote is one edit. A run broken into
+		// pieces by its holes is left to the reader.
 		it("should write the quotes a String is written in", () => {
 			let lines = [
 				"implementation {",
@@ -7199,9 +7183,8 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// Every habit whose answer is a restructuring rather than a
-		// substitution — there is nothing to write over, and an action that wrote
-		// half of it would leave a Program that is refused for a second reason.
+		// A habit whose answer is a restructuring rather than a substitution
+		// gets no fix.
 		it("should offer nothing where the answer is a shape", () => {
 			expect(
 				titles(
@@ -7245,9 +7228,8 @@ describe("Code Actions", () => {
 			"}",
 		]
 
-		// The Case stands above the near miss and above the imports: a name
-		// the Compiler matched to a Case in scope is a better answer than a
-		// spelling guess.
+		// The Case comes before the near miss and the imports, since the
+		// Compiler matched it to a Case in scope.
 		it("should write the sigil in front of the name", () => {
 			let fixes = quickFixes(LINES)
 
@@ -7259,15 +7241,11 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
-		// And in a Record Literal's shorthand, where the name is the
-		// member as well as its value — `{ #Red }` is `Expected 'with'`.
+		// In a Record Literal's shorthand the name is the member as well as its
+		// value, and `{ #Red }` does not parse.
 		it("should spell the member out where the name is a shorthand", () => {
-			// The `is Printable` is load-bearing and says something
-			// about the fix rather than about the Choice: a Record's DECLARED
-			// members decide its printing, so a Record holding a `Light` is
-			// only Printable where `Light` is. Without it the applied fix
-			// leaves a Program that does not compile, and this test is the one
-			// that says the fix leaves none.
+			// A Record holding a `Light` is Printable only where `Light` is, so
+			// the `is Printable` lets the fixed Program compile.
 			let lines = [
 				"implementation {",
 				"\tchoice Light { Red, Green }",
@@ -7290,21 +7268,14 @@ describe("Code Actions", () => {
 	})
 })
 
-// The one door a Diagnostic this analysis did NOT produce comes in by —
-// the Server hands the workspace-wide `similar-tags` through it, and the focus
-// Warning too. A Diagnostic arriving that way carries a Position from some other
-// reading of the file, which is why every fix measures its edit against the LIVE
-// text and refuses where that text does not read as the Diagnostic says.
-//
-// One Program with none of the constructs these codes are about, and one
-// Diagnostic per code laid over a Constant standing in it: nothing may be
-// offered for any of them. The failure this guards against is a fix that trusts
-// a Position and rewrites whatever happens to stand there.
+// The Server hands in Diagnostics this analysis did not produce, such as
+// `similar-tags`. Every fix measures its edit against the live text, so a
+// Diagnostic laid over an unrelated Constant gets nothing.
 describe("A Diagnostic the analysis did not produce", () => {
 	const lines = ["implementation {", "\tconstant count = 1", "}"]
 
-	// `count` and the `1` beside it — a primary span for the codes that
-	// read one, and a secondary for the four that point back at a second place.
+	// `count` and the `1` beside it: a primary span, and a secondary for the
+	// codes that point at a second place.
 	const name = {
 		start: { line: 2, column: 11 },
 		end: { line: 2, column: 16 },
@@ -7362,9 +7333,8 @@ describe("A Diagnostic the analysis did not produce", () => {
 	})
 })
 
-// The refactor walk reaches Record literals wherever they are written,
-// and an arm's value is one more such place — a `define` holds Expressions and
-// no body at all, so a walk with no case for it reaches none of them.
+// A `define` holds Expressions and no body, so the refactor walk needs a case
+// for it to reach a Record literal in an arm.
 describe("Code Actions inside a define arm", () => {
 	it("should offer the shorthand refactor on a literal in an arm's value", () => {
 		let lines = [
@@ -7385,9 +7355,8 @@ describe("Code Actions inside a define arm", () => {
 	})
 })
 
-// The two lookups a REFACTORING starts from, which no fix above reaches:
-// a Diagnostic names the Node it was reported against and a selection names
-// nothing, so both of these answer by containment.
+// The lookups a refactoring starts from. A selection names no Node, so both
+// answer by containment.
 describe("Code Action lookups", () => {
 	const lines = [
 		"implementation {",
@@ -7404,9 +7373,8 @@ describe("Code Action lookups", () => {
 		"}",
 	]
 
-	// Asserted on rather than only parsed — a fixture the Parser recovered
-	// from has a shape nobody wrote, and every assertion below would be about
-	// that shape instead.
+	// Parsed without Diagnostics, since a recovered fixture has a shape nobody
+	// wrote.
 	function programOf(): parser.Program {
 		let { program, diagnostics } = parseWithDiagnostics(lines.join("\n"))
 
@@ -7415,8 +7383,8 @@ describe("Code Action lookups", () => {
 		return program
 	}
 
-	// A range spelled as the text it covers, so that a fixture gaining a
-	// line takes no assertion with it.
+	// A range spelled as the text it covers, so a fixture gaining a line
+	// breaks no assertion.
 	function spanOf(text: string): common.Position {
 		let line = lines.findIndex((candidate) => candidate.includes(text)) + 1
 		let column = (lines[line - 1] as string).indexOf(text) + 1
@@ -7427,8 +7395,8 @@ describe("Code Action lookups", () => {
 		}
 	}
 
-	// From the start of one span to the end of another — the selection a
-	// reader drags over several lines.
+	// From the start of one span to the end of another, as a selection over
+	// several lines.
 	function spanFrom(from: string, to: string): common.Position {
 		return { start: spanOf(from).start, end: spanOf(to).end }
 	}
@@ -7444,8 +7412,7 @@ describe("Code Action lookups", () => {
 			expect(node?.position).toEqual(spanOf('"sign"'))
 		})
 
-		// The Return the Match is written in covers the very same lines,
-		// and the Match is the one inside it.
+		// The Return covers the same lines, and the Match is inside it.
 		it("should answer with the Match a range over its arms sits inside", () => {
 			let node = findInnermostNodeContaining(
 				programOf(),
@@ -7477,9 +7444,8 @@ describe("Code Action lookups", () => {
 			expect(found?.body[1]?.nodeType).toBe("ReturnStatement")
 		})
 
-		// A Handler's body is a body like any other, and the Method body
-		// around it holds the range too — the innermost is the one an inserted
-		// Statement belongs in.
+		// The Method body around a Handler's body holds the range too. An
+		// inserted Statement belongs in the innermost.
 		it("should answer with the innermost body holding the range", () => {
 			let found = enclosingStatementOf(programOf(), spanOf("<- label"))
 
@@ -7509,14 +7475,10 @@ describe("Code Action lookups", () => {
 	})
 })
 
-// A refactoring is offered on code the Compiler is happy with, so every
-// case below asserts the applied text against what the Compiler said BEFORE it
-// — an extraction that type-checks is the whole of what makes it an extraction
-// rather than an edit.
+// A refactoring is offered on code the Compiler is happy with, and its result
+// must type-check too.
 describe("Extract to a Constant", () => {
-	// By title rather than by kind alone — the two extractions share a
-	// kind, and a selection that reads as both is a shape either of them may
-	// meet.
+	// By title, since the extractions share a kind.
 	function extractions(
 		lines: Array<string>,
 		range: common.Position,
@@ -7553,9 +7515,8 @@ describe("Extract to a Constant", () => {
 		expectRefactored(lines, result)
 	})
 
-	// The selection is a character short at either end, which is what
-	// dragging over a name actually produces — the Node it points at is the
-	// same one, and answering with nothing would be answering about the mouse.
+	// A selection a character short at either end, as dragging produces,
+	// still points at the same Node.
 	it("answers with the Expression a partial selection sits inside", () => {
 		let lines = [
 			"implementation {",
@@ -7591,9 +7552,8 @@ describe("Extract to a Constant", () => {
 		expectRefactored(lines, result)
 	})
 
-	// Both halves of a whole Match travel together — the binder a Handler
-	// introduces is declared inside what is being lifted, so it is in scope
-	// wherever the Constant lands.
+	// A Handler's binder is declared inside what is lifted, so it stays in
+	// scope.
 	it("lifts a whole Match, binders and all", () => {
 		let lines = [
 			"implementation {",
@@ -7641,10 +7601,8 @@ describe("Extract to a Constant", () => {
 		expect(action.command).toEqual({
 			title: "Rename",
 			command: "essence.renameAt",
-			// Zero based on both axes, and past the `constant ` the edit
-			// writes in front of the name — the Position of the name as it will
-			// stand once the edits have landed, which is the only Position the
-			// Editor can act on.
+			// Zero-based, and where the name stands once the edits have landed,
+			// past the written `constant `.
 			arguments: [DOCUMENT, { line: 2, character: 11 }],
 		})
 	})
@@ -7666,9 +7624,8 @@ describe("Extract to a Constant", () => {
 		).toEqual([])
 	})
 
-	// An arm is read only when its Condition holds, and a Constant above
-	// the Statement is read every time — lifting one out of the other changes
-	// what the Program does, which is more than a refactoring may do.
+	// An arm is read only when its Condition holds, so lifting its Expression
+	// into a Constant would change what the Program does.
 	it("offers nothing for an Expression only one `define` arm reads", () => {
 		let lines = [
 			"implementation {",
@@ -7739,10 +7696,8 @@ describe("Inline a Constant", () => {
 		expect(action.title).toBe("Inline 'fallback'")
 		expect(action.isPreferred).toBe(false)
 
-		// The line goes with the declaration, break and all — a Constant
-		// with a blank line under it is the ordinary shape, and taking the
-		// break in FRONT of it would leave that blank line standing directly
-		// under the brace the body opened on.
+		// The line goes with the declaration, break and all, so no blank line
+		// is left under the opening brace.
 		expect(result).toEqual([
 			"implementation {",
 			"\tfunction total(_ scores: List<Integer>) -> Integer {",
@@ -7754,9 +7709,8 @@ describe("Inline a Constant", () => {
 		expectRefactored(lines, result)
 	})
 
-	// A compound value is delimited by its own brackets, so it reads as
-	// itself in front of a `::` — the grammar has no precedence for an inline to
-	// get wrong, and no parentheses to write if it had.
+	// A compound value is delimited by its own brackets, so it reads as itself
+	// in front of a `::`.
 	it("writes a compound value in as it stands", () => {
 		let lines = [
 			"implementation {",
@@ -7798,8 +7752,8 @@ describe("Inline a Constant", () => {
 		])
 	})
 
-	// The value moves DOWN into a Scope that declares the name it reads,
-	// which is the one way copying an Expression quietly says something else.
+	// The value would move into a Scope that declares a name it reads, which
+	// changes what it reads.
 	it("offers nothing where a read stands under a name that shadows one", () => {
 		let lines = [
 			"implementation {",
@@ -7863,9 +7817,8 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "empty:"))).toEqual([])
 	})
 
-	// A hole is inside a String Literal, and the Lexer ends that Literal
-	// at the next `"` — so a value carrying one can not be written into a hole,
-	// while every other value can.
+	// The Lexer ends a String Literal at the next `"`, so a value with a quote
+	// cannot be written into a hole.
 	it("offers nothing for a value with a quote read inside a hole", () => {
 		let lines = [
 			"implementation {",
@@ -7903,10 +7856,8 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "unused"))).toEqual([])
 	})
 
-	// A value that CALLS something runs once where the Constant stood and
-	// once per read afterwards, so a Program that printed once prints twice.
-	// Nothing here can tell a call that answers a value from one that does
-	// something, so every call is turned away.
+	// A value that calls something would run once per read. A call that
+	// answers a value looks like one that acts, so every call is turned away.
 	it("offers nothing for a value that calls anything", () => {
 		let lines = [
 			"implementation {",
@@ -7924,9 +7875,7 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "printed ="))).toEqual([])
 	})
 
-	// And a read inside a Function literal is evaluated once per CALL of
-	// that literal. One read is no protection: a body handed to `map` runs once
-	// per item.
+	// A read inside a Function literal runs once per call of that literal.
 	it("offers nothing for a read inside a Function literal", () => {
 		let lines = [
 			"implementation {",
@@ -7941,9 +7890,7 @@ describe("Inline a Constant", () => {
 		expect(inlines(lines, rangeOf(lines, "held ="))).toEqual([])
 	})
 
-	// A builtin Type is in no Scope, so the shadowing check answered null
-	// for it and refused every value that NAMED one — which is most of the
-	// one-line values a reader would ever inline.
+	// A builtin Type is in no Scope, and naming one does not refuse a value.
 	it("offers a value that names a builtin Type", () => {
 		let lines = [
 			"implementation {",
@@ -8019,9 +7966,8 @@ describe("Extract to a Function", () => {
 		expectRefactored(lines, result)
 	})
 
-	// The Position is measured against the text the edits produce, not
-	// against the text they were computed from — the call site collapses the
-	// selection onto one line, and the new Function moves up with it.
+	// The Position is measured against the text the edits produce, since the
+	// call site collapses the selection onto one line.
 	it("carries the command that opens rename on the new Function", () => {
 		let lines = [
 			"implementation {",
@@ -8049,8 +7995,8 @@ describe("Extract to a Function", () => {
 		)
 	})
 
-	// `{}` is the unit Type, and a Function answering it is called as a
-	// Statement — which is what a selection that answers nothing becomes.
+	// A selection that answers nothing becomes a Function answering `{}`,
+	// called as a Statement.
 	it("writes a selection that answers nothing as a Function of unit Type", () => {
 		let lines = [
 			"implementation {",
@@ -8109,9 +8055,8 @@ describe("Extract to a Function", () => {
 		expectRefactored(lines, result)
 	})
 
-	// A Match Handler's body is a body like any other, and the `<-` that
-	// ends it is the ARM's value — which is exactly the Type the extracted
-	// Function then answers, so the call reads back into the arm unchanged.
+	// The `<-` ending a Handler's body is the arm's value, so the extracted
+	// Function answers that Type.
 	it("lifts Statements out of a Match Handler's body", () => {
 		let lines = [
 			"implementation {",
@@ -8156,8 +8101,8 @@ describe("Extract to a Function", () => {
 		expectRefactored(lines, result)
 	})
 
-	// What the selection declares travels with it, so a name it declares
-	// and the Function goes on reading is a name the Function would lose.
+	// What the selection declares travels with it, so a later read of it would
+	// lose its name.
 	it("offers nothing when a name it declares is read after it", () => {
 		let lines = [
 			"implementation {",
@@ -8172,9 +8117,8 @@ describe("Extract to a Function", () => {
 		expect(extractions(lines, rangeOf(lines, "constant total"))).toEqual([])
 	})
 
-	// The Function would have to declare the Variable again, under a name
-	// that does not clash with the Parameter carrying its incoming value — which
-	// is a rename nobody asked for. See the note at the top of the file.
+	// The Function would have to declare the Variable again under a new name,
+	// a rename nobody asked for.
 	it("offers nothing when it writes a Variable declared above it", () => {
 		let lines = [
 			"implementation {",
@@ -8197,8 +8141,8 @@ describe("Extract to a Function", () => {
 		).toEqual([])
 	})
 
-	// A Return that is not the last Statement answers the FUNCTION, and
-	// inside the extracted one it would answer that instead.
+	// A Return before the last Statement answers the Function, and would
+	// answer the extracted one instead.
 	it("offers nothing for a Return in the middle of the selection", () => {
 		let lines = [
 			"implementation {",
@@ -8222,9 +8166,8 @@ describe("Extract to a Function", () => {
 		).toEqual([])
 	})
 
-	// A Method extracted beside a Method has to decide what `@` becomes,
-	// and that decision changes what the extracted code means — so a Namespace
-	// is turned away whether or not the selection reads `@` at all.
+	// A Method extracted beside a Method must decide what `@` becomes, so a
+	// Namespace is turned away.
 	it("offers nothing inside a Namespace", () => {
 		let lines = [
 			"implementation {",
@@ -8250,8 +8193,8 @@ describe("Extract to a Function", () => {
 		).toEqual([])
 	})
 
-	// `@` inside a Match Handler is the value the arm caught, and a
-	// Function written beside the Function is about nothing.
+	// `@` inside a Match Handler is the value the arm caught, which a Function
+	// beside it cannot read.
 	it("offers nothing for a selection that reads its position", () => {
 		let lines = [
 			"implementation {",
@@ -8273,9 +8216,8 @@ describe("Extract to a Function", () => {
 		).toEqual([])
 	})
 
-	// An assertion records against the test that is running, and a
-	// Function called from a test body can not do that — the Enricher refuses
-	// one written in a Function literal for the same reason.
+	// An assertion records against the running test, which a Function called
+	// from a test body cannot do.
 	it("offers nothing for a selection holding an assertion", () => {
 		let lines = [
 			"implementation {",
@@ -8308,8 +8250,8 @@ describe("Write it as a table test", () => {
 		)
 	}
 
-	// The whole test is the target, so a cursor anywhere in it offers
-	// the rewrite — which is what the `test` keyword's own line is here.
+	// A cursor anywhere in the test offers the rewrite. This uses the `test`
+	// keyword's line.
 	function onTheTest(lines: Array<string>, name: string): common.Position {
 		let line = lines.findIndex((candidate) => candidate.includes(name)) + 1
 
@@ -8358,10 +8300,8 @@ describe("Write it as a table test", () => {
 		expectRefactored(lines, result)
 	})
 
-	// A column takes its name from the Parameter the Argument fills, so
-	// the rows read in the callee's own words rather than in the call's. The
-	// label stays where the call writes it — `against conceded` — and is no part
-	// of what the column is called.
+	// A column takes its name from the Parameter the Argument fills, not from
+	// the call's label.
 	it("names a column after the Parameter, and widens a Case to its Choice", () => {
 		let lines = [
 			"implementation {",
@@ -8402,9 +8342,8 @@ describe("Write it as a table test", () => {
 		expectRefactored(lines, result)
 	})
 
-	// A Parameter with no name of its own — `_: Integer` binds nothing the
-	// body could say — leaves its column to the letters, beside one named after
-	// the Parameter that does have a name.
+	// A Parameter that binds no name, such as `_: Integer`, leaves its column
+	// to a letter.
 	it("falls back to a letter where the Parameter binds no name", () => {
 		let lines = [
 			"implementation {",
@@ -8466,9 +8405,8 @@ describe("Write it as a table test", () => {
 		expect(tables(lines, onTheTest(lines, '"does both"'))).toEqual([])
 	})
 
-	// A row holds a value and nothing else, so an Argument that reads a
-	// name has nowhere to go — and an assertion that is not `::is(…)` says
-	// something a column of expected values can not.
+	// A row holds only values, and an assertion other than `::is(…)` says what
+	// a column of expected values cannot.
 	it("offers nothing for an Argument that is not written out", () => {
 		let lines = [
 			"implementation {",
@@ -8515,9 +8453,8 @@ describe("Write it as a table test", () => {
 		expect(tables(lines, onTheTest(lines, '"describes"'))).toEqual([])
 	})
 
-	// A Case widens to its Choice, and a GENERIC Choice's name is not a
-	// Type on its own — `Optional` written where `Optional<Integer>` belongs is
-	// `wrong-type-argument-count`, which is what the row Parameter used to say.
+	// A Case widens to its Choice, and a generic Choice needs its Type
+	// Arguments.
 	it("writes a generic Choice's column at the Type it was applied at", () => {
 		let lines = [
 			"implementation {",
@@ -8566,15 +8503,9 @@ describe("Write it as a table test", () => {
 	})
 })
 
-// What a request asked for, answered BEFORE the work rather than by
-// filtering what came out of it. `"editor.codeActionsOnSave": {
-// "source.organizeImports": true }` sends one request per save, over the whole
-// document, asking for exactly one kind — and computing every refactoring in
-// the file to drop all of them is most of what a save used to cost.
-//
-// Counted rather than timed: the section's own Statement list is read once by
-// every refactoring that walks the Program, so a Proxy over it says how many of
-// them ran, on any machine and with no budget to pick.
+// A request's kinds narrow the work before it is done, since organizing
+// imports on save asks for one kind. A Proxy over the section's Statement list
+// counts the refactorings that walked it.
 describe("the kinds a request narrowed itself to", () => {
 	function walksOf(lines: Array<string>, only?: Array<string>): number {
 		let source = lines.join("\n")
@@ -8667,8 +8598,7 @@ describe("the kinds a request narrowed itself to", () => {
 		expect(kinds(["refactor"])).toEqual(kinds())
 	})
 
-	// Writing a conformance's stubs from the Namespace head is a
-	// refactoring, so the Refactor menu is where it is asked for.
+	// Writing a conformance's stubs from the Namespace head is a refactoring.
 	it("offers the stubs on a Namespace head under the kind they have", () => {
 		let source = [
 			"implementation {",
@@ -8699,13 +8629,11 @@ describe("the kinds a request narrowed itself to", () => {
 	})
 })
 
-// The Quick Fixes for the Diagnostics asynchrony reports. Each is checked
-// by what the buffer reads as once it is applied and by what the Compiler then
-// makes of it — a fix that writes a word in the wrong column is a fix that
-// writes a different Program.
+// The Quick Fixes for asynchrony's Diagnostics, checked by the applied buffer
+// and by what the Compiler makes of it.
 describe("Quick Fixes for asynchrony", () => {
-	// Two answers and nothing in the source chooses between them, which
-	// is why neither is preferred.
+	// Nothing in the source chooses between the two answers, so neither is
+	// preferred.
 	describe("a future whose value goes nowhere", () => {
 		const LINES = ["implementation {", "\tAsync.deferred(() { <- 1 })", "}"]
 
@@ -8749,16 +8677,16 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(
 				codesOf(applied(LINES, fixes[0] as CodeActionEntry)),
 			).toEqual([])
-			// Fire and forget is legal and is told about, so the second
-			// answer leaves the Information behind — which is the point of it.
+			// Fire and forget is legal, so the second answer leaves the
+			// Information behind.
 			expect(
 				codesOf(applied(LINES, fixes[1] as CodeActionEntry)),
 			).toEqual(["unobserved-started"])
 		})
 	})
 
-	// The body is right and the signature is behind it, so what the
-	// Constant was declared as is wrapped rather than replaced.
+	// The body is right and the signature lags, so the declared Type is wrapped
+	// rather than replaced.
 	describe("a complete in a body that declared something else", () => {
 		const LINES = [
 			"implementation {",
@@ -8789,10 +8717,8 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(LINES, fix))).toEqual([])
 		})
 
-		// The other site the code is reported at. A Parameter's default
-		// is filled in before any asynchrony begins and is inside no body at
-		// all, so wrapping the Function's return Type would answer a question
-		// nobody asked.
+		// A Parameter's default is filled in before any asynchrony begins, so
+		// wrapping the return Type would not answer it.
 		it("offers nothing for a complete written in a Parameter's default", () => {
 			let lines = [
 				"implementation {",
@@ -8854,9 +8780,8 @@ describe("Quick Fixes for asynchrony", () => {
 		})
 	})
 
-	// Picked out by the Help rather than by the code — every mismatch in
-	// the language is reported under these two codes, and the Validator is what
-	// decided this one is a missing word.
+	// Picked out by the Help rather than the code, since every mismatch shares
+	// these codes.
 	describe("a mismatch that is one missing complete", () => {
 		it("writes the word in front of the value assigned", () => {
 			let lines = [
@@ -8882,11 +8807,8 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// The one fix here that trades its Diagnostic for another rather
-		// than clearing the buffer: a body that waits has to declare a Future,
-		// which is the fix offered next. The chain converges, and the assertion
-		// below is what says so — the step after this one wraps the annotation
-		// and the step after that completes the call.
+		// This fix trades its Diagnostic for another, since a body that waits
+		// must declare a Future. The next fix wraps the annotation.
 		it("writes it in front of what a body returns", () => {
 			let lines = [
 				"implementation {",
@@ -8910,9 +8832,8 @@ describe("Quick Fixes for asynchrony", () => {
 			])
 		})
 
-		// The whole chain, so that a change which stops it converging
-		// fails rather than passing quietly. Three fixes from a body that
-		// returns work to a Program the Compiler says nothing about.
+		// The whole chain converges from a body that returns work to a Program
+		// the Compiler says nothing about.
 		it("converges in three steps from the body that returns work", () => {
 			let lines = [
 				"implementation {",
@@ -8940,9 +8861,7 @@ describe("Quick Fixes for asynchrony", () => {
 			])
 		})
 
-		// An ARGUMENT is where a reader meets this most — `show(work)` is
-		// what a missing `complete` looks like in everyday code — and the fix
-		// was offered at a Constant one line above it and nowhere here.
+		// `show(work)` is the everyday shape of a missing `complete`.
 		it("writes the word in front of an Argument", () => {
 			let lines = [
 				"implementation {",
@@ -8967,8 +8886,8 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// And a String's hole, which met the same forgotten word under a
-		// Diagnostic about `Printable` and was offered nothing at all.
+		// A String's hole meets the forgotten word under a Diagnostic about
+		// `Printable`.
 		it("writes the word inside a String's hole", () => {
 			let lines = [
 				"implementation {",
@@ -8990,9 +8909,8 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// The three shapes the fix answered but no test asked it about:
-		// a run in flight at a Constant, one at a return, and a body that
-		// already waits handing back a future.
+		// A run in flight at a Constant, one at a return, and a waiting body
+		// handing back a future.
 		it("writes the word for a run that is in flight", () => {
 			let lines = [
 				"implementation {",
@@ -9055,10 +8973,8 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// And the shape the Validator never sees. A call that picks no
-		// Overload is refused by the Enricher, so `argument-type-mismatch` is
-		// never reported for it and the fix above was never offered — while
-		// the mistake is exactly the same one.
+		// The Enricher refuses a call that picks no Overload, so the Validator
+		// never reports it. The same fix is offered there.
 		it("writes the word in front of an Argument of a refused Overload", () => {
 			let lines = [
 				"implementation {",
@@ -9086,8 +9002,7 @@ describe("Quick Fixes for asynchrony", () => {
 			expect(codesOf(applied(lines, fix))).toEqual([])
 		})
 
-		// The codes these arrive under are the ordinary mismatches', so
-		// the fix has to answer nothing where the Validator wrote no Help about
+		// The fix answers nothing where the Validator wrote no Help about
 		// asynchrony.
 		it("offers nothing for a mismatch that is not one", () => {
 			let lines = [
@@ -9106,8 +9021,8 @@ describe("Quick Fixes for asynchrony", () => {
 		})
 	})
 
-	// And the Information that is offered nothing, deliberately — see the
-	// NOTE at the bottom of `futureFixes.ts`.
+	// `unobserved-started` is offered nothing, since its answers are no edit
+	// or a name only the reader knows.
 	it("offers nothing for work nobody waits for", () => {
 		let lines = [
 			"implementation {",
@@ -9120,10 +9035,8 @@ describe("Quick Fixes for asynchrony", () => {
 	})
 })
 
-// What is written UNDER the two Keywords is ordinary code, and every
-// refactoring offered on it is reached by a walk that has to descend through
-// them — the Parser one the fixes share, and the typed one the annotations
-// take.
+// What is written under `start` and `complete` is ordinary code, reached by
+// walks that descend through the Keywords.
 describe("Refactorings under start and complete", () => {
 	it("annotates a Constant declared inside a started body", () => {
 		let lines = [
@@ -9161,9 +9074,8 @@ describe("Refactorings under start and complete", () => {
 		)
 	})
 
-	// Both halves — the call inside the operand, and the whole
-	// Expression the Keyword makes of it. A `complete` lifted into a Constant
-	// stands in the same body, which is a body that already suspends.
+	// The call inside the operand, and the whole Expression. A lifted
+	// `complete` stays in a body that already suspends.
 	describe("extracting to a Constant", () => {
 		const LINES = [
 			"implementation {",
@@ -9308,7 +9220,7 @@ describe("Code Actions inside a Protocol-provided Method body", () => {
 	})
 
 	// Extract to a Function turns a provided body away before it spells a
-	// Type, so the typed lookup it shares is asked directly.
+	// Type, so the shared typed lookup is asked directly.
 	it("should find the typed read of a Parameter in the body", () => {
 		let analysis = analyseDocument(insideFunction.join("\n"), undefined, {
 			tests: true,
