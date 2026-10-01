@@ -12,35 +12,28 @@ import { readStdlibFiles } from "@essence-lang/standard-library"
 import { containsErrors } from "../diagnostics/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// The writing rules the standard library's prose is held to, read off the
-// sources themselves. They are the ASD-STE100 *writing* rules — not its
-// dictionary, since the language's own terms are technical names:
+// The writing rules of ASD-STE100 that the standard library's prose is held
+// to. Its dictionary does not apply, since the language's terms are names.
 //
 // - No sentence over 25 words, in a `§§` block or a `§` note.
 // - No em-dash aside inside a `§§` sentence. A tag's own separator is not one.
 // - `can`, never `may`; no `should`.
-// - No ALL-CAPS emphasis. An acronym is written in capitals and is allowed;
-//   a Type or Namespace name is CamelCase and never matches.
+// - No capitals for emphasis. An acronym is allowed, and a CamelCase name
+//   never matches.
 //
-// Another check is about where the prose stands rather than how it reads: every
-// `choice` and every `type` alias here carries a `§§` block, because a `§` note
-// above one is read by the next editor of the file and by nobody who uses the
-// Type. It is guarded by a count of its own, since a scanner that matched
-// nothing would pass it silently. A last check parses every `define` span a
-// block writes, so a reader can copy it.
+// Every `choice` and `type` alias also carries a `§§` block, since a `§` note
+// reaches only the file's next editor. Every `define` span a block writes must
+// parse, so a reader can copy it.
 //
-// All four rules are live, and a source that breaks one of them fails here.
-//
-// `ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints what each rule finds,
-// per rule and per file, with the line each finding sits on.
+// `ESSENCE_PROSE_REPORT=1 bun test stdlibProse` prints each rule's findings
+// with their files and lines.
 
 const REPORTING = process.env.ESSENCE_PROSE_REPORT !== undefined
 
 const WORD_LIMIT = 25
 
-// Written in capitals and meant that way. Everything else in capitals is
-// emphasis, which the rules spend on nothing. `O(1)` and the like never reach
-// this list — a single capital is not three.
+// Words meant in capitals. `capitalsOf` needs three capitals, so `O(1)`
+// never reaches this list.
 const ACRONYMS = new Set([
 	"API",
 	"ASCII",
@@ -72,19 +65,11 @@ type Finding = {
 	detail: string
 }
 
-// A `choice` or a `type` alias declared in a `declarations` body. Both
-// are Types a user's Program writes down, so both are read by somebody who
-// never opens this directory, and a `§` note above one reaches nobody but the
-// next editor of the file.
-//
-// The indentation is not pinned, though every declaration here stands at
-// one tab today. A pattern that reads the indentation would answer nothing for
-// a declaration written at another one, and a rule that silently stops looking
-// is worse than no rule — which is what the count below guards.
+// A `choice` or a `type` alias. The indentation is not pinned, so a
+// declaration at another depth is still found.
 const declarationPattern = /^\s*(choice|type)\s+([A-Za-z][A-Za-z0-9]*)/
 
-// One run of Comment lines of the same sigil, with the line each started
-// on. A `§§` run is the block above a Declaration; a `§` run is one note.
+// One run of Comment lines with the same sigil, and the line it starts on.
 type ProseBlock = {
 	kind: "§§" | "§"
 	file: string
@@ -120,25 +105,22 @@ function blocksOf(file: string, sourceText: string): Array<ProseBlock> {
 	return blocks
 }
 
-// A `@param` or `@returns` head and the em-dash that separates it from
-// its text. The separator is the form the rules ask for, so it is taken off
-// before the em-dash rule ever sees the line.
+// A `@param` or `@returns` head and its em-dash separator. The separator is
+// required, so it is taken off before the em-dash rule reads the line.
 const tagPattern = /^@(?:param\s+\S+|returns)\s*(?:—\s*)?/
 
-// What is being SHOWN rather than written: a fenced block holds example
-// code, and counting its words says nothing about the prose.
+// A fenced block holds example code, which is not prose.
 const fencePattern = /^\s*(?:```|~~~)/
 
-// One paragraph of a block, kept as the lines it was written on so that
-// a finding can name the line it starts at.
+// One paragraph of a block, kept as its lines so a finding can name the
+// line it starts at.
 type Paragraph = {
 	line: number
 	parts: Array<string>
 }
 
-// The paragraphs of one block, each already stripped of its tag head and
-// of anything fenced. A blank line separates two paragraphs, and a sentence
-// never runs across one.
+// The paragraphs of one block, without tag heads or fenced code. A sentence
+// never runs across the blank line between two paragraphs.
 function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 	let paragraphs: Array<Paragraph> = []
 	let current: Paragraph | null = null
@@ -166,9 +148,8 @@ function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 			continue
 		}
 
-		// A tag opens a section of its own, so it opens a paragraph of
-		// its own — its text is a sentence about that Parameter, and nothing
-		// above it belongs to the same one.
+		// A tag opens a paragraph of its own, since its text is about that
+		// tag alone.
 		if (current === null || tagPattern.test(raw)) {
 			current = { line, parts: [] }
 			paragraphs.push(current)
@@ -240,11 +221,9 @@ export function proseFindings(): Array<Finding> {
 	return findings
 }
 
-// The Types the sources declare, each with whether the Comment run
-// directly above it holds a `§§` block. The run is walked upwards over every
-// Comment line, `§` notes included, because the Parser reads the documentation
-// above the Statement whatever else stands between: a note that explains a
-// decision does not take the block away.
+// The Types the sources declare, each with whether the Comment run above it
+// holds a `§§` block. The walk passes over `§` notes too, though the Parser
+// attaches only a `§§` block with no note between it and the Declaration.
 export function declaredTypes(): Array<{
 	file: string
 	line: number
@@ -311,14 +290,9 @@ export function undocumentedDeclarations(): Array<Finding> {
 		}))
 }
 
-// A code span holding a `define` is written out for a reader to COPY —
-// it is the one construct the prose spells in full rather than naming — and
-// two of them told a reader to write `define { as v if c otherwise d }`, which
-// the parser refuses: the form is `as v if c as d otherwise`. Both stood in
-// Hover text on `Boolean::and` and `or`. So every such span is parsed here, in
-// the body a call site would put it in. Only `define` spans are: the rest of
-// the code spans in this library name Types, Methods and signature fragments,
-// none of which is an Expression.
+// A `define` is the one construct the prose spells in full for a reader to
+// copy. So each such span is parsed as a call site would hold it. Other code
+// spans name Types, Methods and signature fragments, which are no Expressions.
 const definePattern = /`(define\s*\{[^`]*)`/g
 
 export function unparsableCodeSpans(): Array<Finding> {
@@ -326,9 +300,8 @@ export function unparsableCodeSpans(): Array<Finding> {
 
 	for (let { filePath, sourceText } of readStdlibFiles()) {
 		for (let block of blocksOf(path.basename(filePath), sourceText)) {
-			// The lines of one block are joined, because a span can
-			// break across two Comment lines and each half alone parses as
-			// nothing.
+			// A span can break across two Comment lines, so a block's lines
+			// are joined.
 			let text = block.lines.join(" ")
 
 			for (let [, span] of text.matchAll(definePattern)) {
@@ -370,9 +343,7 @@ function report(findings: Array<Finding>): string {
 }
 
 describe("Standard Library Prose", () => {
-	// The splitter decides what a "sentence" is, so every rule above is
-	// only as good as it is. These run — they are about the reader here, not
-	// about the sources.
+	// Every rule is only as good as the sentence splitter.
 	describe("sentences", () => {
 		it("should split where one sentence ends and the next begins", () => {
 			expect(
@@ -441,18 +412,14 @@ describe("Standard Library Prose", () => {
 	})
 
 	it("should find the Types the sources declare", () => {
-		// The same guard as the one below, for the declaration scanner.
-		// The rule it feeds passes on an empty list, so a pattern that stopped
-		// matching would turn the whole check into a no-op nobody notices.
-		// There are twenty Choices and Type Aliases as this is written.
+		// The rule this scanner feeds passes on an empty list, so a pattern
+		// that stopped matching would pass unnoticed.
 		expect(declaredTypes().length).toBeGreaterThanOrEqual(20)
 	})
 
 	it("should find prose to read", () => {
-		// A guard on the reading above. Every rule below passes on an
-		// empty report, so a collector that read no file, or that found no
-		// Comment in the files it read, would make the whole file a no-op that
-		// nobody notices. The sources hold hundreds of blocks.
+		// Every rule passes on an empty report, so a collector that read no
+		// file or found no Comment would pass unnoticed.
 		let files = readStdlibFiles()
 
 		expect(files.length).toBeGreaterThan(10)
@@ -506,18 +473,11 @@ describe("Standard Library Prose", () => {
 		expect(report(findingsFor("all-caps"))).toBe("")
 	})
 
-	// A `§§` block is what a reader of the LANGUAGE sees and a `§` note
-	// is what the next editor of the file sees, so a Type documented by a note
-	// alone is documented for nobody who uses it. Every `choice` and every
-	// `type` alias here carries one, and this is what keeps that true: the
-	// library's Types are as much of its surface as its Methods are.
 	it("should give every Choice and Type Alias a '§§' block", () => {
 		expect(report(undocumentedDeclarations())).toBe("")
 	})
 
-	// The count guards the scanner, as the two above guard theirs: a
-	// pattern that stopped matching would make this pass on nothing. There
-	// are two `define` spans as this is written, both on `Boolean`.
+	// The count guards the span scanner against matching nothing.
 	it("should write a 'define' span a reader can copy", () => {
 		expect(
 			readStdlibFiles().flatMap(({ filePath, sourceText }) =>
