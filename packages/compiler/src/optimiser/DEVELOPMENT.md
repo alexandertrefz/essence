@@ -480,3 +480,41 @@ answers which Namespaces the band can name:
   after its declaration rather than in the band. `constantPoolBand` in the rewriter places it.
 
 Parameter defaults are pooled too. A default runs per call, and every call is emitted after the band.
+
+### build-lists-in-place
+
+`inline-loops` writes a loop's driver out, but its body still makes the call the Program wrote, such as `$loop_0_state
+= append__overload$1(list, index)`. That boxes a new List and calls a native on every turn. The rewriter's own walks,
+such as `map`, already push onto an Array of their own. They box it once at the end, through `pushed` and
+`createdList`. This pass extends that emission to a List accumulator the Program wrote, in every inlined walk that
+threads a State.
+
+Pushing onto the Array is invisible only while nothing else can see it. So the previous State has to be dead the
+moment it is rebuilt. This step keeps the old `current` alive inside `snapshots`:
+
+```
+<- #Continue({ state with
+    current = current::append(next),
+    snapshots = snapshots::append(current),
+})
+```
+
+Pushing onto its Array would rewrite what the Program already recorded. So the fence is tight. The State's name may
+stand only at the root of the rebuilding chain, a run of `append` calls. A branch that changes nothing answers the
+name bare. Any other mention declines the whole walk: an Argument, a member of something built, a closure's capture,
+even a read of `length`. Declining is always correct, so the fence can be widened later. A fold that passes its
+accumulator to a prelude Function such as `contains` declines, and so does an accumulator one Record member deep.
+
+`rebuiltCallback` rewrites each answer that writes the State into a `list-build`, then checks with `mentions`
+that the name appears nowhere else. `mentions` reads every position, a shadowing declaration included, so it can
+only over-answer. In a `Step` walk only `#Continue` writes the State, and a `#Done` carrying another value leaves
+the walk and drops the Array. A `while` walk whose predicate reads the State declines, since a read is a mention.
+
+The State has to be exactly a List, as `unboxed-loop-state` needs exactly an Integer. A refinement over List was
+erased before the pass ran, so a `NonEmptyList` State qualifies.
+
+`appendCall` reads three spellings of `append`. `List` has an Overload adding an item and one adding a List
+under `contentsOf`. `NonEmptyList` re-declares the second without a mangled number, and an item added to a proven
+List still reaches the `List` Overload. `prepend` is not read, since a build pushes onto the back of its Array.
+The pass does nothing where the Program declares a nested `List` or `NonEmptyList`, whose `append` could do
+anything.

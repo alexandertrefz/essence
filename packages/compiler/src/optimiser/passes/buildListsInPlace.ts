@@ -3,58 +3,15 @@ import type { common } from "@essence-lang/interfaces"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
-// A walk that BUILDS a List rebuilds it every turn. `inline-loops` writes
-// the driver out, but what it writes into the body is still the call the Program
-// wrote — `$loop_0_state = append__overload$1(list, index)` — and that call
-// copies everything the turns before it added. Tail sharing took the copy away;
-// what is left is a box and a native call per turn, and both of them are there
-// only because the emission does not know the List is the walk's own.
-//
-// It already knows for its OWN walks. `map` and `everyItem` declare an
-// empty Array, push each answer onto it and box it once at the end — the
-// `pushed` and `createdList` helpers in the Rewriter — because the Array they
-// build is the Compiler's, and nothing else can reach it. This pass extends
-// exactly that emission to an accumulator the PROGRAM wrote, in the four walks
-// that thread a State: the counted walk, the two condition walks, the general
-// `Step` walk and both folds.
-//
-// What it costs is a proof, and the proof is what this file is. Pushing
-// onto an Array is invisible only while no one else can see the Array, so the
-// previous State has to be dead the moment it is rebuilt — and the
-// counter-example is easy to write:
-//
-//   <- #Continue({ state with
-//       current = current::append(next),
-//       snapshots = snapshots::append(current),
-//   })
-//
-// The old `current` survives inside `snapshots`, and pushing onto its Array
-// would rewrite history the Program already recorded. What declines it is
-// visible in the body: `current` is mentioned twice, once as the receiver being
-// replaced and once as a value handed somewhere else.
-//
-// So the fence is drawn tight, in the spirit of `residual.ts`, and
-// deliberately narrower than a fuller analysis could admit. The State's name may
-// stand as the receiver at the ROOT of the rebuilding chain, and nowhere else —
-// a branch that changes nothing answers it bare, which is the chain with no
-// appends on it. Any other mention declines: an Argument, a member of something
-// built, a name a closure captured, a read as innocent as `length`. Declining is
-// always correct, which is what makes a tight fence safe to widen later.
-//
-// So two shapes decline that a wider fence could admit: a fold that reads
-// its accumulator through one of the prelude's own Functions, such as
-// `contains`, because nothing summarises what those Functions retain; and an
-// accumulator one Record member deep.
+// Builds a List accumulator in place: an inlined walk pushes onto an Array of
+// its own and boxes it once. It applies only where the State's name stands
+// nowhere but at the root of its `append` chains, so the old State is dead. See
+// "build-lists-in-place" in DEVELOPMENT.md.
 
 export const buildListsInPlace: OptimiserPass = {
 	name: "build-lists-in-place",
 	run: (program, namespaces) => {
-		// `List` is a name a Program may take for itself, nested, and a
-		// `namespace List for List` writing its own `append` answers under
-		// exactly the name and shape the chain below is read for. So is
-		// `NonEmptyList`, which the chain reads for its own `append`. The same
-		// set answers it for `inline-loops`, which is the pass that made the
-		// walks this one reads.
+		// A nested `List` or `NonEmptyList` Namespace may declare its own `append`.
 		if (
 			namespaces.nested.has("List") ||
 			namespaces.nested.has("NonEmptyList")
@@ -76,10 +33,7 @@ export const buildListsInPlace: OptimiserPass = {
 	},
 }
 
-// Both forms of the intrinsic carry the same `InlineLoop`, so both are
-// offered here and the answer rebuilds whichever one it was given. A walk the
-// fence declines is handed back AS ITSELF, which is what the shared walk's
-// structural sharing rests on.
+// Either form of the intrinsic. A declined walk is handed back as itself.
 function built<Node extends common.typedSimple.InlineLoop>(node: Node): Node {
 	let driver = rebuiltDriver(node.driver)
 
@@ -95,23 +49,14 @@ type RebuiltDriver = {
 	build: common.typedSimple.ListBuild
 }
 
-// WHICH Parameter the State arrives under, per driver, and the answer for
-// the two walks that thread none. The counted walk hands the counter first and
-// the State second, exactly as its Essence body does; every other walk hands the
-// State first.
-//
-// `map` and `keep` build an Array already — that emission is what this
-// pass extends, and there is nothing of theirs to extend it to.
+// Which Parameter carries the State: the second for a counted walk, else the
+// first. `map` and `keep` build an Array already.
 function rebuiltDriver(
 	driver: common.typedSimple.InlineLoopDriver,
 ): RebuiltDriver | null {
 	switch (driver.kind) {
 		case "condition": {
-			// ONE State handed to TWO bodies. The predicate answers a
-			// Boolean rather than the State, so it has no rebuilding chain to
-			// stand in — every mention it makes of the State is a read, and a
-			// read is what the fence declines. A `while` walk whose predicate
-			// asks anything of its accumulator keeps today's emission whole.
+			// The predicate may not mention the State, since any read declines.
 			if (
 				!accumulates(driver.predicate, 0) ||
 				!accumulates(driver.step, 0) ||
@@ -168,16 +113,8 @@ function rebuiltDriver(
 	}
 }
 
-// The State has to be EXACTLY a List — not a Union it is a member of, not
-// a Type Parameter that could be one — because the whole rewrite is that the
-// slot holds what a List holds, and only a List is known to hold that. It is the
-// same exactness `unboxed-loop-state` rests on for an Integer, and it is what
-// leaves a Record, a String or an Optional State untouched.
-//
-// A refinement over List IS accumulated, and there is nothing here that
-// says so because there is nothing here that could see one: `eraseRefinements`
-// runs at the head of the stage, before any pass, so a `NonEmptyList` State
-// reaches this as the List it is.
+// The State has to be exactly a List, not a Union or a Type Parameter. A
+// refinement over List was erased before any pass.
 function accumulates(
 	callback: common.typedSimple.InlineLoopCallback,
 	parameter: number,
@@ -185,11 +122,8 @@ function accumulates(
 	return callback.parameters[parameter]?.type.type === "List"
 }
 
-// The step body with every answer that writes the State rewritten into the
-// build it performs, and null where any of them is a shape the emission could
-// not write. The fence is the LAST line: once the chains are gone, a mention of
-// the State that survives is a use this pass does not understand, and one is
-// enough to decline the whole walk.
+// Every answer that writes the State, rewritten into a build. Any mention of
+// the State left afterwards declines the walk.
 function rebuiltCallback(
 	callback: common.typedSimple.InlineLoopCallback,
 	parameter: number,
@@ -205,10 +139,8 @@ function rebuiltCallback(
 	return { ...callback, body }
 }
 
-// The descent is the Rewriter's own — the three Statement kinds that can
-// hold a walk's answer, which is what `redirectedStatements` writes and
-// therefore the whole of what an answer can be written in. Everything else is
-// handed back untouched and answers to the mention count instead.
+// The Statement kinds that can hold the walk's answer, as `redirectedStatements`
+// writes them. Everything else is left to the mention check.
 function rebuiltBody(
 	nodes: Array<common.typedSimple.ImplementationNode>,
 	name: string,
@@ -249,9 +181,8 @@ function rebuiltStatement(
 				: { ...node, trueBody, falseBody }
 		}
 		case "IntrinsicStatement":
-			// A lowered Statement answering with a Return of its own is
-			// answering the WALK. One that answers a name of its own is
-			// answering that name, and holds no answer of the walk's at all.
+			// A lowered Statement that returns is answering the walk. One that answers a
+			// name of its own holds no answer of the walk's.
 			return node.result.kind === "return"
 				? rebuiltIntrinsic(node, name, stepped)
 				: node
@@ -286,24 +217,16 @@ function rebuiltIntrinsic(
 
 			return expression === null ? null : { ...node, expression }
 		}
-		// A walk nested inside this one, answering it. What the outer walk
-		// is handed is the name the inner one settled in rather than a Node, so
-		// there is nothing to read a chain out of — and a State written from a
-		// name is a State written whole, which this pass has no slot for.
+		// A nested walk answers through a name, a State written whole, which has no
+		// slot here.
 		case "inline-loop":
 			return null
 	}
 }
 
-// One answer. A walk that threads its State plainly writes the State at
-// every answer, so every answer has to BE a build; a walk whose body answers
-// with a `Step` writes it only through `#Continue`, and a `#Done` carrying
-// anything else is the walk leaving with a value of its own.
-//
-// The `Step` is read as the Case it is written as, and not also as the
-// `direct-case` `collapse-construction` makes of one — that pass runs AFTER this
-// one, in the fixed order, so no Program can reach here with a collapsed
-// construction. The Rewriter, which runs after both, reads both.
+// One answer. A plain walk writes the State at every answer. A `Step` walk
+// writes it only through `#Continue`. `collapse-construction` runs later, so a
+// `Step` is still a `CaseValue` here.
 function rebuiltAnswer(
 	node: common.typedSimple.ExpressionNode,
 	name: string,
@@ -322,10 +245,8 @@ function rebuiltAnswer(
 	let build = listBuild(step.value, name)
 
 	if (build === null) {
-		// `#Done(<anything else>)` is admitted and left exactly as it is:
-		// the walk leaves with a value that is not the State, and the Array it
-		// built is simply dropped. `#Continue(<anything else>)` is not — it
-		// would put a List the walk does not own where the accumulator was.
+		// `#Done` with another value leaves the walk and drops the Array.
+		// `#Continue` with another List would replace the accumulator.
 		return step.done ? node : null
 	}
 
@@ -341,12 +262,8 @@ function rebuiltAnswer(
 const doneTag = "Step#Done"
 const continueTag = "Step#Continue"
 
-// A `Step` this pass can read: the Case as it is written, its Record
-// payload, and which member of it carries the value. A payload holding anything
-// MORE than that one member is refused rather than read, for the reason the
-// Rewriter refuses one — `Step` declares exactly one member per Case today, and
-// this is what keeps a second one from silently going somewhere it was not
-// weighed.
+// A `Step` as written, with a one-member Record payload, which is what `Step`
+// declares. A payload with more is refused.
 function stepPayload(node: common.typedSimple.ExpressionNode): {
 	done: boolean
 	member: string
@@ -382,11 +299,9 @@ function stepPayload(node: common.typedSimple.ExpressionNode): {
 	return null
 }
 
-// The rebuilding chain, read from the outside in — `state::append(a)
-// ::append(contentsOf b)` unwinds to `b`, then `a`, then the name, and the
-// additions come back in the order the turn performs them. Null the moment
-// anything else stands in the chain, which includes the whole of what the fence
-// excludes: the root has to be the State's own name and every link an `append`.
+// The rebuilding chain read from the outside in, so the additions come back in
+// the order the turn makes them. The root must be the State's name, and every
+// link an `append`.
 function listBuild(
 	node: common.typedSimple.ExpressionNode,
 	name: string,
@@ -413,27 +328,15 @@ function listBuild(
 		nodeType: "Intrinsic",
 		kind: "list-build",
 		additions,
-		// The Type and the Position of the chain it replaces, as every
-		// intrinsic carries the ones of the Node it stands in for.
+		// The Type and Position of the chain it replaces.
 		type: node.type,
 		position: node.position,
 	}
 }
 
-// One link. Both `append` Overloads bind by position — `$1` adds an item
-// under no label, `$2` adds a List under `contentsOf` — and a call labelled any
-// other way is not one of them. `prepend` is not one of them either, deliberately
-// and for a reason the emission states: what a build pushes onto is the BACK of
-// the Array it owns.
-//
-// THREE spellings, not two, because the second `append` in a chain has a
-// receiver the first one PROVED something about. `append(_:)` answers a
-// `NonEmptyList` whatever it was handed, and `NonEmptyList` re-declares
-// `append(contentsOf:)` so that it may promise the same — one entry, so no
-// mangled number — and that declaration is List's own second Overload
-// re-exported. Its single-item sibling is not re-declared, so an item added to a
-// proven List reaches List's own entry by forgetting the proof and arrives under
-// List's own name.
+// One `append`: an item unlabelled, or a List under `contentsOf`.
+// `NonEmptyList` re-declares the second without a mangled number. `prepend` is
+// never read, since a build pushes onto the back.
 function appendCall(node: common.typedSimple.ExpressionNode): {
 	receiver: common.typedSimple.ExpressionNode
 	addition: common.typedSimple.ListBuildAddition
@@ -469,17 +372,8 @@ function appendCall(node: common.typedSimple.ExpressionNode): {
 	}
 }
 
-// Whether a name is mentioned anywhere at all in what it is given. Every
-// position is read — a Parameter's own binding, a Namespace's name, a Method's
-// member name, a Function declared inside the body and everything it closes over
-// — so the answer is conservative in the one direction that matters: a name this
-// says nothing about is a name nothing may be assumed of. A body that SHADOWS
-// the State's name declines for the same reason, because the declaration is a
-// mention like any other.
-//
-// A Type is walked like everything else. Types are shared between Nodes,
-// and the `seen` set walks an object reached twice only once. Nothing in a Type
-// is an Identifier Node, so walking one only ever costs time.
+// Whether the name appears anywhere, in every position, a shadowing
+// declaration included. Shared Types are walked once.
 function mentions(root: unknown, name: string): boolean {
 	let seen = new Set<object>()
 	let found = false
