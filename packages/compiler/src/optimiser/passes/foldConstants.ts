@@ -15,93 +15,31 @@ import {
 } from "../purity"
 import { rewriteExpressions } from "../walk"
 
-// An operation whose operands are written out in the source has one
-// answer, and the Program computed it again at every evaluation: `60::multiply(
-// with 60)::multiply(with 24)` allocated three Integers and made three calls to
-// arrive at 86400, per turn of whatever loop it stood in, and `"a count: {7}"`
-// rendered `7` through a witness to build a String that could have been written.
-// So the answer is what is emitted, and the operation is not.
-//
-// The whole of what makes it safe is that the Compiler computes the
-// answer THE SAME WAY the Program would have. Essence arithmetic is exact —
-// bigints and pairs of bigints, never a float — so there is no rounding to
-// disagree about, and every fold below is the body of the Method it replaces
-// carried out on the literals it was given. Where the body is a runtime
-// native it is one bigint operation; where it is written in Essence it is
-// followed statement by statement, because what a Rational STORES is decided by
-// the Essence body and not by the value it stands for.
-//
-// Which is the one thing about Rationals that has to be got exactly
-// right. A Rational holds the parts it was BUILT with and reduces only what it
-// ANSWERS with — `4/2` stores 4 and 2, prints `2/1` and answers 2 for its
-// numerator — so what a fold has to reproduce is what the operation STORES, not
-// only what it is worth. CONSTRUCTION stores what it was given, which is why
-// `4/2` is folded to a Rational holding 4 and 2. ARITHMETIC does not: the four
-// same-kind operations are natives on the bigint-rational core, which answers in
-// lowest terms, so `1/2::add(1/4)` folds to a Rational holding 3 and 4 — the
-// very parts the unfolded Program would have built. They are read through the
-// same functions the runtime calls, so there is one definition of the answer
-// rather than two that must agree.
-//
-// Only LITERALS are folded, never a name a Program bound to a constant.
-// A binding is a place a debugger stops and a name a reader looks for, and
-// what is gained by folding through one is an allocation the pool already
-// removes. What is asked of each operand is nevertheless `isPureExpression`,
-// with the Program's shadowed Namespaces: the enumeration a fold rests on is
-// read by NAME, and a Program may write a `namespace Integer for Integer` of
-// its own in a block, whose `add` can print.
+// Replaces an operation on literals with its answer, computed as the Program
+// would compute it. A Rational keeps the parts the operation would store. See
+// "fold-constants" in DEVELOPMENT.md.
 
 export const foldConstants: OptimiserPass = {
 	name: "fold-constants",
 	run: (program, namespaces) => {
-		// The same set `lower-scalar-operations` refuses to lower on, for
-		// the same reason: a Namespace named after a builtin stands in front of
-		// it for the rest of its block, and an `add` written there is a Method
-		// the Program wrote. Refused for the whole Program rather than per
-		// Scope — the Optimiser walks Expressions and not Scopes.
+		// A nested Namespace named after a builtin may answer anything.
 		let shadowed = namespaces.nested
 
-		// A Parameter's `= expression` default is folded too — it answers
-		// an Expression with an Expression and never lifts anything, which is
-		// the whole of what a default's position asks of a pass.
+		// A fold answers an Expression with an Expression, so defaults are safe.
 		return rewriteExpressions(program, (node) => fold(node, shadowed), {
 			parameterDefaults: true,
 		})
 	},
 }
 
-// A deliberate ceiling on how large a folded number may be, in decimal
-// digits. None of the operations folded here can reach it: addition and
-// multiplication of bigints grow the answer by at most the digits of their
-// operands, so a whole tree of them is bounded by the digits WRITTEN in the
-// source, and a Program can not write more source than it has. What the cap is
-// for is the operation that would break that argument — `raise`, whose answer's
-// size is the exponent's VALUE rather than its length — so that folding one
-// later is a decision about this number rather than an emission that quietly
-// balloons. A fold that would exceed it is simply not taken, and the Program
-// computes the answer as it always did.
-//
-// Strings need none. Concatenation copies each operand once, so a folded
-// text is never longer than the literals it was built from.
+// The most decimal digits a folded number may have. A larger answer is left to
+// run. Sums and products stay within the digits written. Concatenation never
+// outgrows its literals.
 const MAXIMUM_FOLDED_DIGITS = 4096
 const MAXIMUM_FOLDED_MAGNITUDE = 10n ** BigInt(MAXIMUM_FOLDED_DIGITS)
 
-// A `define` is not among these, deliberately. Folding an arm whose
-// Condition is decided would drop the arms below it, and what it would buy is
-// an emission nobody produces: `as VALUE if true` is the shape the Node exists
-// to avoid, nothing in the repository writes one, and the arm it would drop is
-// one a coverage counter stands in. An `if` is left alone for exactly the same
-// reasons.
-//
-// The Condition itself is folded like any other Expression, and neither
-// reading of it asks whether another pass ran. A lowered Condition is an
-// `essence-boolean` around a raw test: unboxed, it IS that raw test and the
-// rule below never folds one, so there is nothing here to fold; still boxed, it
-// folds to a Boolean the Rewriter reads `.value` off, which is what a Condition
-// nobody unboxed has always been emitted as. Either way the Node keeps every arm
-// it was written with, and the same collapse stands at the same point in the
-// order for an `if` — this is that story over again rather than one the `define`
-// brought with it.
+// A known condition is folded, but its `define` or `if` keeps every arm, in
+// which a coverage counter may stand.
 function fold(
 	node: common.typedSimple.ExpressionNode,
 	shadowed: ReadonlySet<string>,
@@ -118,16 +56,8 @@ function fold(
 	}
 }
 
-// The shapes `lower-scalar-operations` leaves behind, folded as well as
-// the Invocations below — because that pass runs FIRST and takes every Integer
-// operation this one would otherwise have found. Neither pass may assume the
-// other ran, so both forms are read: with the lowering off, `1::add(2)` is
-// still a Method Invocation and is folded as one.
-//
-// A RAW test is never folded, only an `essence-boolean` around one. A raw
-// intrinsic stands where JavaScript says `if (…)` — a lowered Conditional's
-// question, a Match Handler's test, a dispatch case's — and a `BooleanValue`
-// there would be an object, which is true whatever it holds.
+// The intrinsics `lower-scalar-operations` leaves. A raw test is never folded,
+// since a `BooleanValue` in a JavaScript `if` is always true.
 function foldIntrinsic(
 	node: common.typedSimple.IntrinsicNode,
 ): common.typedSimple.ExpressionNode {
@@ -163,11 +93,8 @@ function foldIntrinsic(
 		return booleanNode(comparisonOf(test.operator, left, right), node)
 	}
 
-	// Integers alone. Two Strings are equal when their CHARACTERS are,
-	// which is a comparison of their canonically normalised forms — an answer
-	// the JavaScript running the Compiler gives out of its own Unicode tables,
-	// and not necessarily the ones the JavaScript running the Program has. The
-	// call stays, and answers where the Program runs.
+	// Integers alone. String equality depends on Unicode tables, which the
+	// compiler's JavaScript need not share with the Program's.
 	if (test.kind === "raw-equals" && test.scalar === "Integer") {
 		let left = integerOf(test.left)
 		let right = integerOf(test.right)
@@ -195,26 +122,16 @@ function foldInvocation(
 	switch (node.base.name) {
 		case "Integer":
 			return foldInteger(node, member, shadowed)
-		// The same rung `lower-scalar-operations` reads, and for the same
-		// reason: a refinement is erased before the first pass runs, so both
-		// operands are plain Integers here, but the Method the Simplifier
-		// emitted is still `NonZeroInteger`'s — which is where a written
-		// receiver's product, negation and distance from zero go now. Those
-		// three alone, because they are the entries of that Namespace whose
-		// body is one bigint operation; `foldInteger` then demands written
-		// Integers, so the entries scaling an Algebraic or a Transcendental
-		// fall out on their operands, and `divide` answers a Rational nobody
-		// has weighed folding.
+		// A refinement's Method keeps its Namespace's name. These entries are one
+		// bigint operation each, and `foldInteger` refuses the ones that scale an
+		// irrational.
 		case "NonZeroInteger":
 			return member === "multiply" ||
 				member === "negate" ||
 				member === "absolute"
 				? foldInteger(node, member, shadowed)
 				: node
-		// The other two refinements of Integer, and the one holding both
-		// proofs, for the same reason: each closes over a sum or a product by
-		// re-exporting Integer's own, so a written `2::add(3)` is
-		// `PositiveInteger`'s sum now and folds to the same `5`.
+		// Their sums and products are Integer's own.
 		case "NonNegativeInteger":
 		case "PositiveInteger":
 			return member === "add" || member === "multiply"
@@ -222,26 +139,15 @@ function foldInvocation(
 				: node
 		case "Rational":
 			return foldRational(node, member, shadowed)
-		// The Rational sister of the rung above, for the same reason: a
-		// written `1/2` proves it is not zero, so its product and its negation
-		// are `NonZeroRational`'s and the name is all this pass has to go by.
-		// `negate` folds as Rational's does, through the lowest-terms parts —
-		// the native is spelled out of the same three reads — and `absolute`
-		// is Rational's own `if` written a second time over that `negate`, so
-		// the same fold follows it. `reciprocal` exchanges the two parts of
-		// ONE value, which `foldRational` takes by name and nobody has weighed
-		// yet.
+		// A written `1/2` is a `NonZeroRational`. Its `negate` and `absolute` fold as
+		// Rational's do. `reciprocal` is not folded.
 		case "NonZeroRational":
 			return member === "multiply" ||
 				member === "negate" ||
 				member === "absolute"
 				? foldRational(node, member, shadowed)
 				: node
-		// The two sign refinements of Rational, for the reason the Integer
-		// pair above is here: each closes over a sum or a product by
-		// re-exporting Rational's own, so a written `1/2::add(1/4)` is
-		// `PositiveRational`'s sum now and folds to the same `3/4`. `squareRoot`
-		// is left alone, as `Rational`'s own is.
+		// Their sums and products are Rational's own.
 		case "NonNegativeRational":
 		case "PositiveRational":
 			return member === "add" || member === "multiply"
@@ -254,12 +160,8 @@ function foldInvocation(
 	}
 }
 
-// The operations whose bodies are one bigint operation — the same
-// enumeration `lower-scalar-operations` writes out, plus the two that take only
-// the receiver. `divide` and `quotient` answer an Optional and `raise` is the
-// one whose answer can be larger than the Program that asks for it; `compare`
-// answers an `Ordering` Case, which is a value to build rather than a literal to
-// write.
+// Operations whose body is one bigint operation. `divide` and `quotient`
+// answer an Optional, `compare` a Case, and `raise` may outgrow the Program.
 function foldInteger(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -316,19 +218,9 @@ function foldInteger(
 	}
 }
 
-// Two Rationals, and no other pair. The Essence bodies for a Rational
-// beside an Integer are three further bodies to follow exactly, for an operand
-// pair nobody writes as two literals — and mixed kinds are left to the general
-// path here for the same reason `lower-scalar-operations` leaves them there.
-//
-// Each of these IS what the Method does, carried out. The three
-// arithmetic entries are natives on the bigint-rational core and are folded
-// through the very functions those natives call, so the folded parts are the
-// parts the Program would have stored — in lowest terms, which is what that
-// core answers in. `negate` and `absolute` are Essence bodies still and are
-// followed statement for statement. The comparisons cross-multiply the STORED
-// parts, which is what `Rational.compare` does, and answer the same for either
-// spelling of a value.
+// Two Rationals only. Each fold is what the Method does to the stored parts:
+// the arithmetic through the natives' own functions, `negate` and `absolute`
+// as their Essence bodies.
 function foldRational(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -342,10 +234,8 @@ function foldRational(
 			return node
 		}
 
-		// `absolute` answers the Rational ITSELF where it is not negative
-		// — `<- @` — so a `4/2` stays 4 over 2 rather than turning into its own
-		// lowest-terms form. `negate` goes through `Rational.of` on the
-		// lowest-terms parts, so it does not.
+		// `absolute` answers a non-negative Rational itself, keeping `4/2` as 4 over
+		// 2. `negate` goes through the lowest-terms parts.
 		if (member === "absolute" && value.numerator >= 0n) {
 			return rationalNode(value, node)
 		}
@@ -366,10 +256,8 @@ function foldRational(
 		return node
 	}
 
-	// The cross-multiplication `Rational.compare` performs, on the parts
-	// as stored. Denominators are positive — `createRational` puts the sign on
-	// the numerator — so the sign of the difference is the sign of the
-	// comparison.
+	// As `Rational.compare` cross-multiplies. Denominators are positive, so the
+	// difference's sign is the answer.
 	let ordering =
 		left.numerator * right.denominator - right.numerator * left.denominator
 
@@ -406,12 +294,8 @@ function foldRational(
 	}
 }
 
-// Concatenation, which is the one String operation that is JavaScript's
-// own `+` on what the two values hold — `append` is `createString(a.value +
-// b.value)` and `prepend` is `append` with the operands the other way round.
-// Every other String Method either normalises, segments or allocates by a rule
-// the Compiler's own JavaScript would answer with its Unicode tables rather
-// than the Program's.
+// Concatenation, the one String operation that is JavaScript's `+` on what the
+// values hold.
 function foldString(
 	node: common.typedSimple.MethodInvocationNode,
 	member: string,
@@ -445,15 +329,8 @@ function foldString(
 	)
 }
 
-// A hole whose value is written out and whose witness names a Method the
-// Compiler can carry out is TEXT, and text is what the segment becomes. The
-// Rewriter renders a hole as `<witness>.toString(<value>).value` and
-// concatenates the pieces, so a hole that folds costs the Program nothing at
-// all: no witness, no call, no String built to be read back out of.
-//
-// And where every hole folds, the interpolation is a String literal — one
-// the pool then declares once, where the unfolded form built it at every
-// evaluation.
+// A hole whose value is a literal and whose `toString` can be carried out
+// becomes text. All text is a String literal.
 function foldInterpolation(
 	node: common.typedSimple.InterpolatedStringValueNode,
 	shadowed: ReadonlySet<string>,
@@ -477,10 +354,7 @@ function foldInterpolation(
 			changed = true
 		}
 
-		// Runs of text are joined as they are folded. The Rewriter emits
-		// each segment as a piece of one `+` chain, so two text pieces beside
-		// each other are two literals JavaScript would concatenate at run time
-		// to no purpose.
+		// Adjacent text pieces are joined.
 		let previous = segments.at(-1)
 
 		if (previous !== undefined && previous.kind === "text") {
@@ -509,11 +383,8 @@ function foldInterpolation(
 	return { ...node, segments }
 }
 
-// What one hole renders to, or null wherever the Compiler can not say.
-// `toString` is the one Method `Printable` declares and the one the Rewriter
-// calls, and the four entries below are the standard library's own — each read
-// off the source of the Method it stands for, each an operation on the literal
-// and nothing else.
+// What one hole renders to, or null, following each standard library
+// `toString` body.
 function renderedHole(
 	segment: {
 		kind: "expression"
@@ -539,8 +410,7 @@ function renderedHole(
 	}
 
 	switch (namespaceName) {
-		// `Integer.toString` is `createString(value.toString())`, which is
-		// what a bigint's own decimal spelling is.
+		// A bigint's own decimal spelling.
 		case "Integer": {
 			let integer = integerOf(value)
 
@@ -549,18 +419,15 @@ function renderedHole(
 		// `String::toString` answers the String itself.
 		case "String":
 			return value.nodeType === "StringValue" ? value.value : null
-		// `Boolean::toString` is written as the Conditional that spells
-		// the two answers out.
+		// `Boolean::toString` spells out its two answers.
 		case "Boolean":
 			return value.nodeType === "BooleanValue"
 				? value.value
 					? "true"
 					: "false"
 				: null
-		// The no-Argument `Rational::toString` reads the lowest-terms
-		// accessors and answers the numerator alone where the denominator is
-		// one, so a Rational storing 4 and 2 renders `2`. `Terminal.inspect`
-		// keeps the structural `2/1`, and it is not this Method.
+		// Lowest terms, the numerator alone where the denominator is one, so `4/2`
+		// renders `2`.
 		case "Rational": {
 			let rational = rationalOf(value)
 
@@ -579,10 +446,8 @@ function renderedHole(
 	}
 }
 
-// The receiver and the Method's own Parameters, all of EXACTLY the named
-// kind — the same question `lower-scalar-operations` asks, for the same reason:
-// a Union-typed operand or a Type Parameter reaches a different Method, and a
-// second Parameter means a different entry of the Overload.
+// The receiver and Parameters, all exactly of `kind`, as
+// `lower-scalar-operations` asks.
 function foldableOperands(
 	node: common.typedSimple.MethodInvocationNode,
 	kind: "Integer" | "Rational" | "String",
@@ -612,11 +477,8 @@ function foldableOperands(
 	return node.arguments.map((argument) => argument.value)
 }
 
-// The literal readers, and the whole of what makes a fold possible: a
-// value written in the source, read as the number the Rewriter would have
-// emitted. A spelling that is not plain digits is refused rather than coerced —
-// the Lexer can not produce one, and a fold is not the place to find out
-// otherwise.
+// A literal read as the number the rewriter would emit. Any spelling but plain
+// digits is refused.
 const decimalDigits = /^-?[0-9]+$/
 
 function integerOf(node: common.typedSimple.ExpressionNode): bigint | null {
@@ -627,10 +489,8 @@ function integerOf(node: common.typedSimple.ExpressionNode): bigint | null {
 	return BigInt(node.value)
 }
 
-// A Rational literal as the parts the value HOLDS, which is what
-// `Rational.createRational` stores rather than what was written: the sign moves
-// onto the numerator and a zero is `0/1`. A zero denominator is refused — the
-// value it makes is one no operation here has an answer for.
+// The parts `Rational.createRational` would store: the sign on the numerator,
+// and zero as `0/1`. A zero denominator is refused.
 function rationalOf(
 	node: common.typedSimple.ExpressionNode,
 ): { numerator: bigint; denominator: bigint } | null {
@@ -649,9 +509,7 @@ function rationalOf(
 	return storedRational(BigInt(node.numerator), BigInt(node.denominator))
 }
 
-// What `Rational.createRational` makes of two bigints — the single
-// gateway every Rational in a running Program is built through, written out
-// here because a folded Rational has to hold what one built there would.
+// What `Rational.createRational` makes of two bigints.
 function storedRational(
 	numerator: bigint,
 	denominator: bigint,
@@ -668,11 +526,8 @@ function storedRational(
 	return { numerator, denominator }
 }
 
-// The three same-kind arithmetic entries, through the very functions the
-// natives behind them call — one cross-multiplication and one reduction each,
-// on the operands' lowest-terms parts. Answering them any other way here would
-// be a second definition of Rational arithmetic that has to agree with the
-// first, which is what these three used to be.
+// Through the functions the natives call, so there is one definition of
+// Rational arithmetic.
 function foldedRationalArithmetic(
 	operation: (first: BigRational, second: BigRational) => BigRational,
 	left: { numerator: bigint; denominator: bigint },
@@ -686,9 +541,7 @@ function foldedRationalArithmetic(
 	return storedRational(answer.numerator, answer.denominator)
 }
 
-// `Rational::negate` is still an Essence body — `Rational.of` over the
-// lowest-terms parts with the numerator flipped — so it is followed statement
-// for statement, as `absolute`'s negative branch is.
+// `Rational::negate` is an Essence body, followed exactly.
 function negatedRational(value: { numerator: bigint; denominator: bigint }): {
 	numerator: bigint
 	denominator: bigint
@@ -736,9 +589,7 @@ function withinCap(value: bigint): boolean {
 	return magnitude < MAXIMUM_FOLDED_MAGNITUDE
 }
 
-// The written-out answers. Each carries the Type and the Position of the
-// Node it replaces — the Position above all, because the operation is where the
-// author wrote it and a debugger stopping there should still say so.
+// Each answer keeps the Type and Position of the Node it replaces.
 function integerNode(
 	value: bigint,
 	node: common.typedSimple.ExpressionNode,

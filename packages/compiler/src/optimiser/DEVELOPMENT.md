@@ -639,3 +639,49 @@ Some calls are left alone:
 Loop names are numbered across the Program, since a loop inlined into another loop's body shares its Scope. In
 the Statement positions `lower-matches-to-statements` lifts from, this pass lifts the loop itself, since that pass
 runs earlier and never sees it.
+
+### fold-constants
+
+An operation on literals has one answer, which the Program would compute at every evaluation. The pass emits
+the answer instead: `60::multiply(with 60)::multiply(with 24)` becomes `86400`, and `"a count: {7}"` becomes a
+String literal that the pool then declares once.
+
+It is safe because the compiler computes the answer as the Program would. Essence arithmetic is exact, bigints
+and pairs of bigints, so there is no rounding to disagree about. Each fold carries out the body of the Method it
+replaces: a native's one bigint operation, or an Essence body followed Statement by Statement.
+
+Rationals need the most care, since a fold has to reproduce what an operation stores, not only what it is worth.
+A Rational holds the parts it was built with and reduces only what it answers with. So `4/2` stores 4 and 2,
+and answers 2 for its numerator. Construction stores what it was given, so `4/2` folds to a Rational holding 4 and 2.
+The same-kind arithmetic entries are natives on the bigint-rational core, which answers in lowest terms, so
+`1/2::add(1/4)` folds to 3 and 4. The pass calls the same functions the natives call, so there is one definition
+of the answer. `negate` and `absolute` are Essence bodies and are followed exactly: `absolute` answers a
+non-negative Rational itself, keeping its stored parts. Comparisons cross-multiply the stored parts, as
+`Rational.compare` does. A Rational beside an Integer is left alone.
+
+Only literals are folded, never a name bound to a constant, which is a place a debugger stops. Each operand still
+has to be pure, against the Program's nested Namespaces, since a nested `Integer` Namespace's `add` may print.
+
+What is left alone:
+
+- String comparisons and every String operation but concatenation. Those normalise or segment by Unicode tables,
+  and the compiler's JavaScript need not have the same tables as the Program's.
+- `divide` and `quotient`, which answer an Optional, `compare`, which answers a Case, and `raise`, whose answer can
+  outgrow the Program. `MAXIMUM_FOLDED_DIGITS` caps a folded number, and a larger answer is left to the Program. Sums
+  and products grow by at most the digits written, so only a Program that writes thousands of digits meets it.
+- A raw test, which stands in a JavaScript `if`, where a `BooleanValue` object would always be true. Only an
+  `essence-boolean` around one is folded.
+- A `define` or an `if` whose condition is known. Folding it would drop arms or branches nobody writes that way,
+  and a coverage counter may stand in them. The condition itself is folded like any Expression.
+
+Both the Invocations and the intrinsics `lower-scalar-operations` leaves are folded, since neither pass may assume
+the other ran. The refinements of Integer and Rational fold the entries that re-export their base's sum,
+product or negation. A refinement was erased, so the operands are plain values.
+
+An interpolation hole whose value is a literal and whose witness names a `toString` the compiler can carry out
+becomes text. Adjacent text pieces are joined, and an interpolation of text alone is a String literal.
+`Rational::toString` answers the numerator alone where the lowest-terms denominator is one, so a Rational storing
+4 and 2 renders `2`.
+
+Each answer keeps the Type and Position of the Node it replaces, so a debugger still stops where the author wrote
+the operation.
