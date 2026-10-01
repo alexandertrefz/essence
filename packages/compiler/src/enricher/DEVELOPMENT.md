@@ -837,3 +837,30 @@ help only where a generation failed.
 
 Without conjuncts, the goal's body is the call as a bare Expression Statement. A Constant nothing reads would be
 dropped by `eliminate-dead-code` wherever the call is pure, and the goal would pass without running the Method.
+
+## Builtin order
+
+`builtins.ts` states the order of the three builtin tables. A declaration is enriched into its Scope, so without
+these lists a name's position would follow the order the standard library's file names sort in. `inBuiltinOrder`
+in `stdlib.ts` sorts each finished table against its list, and an unlisted name follows the listed ones in the
+order it was declared.
+
+Completion lists a shared Method name once, under the first Namespace in the member order that declares it. The
+enricher searches the Namespaces in that order too, and a Diagnostic names the searched Namespaces in it. The
+order never decides what a call resolves to: two Namespaces declaring one Method name are separated by how
+specific their targets are.
+
+So a Namespace comes after every Namespace it narrows: `NonEmptyList` after `List`, and `PositiveInteger` after
+`NonZeroInteger` and `NonNegativeInteger`. A receiver meets the general Namespace first, and the narrower one adds
+its extras. Where a Namespace shares no Method name with those before it, its place only decides where a reader
+finds it. A Choice whose Methods are all derived is such a Namespace. `builtins.spec.ts` holds the Method names
+`Dictionary` shares with the Namespaces before it, which no value reaches together with it.
+
+The Type order serves `closestMatch` and the Completion of a Type annotation, which lists the table in order.
+`closestMatch` prefers, between two candidates the same distance away, the one that opens with the written name's
+letter, and then the first in order. So each refinement sits directly after the Type it refines, and a tie between
+the two goes to the base Type.
+
+Hover, Completion and rename list the builtin Protocols in the Protocol order. A receiver's provided Methods are
+offered Protocol by Protocol in it as well. It is also the order the Protocols build on each other: `Orderable`
+extends `Comparable`.

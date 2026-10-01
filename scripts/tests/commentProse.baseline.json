@@ -67,7 +67,6 @@
 	"packages/compiler/src/embed/emit.ts": {"sentence-length": 10, "em-dash": 8, "all-caps": 2, "position": 2, "counts": 1},
 	"packages/compiler/src/embed/hash.ts": {"sentence-length": 12, "em-dash": 9, "all-caps": 6, "block-length": 2},
 	"packages/compiler/src/embed/index.ts": {"sentence-length": 30, "em-dash": 28, "all-caps": 19, "history": 1, "block-length": 6, "stacked": 1},
-	"packages/compiler/src/enricher/builtins.ts": {"sentence-length": 69, "em-dash": 48, "all-caps": 47, "position": 12, "block-length": 15, "counts": 1, "citation": 1},
 	"packages/compiler/src/enricher/enrich.ts": {"sentence-length": 115, "em-dash": 87, "all-caps": 67, "position": 4, "block-length": 25},
 	"packages/compiler/src/enricher/resolvers.ts": {"sentence-length": 549, "em-dash": 391, "all-caps": 338, "history": 8, "position": 44, "block-length": 129, "stacked": 1, "counts": 3},
 	"packages/compiler/src/enricher/stdlib.ts": {"sentence-length": 57, "em-dash": 42, "all-caps": 45, "history": 1, "position": 1, "block-length": 14},
