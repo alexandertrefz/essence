@@ -18,7 +18,6 @@
 	"packages/compiler/src/tests/lexer.spec.ts": {"sentence-length": 13, "em-dash": 13, "all-caps": 17, "history": 1, "block-length": 3},
 	"packages/compiler/src/tests/natives.spec.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 2},
 	"packages/compiler/src/tests/numericAdditions.spec.ts": {"sentence-length": 11, "em-dash": 6, "all-caps": 1, "position": 1},
-	"packages/compiler/src/tests/parserDiagnostics.spec.ts": {"sentence-length": 55, "em-dash": 46, "all-caps": 27, "history": 5, "position": 2, "block-length": 5},
 	"packages/compiler/src/tests/printType.spec.ts": {"sentence-length": 9, "em-dash": 6, "all-caps": 6, "block-length": 1},
 	"packages/compiler/src/tests/protocolProvidedMethods.spec.ts": {"sentence-length": 56, "em-dash": 40, "all-caps": 27, "history": 1, "position": 1, "block-length": 6},
 	"packages/compiler/src/tests/ranges.spec.ts": {"sentence-length": 4, "em-dash": 1, "all-caps": 3, "history": 1},
