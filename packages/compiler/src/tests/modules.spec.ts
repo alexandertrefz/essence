@@ -2259,6 +2259,47 @@ export {
 		).toEqual(["Export a Function that answers with its value."])
 	})
 
+	// A test that assigns the Variable would meet `constant-reassignment` too.
+	it("withholds the Constant Help where only a test assigns the Variable", () => {
+		withProject(
+			{
+				"Main.es": `implementation {
+	variable counter = 0
+
+	function read() -> Integer {
+		<- counter
+	}
+}
+
+export {
+	counter
+	read
+}
+
+tests {
+	test "assigns the Variable" {
+		counter = 1
+
+		expect read()::is(1)
+	}
+}
+`,
+			},
+			(directory) => {
+				let diagnostics = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				).diagnostics
+
+				expect(codesOf(diagnostics)).toEqual(["export-of-variable"])
+				expect(diagnostics[0]?.helps).toEqual([
+					"Export a Function that answers with its value.",
+				])
+			},
+		)
+	})
+
 	// Forwarding is offered only where a dependency has the name, and then the
 	// specifier is spelled out.
 	it("offers forwarding only where a dependency has the name", () => {

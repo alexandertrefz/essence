@@ -1106,7 +1106,8 @@ function reportCyclicConstantImport(entry: parser.ImportNode): void {
 	)
 }
 
-// Whether anything in the Module, Function bodies included, assigns to `name`.
+// Whether anything in the Module, Function bodies and tests included, assigns
+// to `name`.
 function isAssignedIn(module: Module, name: string): boolean {
 	let found = false
 
@@ -1141,6 +1142,7 @@ function isAssignedIn(module: Module, name: string): boolean {
 	}
 
 	visit(module.program.implementation)
+	visit(module.program.tests)
 
 	return found
 }
