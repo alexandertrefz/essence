@@ -7,62 +7,37 @@ import { canonicalPath } from "@essence-lang/compiler/modules"
 import type { EssenceCompileError } from "./compile-error"
 import { attemptLoad, type EssenceModule, type LoadOptions } from "./load"
 
-// `loadModule`, kept up to date. The sources are watched, and every edit
-// that compiles is handed over as a new Module — the same Module `loadModule`
-// would have answered with, had it been called after the edit. A host that
-// wants its Essence to follow the editor rather than the restart wires the new
-// Module in wherever it held the old one, and nothing else about it changes.
+// `loadModule` kept up to date: each edit that compiles arrives as a new Module.
+// After an edit that does not compile, the Error is reported and the Module
+// before it stays live. A first load that fails leaves `module` as `null`.
 //
-// The Module BEFORE an edit that does not compile stays live. It is not
-// replaced, not closed and not marked; the Error is reported and the watcher
-// goes on watching, so that the edit that fixes it is the next thing a host
-// hears about. A first load that fails is reported the same way, and `module`
-// is `null` until something compiles — a host that would rather fail outright
-// on a broken start calls `loadModule` first.
-//
-// What survives a swap, and what does not. Every load evaluates a bundle
-// of its own with a Type key of its own, so a MARSHALLED value — the plain
-// JavaScript `exports` hand over — is as good after the swap as before, and a
-// RAW one is not: it is tagged by the load that built it, and the next load's
-// Functions refuse it by name (see `mintedTypeKeys` in the interpreter). A host
-// keeping state across reloads keeps it on the JavaScript side of the boundary.
-// And a Module once evaluated can not be unloaded — JavaScript has no such door
-// — so every reload leaves the one before it to the garbage collector, which
-// collects it only once nothing holds a value from it any more.
+// Each load evaluates its own bundle with its own Type key, so a marshalled
+// value survives a swap and a raw one is refused (`mintedTypeKeys`). An
+// evaluated Module is never unloaded, only collected once nothing holds it.
 
 export type WatchOptions = LoadOptions & {
-	// Every Module the sources load as — the first, and one more for
-	// every edit that compiles to something new. An edit that compiles to the
-	// same bundle (a save without a change) is not reported.
+	// Called with the first Module and with each edit that compiles to a new
+	// bundle. A save that changes nothing is not reported.
 	onModule: (module: EssenceModule) => void
-	// Every load that does not compile, first or later. Required, because
-	// a watcher that swallowed a failing edit would leave a host running the
-	// Module from before it with nothing to say why the edit did not take.
+	// Called for each load that does not compile, the first one included.
+	// Required, so a failing edit is never silently ignored.
 	onError: (error: EssenceCompileError) => void
-	// How long after the last change to wait before loading, in
-	// milliseconds. Editors write in bursts — a save is often a temporary file
-	// renamed over the original — and a load per event would compile a file
-	// halfway through being written.
+	// How long after the last change to wait before loading, in milliseconds.
+	// Editors write in bursts, and a load per event could read a half-written file.
 	debounce?: number
-	// How often the sources' signatures are read without a directory
-	// event prompting it, in milliseconds; `DEFAULT_POLL` otherwise, and zero
-	// for never. A directory watcher is NOT armed when `fs.watch` returns, and
-	// a busy machine loses the event outright rather than delivering it late —
-	// measured at 4 writes in 30 unreported when made right after the watch
-	// began, and none when they waited 300 ms. The timer finds a save the
-	// platform never mentioned within one tick; the events stay, because a
-	// tick is slow and an event is not.
+	// How often to check the sources without a directory event, in
+	// milliseconds, or zero for never. A watcher is not armed when `fs.watch`
+	// returns, and a busy machine drops events, so polling finds what they miss.
 	poll?: number
 }
 
 export type ModuleWatcher = {
 	// The latest Module that compiled, or `null` before anything has.
 	readonly module: EssenceModule | null
-	// The sources under watch — the graph as of the last load, whether it
-	// compiled or not.
+	// The sources under watch: the graph of the last load, compiled or not.
 	readonly files: ReadonlyArray<string>
-	// Stops watching. Nothing loaded is affected — the last Module stays
-	// as usable as it was — and no listener is called again.
+	// Stops watching. The last Module stays usable, and no listener is called
+	// again.
 	close: () => void
 }
 
@@ -79,18 +54,15 @@ export async function watchModule(
 	let current: EssenceModule | null = null
 	let currentHash: string | null = null
 	let files: Array<string> = []
-	// `mtime:size` per watched file, so that a directory event — which
-	// says only that SOMETHING happened in that directory, and on macOS may name
-	// a temporary file rather than the one it was renamed over — is checked
-	// against the sources themselves before anything is loaded.
+	// `mtime:size` per watched file. A directory event says only that something
+	// in the directory changed, so the sources are checked before a load.
 	let signatures = new Map<string, string>()
 	let watchers = new Map<string, ReturnType<typeof watchDirectory>>()
 	let timer: ReturnType<typeof setTimeout> | null = null
 	let ticker: ReturnType<typeof setInterval> | null = null
 	let loading = false
-	// A change that landed WHILE a load was running. The load in flight
-	// read the sources before it, so it is loaded again once it is done rather
-	// than trusted to have seen it.
+	// A change landed while a load ran, which may have read the sources before
+	// it, so another load follows.
 	let again = false
 	let closed = false
 
@@ -104,10 +76,8 @@ export async function watchModule(
 		}
 	}
 
-	// Only files not seen before. A load takes long enough for a save to
-	// land while it runs, and re-reading a signature already held would adopt
-	// that save as the state everything is compared against — the change would
-	// be watched for and never noticed.
+	// Signs only files not seen before. Re-reading a held signature would adopt
+	// a save that landed during the load, and that change would go unnoticed.
 	async function watchFiles(next: Array<string>): Promise<void> {
 		files = next
 
@@ -119,11 +89,8 @@ export async function watchModule(
 				}),
 		)
 
-		// One watcher per DIRECTORY holding a file of the graph, never
-		// per file: editors rarely write a file in place — many write a
-		// temporary file and rename it over the original, which destroys a
-		// watch on the file itself. A directory watch survives that, and an
-		// import written during the session brings its directory along.
+		// One watcher per directory, since many editors rename a temporary file
+		// over the original, which ends a watch on the file itself.
 		for (let file of next) {
 			let directory = path.dirname(file)
 
@@ -136,21 +103,15 @@ export async function watchModule(
 					void checkForChanges()
 				})
 
-				// A watcher can fail AFTER it was made — the directory
-				// goes away, or the platform runs out of handles — and says so
-				// with an "error" event, which an EventEmitter with no listener
-				// throws as an uncaught exception. That would take the HOST
-				// down for a directory it may not even be editing, so it is
-				// heard and left alone, for the reason the catch below gives.
+				// A watcher that fails later emits "error", which an
+				// EventEmitter with no listener throws as an uncaught exception.
+				// The failure is ignored, as an unwatchable directory is.
 				watcher.on("error", () => {})
 
 				watchers.set(directory, watcher)
 			} catch {
-				// A directory that can not be watched is one whose files
-				// change unnoticed. There is nothing to do about it here that
-				// a host would want done — the load still works, and the next
-				// change to a directory that CAN be watched picks up any edit
-				// made in this one, because every load re-reads every source.
+				// An edit here waits for polling or for a change elsewhere, since
+				// every load re-reads every source.
 			}
 		}
 	}
@@ -166,9 +127,8 @@ export async function watchModule(
 			files.map(async (file) => {
 				let now = await signature(file)
 
-				// A file that went missing is left as it was: the load
-				// that follows a real change reports it, and a rename in
-				// progress reappears under its own name a moment later.
+				// A missing file is skipped. A rename in progress reappears
+				// under its own name, and a real loss is reported by the next load.
 				if (now === "missing" || signatures.get(file) === now) {
 					return
 				}
@@ -235,9 +195,8 @@ export async function watchModule(
 
 	await load()
 
-	// The timer is a fallback and not a reason to stay alive: the
-	// directory watchers hold the process open, and a host that closed them
-	// is one the timer must not keep running.
+	// The poll does not keep the process alive. The directory watchers do,
+	// until `close`.
 	if (poll > 0 && !closed) {
 		ticker = setInterval(() => {
 			void checkForChanges()
