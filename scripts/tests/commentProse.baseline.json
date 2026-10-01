@@ -66,7 +66,6 @@
 	"packages/client/src/tests/typecheck.ts": {"sentence-length": 4, "em-dash": 2, "all-caps": 1, "block-length": 1, "counts": 1},
 	"packages/client/src/tests/undoReplay.spec.ts": {"sentence-length": 9, "em-dash": 5, "all-caps": 24, "position": 1},
 	"packages/client/src/tests/vite.spec.ts": {"sentence-length": 17, "em-dash": 18, "all-caps": 6, "history": 1, "block-length": 2},
-	"packages/client/src/tools/bench.ts": {"sentence-length": 24, "em-dash": 22, "all-caps": 12, "position": 1, "block-length": 4},
 	"packages/compiler/src/analysis.ts": {"sentence-length": 11, "em-dash": 9, "all-caps": 7, "block-length": 2, "counts": 1},
 	"packages/compiler/src/cache/index.ts": {"sentence-length": 27, "em-dash": 19, "all-caps": 12, "position": 3, "block-length": 5, "counts": 1},
 	"packages/compiler/src/cache/snapshot.ts": {"sentence-length": 16, "em-dash": 10, "all-caps": 4, "history": 1, "position": 2, "block-length": 1},
