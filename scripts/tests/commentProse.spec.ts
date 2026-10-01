@@ -215,6 +215,28 @@ describe("Comment Prose", () => {
 			).toEqual(["stacked"])
 		})
 
+		it("should let a file's header follow imports with attributes", () => {
+			let imports = [
+				'import a from "./a.json" with { type: "json" }',
+				'import b from "./b.json" assert { type: "json" }',
+				'import c from "./c.json"',
+				'with { type: "json" }',
+				'import d from "./d"',
+			].join("\n")
+
+			expect(
+				rulesIn(`${imports}\n\n// Header.\n\n// First.\nlet a = 1\n`),
+			).toEqual([])
+		})
+
+		it("should read an assert call on the line after an import as code", () => {
+			expect(
+				rulesIn(
+					'import a from "./a"\nassert(a)\n\n// One.\n\n// Two.\nlet b = 1\n',
+				),
+			).toEqual(["stacked"])
+		})
+
 		it("should find a count of other code", () => {
 			expect(
 				rulesIn("let a = 1\n// Shared by the three callers.\n"),

@@ -216,6 +216,10 @@ export function scanScript(text: string): Scanned {
 	let previous: SyntaxKind | null = null
 	let codeStart = -1
 	let inImport = false
+	let inAttributes = false
+	// The scanner hands a line break over as a token of its own, so it never
+	// reports one before the token that follows.
+	let lineBreak = false
 
 	for (
 		let kind = scanner.scan();
@@ -234,11 +238,16 @@ export function scanScript(text: string): Scanned {
 						? "line"
 						: "block",
 			})
+			lineBreak ||=
+				kind === SyntaxKind.MultiLineCommentTrivia &&
+				scanner.getTokenText().includes("\n")
 
 			continue
 		}
 
 		if (trivia.has(kind)) {
+			lineBreak ||= kind === SyntaxKind.NewLineTrivia
+
 			continue
 		}
 
@@ -264,8 +273,19 @@ export function scanScript(text: string): Scanned {
 		}
 
 		if (codeStart === -1) {
-			if (kind === SyntaxKind.ImportKeyword && !inImport) {
+			if (inAttributes) {
+				inAttributes = kind !== SyntaxKind.CloseBraceToken
+			} else if (kind === SyntaxKind.ImportKeyword && !inImport) {
 				inImport = true
+			} else if (
+				// A module has no `with` statement, so `with` opens attributes
+				// even on the next line. An `assert` there calls a function.
+				(kind === SyntaxKind.WithKeyword ||
+					(kind === SyntaxKind.AssertKeyword && !lineBreak)) &&
+				previous === SyntaxKind.StringLiteral &&
+				!inImport
+			) {
+				inAttributes = true
 			} else if (!inImport && kind !== SyntaxKind.SemicolonToken) {
 				codeStart = scanner.getTokenStart()
 			} else if (kind === SyntaxKind.StringLiteral) {
@@ -278,6 +298,7 @@ export function scanScript(text: string): Scanned {
 		}
 
 		previous = kind
+		lineBreak = false
 	}
 
 	return {
