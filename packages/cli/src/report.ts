@@ -9,10 +9,8 @@ import type { Terminal } from "./terminal"
 import type { Palette, Theme } from "./theme"
 import { visibleLength } from "./theme"
 
-// Every line the CLI prints about a finished compilation is produced
-// here, as strings, so that the shape of the output can be tested without a
-// terminal and so that no command grows its own private way of saying that
-// something succeeded.
+// Every line the CLI prints about a finished compilation, rendered as strings so
+// specs can assert on it without a terminal.
 
 const BAR_WIDTH = 24
 const INDENT = "  "
@@ -37,9 +35,8 @@ export function formatBytes(bytes: number): string {
 	return `${(bytes / (1000 * 1000)).toFixed(2)} MB`
 }
 
-// Roughly two significant digits at every scale, so that a column of
-// durations spanning three orders of magnitude stays readable and a stage that
-// took no measurable time is not reported as having taken exactly zero.
+// About two significant digits at every scale, so a column of durations stays
+// readable and no stage reads as exactly zero.
 export function formatDuration(milliseconds: number): string {
 	if (milliseconds < 1) {
 		return `${milliseconds.toFixed(2)} ms`
@@ -74,9 +71,7 @@ export function countDiagnostics(diagnostics: Array<common.Diagnostic>): {
 	return { errors, warnings }
 }
 
-// An `s` unless the caller says otherwise, which covers every word the
-// report has needed so far and leaves the one that does not — `entry` — a way to
-// say so rather than a rule of its own somewhere else.
+// Adds an `s` unless the caller gives the plural, as `entry` needs.
 export function pluralise(
 	count: number,
 	singular: string,
@@ -93,18 +88,9 @@ function padVisibleStart(text: string, width: number): string {
 	return " ".repeat(Math.max(0, width - visibleLength(text))) + text
 }
 
-// Diagnostics are rendered by the shared Ariadne renderer, the same one
-// the Language Server output is checked against, so a Diagnostic looks
-// identical wherever it is shown.
-//
-// One block per Module, against that Module's own source and under its own
-// name: an excerpt of the importer's text at a dependency's line numbers would
-// point at whatever happens to be written there. What is left over belongs to
-// the compilation rather than to a file — an unreadable entry, a failed bundle
-// — and is rendered against the entry, which is the file the caller named.
-//
-// Each block closes with its own tally, because each is one file's worth
-// of problems. The compilation's total is the headline underneath them all.
+// Diagnostics go through the shared Ariadne renderer, so they look the same in
+// the Language Server. Each Module gets a block against its own source, closed by
+// its tally. The compilation's own Diagnostics render against the entry.
 export function renderDiagnosticsFor(
 	outcome: CompileOutcome,
 	context: ReportContext,
@@ -274,9 +260,8 @@ function warningLine(
 	)}`
 }
 
-// The full report for a single file. The stage breakdown is the point of
-// it — it is the only place the cost of the Compiler's own stages is visible,
-// and it is what makes a slow compilation explainable rather than mysterious.
+// The full report for a single file. Its stage breakdown is the only place the
+// Compiler's own stage costs show.
 export function renderSingleReport(
 	outcome: CompileOutcome,
 	context: ReportContext,
@@ -331,9 +316,8 @@ export function renderSingleReport(
 	return lines.join("\n")
 }
 
-// While watching, a rebuild is one line. The report form would push the
-// previous rebuilds — and the Diagnostics that matter — off the screen after
-// a handful of saves.
+// While watching, a rebuild is one line, so earlier rebuilds and their
+// Diagnostics stay on screen.
 export function renderWatchLine(
 	outcome: CompileOutcome,
 	context: ReportContext,
@@ -368,18 +352,9 @@ export function renderWatchLine(
 	)}`
 }
 
-// What a failed compile stopped short of, or nothing at all where it
-// stopped short of nothing.
-//
-// A stage NAME is only ever said where a stage refused: the file could not be
-// read, or the emitter gave up. The stages that read the source no longer
-// refuse anything — every one of them runs and every one of them reports — so
-// what the reader is holding after an error in their Program is the complete
-// answer, and "stopped while inferring types" would now be a lie about a report
-// the Validator also contributed to.
-//
-// What IS worth saying is that the file the command was going to write was not
-// written. A `check` writes none, and has nothing to add.
+// What a failed compile stopped short of. A stage is named only where it refused
+// to go on, which only reading and the emitter do. Otherwise it says the output
+// was not written, and a `check` says nothing.
 function stoppedLine(outcome: CompileOutcome): string | null {
 	if (outcome.failedStage !== null) {
 		return `stopped while ${stageVerb(outcome.failedStage)}`
@@ -404,8 +379,7 @@ function stageVerb(stage: StageName): string {
 	return verbs[stage]
 }
 
-// The per-file table for a batch. One line each, aligned into columns,
-// so that an unusually large or slow file stands out by shape alone.
+// The per-file table for a batch, aligned so a large or slow file stands out.
 export function renderBatchReport(
 	outcomes: Array<CompileOutcome>,
 	context: ReportContext,
@@ -420,8 +394,7 @@ export function renderBatchReport(
 		0,
 	)
 
-	// `check` produces no output files, so the whole output half of the
-	// table — arrow, path, size — is dropped rather than shown empty.
+	// `check` writes no output, so the output columns are dropped.
 	let emits = outcomes.some((outcome) => outcome.outputFileName !== null)
 	let summary: Array<string> = []
 

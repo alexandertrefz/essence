@@ -17,13 +17,8 @@ export const EXIT_SUCCESS = 0
 export const EXIT_FAILURE = 1
 export const EXIT_USAGE = 2
 
-// The same 2 a usage error exits with, deliberately. `essence test`
-// leaving a `focused` modifier behind is a run that did not do what it was
-// asked to — it ran two tests out of forty — and that is what a usage error is
-// as well: the invocation and the answer do not match. A third number would
-// have to be documented as meaning something a caller can act on differently,
-// and there is nothing different to do: read the message. Both are non-zero,
-// both are not 1, and 1 stays the one code that means "a test failed".
+// The usage error's code, since a leftover `focused` test means the run did not
+// answer what was asked. A failed test keeps its own code.
 export const EXIT_FOCUSED = 2
 
 function emitJSON(
@@ -94,8 +89,8 @@ export async function runBuild(
 		return EXIT_SUCCESS
 	}
 
-	// `--execute` on a batch would interleave the output of several
-	// programs with no way to tell them apart, so only a single build runs.
+	// `--execute` on a batch would interleave several programs' output, so only a
+	// single build runs.
 	if (result.outcomes.length !== 1) {
 		throw new UsageError(
 			"--execute can only run a single file.",
@@ -121,18 +116,9 @@ export async function runCheck(
 	command: CommandSpec,
 	files: Array<string>,
 ): Promise<number> {
-	// WITH the tests section, which no other command outside `essence
-	// test` reads. `check` is the command that answers "is this file correct?",
-	// and a file whose tests do not compile is not — a build drops the section
-	// and would have said nothing, which left the one command a CI runs to be
-	// told about its code silent about a third of the file. It is also what the
-	// editor already types, so the two agree.
-	//
-	// WITHOUT the contract goals, which `essence test --contracts` is
-	// what asks for. A goal is a test to RUN, and synthesizing one costs a
-	// speculative enrichment per Method and a remark about every Method that
-	// could not have one — none of which says anything about whether the file
-	// in hand is correct.
+	// With the tests section, so `check` reports tests that do not compile, as the
+	// editor does. Without contract goals, which are tests to run and say nothing
+	// about whether the file is correct.
 	let result = await compileAll(context, command, files, {
 		emit: false,
 		tests: true,
@@ -161,18 +147,13 @@ export async function runRun(
 		)
 	}
 
-	// Without --out the compiled file is scratch work rather than a build
-	// artefact, and it has no name of its own: it goes into the bundle cache,
-	// under the name that means these exact sources. That leaves the source tree
-	// untouched exactly as a temporary directory did, and it is what makes a
-	// second run of an unchanged Program write nothing and emit nothing — the
-	// file it would have produced is already sitting there.
+	// Without `--out` the bundle is scratch work, kept in the bundle cache under its
+	// sources' key. The source tree stays untouched, and an unchanged Program emits
+	// nothing.
 	let cacheOutput = context.options.out === undefined
 
-	// The bundle outlives the run and the directory it sits in is shared,
-	// so a map written beside it would be a second file nobody clears up — asked
-	// for a map, `run` rides it inside the bundle instead. `--out` names a place
-	// the user chose and keeps the linked default.
+	// The cached bundle outlives the run in a shared directory, so its map rides
+	// inline. `--out` keeps the linked default.
 	let result = await compileAll(context, command, files, {
 		emit: true,
 		cacheOutput,
@@ -181,9 +162,8 @@ export async function runRun(
 
 	printCompilationResult(context, result)
 
-	// --json changes how the compilation is reported, not what `run`
-	// does — the program still executes, and the exit code is still its own,
-	// exactly as the command documents.
+	// `--json` changes how the compile is reported, not what `run` does: the program
+	// still runs and the exit code is its own.
 	if (context.options.json) {
 		emitJSON(context, result, "run")
 	}
@@ -192,10 +172,8 @@ export async function runRun(
 		return EXIT_FAILURE
 	}
 
-	// `--out` may name a directory, and without one the name is the
-	// cache's — so what runs is the bundle the Compiler actually wrote, which is
-	// what the outcome reports. An emit that succeeded always reports one, which
-	// is what the failures above have already established.
+	// Runs the file the Compiler wrote, since `--out` may be a directory and without
+	// it the name is the cache's. A successful emit always reports one.
 	let compiledFileName = result.outcomes[0]?.outputFileName ?? null
 
 	if (compiledFileName === null) {
