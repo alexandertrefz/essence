@@ -2923,7 +2923,7 @@ describe("Validator", () => {
 
 		// `isBetween` is `Orderable`'s provided Method. Its conjunct is keyed
 		// under `Integer`, the Namespace whose conformance put it in reach.
-		it("should admit a predicate the covering Namespace answered", () => {
+		it("should admit a predicate a Protocol provides to the base's Namespace", () => {
 			expect(
 				diagnosticsOfBody(`
 					function placed(_ digit: Digit) -> Integer {
