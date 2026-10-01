@@ -302,22 +302,26 @@ describe("Dictionary additions", () => {
 			])
 		})
 
-		// A lookup falls through to the scan path only while the store counts
-		// unencoded slots, so a sorted answer carries that count over.
+		// An Algebraic has no canonical encoding, so the sorted answer finds its
+		// slot by the scan path, beside a key that encodes.
 		it("carries an unencodable key over", async () => {
 			expect(
 				await run(`implementation {
-					constant runs = [[2, 1] = "second", [1, 3] = "first"]
+					constant runs: Dictionary<Number, String> = [3::squareRoot() = "second", 1 = "first"]
 					constant ordered = runs::sort()
 
 					Terminal.inspect(ordered::values()::toString())
-					Terminal.inspect(ordered::value(at [2, 1]))
-					Terminal.inspect(ordered::hasKey([9]))
+					Terminal.inspect(ordered::value(at 3::squareRoot()))
+					Terminal.inspect(ordered::hasKey(5::squareRoot()))
+					Terminal.inspect(ordered::hasKey(1))
+					Terminal.inspect(ordered::set(3::squareRoot(), to "again")::length())
 				}`),
 			).toEqual([
 				'"[\\"first\\", \\"second\\"]"',
 				'Optional#Value("second")',
 				"false",
+				"true",
+				"2",
 			])
 		})
 
