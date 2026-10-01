@@ -13,10 +13,8 @@ import {
 } from "../testing/benchmarks"
 import { type BenchmarkRecord, collectBenchmarks } from "../testing/index"
 
-// Where a measurement is kept between two runs, and what survives the
-// round trip — because a baseline is worth exactly what can be read back out of
-// it. The snapshot companion beside it is `snapshotFiles.spec.ts`, and the two
-// files answer the same questions on purpose.
+// Where a measurement is kept between two runs, and what survives the round
+// trip. `snapshotFiles.spec.ts` asks the same questions of the snapshot file.
 
 function record(
 	overrides: Partial<BenchmarkRecord> & { key: string },
@@ -73,9 +71,8 @@ describe("The benchmark companion file", () => {
 		expect(parseBenchmarkFile(printBenchmarkFile(entries))).toEqual(entries)
 	})
 
-	// The format is line-oriented, so a line break in a key is the one
-	// character that could take the file apart — it escapes like a String
-	// Literal's, and the file stays one entry per line whatever the name says.
+	// The format is one entry per line, so a line break in a key escapes the
+	// way it does in a String Literal.
 	it("escapes a line break in a key and reads it back", () => {
 		let entries = { "first\nsecond": 7, "returns\rcarried": 8 }
 		let written = printBenchmarkFile(entries)
@@ -105,9 +102,8 @@ describe("The benchmark companion file", () => {
 		expect(parseBenchmarkFile("§ just a comment\n")).toEqual({})
 	})
 
-	// A file somebody edited into a shape the format does not have is read
-	// for whatever it still says, rather than refused. What is lost is a
-	// baseline, which the next measuring run records again.
+	// A hand-edited file is read for whatever it still says rather than
+	// refused. What is lost is a baseline, which the next run records again.
 	it("steps over an entry with no time under it", () => {
 		expect(
 			parseBenchmarkFile(
@@ -145,8 +141,8 @@ describe("Reading and writing what a run measured", () => {
 		})
 	})
 
-	// A run narrowed by a filter has not measured everything, and deleting
-	// what it did not visit would lose a baseline for the price of a `-f`.
+	// A run narrowed by a filter has not measured everything, so the
+	// baselines it did not visit stay.
 	it("lays what it recorded over what it read, keeping the rest", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -174,9 +170,8 @@ describe("Reading and writing what a run measured", () => {
 		})
 	})
 
-	// Only a measurement that was RECORDED is written. One that matched
-	// changed nothing, one that improved is news the report carries and a
-	// baseline nobody asked to move, and one that regressed is the failure.
+	// Only a `written` measurement moves a baseline. An improved one is news
+	// for the report, and a regressed one is the failure.
 	it("writes nothing for a measurement that was not recorded", async () => {
 		await withDirectory(async (directory) => {
 			let module = path.join(directory, "Season.es")
@@ -196,9 +191,8 @@ describe("Reading and writing what a run measured", () => {
 
 	it("says so where a file could not be written", async () => {
 		await withDirectory(async (directory) => {
-			// A FILE where the companion directory has to go, so the
-			// directory can not be made — the plainest way to be refused by the
-			// filesystem without asking anything of the permissions.
+			// A file stands where the companion directory has to go, so the
+			// filesystem refuses without depending on permissions.
 			let module = path.join(directory, "Season.es")
 
 			mkdirSync(path.dirname(benchmarkFileOf(module)), {
@@ -245,8 +239,8 @@ describe("Reading and writing what a run measured", () => {
 	})
 })
 
-// What the fold hands the writer. The one rule worth its own spec is the
-// refusal: a measurement whose test then failed is not a baseline.
+// What the fold hands the writer: a measurement whose test then failed is
+// not a baseline.
 describe("Collecting what a run measured", () => {
 	const measured = {
 		schema: 1 as const,

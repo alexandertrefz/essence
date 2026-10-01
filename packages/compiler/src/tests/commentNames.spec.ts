@@ -4,28 +4,26 @@ import * as path from "node:path"
 
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
-// A comment that names code by a name nothing declares sends its reader
-// looking for a Function, a Type or a Method label that is not there. A rename
-// leaves such names behind: the code moves on and the note above it keeps the
-// old spelling. So every name a comment quotes in backticks is looked for in the
-// code of every tracked source file: TypeScript, JavaScript, Astro and Essence.
+// A comment that quotes a name nothing declares sends its reader looking for
+// a Function, a Type or a Method label that is not there. A rename leaves
+// such names behind. So every name a comment quotes in backticks is looked for
+// in the code of every tracked TypeScript, JavaScript, Astro and Essence file.
 //
-// A quoted name is checked when it is written the way code names are: a word of
-// letters with both capitals and lowercase in it, so `describeType` and `List`
-// are checked and `slice`, `NFC` and `ok_3f_` are not. A lowercase word reads
-// the same as an English one, and a name with a digit, an underscore or a `$`
-// in it is a generated one or an example. Such words join with `.`, `::` and
-// `#`, and a selector such as `everyItem(where:)` holds each label to the
-// labels a Method of that name is declared or called with.
+// A quoted name is checked when it is written the way code names are: letters
+// only, with both capitals and lowercase. So `describeType` and `List` are
+// checked, and `slice`, `NFC` and `ok_3f_` are not. A lowercase word reads like
+// an English one, and a name with a digit, an underscore or a `$` is generated
+// or an example. Such words join with `.`, `::` and `#`. A selector such as
+// `everyItem(where:)` holds each label to the labels a Method of that name is
+// declared or called with.
 //
-// A name counts as present when it is written anywhere outside a comment: in
-// code, in a String (the Essence programs the specs compile are Strings), or as
-// the name of a tracked file.
+// A name counts as present when code, a String or a tracked file's name spells
+// it. The specs' Essence programs are Strings.
 //
 // A failure names the file and line of each name the code lacks. Correct the
-// comment to name what the code has now, or take the name out. A name from
-// outside this repository, or one a note writes for what the code does not
-// have, belongs in `OUTSIDE_NAMES` or `ABSENT_NAMES` with its reason.
+// comment, or take the name out. A name from outside this repository goes in
+// `OUTSIDE_NAMES`, and one a note writes for what code lacks goes in
+// `ABSENT_NAMES`, each with a reason.
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "../../../..")
 
@@ -54,11 +52,10 @@ const OUTSIDE_NAMES = new Map([
 	["mapError", "Elm's name for the transform on a failure"],
 ])
 
-// Names a comment writes for what the code does NOT have: an alternative
-// a design note weighs and turns down, a slip a Diagnostic is shown, a name in
-// an example Program. An entry written as a selector allows that one label.
-// What the code USED TO have is not one of these. A note says why the code is
-// as it is now, so a removed name comes out of it.
+// Names a comment writes for what the code does not have. Examples are an
+// alternative a note turns down, a slip a Diagnostic is shown, or a name in an
+// example Program. An entry written as a selector allows that one label. A
+// name the code has dropped is not one of these: it comes out of the comment.
 const ABSENT_NAMES = new Map([
 	["Age", "the refined Type in `makeGeneratable.ts`'s example"],
 	["Binary", "a Case of the base Choice `Integer.es` turns down"],
@@ -361,9 +358,9 @@ export function scanScript(file: string, source: string): Scanned {
 	return { runs, code: code.join("") }
 }
 
-// An Essence source. `§` opens a Comment that runs to the end of its line,
-// and a String runs from `"` to `"` with its interpolation holes in between,
-// whose code can hold a String of its own.
+// An Essence source. `§` opens a Comment that runs to the end of its line. A
+// String runs from `"` to `"`, and the code in its interpolation holes can hold
+// a String of its own.
 export function scanEssence(file: string, source: string): Scanned {
 	let runs: Array<CommentRun> = []
 	let code: Array<string> = []
@@ -470,10 +467,10 @@ export function scanEssence(file: string, source: string): Scanned {
 	return { runs, code: code.join("") }
 }
 
-// An Astro component is TypeScript between its `---` fences and inside
-// its `<script>` elements, and markup everywhere else. The markup's comments are
-// the `/* */` blocks its expressions and styles hold; the rest of it is read as
-// code, because its expressions name the frontmatter's bindings.
+// An Astro component is TypeScript between its `---` fences and inside its
+// `<script>` elements, and markup everywhere else. The markup's comments are the
+// `/* */` blocks in its expressions and styles. The rest is read as code, since
+// its expressions name the frontmatter's bindings.
 export function scanAstro(file: string, source: string): Scanned {
 	let script = source.replace(/[^\n]/g, " ").split("")
 	let markup = source.split("")
@@ -516,9 +513,8 @@ export function scanAstro(file: string, source: string): Scanned {
 
 const scannedExtensions = /\.(?:[cm]?[jt]sx?|es|astro)$/
 
-// A generated file's comments are written by its generator, whose own
-// comments are the ones to hold; its code still counts, since other files'
-// comments name what it declares.
+// A generated file's comments come from its generator, whose own comments are
+// the ones checked. Its code still counts, since other comments name it.
 const generatedFile = /\.generated\.ts$/
 
 async function trackedFiles(): Promise<Array<string>> {
@@ -1056,10 +1052,8 @@ describe("Names Comments Quote", () => {
 	})
 
 	it("should find names to check", async () => {
-		// A guard on the scanners. The checks that follow pass on an
-		// empty report, so a scanner that read no file, or that found no
-		// comment in the files it read, would make this whole file a no-op
-		// that nobody notices.
+		// The other checks pass on an empty report, so a scanner that read no
+		// file or found no comment would make them pass unnoticed.
 		let { fileCount } = await readRepository()
 		let { quotedCount, checkedCount, selectorCount } = await danglingNames()
 
@@ -1073,9 +1067,8 @@ describe("Names Comments Quote", () => {
 		expect(reportOf((await danglingNames()).findings)).toBe("")
 	})
 
-	// An allowed name no comment quotes any more, or one the code now
-	// writes, allows nothing, and it would allow the next stale reference
-	// that happened to spell it.
+	// An allowed name no comment quotes, or one the code writes, allows
+	// nothing except the next stale reference that happens to spell it.
 	it("should allow only names a comment quotes and the code lacks", async () => {
 		let { allowedInUse } = await danglingNames()
 
