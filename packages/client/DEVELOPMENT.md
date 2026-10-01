@@ -205,3 +205,90 @@ pass with no watcher.
 The runtime has no `onStart` and no hook that reports a changed file, so the plugin checks for itself. It remembers
 every source it served by size and time. Each load first asks the filesystem which of them moved, and invalidates
 those. Under `Bun.build` the same check finds nothing moved, at the cost of a `stat` per source.
+
+## Declaration files
+
+`generateDeclarations` in `dts.ts` prints a Module as TypeScript from the Descriptor the interpreter marshals by. Every
+rule a value crosses by is written once, on the compiler's side, and a declaration file reads it in the other language.
+
+There are two views, because a bundler serves two doors into one Module. The wrapper hands over JavaScript, which the
+`javascript` view declares. Behind it, `?raw` serves the emitted Module itself, which the `bundle` view declares. A
+generated file has to describe the module it stands beside, so the view follows from the door.
+
+The `bundle` view declares only what the emitted Module binds. Types, Choices and Protocols are erased before anything
+is emitted, and an Overload set binds each Overload under a name of its own. Every value there is an opaque
+`EssenceValue`, declared in the file itself rather than imported, so the file needs nothing from this package. A
+Namespace member is declared under its emitted name, since a member called `prototype` or `constructor` is bound under
+a mangled one.
+
+### Directions
+
+A position's Type depends on which way a value crosses it: in, as an Argument, or out, as a constant or an answer.
+Coming out, a value says what it is. Going in, it has to be built against what the Module declared. So what the
+interpreter can not build, such as a Type Parameter, is `never` on the way in and ordinary on the way out.
+`inputRefusal` prints that `never` with the interpreter's own sentence beside it. A call the interpreter would refuse
+then fails to typecheck instead.
+
+The direction travels down through everything a position holds, and a Function turns it around. A Function coming out
+is called by the host, so its Parameters go in and its answer comes out. A callback going in is called by the Module,
+so its Parameters come out and its answer goes in. Either way it is wrapped to marshal around its calls, so the
+printed signature is the one its holder really calls.
+
+The in-form is wider where an Integer is reachable without a Function in the way. An Integer is the one leaf the
+interpreter takes more of than it gives back. `widensOnInput` finds such a Type, and a named one is printed as
+`Input<Name>` at a Parameter. A Record member the callee fills in with a default may be left out going in. It is
+always there coming out, so it carries `?` only in the in-form.
+
+### Naming
+
+A Type the Module exports under a name of its own is looked up by `shown`, the Type as the compiler printed it. That
+is the one identity that survives a Descriptor being written down. Two Types that print alike are one Type to
+TypeScript anyway, since it compares by shape. Printing the name makes a generated file read like its source.
+
+A Type Alias is declared once, in its out-form. `crossesDifferently` decides whether a Parameter may still go by the
+name. Where the two directions print differently, the shape is spelled out at the Parameter instead. A callback member, a
+nested `Optional` and a member with a default all differ. The difference then lands on the member it belongs to.
+Refusals are asked before the names, so an alias for a callback is refused where it is passed in.
+
+### Unions and Cases
+
+An `Optional` is spelled by absence: `#Value` is its item and `#Empty` is `undefined`. A Union's arms print in
+declaration order without duplicates, so `Optional<Integer> | Integer` is one `bigint`. An `Optional` inside a Union
+adds its item and one `undefined`, however deep it sits.
+
+A Union that puts two bare Cases, or a bare Case and a String, in one position prints as `never` with the reason.
+TypeScript would read `"Up" | string` as `string`, a position the interpreter refuses entirely. The refusal stands
+inline where the mistake is, since such a Union may be a Record member or a callback's answer.
+`OVERLOADED_NOTICE` precedes its declaration instead, because an Overload set is refused as a whole export.
+
+Every other Case carries `$case`: the Choice as declared, and the Case's name. A Case of a unit Choice prints as the
+string literal of its bare name in both directions. The boundary also takes the qualified `"Direction#Up"` going in,
+but a declaration states the one spelling a caller should write.
+
+A Choice is declared twice under one name: the Type a value has, and the object its Cases are spelled through. A host
+writes `Shape.Circle({ radius: 3n })` and annotates it `Shape`. A Case constructor is a spelling: `caseConstructors`
+copies the payload with the tag added and marshals nothing. So its declaration is generic, taking any payload the
+boundary accepts and answering that payload with the tag. `Shape.Circle({ radius: 3 })` is then an `Input<Shape>`,
+since it holds a number until it crosses. The Type Parameter is named `Payload_`, and no Essence name holds an
+underscore, so it shadows nothing. Only a bare Case is `readonly`. The table is frozen either way, but a bare string is
+the one member a reader might take for a slot rather than a name.
+
+A Namespace leaves out a Case whose name it also declares, because `bindNamespace` lets the Namespace's own member
+replace the constructor.
+
+### Work
+
+Work crosses only as a call's answer. `printAnswer` prints a `Future<T>` there as `Promise<T>`, and `printBody` prints
+work anywhere else as `never` with the reason. A `Started<T>` comes out as a promise too, but has no way in: a host
+callback has nothing to start the Module's work with. A callback that answers a Future is declared to answer
+`Promise<T>`, not `Promise<T> | T`, although the boundary takes either.
+
+### Parameters
+
+TypeScript allows `?` only on a trailing run of Parameters. Essence lets a Parameter with a default stand before a
+required one when labels tell them apart. There the positional declaration keeps the Parameter required, as
+`T | undefined`, which a positional JavaScript call has to pass. The labelled form marks it optional. It is declared
+exactly where `labelsOf` lets the interpreter answer a labelled call.
+
+A Parameter is named by its label. A `_` Parameter has none, and a label TypeScript would misread, such as `first?`, is
+no better. Both fall back to `p` and the position, prefixed with `_` until no other Parameter has that name.

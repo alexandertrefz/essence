@@ -12,47 +12,26 @@ import type {
 import { labelsOf, lastRequiredIndex } from "./marshal-runtime"
 import { isTypeName, isValueName, mangled, memberName } from "./names"
 
-// A Module as TypeScript, printed off the same Descriptor the interpreter
-// marshals by. That is the whole point of it being a Descriptor: every rule a
-// value is decided by was written down once, on the Compiler's side of the seam,
-// and a declaration file is that same writing read as the other language. An
-// Integer comes out as a `bigint` and says `bigint`, and goes in as a `bigint`
-// or a safe `number` and says so; an `Optional<T>` collapses to `T | undefined`
-// in both, because there is only one node to collapse.
-//
-// There are TWO views of a Module, because a bundler serves two doors into
-// one. The wrapper the plugin emits hands over JavaScript — that is the
-// `javascript` view, and the whole of the mapping table. Behind it, `?raw` serves
-// the emitted Module itself: Essence's own values, under the names the Rewriter
-// emitted them as — that is the `bundle` view, where every value is opaque. A
-// generated declaration file has to describe the module it sits next to, so which
-// of the two is asked for is not a matter of taste.
+// A Module as TypeScript, printed from the Descriptor the interpreter marshals
+// by. See "Declaration files" in DEVELOPMENT.md.
 
 export type DeclarationView = "javascript" | "bundle"
 
 export type DeclarationOptions = {
 	view?: DeclarationView
-	// What the header says the declarations came from — a file name, for a
-	// reader who found the file without the Module.
+	// The file name the header says the declarations came from.
 	moduleName?: string
-	// Where `EssenceRational` is imported from — the one name a generated
-	// file borrows, and only in the `javascript` view. The package itself by
-	// default; a path, where a generated file has to resolve from somewhere the
-	// package name does not reach.
+	// Where the `javascript` view imports the names it borrows from: the
+	// package by default, or a path where the package name does not resolve.
 	clientSpecifier?: string
-	// The Types the Module exports under names of their own, which a
-	// `ModuleDescriptor` deliberately does not carry — nothing at run time reads
-	// a Type Alias. Without them a declaration is still true, it just spells
-	// every shape out where the source had a name for it.
+	// The Types the Module exports by name, which a `ModuleDescriptor` does not
+	// carry. Without them every shape is spelled out.
 	types?: ReadonlyArray<DeclaredType>
 }
 
 const DEFAULT_CLIENT_SPECIFIER = "@essence-lang/client"
 
-// Past this, a declaration is broken onto one line per member or per arm.
-// A Namespace of eight Methods and a Choice of three payloads are the shapes
-// that need it — either on one line is the one thing a reader of a generated
-// file can not skim.
+// Past this width a declaration takes one line per member or per arm.
 const SINGLE_LINE_WIDTH = 80
 
 export function generateDeclarations(
@@ -81,15 +60,9 @@ export function generateDeclarations(
 	return `${[...preamble, ...blocks].join("\n\n")}\n`
 }
 
-// The names this file declares of its own, which is what a name BORROWED
-// from this package has to stay clear of — a Module exporting `EssenceRational`
-// beside a Rational would otherwise be an import and a declaration of one name,
-// which TypeScript refuses outright and takes the whole declaration file with it.
-//
-// Both views' names, gathered whichever one is being written. It costs a
-// walk of the exports and buys never having to remember which view declares
-// what, and a name that is free in one view and taken in the other is a name
-// worth stepping around in both.
+// The names the file declares, which a name borrowed from this package must
+// avoid. A Module may export its own `EssenceRational`, and TypeScript refuses an
+// import and a declaration of one name. Both views' names count.
 function declaredNames(
 	descriptor: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
@@ -115,11 +88,7 @@ function declaredNames(
 	return names
 }
 
-// How a name this package owns is spelled INSIDE a generated file: as
-// itself where nothing else claims it, and `$`-prefixed until it is free where
-// something does. Aliasing only on a collision is deliberate — a generated file
-// is read far more often than it is generated, and `EssenceRational` reads
-// better than `$EssenceRational` in every file that has no reason to avoid it.
+// A borrowed name is spelled as itself, or prefixed with `$` until it is free.
 function createBorrower(declared: ReadonlySet<string>): {
 	borrow: (name: string) => string
 	imports: () => Array<string>
@@ -176,9 +145,8 @@ function header(view: DeclarationView, moduleName: string | undefined): string {
 
 // #region The JavaScript view
 
-// The Types first and the values after — the order a reader wants, and the
-// order a hand written declaration file is written in. TypeScript hoists both,
-// so nothing here depends on it.
+// The Types first and the values after, as a reader expects. TypeScript
+// hoists both, so the order is for the reader alone.
 function javascriptBlocks(
 	descriptor: ModuleDescriptor,
 	types: ReadonlyArray<DeclaredType>,
@@ -187,8 +155,7 @@ function javascriptBlocks(
 	let blocks: Array<string> = []
 
 	for (let declared of types) {
-		// A Type Alias is reachable only under the name it was written
-		// with, and TypeScript has no spelling for one it can not write as an
+		// TypeScript can not declare a Type under a name that is not an
 		// identifier.
 		if (!isTypeName(declared.name)) {
 			continue
@@ -224,11 +191,8 @@ function javascriptBlocks(
 
 // #region The bundle view
 
-// What the emitted Module actually binds, and nothing it does not: a Type,
-// a Choice and a Protocol are erased before a byte is emitted, so a declaration
-// for one would name an export that is not there. An Overload set binds no name
-// of its own either — each Overload is its own `name__overload$N`, and those are
-// the names a call can reach.
+// Only what the emitted Module binds. Types, Choices and Protocols are erased,
+// and an Overload set binds each Overload under a name of its own.
 function bundleBlocks(
 	descriptor: ModuleDescriptor,
 	walker: Walker,
@@ -258,11 +222,8 @@ function bundleBlocks(
 	}
 
 	return [
-		// Declared here rather than imported. These declarations sit beside
-		// a `.es` file in somebody else's project, and the one thing they need
-		// from this package is a single word for "opaque" — importing it would
-		// make a generated file depend on a package a build that only ever used
-		// the plugin need not have installed.
+		// Declared rather than imported, so the file needs nothing from this
+		// package.
 		[
 			"// An Essence value as JavaScript holds it — deliberately opaque. It",
 			"// carries its Type on a Symbol the runtime mints, and reading one apart",
@@ -277,28 +238,12 @@ function bundleBlocks(
 
 // #region The walker
 
-// Which way a value at this position CROSSES — into the Module as an
-// Argument, or out of it as a constant or an answer. The two are not the same
-// Type, because the boundary is not symmetric: coming out a value says what it
-// is, and going in it has to be BUILT against what the Module declared. What the
-// interpreter has no way to build is therefore uninhabited on the way in and
-// perfectly ordinary on the way out — a Type Parameter is the clearest case.
-//
-// It travels DOWN through everything a position carries, and a Function is
-// the one shape that turns it around: whoever holds a Function passes its
-// Parameters and reads its answer, so a callback going in is handed values that
-// are coming out.
+// Which way a value crosses a position: in as an Argument, or out as a constant
+// or an answer. See "Directions" in DEVELOPMENT.md.
 type Direction = "in" | "out"
 
-// The Descriptors nothing may be passed to, as the one TypeScript Type
-// nothing is assignable to. `never` is not a shrug: it makes the call the
-// interpreter would throw on fail to typecheck instead, which is the whole reason
-// an Overload set is already declared this way.
-//
-// A `refused` node carries the sentence the interpreter throws, so the
-// refusal a reader is shown and the refusal a caller would have been given are
-// one string. The rule below is the interpreter's own, stated where the
-// Descriptor has a shape rather than a refusal to carry it.
+// The Descriptors nothing may be passed to, as `never`, with the sentence the
+// interpreter would throw. A call it would refuse then fails to typecheck.
 function inputRefusal(node: Descriptor): string | null {
 	let item = optionalItem(node)
 
@@ -309,21 +254,8 @@ function inputRefusal(node: Descriptor): string | null {
 	return node.kind === "refused" ? `never /* ${node.why} */` : null
 }
 
-// The one refusal that lands on BOTH directions at once, and the one this
-// file can not simply print the arms of. A unit Choice's Case crosses as its
-// bare name, so a Union holding one beside a `String` — or beside another
-// Choice's Case of the same name — has arms TypeScript would read as one:
-// `"Up" | string` collapses to `string`, and a declaration printed that way
-// would promise a position that takes any string at all while the interpreter
-// refuses every value there. `never` is the only spelling that admits exactly
-// the calls that work, which is none.
-//
-// Inline, rather than hoisted above the declaration the way
-// `OVERLOADED_NOTICE` is. An Overload set is a refusal about the EXPORT and has
-// no position inside a Type to stand at; this is a refusal about one position,
-// and the Union is as likely to be a Record's member or a callback's answer as
-// it is to be the whole of a Parameter — so the reason goes where the mistake
-// is, exactly as the nested-Optional refusal already does.
+// A Union with no unambiguous spelling, refused in both directions and inline.
+// See "Unions and Cases" in DEVELOPMENT.md.
 function unionRefusal(node: Descriptor): string | null {
 	let collision = bareCaseCollision(node)
 
@@ -332,13 +264,9 @@ function unionRefusal(node: Descriptor): string | null {
 		: `never /* '${node.shown}' has no unambiguous JavaScript spelling — ${collision}. Crossing one throws. */`
 }
 
-// Whether this Descriptor's two directions are printed DIFFERENTLY. What it
-// decides is whether an in-position use may go by NAME: a Type Alias is declared
-// once, in its out-form, so naming it at a Parameter is the claim that a value
-// going in has the same shape as one coming out. Where that is false — a refusal
-// three levels down, a callback member, whose own directions turn around — the
-// shape is spelled out at the Parameter instead, which puts the difference on the
-// member it belongs to rather than on the name.
+// Whether the two directions print differently, in which case a Parameter
+// spells the shape out rather than naming its alias. See "Naming" in
+// DEVELOPMENT.md.
 function crossesDifferently(node: Descriptor): boolean {
 	if (inputRefusal(node) !== null) {
 		return true
@@ -347,10 +275,8 @@ function crossesDifferently(node: Descriptor): boolean {
 	switch (node.kind) {
 		case "list":
 		case "optional":
-		// Work prints one way as an answer and another way everywhere
-		// else, which is a difference between POSITIONS rather than between the
-		// two directions — so what decides this is what it holds, exactly as for
-		// a List.
+		// Work prints differently by position, not by direction, so what it
+		// holds decides.
 		case "future":
 		case "started":
 			return crossesDifferently(node.of)
@@ -358,12 +284,7 @@ function crossesDifferently(node: Descriptor): boolean {
 			return (
 				crossesDifferently(node.key) || crossesDifferently(node.value)
 			)
-		// A member the callee fills in is the plainest case there is of a
-		// Type whose two directions differ — one going in may leave it out, one
-		// coming out never lacks it — so the Record is spelled out where it is
-		// passed instead of going by the name it is declared under, and the `?`
-		// lands on the member rather than on the declaration every other use of
-		// that Type shares.
+		// A member the callee fills in may be left out going in only.
 		case "record":
 			return Object.values(node.members).some(
 				(member) =>
@@ -376,10 +297,7 @@ function crossesDifferently(node: Descriptor): boolean {
 			)
 		case "union":
 			return node.arms.some(crossesDifferently)
-		// A Function turns its own directions around — whoever holds it
-		// passes its Parameters and reads its answer, and which side that is
-		// depends on which way the Function itself crossed. So it prints
-		// differently exactly where anything it carries does.
+		// A Function prints differently where anything it carries does.
 		case "function":
 			return (
 				node.parameters.some((parameter) =>
@@ -391,13 +309,9 @@ function crossesDifferently(node: Descriptor): boolean {
 	}
 }
 
-// Whether a Type's IN-form is wider than its declaration — which is so
-// exactly where an Integer is reachable without a Function in the way, since
-// that is the one leaf the interpreter takes more of than it gives back. A named
-// Type that widens is still spelled by its name at a Parameter, wrapped in the
-// package's own `Input<…>`, so the alias survives and the widening is stated
-// once, in a mapped Type, rather than spelled out at every place it is passed.
-// A Function does not widen: see `Input`.
+// Whether the in-form is wider than the declaration, which is so where an
+// Integer is reachable without a Function in the way. A named Type that widens
+// is printed as `Input<Name>` at a Parameter.
 function widensOnInput(node: Descriptor): boolean {
 	switch (node.kind) {
 		case "integer":
@@ -424,10 +338,8 @@ function widensOnInput(node: Descriptor): boolean {
 	}
 }
 
-// What an `Optional` holds, or `null` where this is not one. The pair
-// collapses to a node of its own; a lone `#Value` is met where a `constant thing
-// = Optional<Integer>#Value(3)` was inferred as the Case rather than as the
-// Union an annotation would have named.
+// What an `Optional` holds, or `null`. A lone `#Value` appears where a constant
+// was inferred as the Case rather than the Union.
 function optionalItem(node: Descriptor): Descriptor | null {
 	switch (node.kind) {
 		case "optional":
@@ -452,10 +364,7 @@ function optionalItem(node: Descriptor): Descriptor | null {
 	}
 }
 
-// Whether `undefined` is a value of this Descriptor — which is exactly
-// whether an `Optional`'s `#Empty` is reachable in it. What it decides is whether
-// an `Optional` is about to be put inside another one, and both levels spelled as
-// nothing.
+// Whether an `Optional`'s `#Empty`, and so `undefined`, is reachable here.
 function admitsAbsence(node: Descriptor): boolean {
 	switch (node.kind) {
 		case "optional":
@@ -469,10 +378,8 @@ function admitsAbsence(node: Descriptor): boolean {
 	}
 }
 
-// An export the BUNDLE binds a name for. Two do not: an Overload set,
-// whose Overloads each bind one instead, and a Choice, which binds nothing at
-// all — so the bundle view takes the first apart and leaves the second out
-// before it asks for a declaration.
+// An export the bundle binds a name for. An Overload set's Overloads bind names
+// of their own, and a Choice binds nothing.
 type BoundExport = Exclude<
 	ExportDescriptor,
 	{ kind: "overloaded" } | { kind: "choice" }
@@ -482,8 +389,7 @@ type Walker = {
 	aliasDeclaration: (name: string, node: Descriptor) => string
 	valueDeclaration: (name: string, entry: ExportDescriptor) => string
 	emittedDeclaration: (name: string, entry: BoundExport) => string
-	// One Overload of a set, which is a signature and no export at all —
-	// the set is the export, and only its members are bound in the bundle.
+	// One Overload of a set, which the bundle binds but does not export by itself.
 	emittedFunction: (
 		name: string,
 		emitted: string,
@@ -495,12 +401,8 @@ function createWalker(
 	types: ReadonlyArray<DeclaredType>,
 	borrow: (name: string) => string,
 ): Walker {
-	// The Types this Module exports under a name of their own, keyed by
-	// the Type as the Compiler PRINTS it — which is the one identity that
-	// survives a Descriptor being written down. Printing the name rather than
-	// the shape is what makes a generated file read like the source it came
-	// from, and two Types that print alike are the same Type to TypeScript
-	// anyway, since it decides by shape.
+	// The Types the Module exports by name, keyed by `shown`. See "Naming" in
+	// DEVELOPMENT.md.
 	let named = new Map<string, string>()
 
 	for (let declared of types) {
@@ -510,9 +412,8 @@ function createWalker(
 	}
 
 	function print(node: Descriptor, direction: Direction): string {
-		// Ahead of the naming table, so that a Type Alias for a callback —
-		// `type Handler = (_ Integer) -> Integer` — is refused where it is passed
-		// IN rather than named there and declared callable somewhere else.
+		// Before the names, so an alias for a callback is refused where it is
+		// passed in.
 		if (direction === "in") {
 			let refusal = inputRefusal(node)
 
@@ -521,11 +422,7 @@ function createWalker(
 			}
 		}
 
-		// By name only where the name tells the truth. A declaration is
-		// printed once, in its out-form, and a Type whose in-form differs — a
-		// callback among its members, a nested Optional — is spelled out at the
-		// Parameter instead, so the refusal lands on the member that is the
-		// mistake.
+		// By name only where the name is true in this direction.
 		let alias = named.get(node.shown)
 
 		if (
@@ -540,15 +437,10 @@ function createWalker(
 		return printBody(node, direction)
 	}
 
-	// The shape itself, with the naming table skipped — what a Type Alias'
-	// own declaration prints, since looking the name up there would declare it as
-	// itself.
+	// The shape without the naming table, as an alias's own declaration needs.
 	function printBody(node: Descriptor, direction: Direction): string {
 		switch (node.kind) {
-			// One kind out — a `bigint` at every size, so a call's Type does
-			// not depend on how big its answer was — and either kind in, because
-			// the interpreter hands a safe `number` to the runtime's own
-			// canonicaliser as readily as a `bigint`. See `Input`.
+			// A `bigint` out at every size, and a safe `number` too going in.
 			case "integer":
 				return direction === "in" ? "bigint | number" : "bigint"
 			case "string":
@@ -559,10 +451,8 @@ function createWalker(
 				return borrow("EssenceRational")
 			case "list":
 				return `Array<${print(node.of, direction)}>`
-			// A `Map` at every key Type, which is the whole of what a
-			// Dictionary is on this side — and a unit Choice's Case among the
-			// keys is the literal union its Case names already print as, so
-			// `Map<"Up" | "Down", bigint>` is what a reader is offered.
+			// A `Map` at every key Type. Bare Case keys print as string literals,
+			// as in `Map<"Up" | "Down", bigint>`.
 			case "dictionary":
 				return `Map<${print(node.key, direction)}, ${print(
 					node.value,
@@ -575,50 +465,26 @@ function createWalker(
 			case "optional":
 			case "union":
 				return unionParts(node, direction).join(" | ")
-			// A Function crosses BOTH ways, and its own two directions are
-			// the reverse of whichever way it crossed. One coming out is called
-			// by the host, so its Parameters are values passing IN and its
-			// answer one coming OUT; one going in is called by the MODULE, so
-			// its Parameters are the Module's own values coming OUT and its
-			// answer is a value passing IN. Either way it is wrapped to marshal
-			// around its calls, so the signature printed here is the one whoever
-			// holds it really calls.
-			//
-			// The answer goes through `printAnswer`, which is the one
-			// position asynchronous work has a spelling at — so a Method
-			// answering a `Future<String>` reads `=> Promise<string>`, and a
-			// callback Parameter declared to answer one reads the same, which is
-			// what its writer really has to write.
+			// A Function's Parameters cross against its own direction. See
+			// "Directions" in DEVELOPMENT.md.
 			case "function":
 				return `(${printParameters(
 					node.parameters,
 					direction === "out" ? "in" : "out",
 				)}) => ${printAnswer(node.returns, direction)}`
-			// Work anywhere but a call's answer, which is the one position
-			// it crosses at — see `printAnswer`. `never` rather than the shape
-			// it would have had, for the reason an Overload set is `never`: it
-			// makes the line the interpreter would throw on fail to typecheck
-			// instead, and the sentence beside it is the one it would have
-			// thrown. The refusal is the same in both directions, because the
-			// rule is about the POSITION rather than about the way it is
-			// crossed.
+			// Work anywhere but a call's answer. See "Work" in DEVELOPMENT.md.
 			case "future":
 			case "started":
 				return `never /* a ${node.shown} is work rather than a value, and work crosses only as a call's answer */`
-			// The numeric tower above Rational, a Type Parameter nothing
-			// has applied, and whatever else arrives before its mapping does —
-			// each carrying the sentence the Compiler wrote while it still had
-			// the Type to name.
+			// What has no mapping yet, such as an unapplied Type Parameter, with
+			// the compiler's sentence.
 			case "refused":
 				return `unknown /* ${node.why} */`
 		}
 	}
 
-	// `?` on a member the callee's own default fills in — and IN only,
-	// because that is the whole of what it says: a value written for this
-	// position may leave the member out, and a value that comes out of one never
-	// does. Unlike a positional Parameter's `?`, whose legality is a rule about
-	// the trailing run, a member has no order to respect.
+	// `?` marks a member the callee's default fills in, going in only. A member
+	// has no order, so it needs no trailing-run rule.
 	function recordEntries(
 		members: Members,
 		direction: Direction,
@@ -633,23 +499,9 @@ function createWalker(
 		})
 	}
 
-	// An `Optional` is spelled by its ABSENCE on this side, so its two
-	// Cases are not Cases here at all: `#Value` is its item and `#Empty` is
-	// `undefined`. Every other Case carries which one it is as a member, under
-	// the `$case` the boundary writes — the Choice as it was DECLARED and the
-	// Case, never the path of the machine that compiled it.
-	//
-	// Except a Case of a UNIT Choice — one all of whose Cases are
-	// payload-less — which crosses as its own bare name and is therefore that
-	// name's string literal here. An `Ordering` reads as the three words it can
-	// be, which is the whole ergonomic point of the spelling.
-	//
-	// The bare name in BOTH directions, though the boundary also ACCEPTS
-	// the qualified `"Direction#Up"` on the way in. A declaration says what a
-	// value is, and printing the second spelling at every Parameter would offer
-	// a reader a choice where there is only one right answer — the qualified
-	// form is there for a host that already had the tag, not for one writing a
-	// call.
+	// An `Optional`'s Cases are its item and `undefined`, a unit Choice's Case
+	// is its bare name, and every other Case carries `$case`. See "Unions and
+	// Cases" in DEVELOPMENT.md.
 	function printCase(node: CaseDescriptor, direction: Direction): string {
 		if (node.optional) {
 			let item = node.payload.item
@@ -669,22 +521,14 @@ function createWalker(
 		])
 	}
 
-	// The arms as they cross, in declaration order and deduplicated —
-	// `Optional<Integer> | Integer` is one `bigint` on this side, and printing it
-	// twice would only ask a reader what the difference was. An `Optional` inside
-	// a Union contributes its item and one `undefined`, however deep it sits, so
-	// that `Optional<Optional<Integer>>` coming out reads `bigint | undefined`
-	// rather than spelling its absence twice.
+	// The arms as they cross, in declaration order and without duplicates. Any
+	// `Optional` adds its item and one `undefined`, however deep it sits.
 	function unionParts(
 		node: Extract<Descriptor, { kind: "optional" | "union" }>,
 		direction: Direction,
 	): Array<string> {
-		// Ahead of the arms, because the whole position is what is being
-		// refused — printing them and then refusing would be printing a Union
-		// TypeScript reads as one arm. Asked here rather than in `print` so that
-		// a Type Alias declaring such a Union is refused in its own declaration
-		// too: `aliasDeclaration` lays a Union out itself and never asks `print`
-		// for one.
+		// Asked here rather than in `print`, because `aliasDeclaration` lays out
+		// a Union itself and must refuse it too.
 		let refusal = unionRefusal(node)
 
 		if (refusal !== null) {
@@ -734,24 +578,8 @@ function createWalker(
 		return unique.length === 0 ? ["never"] : unique
 	}
 
-	// What a call ANSWERS with — the one position asynchronous work
-	// crosses at, and so the one position that reads a `Future<T>` as
-	// `Promise<T>` rather than as the refusal `printBody` prints everywhere
-	// else. It is the declaration half of `compileAnswerOut`, and it is written
-	// as a door in front of `print` for the same reason that one is: the rule is
-	// about the position rather than about the shape.
-	//
-	// A `Started<T>` crosses OUT as a promise like a Future — it is a run
-	// in flight, and what a host gets is the wait — but there is no way IN: a
-	// host callback can not answer one, because it has nothing to start a run of
-	// the Module's own work with. So the way in falls through to the refusal,
-	// which is what the marshaller does with the same position.
-	//
-	// `Promise<T>` and not `Promise<T> | T` on the way in, though the
-	// boundary would take a value the host answered without one. A declaration
-	// says what a position IS, and a Parameter offering both spellings would ask
-	// its reader to choose between them where there is one right answer: what is
-	// declared as work is written as work.
+	// What a call answers with, the one position work crosses at, as
+	// `compileAnswerOut` marshals it. See "Work" in DEVELOPMENT.md.
 	function printAnswer(node: Descriptor, direction: Direction): string {
 		if (
 			node.kind === "future" ||
@@ -763,22 +591,14 @@ function createWalker(
 		return print(node, direction)
 	}
 
-	// Everything under a Parameter crosses the way the Parameter does —
-	// the item Type of a List Parameter, the member Type of a Record one. Which
-	// way that is belongs to the caller: the Module's own Parameters are values
-	// going IN, and a callback's are the Module's values coming OUT.
+	// Everything under a Parameter crosses the way the Parameter does, which
+	// the caller decides.
 	function printParameters(
 		parameters: FunctionDescriptor["parameters"],
 		direction: Direction,
 	): string {
-		// The FIRST place a `?` is ever written in this generator, and it
-		// can only be written on a TRAILING run: TypeScript forbids `a?: T, b:
-		// U`, which is weaker than what Essence allows — a Parameter with a
-		// default may be followed by a required one so long as the labels tell
-		// them apart. Where that happens the positional declaration keeps the
-		// Parameter required and widens it to `T | undefined`, which is exactly
-		// what a positional JavaScript call has to pass there. The labelled form
-		// below has no ordering constraint at all and marks it optional.
+		// `?` only on a trailing run, as TypeScript requires. See "Parameters" in
+		// DEVELOPMENT.md.
 		let lastRequired = lastRequiredIndex(parameters)
 
 		return parameterNames(parameters)
@@ -797,12 +617,8 @@ function createWalker(
 			.join(", ")
 	}
 
-	// The second way a Function may be called, where the interpreter offers
-	// one: a single object whose keys are exactly the labels, in place of the
-	// positional Arguments. `labelsOf` is the interpreter's own rule for when
-	// that is offered — every Parameter labelled, and not a lone Record Parameter,
-	// where a plain object is the Argument itself — so a declaration promises a
-	// labelled call exactly where a call would be answered as one.
+	// A call with one object keyed by the labels, declared exactly where
+	// `labelsOf` lets the interpreter answer one.
 	function labelledParameters(signature: FunctionDescriptor): string | null {
 		let labels = labelsOf(signature)
 
@@ -825,12 +641,7 @@ function createWalker(
 
 	// #region Declarations
 
-	// Declared as it comes OUT. A Type Alias has one spelling and is used
-	// in both directions, so a body that crosses differently each way — a
-	// callback — is named here in its permissive form and spelled out, with the
-	// refusal on it, at the Parameter that would pass one — which is where the
-	// mistake actually is. `crossesDifferently` is what keeps the name off
-	// such a Parameter.
+	// Declared in its out-form. See "Naming" in DEVELOPMENT.md.
 	function aliasDeclaration(name: string, node: Descriptor): string {
 		let head = `export type ${name} =`
 
@@ -842,8 +653,7 @@ function createWalker(
 			return braced(head, recordEntries(node.members, "out"))
 		}
 
-		// The body, never the name — this IS the declaration of that name,
-		// and asking the naming table here would declare it as itself.
+		// The body, since the naming table would declare the alias as itself.
 		return `${head} ${printBody(node, "out")}`
 	}
 
@@ -852,10 +662,8 @@ function createWalker(
 			return `${OVERLOADED_NOTICE}${exported(name, "never")}`
 		}
 
-		// A Choice is declared TWICE under one name, and TypeScript keeps
-		// both apart: the Type above, which is what a value of it is, and this,
-		// which is the object its Cases are spelled through. A host writes
-		// `Shape.Circle({ radius: 3n })` and annotates it `Shape`.
+		// The object a Choice's Cases are spelled through, under the name of its
+		// Type, as in `Shape.Circle({ radius: 3n })`.
 		if (entry.kind === "choice") {
 			return braced(
 				`export declare const ${name}:`,
@@ -894,25 +702,8 @@ function createWalker(
 		return exported(name, print(entry.of, "out"))
 	}
 
-	// One way to spell each Case, as a host reads it: a Case with a payload
-	// is a Function of that payload, and one without is the value itself. A
-	// constructor is a SPELLING — `caseConstructors` writes the tag onto the very
-	// object it was handed and marshals nothing — so its declaration says exactly
-	// that: it takes any payload the boundary would accept (the IN-form), and
-	// answers THAT payload with the tag on it. Written as a generic so that the
-	// answer keeps the caller's own Types: `Shape.Circle({ radius: 3n })` is a
-	// `Shape`, and `Shape.Circle({ radius: 3 })` is an `Input<Shape>` — which is
-	// what each really is, since one holds a bigint and the other a number until
-	// it crosses. A Type Parameter named with an `_`, which no Essence identifier
-	// contains, so it can shadow nothing a Module declared.
-	//
-	// `readonly` on a bare Case and on nothing beside it. The table is
-	// frozen whichever Cases it holds — `caseConstructors` answers with an
-	// `Object.freeze`d object — so this is news about the value rather than
-	// about the slot: a bare Case is the one member spelled as a bare string,
-	// and a bare string is the one thing a reader might take for somewhere to
-	// keep one rather than a name to pass. Its neighbours are a constructor and
-	// a tagged object, which nobody mistakes for either.
+	// A Case with a payload is a generic Function of it, and one without is the
+	// value. See "Unions and Cases" in DEVELOPMENT.md.
 	function caseEntries(cases: ReadonlyArray<CaseDescriptor>): Array<string> {
 		return cases.map((node) => {
 			if (Object.keys(node.payload).length === 0) {
@@ -929,16 +720,9 @@ function createWalker(
 		})
 	}
 
-	// A Namespace is an object of its statics on this side, so its Methods
-	// are members rather than declarations — and its constants come OUT whichever
-	// way the Namespace itself was reached, since there is no writing one.
-	//
-	// A Case whose name the Namespace also declares is left out, because
-	// the Namespace's own member is what the binding puts there — see
-	// `bindNamespace`, which writes the constructors first exactly so that a
-	// Method or a static constant of that name overwrites one. Declared as well
-	// it would be a member named twice, which TypeScript refuses, and where it
-	// compiled it would promise a constructor the Module never binds.
+	// A Namespace is an object of its statics. Its constants only come out. A
+	// Case it also declares a member for is left out, as `bindNamespace` lets the
+	// member replace the constructor.
 	function namespaceEntries(entry: NamespaceDescriptor): Array<string> {
 		let declared = new Set([
 			...Object.keys(entry.properties),
@@ -985,11 +769,8 @@ function createWalker(
 		return entries
 	}
 
-	// The bundle's binding: the name the Rewriter emitted, and a Type that
-	// says only that the value is Essence's. It IS only that — an Integer there is
-	// a tagged object holding a number or a bigint, keyed by a Symbol this side
-	// never sees, and every shape it might have is one the bridge builds rather
-	// than one TypeScript can check.
+	// The bundle's binding under its emitted name, as an opaque `EssenceValue`.
+	// Its shapes are the bridge's to build, and TypeScript can not check them.
 	function emittedDeclaration(name: string, entry: BoundExport): string {
 		if (entry.kind === "function") {
 			return emittedFunction(name, entry.emitted, entry.of)
@@ -1026,10 +807,8 @@ function createWalker(
 			: `// '${name}' as the Rewriter emits it.\n`
 	}
 
-	// The emitted member names, which are the CLASS's — a member named
-	// `prototype` or `constructor` is bound under a mangled one, and a
-	// declaration spelling the written name would promise a member the bundle
-	// does not have.
+	// The emitted member names, since a member called `prototype` or
+	// `constructor` is bound under a mangled one.
 	function emittedMembers(entry: NamespaceDescriptor): Array<string> {
 		let entries = Object.values(entry.properties).map(
 			(property) => `${memberName(property.emitted)}: EssenceValue`,
@@ -1075,10 +854,8 @@ function inlined(entries: Array<string>): string {
 	return entries.length === 0 ? "{}" : `{ ${entries.join("; ")} }`
 }
 
-// An object Type after its declaration's head, on one line while it fits
-// there. A member per line otherwise, with no separator — TypeScript reads a
-// newline as one, and a trailing `;` on every line of a generated file is noise
-// a reader has to look past.
+// An object Type after its head, on one line while it fits. Otherwise one
+// member per line, with no `;`, since TypeScript reads a line break as one.
 function braced(head: string, entries: Array<string>): string {
 	if (entries.length === 0) {
 		return `${head} {}`
@@ -1091,9 +868,8 @@ function braced(head: string, entries: Array<string>): string {
 		: `${head} {\n\t${entries.join("\n\t")}\n}`
 }
 
-// A Union after its declaration's head, on one line while it fits there.
-// One arm per line otherwise, each led by its `|` — which is what makes a Choice
-// of three payloads readable and a Union of two words not worth breaking.
+// A Union after its head, on one line while it fits, otherwise one arm per
+// line, each led by its `|`.
 function unioned(head: string, entries: Array<string>): string {
 	let line = `${head} ${entries.join(" | ")}`
 
@@ -1102,9 +878,8 @@ function unioned(head: string, entries: Array<string>): string {
 		: `${head}\n\t| ${entries.join("\n\t| ")}`
 }
 
-// One declaration per line, with a blank line around any that needed more
-// than one — a comment above a declaration reads as belonging to the one below
-// it, and packed against its neighbour it reads as belonging to that one too.
+// One declaration per line, with a blank line around any that takes more, so
+// a comment heading one is not read as its neighbour's.
 function grouped(declarations: Array<string>): string {
 	let text = ""
 
@@ -1126,10 +901,7 @@ function grouped(declarations: Array<string>): string {
 
 // #region Spelling
 
-// A name JavaScript can not spell is still an export — `ok?` is one — and
-// a module may name its exports with a string literal, which is exactly what
-// this is for. The local binding is what the declaration hangs off; the string is
-// the name a host imports by.
+// A name such as `ok?` is exported under a string literal from a mangled local.
 function exported(name: string, type: string): string {
 	if (isValueName(name)) {
 		return `export declare const ${name}: ${type}`
@@ -1150,11 +922,8 @@ function opaqueParameters(
 		.join(", ")
 }
 
-// The Parameter names a signature reads with — its labels, which is what
-// the Declaration wrote and what a labelled call passes. A `_` Parameter has
-// none, and a name TypeScript would read as something else (`first?` is an
-// OPTIONAL Parameter there, silently) is no better than none, so both fall back
-// to the position. The fallback is nudged until it is nobody else's name.
+// The Parameter names: labels where TypeScript can read them, and the position
+// otherwise. See "Parameters" in DEVELOPMENT.md.
 function parameterNames(
 	parameters: FunctionDescriptor["parameters"],
 ): Array<string> {
