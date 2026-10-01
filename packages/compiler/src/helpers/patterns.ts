@@ -1,45 +1,32 @@
 import type { parser } from "@essence-lang/interfaces"
 
-// One step of a binding's spine, as the source wrote it — the member
-// Identifier and the Type annotation beside it, where there was one.
-//
-// Every step carries its own, not just the last: a nested Pattern's outer
-// member is written once and stands on the spine of every binding beneath it,
-// so `{ origin as { x, y } }` has a real `origin` to point a rename at and a
-// real annotation to check. Giving an intermediate step the innermost binder's
-// span instead made renaming `origin` overwrite `x` and `y`.
+// One step of a binding's spine as the source wrote it: the member Identifier
+// and its Type annotation, if any. Each step keeps its own span, so in
+// `{ origin as { x, y } }` a rename of `origin` touches only `origin`.
 export type PatternStep = {
 	name: parser.IdentifierNode
 	type: parser.TypeDeclarationNode | null
 }
 
-// One binding a Pattern makes. `path` is the spine from the value being
-// taken apart down to what this name stands for, so `{ origin as { x } }`
-// gives `["origin", "x"]` and a Pattern's own `as` binder gives `[]` — the
-// value itself. `type` is what the source wrote for the member, where it wrote
-// anything: a bare `{ x }` leaves it null and takes its Type from the value.
+// One binding a Pattern makes. `path` runs from the value taken apart to this
+// name: `{ origin as { x } }` gives `["origin", "x"]`, and a Pattern's own `as`
+// binder gives `[]`.
 export type PatternBinding = {
 	name: parser.IdentifierNode
 	path: Array<string>
 	steps: Array<PatternStep>
-	// The LAST step's annotation — what the binding itself is declared
-	// as. Null where the spine is empty, which is a Pattern's own `as` binder.
+	// The last step's annotation, or null for a bare member or a Pattern's
+	// own `as` binder.
 	type: parser.TypeDeclarationNode | null
-	// The LAST step's member Identifier, which is a DIFFERENT span from
-	// `name` wherever `as` renamed it. Both are needed: what the binding is
-	// read under is `name`, and what the Record calls it is this — and the
-	// Language Server rewrites one without touching the other.
+	// The last step's member Identifier: what the Record calls it, where
+	// `name` is what the binding is read under. They differ where `as` renamed
+	// it, and the Language Server rewrites one without the other.
 	member: parser.IdentifierNode | null
 }
 
-// Every name a Pattern brings into scope, in source order, whatever the
-// nesting. Every reader needs exactly this list and must never disagree about
-// it: the Enricher desugars one Constant per entry, the Module linker reports
-// a Declaration per entry so a top-level Pattern can be exported, and the
-// Language Server declares a rename target per entry.
-//
-// A `name = literal` member contributes nothing — it constrains the value and
-// the value is written right there, so there is no name to bring in.
+// Every name a Pattern brings into scope, in source order, at any depth. The
+// Enricher, the Module linker and the Language Server all read this one list.
+// A `name = literal` member constrains the value and binds nothing.
 export function patternBindings(
 	pattern: parser.PatternNode,
 	steps: Array<PatternStep> = [],
@@ -86,14 +73,9 @@ export function patternBindings(
 	return bindings
 }
 
-// Every name a MATCHER introduces, in written order. Two Matchers
-// introduce anything at all: a Pattern names what its members name, and a Case
-// Matcher names what its payload binder names. A Type, a wildcard and a written
-// value each ask something of the value and name nothing.
-//
-// The names alone, since this answers the one question that can be asked
-// without Types in hand — `resolveMatcherBindings` is the Enricher's answer,
-// and it knows what each name stands for as well as what it is called.
+// Every name a Matcher introduces, in written order: a Pattern's bindings, or a
+// Case Matcher's payload binder. Names only, without Types; the Enricher's
+// `resolveMatcherBindings` knows what each stands for.
 export function matcherNames(matcher: parser.MatcherNode): Array<string> {
 	if (matcher.nodeType === "Pattern") {
 		return patternBindings(matcher).map((binding) => binding.name.content)
@@ -110,18 +92,10 @@ export function matcherNames(matcher: parser.MatcherNode): Array<string> {
 		: [matcher.binding.content]
 }
 
-// The members that make a Pattern able to DECLINE a value — a member
-// constrained by a written value, at any depth. A Matcher may hold them,
-// because an arm that declines falls through to the next one; a Parameter and
-// a Declaration may not, because neither has anywhere to fall through to.
-//
-// A member constrained by TYPE is not among them: in an irrefutable position
-// that is an annotation, and it fails the way every annotation fails.
-//
-// The spine comes back with each one, because the position that refuses a
-// member still has to BIND its name — a body reading `width` after the
-// Diagnostic about `{ width = 0 }` must not be told a second time that `width`
-// does not exist.
+// The members constrained by a written value, at any depth, which let a Pattern
+// decline a value. A Matcher arm may decline, but a Parameter or a Declaration
+// has nowhere to fall through to. Each comes back with its path, since the
+// position that refuses it still binds the name.
 export function refutablePatternMembers(
 	pattern: parser.PatternNode,
 	path: Array<string> = [],

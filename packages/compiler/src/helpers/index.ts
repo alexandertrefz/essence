@@ -1,8 +1,6 @@
-// The package boundary for `@essence-lang/compiler/helpers`. The Compiler's
-// own phases import the module they actually need — `./types`, `./describe` and
-// the rest — so that a file's imports say which of these concerns it depends on.
-// This barrel exists for the packages OUTSIDE the Compiler, which have one
-// subpath to reach rather than one per module.
+// The `@essence-lang/compiler/helpers` subpath, for packages outside the
+// Compiler. The Compiler's own stages import the module they need, so a file's
+// imports say which concern it depends on.
 
 export {
 	computeConformanceMethodMap,

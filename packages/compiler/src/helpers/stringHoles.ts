@@ -1,21 +1,11 @@
-// A `{` inside a String Literal opens a HOLE — `"Hello, {name}"` reads
-// the value of `name` — so a brace that stands for itself is written `\{`, and
-// its partner `\}`.
-//
-// `"{\"a\": 1}"` is the shape that brings a reader here: JSON, written with the
-// quotes escaped the way another language wants them and the braces left alone.
-// The `{` opens a hole, the escaped quote inside it opens a String of its own,
-// and the Literal runs off the end of the file. The Quick Fix that writes the
-// missing `"` then produces a file with the SAME refusal in it, and writes
-// another quote, and another — so what this decides is whether there is a fix to
-// offer at all, and it is asked by the report and by the fix alike so that the
-// two can not answer it differently.
+// A `{` inside a String Literal opens a hole, so a brace that stands for itself
+// is written `\{`. In `"{\"a\": 1}"` the escaped quote inside the hole opens a
+// String of its own, and the Literal runs to the end of the file. Writing the
+// missing `"` repeats the refusal, so the Parser's report and the Quick Fix both
+// ask here whether a quote is the fix.
 
-// A backslash is the whole of the test. A hole holds an Expression, and
-// there is no Expression in this language that a `\` is part of — so a hole with
-// one inside it is a hole nobody meant to open, which is exactly the reading
-// that makes the missing quote the wrong thing to talk about. A hole holding a
-// name is left alone: `"Hello, {name}` really is a String short one quote.
+// A backslash is the whole test: no Expression holds a `\`, so a hole holding
+// one was never meant as a hole. `"Hello, {name}` really is short one quote.
 export function holeHoldsAnEscape(text: string): boolean {
 	let index = 0
 

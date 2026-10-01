@@ -1,9 +1,6 @@
-// The Damerau-Levenshtein distance — Levenshtein plus the swap of two
-// adjacent characters as ONE edit rather than two, because that is the typo
-// people actually make: `slwo` for `slow`, `retrun` for `return`. Exported
-// because every "did you mean" in the toolchain has to answer the same way
-// about the same pair of words, whether it is asked here or by the Language
-// Server about a tag.
+// The Damerau-Levenshtein distance, where a swap of two adjacent characters is
+// one edit, as in `retrun` for `return`. Exported so every "did you mean" in the
+// toolchain answers alike.
 export function editDistance(left: string, right: string): number {
 	let rows = left.length + 1
 	let columns = right.length + 1
@@ -42,12 +39,8 @@ export function editDistance(left: string, right: string): number {
 	return distances[rows - 1]![columns - 1]!
 }
 
-// Whether two names begin with the same letter, which is the one position
-// in a word a slip almost never lands on — and the one a reader reads first. Two
-// names that open alike look alike; two that do not are two words.
-//
-// Compared without case, because the shift key is a slip like any other and the
-// two spellings of a first letter are the same letter.
+// Whether two names begin with the same letter, ignoring case. A slip rarely
+// lands on the first letter, and a reader reads it first.
 function sharesOpeningLetter(left: string, right: string): boolean {
 	return (
 		left.length > 0 &&
@@ -56,17 +49,9 @@ function sharesOpeningLetter(left: string, right: string): boolean {
 	)
 }
 
-// A suggestion is only offered when it is close enough to be plausible —
-// proposing an unrelated flag is worse than proposing nothing.
-//
-// Two edits on a short name is not a near miss, it is a coincidence. `add` and
-// `pad` differ in two letters of three, `noon` and `loop` in two of four, and
-// both were offered as "Did you mean" with a Quick Fix behind them that wrote
-// the wrong word into the reader's file. So the rule is read off the NAME rather
-// than off a fixed threshold: one edit is always a near miss — a single slip,
-// a swap of two letters included, is the typo people actually make — and
-// anything beyond one has to be small next to the name it is measured against,
-// a third of its length at most, and has to open on the same letter.
+// The candidate close enough to be a plausible slip, or null. One edit always
+// is, a swap included. More edits must be at most a third of the input's length
+// and open on the same letter, so `add` is never offered for `pad`.
 export function closestMatch(
 	input: string,
 	candidates: Array<string>,
@@ -81,11 +66,8 @@ export function closestMatch(
 		let distance = editDistance(input, candidate)
 		let sharesOpening = sharesOpeningLetter(input, candidate)
 
-		// A tie is broken on the FIRST candidate, which several callers
-		// order their candidates for — see `builtins`. The one thing that comes
-		// before that order is the opening letter: between two names the same
-		// distance away, the one that starts as the input does is the one the
-		// reader was looking at.
+		// A tie goes to the earlier candidate, which callers may order for,
+		// unless only the later one shares the opening letter.
 		if (
 			best === null ||
 			distance < best.distance ||
@@ -99,9 +81,8 @@ export function closestMatch(
 		return null
 	}
 
-	// A candidate must also share more with the input than it differs
-	// from it. Without that, every short name is within the threshold of
-	// every other short name, and `point.z` gets told it meant `point.x`.
+	// A candidate must share more with the input than it differs from it,
+	// so `point.z` is not told it meant `point.x`.
 	if (best.distance >= input.length) {
 		return null
 	}

@@ -1,23 +1,13 @@
-// The reader's OWN text, on its way into something the toolchain prints.
-// A Diagnostic names the character a Literal was refused for; the test reporter
-// prints the name a test was written under. Both used to hand that text to the
-// terminal as it stood, which was harmless only while no Program could write a
-// character that ACTS there — `\u{…}` made every one of them writable, so a
-// test called "\u{1B}[2K" now erases the line the report had just written and a
-// `\u{202E}` inside one reorders it. A report that can be made to say something
-// other than what it holds is not a report.
+// The reader's own text on its way into toolchain output, such as a refused
+// character or a test's name. A character that acts on the terminal is spelled
+// rather than printed, so a test called "\u{1B}[2K" can not erase a line.
 //
-// The SAME SET the runtime's `quotedText` escapes, less the four
-// characters it escapes for a reason that is not about the terminal at all
-// (`"`, `\`, `{` and `}` are escaped so its output READS BACK as a Literal).
-// The two are held together by `escapeSet.spec.ts`, which derives both from the
-// one documented sentence — a character the printer escapes for being invisible
-// and this does not is a drift the suite goes red for.
+// The set is the invisible part of what the runtime's `quotedText` escapes.
+// `escapeSet.spec.ts` holds both to the documented list.
 
-// The C0 controls and DEL, the C1 controls, the bidi marks, embeddings,
-// overrides and isolates, the two line separators, and the byte order mark.
-// Every one of them either drives the terminal or draws nothing while changing
-// what its neighbours mean; nothing else does.
+// The C0 and C1 controls, DEL, the bidi marks, embeddings, overrides and
+// isolates, the line and paragraph separators, and the byte order mark. Each
+// drives the terminal or draws nothing while changing what its neighbours mean.
 export function actsOnTerminal(code: number): boolean {
 	return (
 		code < 0x20 ||
@@ -30,9 +20,8 @@ export function actsOnTerminal(code: number): boolean {
 	)
 }
 
-// The WHOLE character at an offset, not the code unit standing there. A
-// message that named half of an astral character would print a lone surrogate,
-// which is the one thing no text can carry.
+// The whole character at an offset, so a message never prints half of an
+// astral character as a lone surrogate.
 export function characterAt(text: string, offset: number): string {
 	return String.fromCodePoint(text.codePointAt(offset) ?? 0)
 }
@@ -42,11 +31,8 @@ export function printsAsItself(character: string): boolean {
 	return !actsOnTerminal(character.codePointAt(0) ?? 0)
 }
 
-// A code point the way a chart names one — `U+202E`, four digits at the
-// least, which is how the standard writes it and how a reader looks it up. It
-// is deliberately NOT the Literal spelling `\u{202E}`: the sentences it lands in
-// are about a character, and a reader who has just been refused an escape does
-// not need a second one to read past.
+// A code point as a chart names one, `U+202E`, with at least four digits. Not
+// the Literal escape `\u{202E}`, since the sentence is about a character.
 export function codePointName(character: string): string {
 	return `U+${(character.codePointAt(0) ?? 0)
 		.toString(16)
@@ -54,26 +40,17 @@ export function codePointName(character: string): string {
 		.padStart(4, "0")}`
 }
 
-// One character of the reader's text, ready to drop into a message:
-// quoted where it prints as itself, and named where it does not. `'G' is not a
-// hexadecimal digit` and `U+202E is not a hexadecimal digit` — the quotes go
-// with the character, because a pair of them with nothing between is what a
-// byte order mark used to print as.
+// One character of the reader's text for a message: quoted where it prints as
+// itself, named where it does not, as in `U+202E is not a hexadecimal digit`.
 export function spelledCharacter(character: string): string {
 	return printsAsItself(character)
 		? `'${character}'`
 		: codePointName(character)
 }
 
-// A whole run of the reader's text — a test NAME — with the characters
-// that act on the terminal written as the escape a String Literal spells them
-// with, and NOTHING else touched. A name is not a value: it is printed rather
-// than quoted, so it keeps its quotes, its braces and its backslashes exactly
-// as they were written and only what would drive the terminal is spelled.
-//
-// Every one of them as `\u{…}`, including the three with a short spelling of
-// their own: `\n` in a name is rare enough that naming its code point costs
-// nobody anything, and one rule here is one rule to read.
+// A test name with each character that acts on the terminal written as `\u{…}`,
+// even `\n`. Nothing else changes: a name is printed, not quoted, so its quotes,
+// braces and backslashes stay as written.
 export function printableText(text: string): string {
 	let printable = ""
 	let runStart = -1

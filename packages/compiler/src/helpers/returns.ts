@@ -1,13 +1,9 @@
 import type { common } from "@essence-lang/interfaces"
 
-// Whether every path through a body reaches a `<-`. Two stages need the
-// same answer and must never disagree: the Validator refuses a body that
-// promises a value and can fall off its end, and the Simplifier gives the
-// bodies that may fall off — the ones returning unit — the `return` that says
-// so, because JavaScript would otherwise answer `undefined`, which is not an
-// Essence value at all. Conservative on purpose: only a `<-` and an
-// `if`/`else` whose both halves return count, so anything it can not see
-// through is treated as falling through.
+// Whether every path through a body reaches a `<-`. The Validator refuses a body
+// that promises a value and can fall off its end. The Simplifier ends any other
+// body with a unit `return`, since JavaScript would answer `undefined`. Only a
+// `<-` and an `if`/`else` whose halves both return count.
 export function bodyDefinitelyReturns(
 	body: Array<common.typed.ImplementationNode>,
 ): boolean {

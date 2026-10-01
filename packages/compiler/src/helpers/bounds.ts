@@ -1,16 +1,10 @@
-// THE words for "a Type Parameter carries one bound", shared by the two
-// Enricher reports that have to say it: two bounds written down in one `<…>`,
-// and a body that wants a second Protocol of a Parameter something already
-// bounded. A reader who meets the rule twice in two spellings has to work out
-// whether it is one rule or two, and it is one.
+// The notes for "a Type Parameter carries one bound". The Enricher reports two
+// bounds in one `<…>`, and a second Protocol wanted of a bounded Parameter, with
+// these words.
 //
-// No Help goes with them, and that is deliberate. The combined Protocol named
-// below is the only way to ask for two bounds today, and it is not an edit that
-// works from where either report stands: it needs a declaration AND a
-// conformance for every Type the Parameter is ever bound to, which for a Type
-// the standard library owns is not the reader's to write — conforming `Integer`
-// to it makes every `Terminal.print(5)` in the file ambiguous. So the rule is
-// stated, the one way around it is named as what it is, and the reader chooses.
+// A Protocol that extends both is named in a note, not offered as a Help. It
+// needs a conformance for every Type bound to the Parameter, and a standard
+// library Type's conformance is not the reader's to write.
 export function oneBoundOnly(
 	parameter: string,
 	carried: string,

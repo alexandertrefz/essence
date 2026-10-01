@@ -1,11 +1,6 @@
-// `1.5/2` — a Rational written as a fraction and a decimal at once, and
-// the value the two spellings say between them, written back each way.
-//
-// This lives in the Compiler rather than beside the Quick Fix it was first
-// written for, because the Help and the fix have to offer the SAME number. The
-// Help printed `'3/4'` and `'0.75'` whatever was written, so `2.5/3` — which is
-// five sixths — was answered with a Help that quietly changed the value while
-// the fix standing beside it offered `5/6`.
+// `1.5/2`, a Rational written as a fraction and a decimal at once, and the value
+// the two spellings say together, written back each way. The Parser's Help and
+// the language server's Quick Fix both ask here, so they offer the same number.
 
 const decimalOverFractionPattern =
 	/^(-?[0-9][0-9_]*)\.([0-9][0-9_]*)\/([0-9][0-9_]*)$/
@@ -15,11 +10,8 @@ const fractionOverDecimalPattern =
 type Rational = { numerator: bigint; denominator: bigint }
 
 // Both spellings of the written value, the fraction first. A value with no
-// terminating decimal — `1.5/7` — is one spelling alone: there is no decimal
-// that says it, and a rounded one would answer with a different number.
-//
-// Empty where the text is not a mixed Literal at all, which is what lets a
-// caller ask this of whatever it is holding.
+// terminating decimal, such as `1.5/7`, has only the fraction. Empty where the
+// text is not a mixed Literal.
 export function mixedRationalSpellings(written: string): Array<string> {
 	let value =
 		rationalOf(decimalOverFractionPattern.exec(written), "decimal") ??
@@ -37,11 +29,9 @@ export function mixedRationalSpellings(written: string): Array<string> {
 	]
 }
 
-// The two mixed spellings read as one value. `A.B/C` is `AB` over
-// `10^len(B) · C`, and `A/B.C` is `A · 10^len(C)` over `BC` — the same
-// arithmetic either way round, with the power of ten on the side the decimal was
-// written on. Reduced to lowest terms, so that what is offered back is the
-// number rather than the digits it was typed as.
+// `A.B/C` is `AB` over `10^len(B) · C`, and `A/B.C` is `A · 10^len(C)` over
+// `BC`. Reduced to lowest terms, so what is offered back is the number rather
+// than the digits it was typed as.
 function rationalOf(
 	written: RegExpExecArray | null,
 	side: "decimal" | "fraction",
@@ -81,8 +71,7 @@ function rationalOf(
 	}
 }
 
-// Euclid's, over a magnitude that may be zero and a denominator that is
-// not — `gcd(0, d)` is `d`, which is what canonicalises every zero as `0/1`.
+// `gcd(0, d)` is `d`, so every zero reduces to `0/1`.
 function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	while (denominator !== 0n) {
 		;[magnitude, denominator] = [denominator, magnitude % denominator]
@@ -91,13 +80,10 @@ function greatestCommonDivisor(magnitude: bigint, denominator: bigint): bigint {
 	return magnitude
 }
 
-// A decimal is a fraction over a power of ten, so a value has one exactly
-// where its reduced denominator divides one — which is to say where it is built
-// of twos and fives and nothing else. Null for every other value, since a
-// rounded decimal would be a different number than the one that was written.
-//
-// A whole value keeps one place — `2.0/2` is written back as `1.0` rather than
-// as `1`, which is an Integer and no longer the Rational the Literal was.
+// A value has a decimal exactly where its reduced denominator holds no prime
+// but two and five. Null for every other value, since a rounded decimal is a
+// different number. A whole value keeps one place: `2.0/2` is `1.0`, not the
+// Integer `1`.
 function decimalSpelling({ numerator, denominator }: Rational): string | null {
 	let remaining = denominator
 	let twos = 0
