@@ -10,25 +10,15 @@ import {
 	readsNamespaceMember,
 } from "./lookups"
 
-// The Diagnostics a DECLARATION'S HEAD carries — the Type Parameter list,
-// the `static` a Method opens with, the `where` on a Protocol's extension list.
-// What they share is that the fix is an edit to the line the declaration is
-// announced on, never to the body under it, which is why they are read together
-// rather than beside the fixes for the Statements they hold.
+// Fixes for a declaration's head: its Type Parameters, a Method's `static`, a
+// Protocol extension's `where`. Each edits the head, never the body.
 
 const inferKeyword = /^infer[ \t]+$/
 const staticKeyword = "static"
 
-// What goes is the marker and the blanks behind it, which is the span
-// between where the Type Parameter starts and where its NAME does — the
-// Parameter's own Position opens on `infer` wherever one was written. Measured
-// from the Node rather than from the Diagnostic's span, and then read back off
-// the buffer: a marker carried over a line break is a shape this has no answer
-// for, and the check is what turns one away instead of guessing.
-//
-// What follows the name is left exactly as it stands: a bound (`infer Item is
-// Comparable`) and a default (`infer Item = Integer`) are no part of what the
-// Diagnostic refuses.
+// Removes `infer` and its blanks: the span from the Type Parameter's start to
+// its name. A marker over a line break is refused. A bound or default after
+// the name stays.
 export function removeInferAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -59,11 +49,8 @@ export function removeInferAction(
 	}
 }
 
-// The mirror, and the mirror of the span too: a Parameter written without
-// the marker opens on its own name, so the marker goes in front of that name.
-// The name is read back off the buffer first — an insertion can not be checked
-// after the fact, so what has to be checked is that the Node and the text still
-// agree about where the name stands.
+// Writes `infer` before the Type Parameter's name, once the buffer confirms
+// the name stands where the Node says.
 export function inferParameterAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -97,16 +84,9 @@ export function inferParameterAction(
 	}
 }
 
-// The Diagnostic points at the `@`, which is inside the body — so the
-// Method it belongs to is what the fix starts from, and the Keyword is the one
-// written in front of that Method's name. `overload static make` reads the same
-// way as `static make`, since the Keyword sits directly against the name in both.
-//
-// Never preferred, and the Help says why: the other answer is to take the value
-// as a Parameter, which is a change to the Signature and to every call, and
-// nothing in the Diagnostic chooses between the two. Dropping the Keyword also
-// moves the Method — a static is called on the Namespace and an instance Method
-// on a value — so an Editor must not apply it without being asked.
+// Drops the `static` before the Method whose body uses `@`. Not preferred:
+// taking the value as a Parameter is the other answer, and dropping `static`
+// changes how every call is written.
 export function dropStaticAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -118,14 +98,8 @@ export function dropStaticAction(
 		return null
 	}
 
-	// And withheld altogether where this file CALLS the Method. Dropping
-	// the Keyword changes how every call is written — `Namespace.name(…)`
-	// becomes `value::name(…)` — so a file calling it once is refused once more
-	// than it was, and one calling it five times five times more, each at a
-	// line the reader was not looking at and none of them mentioned by the
-	// lightbulb they pressed. The Diagnostic's Help says what dropping costs
-	// and says it either way; what is withheld is the button that does it in
-	// one click.
+	// Withheld where this file calls the Method, since each call would
+	// then be refused. The Diagnostic's Help still explains the option.
 	let namespace = enclosingNamespace(program, diagnostic.position)
 
 	if (
@@ -146,9 +120,8 @@ export function dropStaticAction(
 		end: name.position.start,
 	}
 
-	// The Keyword and the blanks between it and the name, and nothing
-	// else — a `static` the Parser read from another line, or a name that
-	// merely ENDS in one, would otherwise have text deleted around it.
+	// Only the keyword and its blanks, so a `static` on another line or a
+	// name ending in one is left alone.
 	if (!/^static[ \t]+$/.test(sliceOf(lines, range))) {
 		return null
 	}
@@ -163,11 +136,9 @@ export function dropStaticAction(
 	}
 }
 
-// The whole clause goes, from the Protocol's name to the last condition —
-// a `where` with one condition left is the same refusal, so taking them out one
-// at a time would only report again. Every condition of one clause therefore
-// answers with this same edit, and the registry drops the repeats: two
-// Diagnostics with one answer are one offer in the lightbulb.
+// Removes the whole `where` clause, since one condition left is refused the
+// same way. Each condition's Diagnostic gets this edit, and the repeats are
+// offered once.
 export function dropWhereClauseAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -184,9 +155,8 @@ export function dropWhereClauseAction(
 		end: clause.position.end,
 	}
 
-	// A clause written over two lines is deleted whole, break and all —
-	// `where` is contextual, so what says the span is a clause is that the
-	// Keyword opens it.
+	// `where` is contextual, so the span must open with it. A clause over
+	// two lines goes whole.
 	if (!/^\s*where\b/.test(sliceOf(lines, range))) {
 		return null
 	}

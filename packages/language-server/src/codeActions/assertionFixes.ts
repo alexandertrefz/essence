@@ -3,10 +3,9 @@ import type { common } from "@essence-lang/interfaces"
 import { keywordBefore, lineAt, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 
-// The three assertion shapes the Parser turns away, and the one spelling
-// each of them was reaching for. All three drop the whole Statement, so there is
-// no Node left to measure an edit against — what the fixes below read is the
-// Diagnostic's span, the Labels beside it, and the line the keyword opens.
+// Fixes for assertion shapes the Parser refuses, each rewritten to the
+// spelling it reached for. The Statement is dropped, so they read the
+// Diagnostic's span, its Labels and the keyword's line.
 
 const assertionKeywords = ["expect", "require"] as const
 
@@ -17,16 +16,9 @@ type Opening = {
 	position: common.Position
 }
 
-// Where the assertion this Diagnostic is about begins. Both shapes are
-// written on one line — `expect { team } = value`, `expect value is Integer` —
-// so the keyword is looked for on the line the span opens on, and a fix that
-// can not find it offers nothing rather than guessing at where the Statement
-// began.
-//
-// The keyword must OPEN its line, which is what keeps `expect "expect" is
-// Integer` from being rewritten around the word inside the String: a backwards
-// search finds the last one before the cursor, and only the one with nothing but
-// indentation in front of it is the Statement's own.
+// Where the assertion begins: its keyword, on the line the span opens on. The
+// keyword must open its line, so the word inside `expect "expect" is Integer`
+// is never taken for it.
 function openingOf(
 	lines: Array<string>,
 	cursor: common.Cursor,
@@ -55,12 +47,9 @@ function openingOf(
 	return null
 }
 
-// `expect MATCHER = EXPR` — the form `require` has, written on the Keyword
-// that can not have it. The whole of what is wrong is the Keyword: an `expect`
-// records its result and the test carries on, so a name it introduced would
-// stand below a line that may never have run, and a `require` ends the test
-// where it stands. Swapping the word is the whole edit, and the Matcher and the
-// value it was written over are left exactly as they are.
+// `expect MATCHER = EXPR` becomes `require MATCHER = EXPR`. An `expect` lets
+// the test go on after a failure, so it cannot bind names; a `require` ends
+// the test.
 export function requireKeywordAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -85,19 +74,9 @@ export function requireKeywordAction(
 // whatever was written between the Keyword and it.
 const trailingMatcherPattern = /^is\s+(\S[\s\S]*)$/
 
-// `EXPR is MATCHER` — the form a writer reaches for who has met a Matcher
-// behind an `is` somewhere else. A name is introduced left of `=`, so the
-// rewrite is the two sides swapped around a `require`: `expect value is Integer`
-// becomes `require Integer = value`.
-//
-// Preferred, because it is the only mechanical answer the Diagnostic has. Its
-// other Help — compare instead — needs the value the comparison is against, and
-// a Matcher is not one: `Integer` names a shape and there is no `::is(Integer)`
-// to write.
-//
-// Refused where either side runs over a line break. The rewrite puts them on one
-// line in the other order, and text that was laid out over several would come
-// back as one long one.
+// `expect value is Integer` becomes `require Integer = value`. Preferred: the
+// Diagnostic's other Help, comparing, has no value to compare with. Refused
+// for a Matcher over several lines, which the rewrite would join.
 export function matcherBeforeValueAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -143,15 +122,9 @@ export function matcherBeforeValueAction(
 // between a Matcher and the value it was written over.
 const assignmentPattern = /^\s*=\s*$/
 
-// `require 3 = value` — a written value where a shape belongs. What the
-// line asks is whether the two are equal, and that is `Equatable::is`, so the
-// two sides swap around the call: `require value::is(3)`. The Keyword stays as
-// it was written, which is what the Diagnostic's own Help spells — a comparison
-// is a Boolean, and both Keywords judge one.
-//
-// The value's span comes off the secondary Label, and it is the only place it
-// could come from: the Statement is refused whole, so no Node records where the
-// value ends.
+// `require 3 = value` becomes `require value::is(3)`, as the Diagnostic's Help
+// spells it; the keyword stays. The value's span comes from the secondary
+// Label, since no Node records it.
 export function compareWrittenValueAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
