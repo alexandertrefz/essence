@@ -10,30 +10,21 @@ import { analyseSource } from "../analysis"
 import { Lexer } from "../lexer/index"
 import { parseWithDiagnostics } from "../parser/index"
 
-// The guard that makes running every stage over a broken Program safe.
+// Every stage runs over a broken Program, so the Validator reads recovered
+// Programs. They hold an Error where a name did not resolve, or a body missing
+// a dropped Statement. The Validator must never throw there, nor report a
+// mistake caused only by the hole. These specs break real sources at spread
+// sites.
 //
-// The Validator used to see only Programs the two stages in front of it had
-// nothing to say about, so every Type it read was one the Enricher had
-// established. It now reads Programs those stages RECOVERED — an Error where a
-// name did not resolve, a body missing the Statement the Parser dropped — and
-// what it must never do there is throw, or report a mistake whose whole cause
-// is the hole. A spec written by hand can only cover the holes somebody thought
-// of; this one breaks real sources at every site there is.
-//
-// Deterministic, and no timing assertion anywhere. Every mutant is a
-// function of the corpus text and an index into it: the same files produce the
-// same mutants in the same order on every machine, so a failure names a mutant
-// anybody can rebuild. It is a SPEC, so it takes a few hundred sites — the
-// thousands-of-sites sweep is an offline run over the same mutator.
+// Every mutant is a function of the corpus text and an index, so a failure
+// names a mutant anybody can rebuild. Nothing asserts timing.
 
 const TokenType = lexerTypes.TokenType
 type Token = lexerTypes.Token
 
-// Whole, valid sources — the mutants have to start from a Program with
-// nothing wrong with it, or what they measure is the file rather than the
-// mutation. A standard library source is left out: it is one shared declaration
-// space whose names are already builtins, and analysing it as an ordinary
-// Program reports every one of them as a redeclaration of itself.
+// Valid sources, so a verdict is about the mutation rather than the file. A
+// `declarations` source is left out: its names are already builtins, so an
+// ordinary analysis reports each as a redeclaration.
 function corpus(): Array<{ name: string; text: string }> {
 	let directories = [fixturePath(), STDLIB_DIRECTORY]
 	let files: Array<{ name: string; text: string }> = []
@@ -77,8 +68,8 @@ function tokensOf(source: string): Array<Token> {
 			token = lexer.next()
 		}
 	} catch {
-		// An unterminated String is the Lexer's one fatal error. The
-		// Tokens in front of it are still mutation sites.
+		// An unterminated String throws. The Tokens before it are still
+		// mutation sites.
 	}
 
 	return tokens
@@ -94,11 +85,9 @@ const CLOSERS = new Set([
 
 const NAMES = new Set([TokenType.Identifier])
 
-// One mutation per mutant, at a site the Token stream names — a deleted
-// Token, a name nothing declares, a Number written as a String, a dropped `<-`,
-// a dropped closing bracket. Each is a mistake a reader really makes, and each
-// lands in a different stage: a dropped bracket is the Parser's, an undeclared
-// name the Enricher's, a retyped literal the Validator's.
+// One mutation per mutant, at a Token. It deletes a Token, undeclares a name,
+// writes a Number as a String, or drops a `<-` or a closing bracket. These are
+// real mistakes, and each reaches a different stage.
 function mutationsOf(source: string): Array<Mutation> {
 	let tokens = tokensOf(source)
 	let mutations: Array<Mutation> = []
@@ -151,10 +140,8 @@ function mutationsOf(source: string): Array<Mutation> {
 	return mutations
 }
 
-// A fixed number of sites per file, spread across the whole file rather
-// than taken off its head — a stride, so that a file's last Statement is
-// mutated as often as its first. Adding a file to the corpus changes which
-// sites are picked in that file and in no other.
+// A fixed number of sites per file, picked by a stride so the whole file is
+// covered. Adding a file to the corpus changes no other file's sites.
 const SITES_PER_FILE = 12
 
 function mutantsOf(file: { name: string; text: string }): Array<Mutation> {
@@ -164,10 +151,8 @@ function mutantsOf(file: { name: string; text: string }): Array<Mutation> {
 	return mutations.filter((_, index) => index % stride === 0)
 }
 
-// Every Position the Enricher wrote an Error onto — the holes a Validator
-// Diagnostic may not point into. Read off the typed tree by walking every
-// field, for the reason `eraseRefinements` walks one: a hole in a Node kind
-// this did not name by hand would be a hole nothing checks.
+// Every Position the Enricher typed Error, where no Validator Diagnostic may
+// point. Walking every field means no Node kind is missed.
 function errorSpans(program: common.typed.Program): Array<common.Position> {
 	let spans: Array<common.Position> = []
 	let seen = new Set<object>()
@@ -230,11 +215,8 @@ function positionKey(diagnostic: common.Diagnostic): string {
 		: `${position.start.line}:${position.start.column}`
 }
 
-// Which stage a Diagnostic came from, by its code — the Validator's own
-// codes are the ones this spec has anything to say about, since it is the
-// Validator that now reads a Program it never used to see. A code both stages
-// can report is not in the set: the question asked of it would be about which
-// of them said it, and the fingerprint does not carry that.
+// The codes only the Validator reports. A code both stages report is left
+// out, since nothing here says which stage reported it.
 const VALIDATOR_ONLY_CODES = new Set([
 	"missing-return",
 	"missing-case",
@@ -254,28 +236,21 @@ const VALIDATOR_ONLY_CODES = new Set([
 	"unobserved-started",
 ])
 
-// ONE corpus and ONE set of mutants for every `describe` below. They are
-// a pure function of the checked-in sources, so a second copy was the same list
-// built from the same files a second time — and the blocks asking different
-// questions of the SAME mutants is the point: a mutant that throws in one of
-// them is the mutant that leaked a name in the other.
+// One corpus and one set of mutants for every describe, so the specs ask
+// different questions of the same mutants.
 const files = corpus()
 const mutants = files.flatMap((file) =>
 	mutantsOf(file).map((mutation) => ({ file: file.name, mutation })),
 )
 
-// The sweeps write out the budget `scripts/testBudget.ts` gives every
-// spec. None of them is a performance assertion: each walks a fixed set of a
-// few hundred mutants and stops.
-
+// The sweeps restate the budget `scripts/testBudget.ts` gives every spec.
+// None asserts performance: each walks a fixed set of mutants.
 describe("analysing a broken Program", () => {
 	it("has a corpus to break", () => {
 		expect(files.length).toBeGreaterThan(20)
 		expect(mutants.length).toBeGreaterThan(200)
 	})
 
-	// The corpus itself has to be clean, or every verdict below is about
-	// a file rather than about a mutation.
 	it("starts from Programs with nothing wrong with them", () => {
 		for (let file of files) {
 			expect([
@@ -300,8 +275,7 @@ describe("analysing a broken Program", () => {
 				)
 			}).not.toThrow()
 
-			// An `internal-error` out of a Program that has a genuine
-			// mistake in it is the Compiler blaming itself for the recovery.
+			// An `internal-error` here would blame the Compiler for a real mistake.
 			expect([
 				name,
 				codes.filter((code) => code === "internal-error"),
@@ -309,10 +283,9 @@ describe("analysing a broken Program", () => {
 		}
 	}, 60_000)
 
-	// The no-cascade rule, measured two ways. A Validator Diagnostic
-	// standing INSIDE the span of something the Enricher typed Error is a
-	// verdict about a hole; and two Diagnostics sharing one Position are two
-	// stages answering the same mistake in different words.
+	// No cascade. A Validator Diagnostic inside a span the Enricher typed
+	// Error is about a hole. Two Diagnostics at one Position report one mistake
+	// twice.
 	it("says nothing about a hole, and nothing twice about one place", () => {
 		for (let { file, mutation } of mutants) {
 			let name = `${file} ${mutation.kind}@${mutation.index}`
@@ -329,11 +302,8 @@ describe("analysing a broken Program", () => {
 				[name, []],
 			)
 
-			// And no Validator Diagnostic standing where another stage has
-			// already put one. Two verdicts at one Position are two answers to
-			// one mistake, and the Validator's is the one that is new here —
-			// the Parser's own double reports are its business and are as old
-			// as the recovery.
+			// Only doubles that include a Validator code count. The Parser's
+			// own doubles are outside this spec.
 			let seen = new Map<string, Array<string>>()
 
 			for (let diagnostic of analysed.diagnostics) {
@@ -356,23 +326,13 @@ describe("analysing a broken Program", () => {
 	}, 60_000)
 })
 
-// Two things the same Compiler must say the same way twice, measured over
-// the same mutants.
-//
-// A Diagnostic is TEXT a reader compares against what they remember, a Snapshot
-// records, and a bug report quotes. So nothing the Compiler made up for its own
-// bookkeeping may reach one — and nothing that depends on how much work the
-// process did before this analysis may either, or the same file analysed twice
-// in one session says two different things and neither of them is wrong.
+// A Diagnostic is text that Snapshots record and bug reports quote. No name
+// the Compiler invents may reach it, and it may not depend on what the process
+// analysed before.
 describe("the same broken Program, analysed twice", () => {
-	// A callee's Type Parameters are alpha-renamed for the span of one
-	// invocation — `ItemType` becomes `ItemType`, a ZERO-WIDTH SPACE and a
-	// counter — and a Parameter that never binds is still carrying that name
-	// where a report picks it up. Only the separator is invisible, so the
-	// reader was shown `ItemType57`; and the counter is process-wide, so the
-	// number changed every time the same file was analysed again. The separator
-	// is the one thing no source Generic can hold, which makes it exactly the
-	// thing to search a message for.
+	// A callee's Type Parameters are renamed for one invocation with a
+	// zero-width space and a process-wide counter. No source Generic holds that
+	// separator, so the spec searches every message for it.
 	it("names no Type Parameter the Compiler invented", () => {
 		for (let { file, mutation } of mutants) {
 			let name = `${file} ${mutation.kind}@${mutation.index}`
@@ -391,10 +351,9 @@ describe("the same broken Program, analysed twice", () => {
 		}
 	}, 60_000)
 
-	// And the whole report, three times over, in ONE process. A counter,
-	// a cache keyed on something it should not be, a Map iterated in insertion
-	// order that another run filled differently — each of them shows up here and
-	// nowhere else, because every other spec analyses each source once.
+	// The whole report three times in one process. A counter, a wrongly keyed
+	// cache or a Map filled in another order shows only here, since other specs
+	// analyse each source once.
 	it("says the same thing three times running", () => {
 		for (let { file, mutation } of mutants) {
 			let name = `${file} ${mutation.kind}@${mutation.index}`
@@ -406,9 +365,8 @@ describe("the same broken Program, analysed twice", () => {
 	}, 60_000)
 })
 
-// Everything a reader sees, in the order they see it — the message, where
-// it points, and every line under it. A determinism check written over the codes
-// alone passes through a counter that only ever reaches a Note.
+// Everything a reader sees, in order: the message, its place and every line
+// under it. A check of the codes alone would miss a counter in a Note.
 function fingerprints(source: string): Array<string> {
 	return analyseSource(source).diagnostics.map((diagnostic) =>
 		[
@@ -423,10 +381,9 @@ function fingerprints(source: string): Array<string> {
 	)
 }
 
-// The keywords a name is DECLARED after. A mutant that renames a
-// declaration renames one end of a binding and leaves the other alone, so what
-// reports is the READ somewhere else in the file — or nothing at all, where
-// nothing reads it. Those are not the sites this measures.
+// The keywords a name is declared after. Renaming a declaration leaves the
+// reads elsewhere to report, or nothing where nothing reads it, so these sites
+// are skipped.
 const DECLARING_TOKEN_TYPES = new Set([
 	TokenType.KeywordConstant,
 	TokenType.KeywordVariable,
@@ -442,16 +399,10 @@ const DECLARING_TOKEN_TYPES = new Set([
 	TokenType.KeywordCase,
 ])
 
-// Whether the Identifier at `index` stands where the Program READS a
-// name, rather than where it binds one. A binder is not a read: renaming
-// `constant total` leaves every `total` below it reporting instead, and
-// renaming a Parameter or a Record key reports nothing anywhere, because
-// nothing was looking the name up.
-//
-// Three shapes are bindings: a name after one of the declaring keywords above,
-// a name a `:` or `=` follows (a Parameter's annotation, a Record member's
-// value), and a Function literal's Parameter list — `(count, item) { … }`,
-// which is the one parenthesised run whose `)` is followed by a `{`.
+// Whether the Identifier at `index` reads a name rather than binding one. A
+// binding is a name after a `DECLARING_TOKEN_TYPES` keyword, a name followed
+// by `:` or `=`, or a Function literal's Parameter. That last is the one
+// parenthesised run whose `)` is followed by a `{`.
 function readsAName(tokens: Array<Token>, index: number): boolean {
 	let previous = tokens[index - 1]
 	let next = tokens[index + 1]
@@ -498,16 +449,9 @@ function insideFunctionLiteralParameters(
 	return false
 }
 
-// The check that a genuine mistake is never SILENCED — the one every
-// stand-down in the recovery has to survive. Replacing a name a Program reads
-// with one nothing declares is a mistake by construction, so the analysis owes
-// a report about it: at the mutation site, under whichever "no such name" code
-// the position calls for.
-//
-// The exception is the whole point of the recovery: a site standing in text the
-// Parser ABANDONED is a site inside a syntax error, and answering it a second
-// time is the cascade all of this exists to remove. A mutation that breaks the
-// parse is excused, and only that.
+// A real mistake is never silenced by a stand-down. Replacing a read name with
+// an undeclared one owes a report. Only a mutation that breaks the parse is
+// excused, since reporting it again would be the cascade the recovery removes.
 describe("a name nothing declares, in a Program that parsed", () => {
 	const NAME_CODES = new Set([
 		"unknown-name",
@@ -521,9 +465,8 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	it("is reported where it is written", () => {
 		for (let file of files) {
 			let tokens = tokensOf(file.text)
-			// The implementation only. A `tests { … }` block is left
-			// parsed and never enriched unless the compile ASKED for the tests,
-			// so a name broken in one is a name nothing looked at.
+			// The implementation only. A `tests { … }` block is not enriched
+			// unless the compile asks for tests.
 			let testsLine =
 				file.text.split("\n").findIndex((line) => line === "tests {") +
 				1
@@ -548,8 +491,7 @@ describe("a name nothing declares, in a Program that parsed", () => {
 					"zqNotDeclared" +
 					file.text.slice(token.end)
 
-				// A mutation that broke the parse is excused — and only
-				// that. Every other one has to be answered.
+				// Only a mutation that broke the parse is excused.
 				if (
 					(parseWithDiagnostics(source).program.recovery?.lines
 						.length ?? 0) > 0
@@ -570,11 +512,8 @@ describe("a name nothing declares, in a Program that parsed", () => {
 							token.position.start.column,
 				)
 
-				// At the mutation site where the site READS the name, and
-				// somewhere otherwise — a site this could not tell from a
-				// binder renames one end of a binding, and what answers is the
-				// read at the other end. Either way the mistake is ANSWERED,
-				// which is the whole of what a stand-down may not take away.
+				// `here` is a subset of `errors`, so this asserts only that some
+				// error is reported, not that it stands at the mutation site.
 				expect([name, errors.length > 0 || here.length > 0]).toEqual([
 					name,
 					true,
@@ -584,17 +523,9 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	}, 60_000)
 })
 
-// The mutant that found this, written down whole rather than left to a
-// sweep to rediscover. A Type Alias the file never declared leaves `Seat` an
-// Error, the Dictionary keyed by it never binds `List.of`'s `ItemType`, and the
-// bound the key position carries is checked against a Type Parameter still
-// wearing the name the freshening gave it for the span of that one call.
-//
-// Two things were wrong with the report. The reader was shown `ItemType57` —
-// only the separator is invisible — for a Parameter their file spells
-// `ItemType`. And the counter is process-wide, so the same file analysed twice
-// in one session named a different Parameter each time: a Diagnostic that is
-// not a function of the source it is about.
+// The undeclared `Seat` is an Error, so `List.of`'s `ItemType` never binds.
+// The key's bound is then checked against the renamed Type Parameter, and the
+// report must still name `ItemType` the same way every time.
 describe("a bound checked against a Type Parameter mid-inference", () => {
 	let source = `implementation {
 	constant seats: List<Seat> = List.of(integersFrom 0, through 9)
