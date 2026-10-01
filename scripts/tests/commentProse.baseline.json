@@ -124,7 +124,6 @@
 	"packages/language-server/src/codeActions/payloads.ts": {"sentence-length": 15, "em-dash": 12, "all-caps": 8, "block-length": 1},
 	"packages/language-server/src/codeActions/sectionFixes.ts": {"sentence-length": 14, "em-dash": 9, "all-caps": 5, "position": 2, "block-length": 3},
 	"packages/language-server/src/codeActions/tableTest.ts": {"sentence-length": 21, "em-dash": 21, "all-caps": 16, "block-length": 1},
-	"packages/language-server/src/codeActions/testFixes.ts": {"sentence-length": 9, "em-dash": 8, "all-caps": 6, "position": 1, "block-length": 3},
 	"packages/language-server/src/tests/affected.spec.ts": {"sentence-length": 5, "em-dash": 6, "all-caps": 3},
 	"packages/language-server/src/tests/analysisCache.spec.ts": {"sentence-length": 111, "em-dash": 71, "all-caps": 48, "history": 7, "position": 1, "block-length": 11, "counts": 1},
 	"packages/language-server/src/tests/argumentContext.spec.ts": {"sentence-length": 1, "em-dash": 3, "all-caps": 1},

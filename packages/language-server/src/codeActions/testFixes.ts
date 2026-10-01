@@ -5,33 +5,22 @@ import { isWordBounded, removeLinesEdit, sliceOf } from "./geometry"
 import type { CodeActionEntry } from "./index"
 import { findTestModifierWord } from "./lookups"
 
-// The Diagnostics a test's or a suite's MODIFIERS carry. Each of them is
-// answered by taking a Modifier back out — the vocabulary is three words and
-// the Enricher is what knows them, so nothing here decides what a Modifier
-// means; it decides what a word plus its arguments occupies, which is what an
-// edit needs.
+// Fixes for a test's or suite's Modifiers, each taking a Modifier out. The
+// Enricher knows what Modifiers mean; these decide only what text a word and
+// its arguments occupy.
 
-// A Modifier's name and what it was written with. The Parser reads a
-// Modifier generically — a name and the arguments that follow it — so the two
-// halves are told apart here by the same rule, off the buffer, rather than by
-// asking the Enricher to hand its reading back.
+// A Modifier's name and its arguments, split off the buffer by the Parser's
+// own rule: a name, then whatever follows.
 const modifierParts = /^([A-Za-z][A-Za-z0-9]*)[ \t]*([\s\S]*)$/
 const bareWord = /^[A-Za-z][A-Za-z0-9]*$/
 const tagged = "tagged"
 
-// The Diagnostic spans the NAME, and what has to go is the Modifier — a
-// name the Parser read arguments into takes them with it, or `test "a" retries
-// 3 {}` is left holding a `3` that opens nothing. Where the Enricher's
-// regrouping reported about an ARGUMENT instead, the word goes alone, which is
-// what leaves `tagged slow` standing.
+// Removes the Modifier the Diagnostic names, with any arguments the Parser
+// read into it, so an unknown `retries 3` goes whole. Reported about an
+// argument, only that word goes, leaving `tagged slow`.
 //
-// So the word is looked up rather than assumed to be one: a Position that names
-// neither belongs to some other reading of the file, and nothing is offered for
-// it.
-//
-// Preferred only where the Diagnostic names no near miss. Where it does, the
-// spelling fix beside this one is the likelier answer and is the one an Editor
-// may apply unasked.
+// Preferred unless the Diagnostic suggests a near miss, whose spelling fix is
+// likelier.
 export function removeModifierAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -55,14 +44,9 @@ export function removeModifierAction(
 	})
 }
 
-// Both readings, and neither preferred — which of `skipped` and `focused`
-// was meant is not something the source says, and that is the whole of what the
-// Diagnostic has to report. `skipped` is offered first because it is the one
-// that stops the test from running at all.
-//
-// The Diagnostic spans the `focused` and points back at the `skipped` with its
-// secondary Label, and that span covers the reason String — a skip is written
-// with one, so the String goes with the Modifier it belongs to.
+// Removes `skipped` or `focused`, neither preferred, since the source does not
+// say which was meant. The secondary Label spans `skipped` with its reason, so
+// both go together.
 export function contradictoryModifierActions(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -96,17 +80,11 @@ export function contradictoryModifierActions(
 	return entries
 }
 
-// The Diagnostic spans the SECOND Modifier and points back at the first,
-// and both spans are read off the buffer rather than looked up: the Enricher
-// regroups what the Parser read before it reports, so `tagged slow` may be one
-// Modifier made of two the Parser kept apart, and no Node here spans it.
+// A repeated Modifier. Both spans are read off the buffer, since the Enricher
+// may have joined two Parser Modifiers into one that no Node spans.
 //
-// `tagged` merges, because its arguments are a list and two lists are one list
-// — nothing is lost, which is what makes the merge preferred. Every other
-// Modifier says ONE thing, so there is nothing to merge and the second is
-// simply taken out: the Enricher already keeps the first, and the edit says so
-// rather than changing what the Program means. Never preferred, since which of
-// the two was meant is not something the source says.
+// Two `tagged` lists merge without loss, so the merge is preferred. Any other
+// repeat is removed, as the Enricher already ignores it; that is not preferred.
 export function mergeModifierAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	lines: Array<string>,
@@ -126,11 +104,8 @@ export function mergeModifierAction(
 		return null
 	}
 
-	// And both spans have to stand on whole words. Two spans that slid by
-	// the SAME column read as the same word as readily as two that did not —
-	// `ocused` out of `focused focused`, once the line lost its indentation —
-	// so the agreement above says nothing on its own, and what is asked here is
-	// that neither edge of either span cuts a name in half.
+	// Both spans must stand on whole words, since two spans shifted alike
+	// still read alike, such as `ocused`.
 	if (
 		!isWordBounded(lines, diagnostic.position) ||
 		!isWordBounded(lines, first)
@@ -140,9 +115,8 @@ export function mergeModifierAction(
 
 	let removal = removeLinesEdit(lines, diagnostic.position)
 
-	// A `tagged` naming no tags is refused by a Diagnostic of its own, and
-	// merging one in would write `tagged, slow`. So the merge asks that both
-	// halves name something, and the removal answers everything else.
+	// A `tagged` without tags has its own Diagnostic, and merging it would
+	// write `tagged, slow`, so it is removed instead.
 	if (second[1] !== tagged || second[2] === "" || earlier[2] === "") {
 		return {
 			title: `Remove the second '${second[1]}'`,
@@ -160,8 +134,7 @@ export function mergeModifierAction(
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
 		isPreferred: true,
-		// In document order, since the two never overlap — the first
-		// Modifier is above the second by the order they were seen in.
+		// In document order; the first Modifier precedes the second.
 		edits: [
 			{
 				range: { start: first.end, end: first.end },
