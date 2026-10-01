@@ -1,18 +1,10 @@
-// The child half of `enricherTermination.spec.ts` — one job in on stdin,
-// one word out. It exists so the spec can put a WALL CLOCK around work that
-// might not come back: a run that does not terminate can not be caught in the
-// process that started it, and a `bun test` that inherits the spin reports
-// nothing at all.
+// The child half of `enricherTermination.spec.ts`: one job in on stdin, one
+// word out. A run that never terminates can not be caught in the process that
+// started it, so the spec runs it here under a wall clock.
 //
-// Two jobs, because the two protections being guarded sit at different depths.
-// A `source` job analyses a whole Program, which is what a reader would hit; a
-// `match` job hands `matchesTypeWithBindings` a raw context whose Type
-// Parameters were NOT alpha-renamed, which is the only way to reach the occurs
-// check while the renaming that normally keeps it out of the way is in place.
-//
-// Nothing is asserted here. Whether the analysis reports Diagnostics, and
-// whether the match answers yes or no, are the spec's business; this only has to
-// come back.
+// A `source` job analyses a whole Program. A `match` job hands
+// `matchesTypeWithBindings` Type Parameters that were not alpha-renamed, the
+// only way to reach the occurs check. Nothing is asserted here.
 import type { common } from "@essence-lang/interfaces"
 
 import { analyseSource } from "../analysis"

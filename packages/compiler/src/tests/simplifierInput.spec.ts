@@ -9,14 +9,9 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 
-// The Simplifier READS a typed Program and writes a new one. The typed
-// Program is read again after it — the Language Server holds it for every hover
-// and rename, the prelude simplifies the standard library's once per process,
-// and a contract goal shares one typed check between every entry over the same
-// refinement — so a Simplifier that wrote into its input would hand the next
-// reader something no source said. The Overload suffix is the case that bit:
-// it only appends, so a node simplified twice named `raise__overload$1` the
-// first time and `raise__overload$1__overload$1` the second.
+// The Simplifier reads a typed Program and writes a new one. The Language
+// Server and the prelude read the typed Program again afterwards. Writing into
+// it would append a second Overload suffix on a second pass.
 function typedOf(source: string): common.typed.Program {
 	let parsed = parseWithDiagnostics(source)
 
@@ -29,9 +24,8 @@ function typedOf(source: string): common.typed.Program {
 	return enriched.program
 }
 
-// The base of the power is COMPUTED, so that `raise` reaches the
-// Overload `Integer` declares rather than the lone entry a proven base has —
-// this file is about the suffix that Overload gives an emitted name.
+// The base of the power is computed, so `raise` reaches the Overload
+// `Integer` declares rather than the lone entry a proven base has.
 const SOURCE = `implementation {
 	constant power = 3::subtract(1)::raise(to 10)
 	constant range = List.of(integersFrom 1, through 3)

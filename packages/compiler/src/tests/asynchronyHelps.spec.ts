@@ -3,21 +3,17 @@ import { describe, expect, it } from "bun:test"
 import { barredCompletion } from "../helpers/describe"
 import { analysedDiagnosticsFor, compiles } from "./followedHelps"
 
-// One question, asked by every report that could offer `complete`, and one
-// answer per position. The audit found the word offered where writing it is
-// `complete-outside-future` and withheld where writing it compiles, because
-// three reporters asked three questions: "is this body marked completing", "does
-// it declare a Future", "is it the top level". They ask `bodyCanWait` now — the
-// Enricher off the Scope chain, the Validator off its stack of enclosing bodies
-// — and this is the table that says so.
+// Every report that could offer `complete` gives one answer per position, the
+// one `bodyCanWait` gives. See "Completing bodies" in
+// packages/compiler/src/validator/DEVELOPMENT.md.
 //
 // The positions are every shape a body comes in, and the sites are every report
-// that holds a Future where a value was wanted. A cell is what the report SAYS
-// about the word, and where it offers it, the Program with the word written in
-// is compiled: a Help that offers an edit is a promise that the edit works.
+// that holds a Future where a value was wanted. A cell is what the report says
+// about the word. Where it offers the word, the Program with it written in must
+// compile.
 
 type Verdict =
-	// The word, written HERE, is the edit.
+	// The word, written here, is the edit.
 	| "offered"
 	// Two steps: declare the enclosing Function a waiting one, then write it.
 	| "two-step"
@@ -37,8 +33,8 @@ function verdictOf(helps: Array<string>): Verdict | "nothing" {
 		return "parameter-default"
 	}
 
-	// Case-folded, because the clause is written "Or declare …" where it
-	// comes second and "Declare …" where it stands alone.
+	// Case-folded, because the clause starts "Or declare" where it comes second
+	// and "Declare" where it stands alone.
 	if (
 		helps.some((help) =>
 			help.toLowerCase().includes("declare the enclosing function"),
@@ -60,8 +56,8 @@ function verdictOf(helps: Array<string>): Verdict | "nothing" {
 	return "nothing"
 }
 
-// `fetched` and the two names the sites call are written into every probe,
-// so that what differs between two cells is the position and nothing else.
+// Every probe declares the names the sites call, so two cells differ only
+// in the position.
 let preamble = [
 	"	function fetched() -> Future<Integer> {",
 	"		complete Async.sleep(milliseconds 1)",
@@ -81,17 +77,14 @@ let preamble = [
 ].join("\n")
 
 type Site = {
-	// The code the report carries, so that a cell testing the Helps of
-	// nothing fails rather than passes.
+	// The code the report carries, so a cell that reports nothing fails.
 	code: string
 	// One statement holding a Future where a value goes, and the same statement
 	// with the word written in.
 	written: string
 	followed: string
-	// And the same statement as an EXPRESSION, for the Parameter default
-	// position, which takes one rather than a statement. Null where the report
-	// has no shape there at all — a default is a default, and an ASSIGNMENT is
-	// not one, so `assignment-type-mismatch` has nothing to say in that cell.
+	// The same as an Expression, for the Parameter default position. Null
+	// where the report has no such shape: an assignment can not be a default.
 	asDefault: string | null
 }
 
@@ -141,10 +134,8 @@ let sites: Array<Site> = [
 type Position = {
 	name: string
 	wrap: (statement: string) => string
-	// And the same position once the word IS written, where writing it
-	// changes what the body around it has to say. A body that had completed
-	// nothing answers with a Future it built; once it waits, it answers with the
-	// value — which is the ordinary shape of every async body.
+	// The same position once the word is written, where that changes the body
+	// around it. A body that waits answers with the value, not a Future it built.
 	wrapFollowed?: (statement: string) => string
 	verdict: Verdict
 }
@@ -168,11 +159,8 @@ let positions: Array<Position> = [
 			`implementation {\n${preamble}\n\n\tfunction waits() -> Future<Integer> {\n\t\tcomplete Async.sleep(milliseconds 1)\n\n\t\t${statement}\n\n\t\t<- 0\n\t}\n}`,
 		verdict: "offered",
 	},
-	// The cell the whole seam was about. A body that declares
-	// `-> Future<…>` and has not written its first `complete` is the body a
-	// report is most likely to be offering the word to — and three of these
-	// sites used to answer it with "declare the enclosing Function
-	// '-> Future<…>'", which its author had already done.
+	// A body that declares `-> Future<…>` but has not written `complete` yet is
+	// offered the word, not the declaration it already has.
 	{
 		name: "a waiting Function that has not completed anything yet",
 		wrap: (statement) =>
@@ -240,11 +228,9 @@ describe("Every report that could offer 'complete'", () => {
 						: site.written
 					let { codes, helps } = helpsAt(position, statement)
 
-					// The Parameter default position raises the
-					// Declaration's own refusal for some of these — a default is
-					// measured against the Parameter's Type before anything else
-					// — so what is pinned there is the barrier's sentence rather
-					// than which code carries it.
+					// A default is measured against the Parameter's Type first, so
+					// the default position may report another code. It pins the
+					// barrier's sentence alone.
 					if (!isDefaultPosition(position)) {
 						expect(codes).toContain(site.code)
 					}
@@ -253,8 +239,7 @@ describe("Every report that could offer 'complete'", () => {
 				})
 			}
 
-			// And the promise, kept: where the word is offered, the Program
-			// with the word written in is a Program that compiles.
+			// Where the word is offered, the Program with it written in compiles.
 			for (let position of positions.filter(
 				(candidate) => candidate.verdict === "offered",
 			)) {

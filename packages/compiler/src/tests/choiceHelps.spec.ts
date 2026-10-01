@@ -2,16 +2,13 @@ import { describe, expect, it } from "bun:test"
 
 import { analysedDiagnosticsFor, compiles, firstOf } from "./followedHelps"
 
-// The Helps about Choices and about asynchrony that named a spelling the
-// language does not have, contradicted the message above them, or were printed
-// once per arm for one mistake. And the codes in this family that knew the fix
-// and printed nothing at all.
+// Helps about Choices and asynchrony name a spelling the language has, agree
+// with their message, and come once per mistake. Codes that know the fix say it.
 
 describe("A hole holding a Type Parameter", () => {
-	// The Union Help is UNFOLLOWABLE for one: `Item` is no Union to match
-	// apart and no Optional to unwrap, so a reader who followed it had nothing
-	// to write a Case for. What it wants is a bound, and whose Parameter it is
-	// decides where the bound goes.
+	// The Union Help does not fit a Type Parameter: `Item` is no Union to
+	// match apart and no Optional to unwrap. It wants a bound, and whose
+	// Parameter it is decides where the bound goes.
 	let source = `implementation {
 		type Box<Item> = { item: Item }
 
@@ -24,18 +21,16 @@ describe("A hole holding a Type Parameter", () => {
 		Terminal.print("{{ item = 1 }}")
 	}`
 
-	// `toString` FULFILS this Namespace's `Printable`, so the conformance
-	// promises it unconditionally and a bound of its own is refused — the
-	// condition belongs on the conformance, and that is the only Help offered.
+	// `toString` fulfils this Namespace's `Printable`, so a bound of its own is
+	// refused. The condition belongs on the conformance.
 	it("should ask for the bound rather than for a Match", () => {
 		expect(firstOf(source, "interpolation-not-printable").helps).toEqual([
 			"Add 'where Item is Printable' to 'is Printable' on this Namespace.",
 		])
 	})
 
-	// The per-Method bound is not offered here because it does not work
-	// here: a Method that answers a requirement can not quietly want more of its
-	// receiver than the conformance promised.
+	// A Method that answers a requirement can not want more of its receiver
+	// than the conformance promised.
 	it("should not offer a per-Method bound to a fulfilling Method", () => {
 		expect(
 			compiles(
@@ -60,8 +55,7 @@ describe("A hole holding a Type Parameter", () => {
 		).toBe(true)
 	})
 
-	// A hole that holds neither work nor a Type Parameter keeps the Help
-	// it was written for.
+	// A hole that holds neither work nor a Type Parameter keeps the Union Help.
 	it("should leave an unprintable Union alone", () => {
 		let union = `implementation {
 			constant value: Integer | String = 1
@@ -98,9 +92,8 @@ describe("A Match written on a Future", () => {
 		Terminal.print(name())
 	}`
 
-	// One mistake — the subject — said once per arm, each time about a
-	// different Case name. The arms below the first answer with the Error they
-	// would have answered with anyway.
+	// The subject is one mistake, so it is reported once rather than once per
+	// arm.
 	it("should report the subject once, not once per arm", () => {
 		expect(
 			analysedDiagnosticsFor(source).filter(
@@ -109,18 +102,16 @@ describe("A Match written on a Future", () => {
 		).toBe(1)
 	})
 
-	// `complete` is refused in a body that answers anything but a Future,
-	// so the edit takes two steps and the declaration is the first of them.
+	// `complete` is refused in a body that answers anything but a Future, so
+	// the edit takes two steps and the declaration is the first.
 	it("should name the declaration where the body can not wait", () => {
 		expect(firstOf(source, "unknown-case").helps).toEqual([
 			"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, then wait for it first — 'constant answered = complete …' — and match 'answered'.",
 		])
 	})
 
-	// A body only WAITS once it writes the word — that is what the Parser
-	// marks a body completing by — so the declaration alone is not enough and
-	// the two-step Help above is right for a body that has not written one yet.
-	// A Program's top level waits outright, and there the word is the whole edit.
+	// A Program's top level waits outright, so there `complete` is the whole
+	// edit.
 	it("should name one step where the position waits outright", () => {
 		let waits = `implementation {
 			choice Colour {
@@ -173,9 +164,7 @@ describe("A Match written on a Future", () => {
 })
 
 describe("A 'start' on work already in flight", () => {
-	// The Note explained a value that is NOT work, which is the opposite
-	// complaint to the message above it — a reader told both had a
-	// contradiction to resolve on their own.
+	// A Started is work, so its Note must not say the value describes no work.
 	it("should say what a Started is", () => {
 		let source = `implementation {
 			function fetched() -> Future<String> {
@@ -207,10 +196,8 @@ describe("A 'start' on work already in flight", () => {
 })
 
 describe("A payload default a generic Choice can not take", () => {
-	// "Declare a Choice for the Type this default is a value of" is a
-	// Choice of what the MEMBER holds — `1` is an Integer, and a Choice of
-	// Integers defaults nothing. What admits the default is a Choice that
-	// abstracts over nothing.
+	// What admits the default is a Choice that abstracts over nothing, not a
+	// Choice of the member's Type.
 	let source = `implementation {
 		choice Holder<Item> {
 			Full { item: Item, count: Integer } = { count = 1 },
@@ -247,9 +234,8 @@ describe("A payload default a generic Choice can not take", () => {
 })
 
 describe("A payload default that names a value", () => {
-	// `'= { … }'` says only "a Record goes here", which the message above
-	// it already said. The member names are in hand at the report site; the
-	// values are not, and stay the `…` they are.
+	// The Help spells the member names, which the report site knows. The
+	// values it does not know stay `…`.
 	let source = `implementation {
 		constant defaults = { retries = 3 }
 

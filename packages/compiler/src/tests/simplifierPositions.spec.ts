@@ -7,9 +7,9 @@ import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { simplify } from "../simplifier/index"
 
-// Positions must survive simplification for the Rewriter to map what it
-// emits back onto the source — while a node the Simplifier synthesizes, which
-// no source was written for, must stay position-less, so it emits no mapping.
+// Positions survive simplification so the Rewriter can map its output onto
+// the source. A node the Simplifier synthesizes stays position-less, so it
+// emits no mapping.
 function simplifyWithTyped(source: string): {
 	typed: common.typed.Program
 	simplified: common.typedSimple.Program
@@ -61,11 +61,8 @@ describe("Simplifier Positions", () => {
 		)
 	})
 
-	// A default is an Expression written where it stands, and it keeps the
-	// Position it was written at — so stepping into a call that took one stops
-	// on the `= …` in the source, which is where the work is happening. The
-	// filler an interior omission emits is the other half: no source wrote it,
-	// so it carries no Position and emits no mapping.
+	// Stepping into a call that took a default stops on the `= …` in the
+	// source.
 	it("keeps a default's own position", () => {
 		let { typed, simplified } = simplifyWithTyped(`implementation {
 			function f(_ count: Integer = 1) -> Integer {
@@ -90,11 +87,9 @@ describe("Simplifier Positions", () => {
 		expect(simplifiedDefault.position).toEqual(typedDefault.position)
 	})
 
-	// A Record default carries no JavaScript default at all — it opens the
-	// body with a merge instead — and that Statement takes the Parameter's own
-	// Position, so a step into the Function stops on the Parameter that was
-	// defaulted rather than on Compiler glue the Debug Adapter would step out
-	// of.
+	// A step into the Function stops on the defaulted Parameter rather than on
+	// glue the Debug Adapter would step out of. See "Record defaults" in
+	// packages/compiler/src/simplifier/DEVELOPMENT.md.
 	it("gives a Record default's merge the Parameter's position", () => {
 		let { typed, simplified } = simplifyWithTyped(`implementation {
 			type Options = { host: String, retries: Integer }
@@ -149,10 +144,9 @@ describe("Simplifier Positions", () => {
 		expect(filler.position).toBeUndefined()
 	})
 
-	// A member path's Function is synthesized, but every span in it was
-	// WRITTEN — the step's own for the Lookup that reads it, the path's for the
-	// Parameter and the Return. That is what a step into the callback stops on,
-	// and what the Language Server renames and colours.
+	// A member path's Function is synthesized from written spans: the step's
+	// own for its Lookup, the path's for the Parameter and the Return. Stepping
+	// and renaming rely on them.
 	it("keeps the span each step of a member path was written at", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			type Maker = { town: String }
@@ -205,9 +199,8 @@ describe("Simplifier Positions", () => {
 		})
 	})
 
-	// A body promising unit, the empty Record `{}`, may fall off its end,
-	// and the Simplifier appends the `<- {}` the Signature promised. No source
-	// was written for that Return, so it carries no position.
+	// A body promising the empty Record `{}` may fall off its end, and the
+	// Simplifier appends the `<- {}` with no position.
 	it("leaves the synthesised trailing Return position-less", () => {
 		let { simplified } = simplifyWithTyped(`implementation {
 			function noop () -> {} {
