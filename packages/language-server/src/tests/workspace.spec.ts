@@ -5722,6 +5722,45 @@ describe("Workspace", () => {
 				).toContain("Move 'double' to ./B.es")
 			})
 
+			// This Module publishes `factor` as `scale`, so that is the name the
+			// destination imports, under the one the Statement writes.
+			it("should import a name this Module publishes under another name by that name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tconstant factor = 2",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with factor)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble",
+						"\tfactor as scale",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					4,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
+					'\tfrom "./A.es" { scale as factor }',
+				)
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
+			})
+
 			// A Variable cannot be exported, so it cannot move. The cursor must be
 			// on the name, or every Statement of a body would offer the move.
 			it("should offer nothing for a Variable, or for a cursor off the name", () => {

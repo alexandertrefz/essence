@@ -113,9 +113,9 @@ type Move = {
 	// The Statement with its `§§` block.
 	span: common.Position
 	text: string
-	// The published names of this Module the Statement reads, which the
-	// destination imports.
-	needed: Array<string>
+	// The names of this Module the Statement reads, which the destination
+	// imports by the name this Module publishes each under.
+	needed: Array<{ name: string; local: string }>
 	// The destination imports these from the Modules they name.
 	imports: Array<ReadImport>
 	removal: CodeActionEdit
@@ -283,13 +283,29 @@ function readsMovableNames(
 	index: RenameIndex,
 	uses: Array<ImplicitUse>,
 	span: common.Position,
-): { needed: Array<string>; imports: Array<Declaration> } | null {
+): {
+	needed: Array<{ name: string; local: string }>
+	imports: Array<Declaration>
+} | null {
 	let program = context.program
-	let published = new Set(
-		(program.exports?.entries ?? [])
-			.filter((entry) => entry.source === null)
-			.map((entry) => entry.name.content),
-	)
+	// By local name, the name each is published under. An entry publishing it
+	// under its own name wins.
+	let published = new Map<string, string>()
+
+	for (let entry of program.exports?.entries ?? []) {
+		if (entry.source === null && entry.alias === null) {
+			published.set(entry.name.content, entry.name.content)
+		} else if (
+			entry.source === null &&
+			!published.has(entry.name.content)
+		) {
+			published.set(
+				entry.name.content,
+				(entry.alias ?? entry.name).content,
+			)
+		}
+	}
+
 	let needed = new Set<string>()
 	let imports = new Set<Declaration>()
 
@@ -379,7 +395,13 @@ function readsMovableNames(
 		needed.add(owner.name)
 	}
 
-	return { needed: [...needed], imports: [...imports] }
+	return {
+		needed: [...needed].map((local) => ({
+			name: published.get(local) ?? local,
+			local,
+		})),
+		imports: [...imports],
+	}
 }
 
 // The file and name an identity is made of, or null for one the standard
@@ -757,7 +779,7 @@ function readOutside(
 // the Statement carries, or one this file imports.
 function namespaceReach(
 	program: parser.Program,
-	published: Set<string>,
+	published: Map<string, string>,
 	span: common.Position,
 	declaration: Declaration,
 ): { imported: string | null } | null {
@@ -1258,9 +1280,9 @@ function landingEdits(
 function landingImports(move: Move, target: Target): Array<ImportEntry> | null {
 	let workspace = move.context.workspace
 	let reads = [
-		...move.needed.map((name) => ({
+		...move.needed.map(({ name, local }) => ({
 			name,
-			alias: null,
+			alias: local === name ? null : local,
 			filePath: move.context.filePath,
 			named: true,
 			implicit: bindingOf(workspace, move.context.filePath, name)

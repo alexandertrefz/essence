@@ -197,13 +197,13 @@ and `#Loss` make one column of `Outcome`.
 never have opened. These are the Module the Declaration lands in, and every Module that named it in an entry. The
 Statement travels as written, its `§§` block included, rather than printed back from its Node.
 
-`readsMovableNames` decides whether the move is safe. Every name the Statement reads must mean the same thing in
-the Module it lands in. It does so if it is a builtin, declared in the Statement, or published by this file, which
-the landing Module then imports back. A name this file imports means the same once the landing Module imports it
-from the same file under the same name. A name this file keeps to itself means nothing there, so the move is
-refused. The question is asked of the rename index, which already answers what each name resolves to. A Method is
-reached through a Type rather than by name, but the Namespace declaring it must be in reach too. So a Method of a
-private Namespace refuses the move as well.
+`readsMovableNames` decides whether the move is safe. Every name the Statement reads must mean the same thing in the
+Module it lands in. It does so if it is a builtin, declared in the Statement, or published by this file, which the
+landing Module then imports back by the name it is published under. A name this file imports means the same once the
+landing Module imports it from the same file under the same name. A name this file keeps to itself means nothing there,
+so the move is refused. The question is asked of the rename index, which already answers what each name resolves to. A
+Method is reached through a Type rather than by name, but the Namespace declaring it must be in reach too. So a Method
+of a private Namespace refuses the move as well.
 
 Some uses write no name, and `implicitUses` reads them off the typed tree: the Namespace a call dispatches through, the
 Protocol whose body answers a provided Method, and the Choice a bare Case or a Case Matcher resolves through. A Method
