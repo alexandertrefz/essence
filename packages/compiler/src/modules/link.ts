@@ -8,12 +8,18 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { exampleTestsOf } from "../enricher/examples"
 import { enrichPrograms, topLevelScope } from "../enricher/index"
-import { invalidateNamespacesInScope } from "../enricher/resolvers"
+import {
+	invalidateNamespacesInScope,
+	printableProtocolName,
+} from "../enricher/resolvers"
 import { countTypeDeclaration } from "../enricher/scope"
+import { derivedPrintableNamespaceName } from "../helpers/conformance"
 import { specifierTo } from "../helpers/describe"
 import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
+import { flattenUnionMembers } from "../helpers/types"
 import type { Module, ModuleGraph } from "./graph"
 
 // What a top-level declaration was written as. A Variable can not be
@@ -1253,12 +1259,18 @@ function usedNames(
 	// Names a conformance was reached through without being written. See
 	// `collectReachedNames`.
 	reachedNames: Set<string>,
-	// By local name. The typed tree names a Protocol by identity, and every
-	// name bound to a Protocol it names is read.
-	protocols: Record<string, common.ProtocolType>,
+	// The Module's own, binding each import under its local name.
+	scope: enricher.Scope,
 ): Set<string> {
 	let names = new Set(reachedNames)
 	let identities = new Set<string>()
+	// A bare Case by `choice#name` where the typed tree resolved it. Otherwise
+	// by its name alone.
+	let bareCases = new Set<string>()
+	let bareCaseNames = new Set<string>()
+	let byName = false
+	// The Choices a call printed through the derive.
+	let printedChoices = new Set<string>()
 
 	let visit = (node: unknown): void => {
 		if (Array.isArray(node)) {
@@ -1290,6 +1302,16 @@ function usedNames(
 			if (typeof namespace?.["name"] === "string") {
 				names.add(namespace["name"])
 			}
+
+			// The derive answers only where a Namespace declared the Choice
+			// `is Printable`, and the call names neither.
+			if (namespace?.["name"] === derivedPrintableNamespaceName) {
+				let base = record["base"] as { type: common.Type }
+
+				for (let member of casesOf(base.type)) {
+					printedChoices.add(member.choice)
+				}
+			}
 		}
 
 		// A Union receiver's branch, or a conformance witness.
@@ -1310,6 +1332,21 @@ function usedNames(
 			names.add(record["name"])
 		}
 
+		// A bare Case with no Choice expected resolves through the Choices
+		// in Scope. One the position resolved counts too, which only quiets
+		// the warning.
+		if (record["nodeType"] === "CaseValue" && record["choice"] === null) {
+			let type = record["type"] as common.Type | undefined
+
+			if (type?.type === "Case") {
+				bareCases.add(`${type.choice}#${type.name}`)
+			} else if (byName || type !== undefined) {
+				let caseName = record["caseName"] as parser.IdentifierNode
+
+				bareCaseNames.add(caseName.content)
+			}
+		}
+
 		// A resolved Type's name is not a use, or an import whose Type only
 		// flows through would never be reported.
 
@@ -1319,17 +1356,61 @@ function usedNames(
 	}
 
 	visit(module.program.implementation)
-	// The parser's tests section, which only a test compile types.
-	visit(module.program.tests)
 	visit(program)
+	// The parser's tests section and `@example` blocks, which only a test
+	// compile types. Parsed here, so an import an example needs counts.
+	byName = program.tests === null
+	visit(module.program.tests)
 
-	for (let [name, protocol] of Object.entries(protocols)) {
+	if (byName) {
+		visit(
+			collectDiagnostics(() =>
+				exampleTestsOf(module.program, module.sourceText),
+			).result,
+		)
+	}
+
+	for (let [name, protocol] of Object.entries(scope.protocols)) {
 		if (identities.has(protocol.identity)) {
 			names.add(name)
 		}
 	}
 
+	for (let [name, type] of Object.entries(scope.types)) {
+		if (
+			casesOf(type).some(
+				(member) =>
+					bareCases.has(`${member.choice}#${member.name}`) ||
+					bareCaseNames.has(member.name),
+			)
+		) {
+			names.add(name)
+		}
+	}
+
+	for (let [name, value] of Object.entries(scope.members)) {
+		if (
+			value.type === "Namespace" &&
+			value.targetType !== null &&
+			value.conformsTo?.includes(printableProtocolName) === true &&
+			casesOf(value.targetType).some((member) =>
+				printedChoices.has(member.choice),
+			)
+		) {
+			names.add(name)
+		}
+	}
+
 	return names
+}
+
+// The Cases a Type declares: a Choice's, a generic Choice's through its
+// Generic Alias, or a lone Case.
+function casesOf(type: common.Type): Array<common.CaseType> {
+	let body = type.type === "GenericAlias" ? type.aliasedType : type
+	let members = body.type === "UnionType" ? flattenUnionMembers(body) : [body]
+
+	return members.filter((member) => member.type === "Case")
 }
 
 function reportUnusedImports(
@@ -1348,12 +1429,7 @@ function reportUnusedImports(
 		return
 	}
 
-	let used = usedNames(
-		state.module,
-		program,
-		reachedNames,
-		state.scope.protocols,
-	)
+	let used = usedNames(state.module, program, reachedNames, state.scope)
 
 	for (let binding of bound) {
 		if (used.has(binding.localName)) {

@@ -2145,6 +2145,195 @@ export {
 		)
 	})
 
+	// A bare Case with no Choice expected resolves through the Choices in
+	// Scope, so removing the entry would leave `#Hearts` an `unknown-case`.
+	it("counts a bare Case as a use of the Choice it resolves through", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Cards.es" {
+		Suit
+		paint
+	}
+}
+
+implementation {
+	constant chosen = #Hearts
+
+	Terminal.print(paint(chosen))
+}
+`,
+				"Cards.es": `implementation {
+	choice Suit {
+		Hearts,
+		Spades,
+	}
+
+	function paint(_ suit: Suit) -> String {
+		<- match suit -> String {
+			case #Hearts { <- "red" }
+			case #Spades { <- "black" }
+		}
+	}
+}
+
+export {
+	Suit
+	paint
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// A compile that leaves the tests out never types them, so a bare Case only
+	// a test writes is counted by its name.
+	it("counts a bare Case only a test writes as a use, in a compile without the tests", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Cards.es" { Suit }
+}
+
+implementation {
+	function always() -> Integer {
+		<- 1
+	}
+}
+
+tests {
+	test "a bare Case in a test" {
+		constant chosen = #Hearts
+
+		expect always()::is(1)
+	}
+}
+`,
+				"Cards.es": `implementation {
+	choice Suit {
+		Hearts,
+		Spades,
+	}
+}
+
+export {
+	Suit
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// An `@example` is a test, so what it reads is read, though a compile
+	// without the tests never parses it as code.
+	it("counts what an @example reads as a use, in a compile without the tests", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Cards.es" { Suit paint }
+}
+
+implementation {
+	§§ @example
+	§§   expect paint(Suit#Hearts)::is("red")
+	function always() -> Integer {
+		<- 1
+	}
+}
+`,
+				"Cards.es": `implementation {
+	choice Suit {
+		Hearts,
+		Spades,
+	}
+
+	function paint(_ suit: Suit) -> String {
+		<- "red"
+	}
+}
+
+export {
+	Suit
+	paint
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
+	// A Choice prints through the derive only where a Namespace declared it
+	// `is Printable`, and the call names neither.
+	it("counts the Namespace that lets a Choice print as a use", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Cards.es" { Suit SuitShow pick }
+}
+
+implementation {
+	Terminal.print(pick()::toString())
+}
+`,
+				"Cards.es": `implementation {
+	choice Suit {
+		Hearts,
+		Spades,
+	}
+
+	namespace SuitShow for Suit is Printable {
+	}
+
+	function pick() -> Suit {
+		<- Suit#Spades
+	}
+}
+
+export {
+	Suit
+	SuitShow
+	pick
+}
+`,
+			},
+			(directory) => {
+				expect(
+					linkedAt(
+						directory,
+						linkProject(directory, "Main.es"),
+						"Main.es",
+					).diagnostics,
+				).toEqual([])
+			},
+		)
+	})
+
 	// A Type whose values only flow through the file is no use. Nothing derives a
 	// conformance off `Standing`, so removing the entry compiles.
 	it("warns about a Type import whose values only flow through", () => {

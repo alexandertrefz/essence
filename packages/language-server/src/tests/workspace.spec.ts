@@ -4922,8 +4922,8 @@ describe("Workspace", () => {
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
-			// The linker counts no bare Case as a use of its Choice, so it warns
-			// about each entry a bare Case needs.
+			// A bare Case resolves through the Choices in Scope, so the Choice
+			// moves with the Declaration that writes it.
 			it("should carry the Choice a bare Case in the Declaration resolves through", () => {
 				let { workspace, pathOf } = makeWorkspace({
 					"A.es": [
@@ -4961,9 +4961,7 @@ describe("Workspace", () => {
 				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
 					'\tfrom "./C.es" { Suit paint }',
 				)
-				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([
-					"unused-import",
-				])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
 			// `is` on a Case is derived, which needs the Choice in scope though
@@ -5025,8 +5023,7 @@ describe("Workspace", () => {
 			})
 
 			// Derived printing also needs the Namespace that states the Choice
-			// `is Printable`. The linker counts no use of that Namespace, so it
-			// warns about the entry.
+			// `is Printable`, though the call names neither.
 			it("should carry the Namespace that makes a Choice printable", () => {
 				let { workspace, pathOf } = makeWorkspace({
 					"A.es": [
@@ -5083,9 +5080,7 @@ describe("Workspace", () => {
 				expect(texts[pathOf("B.es")]?.split("\n")[1]).toBe(
 					'\tfrom "./C.es" { Suit SuitShow pick }',
 				)
-				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([
-					"unused-import",
-				])
+				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 
 			// The bare `#Hearts` left behind still resolves through `Suit`.
@@ -5128,9 +5123,7 @@ describe("Workspace", () => {
 				expect(texts[declaringPath]?.split("\n")[1]).toBe(
 					'\tfrom "./C.es" { Suit paint }',
 				)
-				expect(codesAfter(workspace, texts, declaringPath)).toEqual([
-					"unused-import",
-				])
+				expect(codesAfter(workspace, texts, declaringPath)).toEqual([])
 				expect(codesAfter(workspace, texts, pathOf("B.es"))).toEqual([])
 			})
 

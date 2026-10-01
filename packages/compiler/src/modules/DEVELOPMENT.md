@@ -61,6 +61,15 @@ It reads both trees, since neither holds every use:
   carrying it. A `namespaceName` field covers Union branches and conformance witnesses, and `providedBy`
   names the Protocol whose provided Method was called. Every local name bound to that Protocol counts.
 - `reachedNames` from the enricher adds the names a conformance was reached through without being written.
+- A bare Case such as `#Hearts` with no Choice expected resolves through the Choices in Scope, so every name
+  whose Type declares that Case counts. The typed tree does not say whether the position resolved it instead,
+  so such a Case counts too, which only quiets the warning. A Matcher's bare Case resolves against its
+  subject and counts nothing.
+- Where no typed Case stands for a bare Case, every Type declaring a Case of its name counts. That holds for
+  one that did not resolve, and for the tests section of a compile without the tests, which nothing types.
+  Such a compile also parses each `@example` here, so what an example reads counts.
+- A Choice printed through the derive needs the Namespace that declared it `is Printable`, though the call
+  names neither. Every bound Namespace over that Choice declaring `is Printable` counts.
 
 A named Type the typed tree resolved to does not count as a use. Every Type object carries a name, so an
 import whose Type merely flows through a call would otherwise never be reported.
