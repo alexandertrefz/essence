@@ -16,26 +16,19 @@ import { type OptionValues, UsageError } from "./args"
 import type { CommandSpec } from "./commands"
 import type { CLIContext } from "./context"
 
-// What a project's own `essence.json` means to a run, in one place: which
-// commands read it, how what it could not read is reported, and how every
-// setting it holds meets the flag that says the same thing. A command reads the
-// answer off its context and nothing else — a second place deriving "the flag
-// unless the project said otherwise" would be a second answer to give.
+// What a project's `essence.json` means to a run: which commands read it, how
+// its unreadable settings are reported, and how each setting meets its flag.
 
-// The commands a project file has something to say to. A check is about
-// the files it was handed, the two servers are handed a workspace by the editor,
-// which reads the file itself, and the Formatter reads only `exclude`, itself.
+// The commands that read the project file. A check is about its files alone,
+// and the servers and the Formatter read the file themselves.
 const READING_COMMANDS = new Set(["build", "run", "watch", "test", "init"])
 
 export function readsProjectConfiguration(command: CommandSpec): boolean {
 	return READING_COMMANDS.has(command.name)
 }
 
-// Read from the working directory, once, for the whole invocation — the
-// nearest file at or above where the run was started. A command that walks a
-// project walks the directory this file sits in; a command handed file names
-// still reads it, because how a bundle is built is a fact about the project the
-// sources belong to.
+// The nearest project file at or above the working directory, read once per
+// invocation. Commands handed file names read it too, for how bundles are built.
 export function projectConfigurationFor(
 	command: CommandSpec,
 ): ProjectConfiguration {
@@ -44,24 +37,15 @@ export function projectConfigurationFor(
 		: defaultConfiguration()
 }
 
-// What the project file said that could not be read, rendered by the
-// renderer every other Diagnostic goes through — one block per file, against
-// that file's own text, so a mistake in `essence.json` is underlined in
-// `essence.json` exactly as a mistake in a source is underlined in the source.
-// They are Warnings: the run carries on with the setting at its default, which
-// is what each of them says in its note.
-//
-// Called once, from the entry point, rather than by each command. Every
-// command that reads the file reports the same thing at the same moment — ahead
-// of the work — and a command that grew a second copy of this loop would be a
-// command whose Warnings appeared somewhere else in the output.
+// Reports what the project file could not read as Warnings, rendered against
+// `essence.json` like any Diagnostic. Each setting falls back to its default. It
+// is called once, from the entry point, so the Warnings always come first.
 export function reportProjectSettings(
 	context: CLIContext,
 	command: CommandSpec,
 ): void {
-	// A command that reads no settings says nothing about them, `--verbose`
-	// or not: "no essence.json governs the working directory" from a `check`
-	// that would not have read one is an answer to a question nobody asked.
+	// A command that reads no settings says nothing about them, even under
+	// `--verbose`.
 	if (!readsProjectConfiguration(command)) {
 		return
 	}
@@ -92,12 +76,9 @@ export function reportProjectSettings(
 	)
 }
 
-// A configured `build.out` is a DIRECTORY, always: the setting says where
-// a project's bundles are written, and a project can not name one output file
-// for every source it builds. `--out` spells "a directory" with a trailing
-// separator, so that is what the configured path arrives with — without it, a
-// project with a single source and no `dist` yet would have its bundle written
-// AS `dist`.
+// A configured `build.out` is always a directory, so it gains the trailing
+// separator that marks `--out` as one. Otherwise a single bundle could be
+// written as `dist`.
 function asDirectory(out: string | null): string | undefined {
 	if (out === null) {
 		return undefined
@@ -106,24 +87,8 @@ function asDirectory(out: string | null): string | undefined {
 	return out.endsWith(path.sep) ? out : `${out}${path.sep}`
 }
 
-// Where a setting meets the flag that says the same thing, for every
-// setting that mirrors one — ONCE, so that no command derives "the flag unless
-// the project said otherwise" a second way. Three rules cover all of them:
-//
-//   · A value a flag NAMES — `--out`, `--cases`, `--coverage-report`,
-//     `--coverage-out` — is the flag's if it was given, the project's
-//     otherwise, and the default of whatever reads it where neither said.
-//   · A value a flag TURNS ON — `--sourcemap`, `--minify`, `--embed` — is on
-//     when either says so, and off when the run said `--no-…`. Saying both
-//     twins is refused: a run has to be one or the other, and guessing which
-//     would write an artefact the reader did not ask for.
-//   · The Optimiser runs unless something turned it off, and the passes left
-//     out are the union of the two lists.
-//
-// What is NOT here: `--coverage` itself. Collecting coverage is a choice about
-// one run — it compiles the whole project a second way — while the format and
-// the directory a report goes to are facts about the project. A configured
-// format is what a `--coverage` run writes, and turns nothing on by itself.
+// Where the build, coverage and case-count settings meet the flags that mirror
+// them. See "Settings and flags" in DEVELOPMENT.md.
 export function resolveProjectOptions(
 	options: OptionValues,
 	configuration: ProjectConfiguration,
@@ -146,12 +111,8 @@ export function resolveProjectOptions(
 	}
 	let report = options.coverageReport ?? configuration.test.coverage.report
 
-	// A place to write and nothing to write there is a mistake that costs
-	// a whole run to discover — the table appears, the directory does not, and
-	// nothing says why. Refused rather than defaulted: which format was meant is
-	// not something to guess at. It asks about the FLAG, because a configured
-	// directory with no configured format is a project saying where a report
-	// would go if one were asked for, which is not a mistake at all.
+	// A report directory without a report format is refused rather than guessed at.
+	// Only the flag is checked: a configured directory alone is not a mistake.
 	if (options.coverageOut !== undefined && report === null) {
 		throw new UsageError(
 			"--coverage-out says where to write a report, and no report was asked for.",

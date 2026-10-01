@@ -162,3 +162,19 @@ with a change, not in how they notice one. The rules match `watchModule` in the 
   adopting it as the baseline would wait for a change that already happened.
 - A directory watcher is not armed when `fs.watch` returns, and a busy machine can lose an event outright. So the
   signatures are also read on a timer, every `DEFAULT_POLL` milliseconds, and the events stay because they are faster.
+
+## Settings and flags
+
+`resolveProjectOptions` is where the build, coverage and case-count settings in `essence.json` meet the flags that
+say the same thing. `resolveContracts` and `resolveFilters` in `src/test.ts` do the same for `test.contracts` and
+`test.skipTags`. Three rules cover the pairs `resolveProjectOptions` resolves:
+
+- A value a flag names is the flag's when given, else the project's, else the default of whatever reads it. Such
+  flags are `--out`, `--cases`, `--coverage-report` and `--coverage-out`.
+- A value a flag turns on, such as `--sourcemap`, `--minify` or `--embed`, is on when either says so and off under the
+  `--no-` twin. Both twins at once are refused, since a run must be one or the other.
+- The Optimiser runs unless the flag or the setting turns it off, and the passes left out are the union of both lists.
+
+`--coverage` itself has no setting. Collecting coverage is a choice about one run, while the report's format and
+directory are facts about the project. A configured format is what a `--coverage` run writes, and turns nothing on by
+itself.
