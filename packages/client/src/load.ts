@@ -27,61 +27,45 @@ import {
 } from "./descriptor"
 import { bind } from "./marshal-runtime"
 
-// Essence from JavaScript, in one call: a path to a `.es` file goes in and
-// its exports come back, compiled, bundled and imported on the way. The Compiler
-// is not something a caller has to drive — `loadModule` is the whole surface,
-// and what it answers with is a Module rather than a build artifact.
+// Essence from JavaScript in one call: a path to a `.es` file goes in, and its
+// exports come back compiled, bundled and imported.
 
 export type LoadOptions = {
-	// Where the sources are read from. The default reads disk; a host
+	// Where the sources are read from. The default reads disk, and a host
 	// holding unsaved text answers out of memory.
 	host?: ModuleHost
 	optimisation?: OptimiserOptions
-	// Overrides both the default location and `ESSENCE_CLIENT_CACHE`, for a
-	// host that wants its compiled bundles to travel with its own build output.
+	// Overrides both the default location and `ESSENCE_CLIENT_CACHE`.
 	cacheDirectory?: string
-	// The host's own stop. Every run this Module's boundary starts — a
-	// call answering a `Future` — belongs under it, so aborting it stops
-	// everything the host asked this Module for and nothing else. It reaches the
-	// BINDING rather than the compile: the bundle is the same bundle either way,
-	// which is why it is no part of the hash the cache is named by.
+	// The host's stop. Every run the boundary starts, such as a call answering
+	// a `Future`, belongs under it. It reaches the binding, not the compile, so
+	// it does not change the bundle or its hash.
 	signal?: AbortSignal
 }
 
 export type EssenceModule = {
-	// Canonical, which is the path everything about this Module is keyed
-	// by — including the hash the bundle is cached under.
+	// The canonical path, which everything about this Module is keyed by.
 	entryPath: string
-	// What the Module offers, as the Compiler established it: the Types of
-	// its exports, what each was declared as, and where. A host binding names off
-	// this is reading the Essence, not the JavaScript.
+	// What the Module exports, as the compiler established it: each export's
+	// Type, what it was declared as, and where.
 	surface: ExportSurface
-	// Every `.es` source the Module was compiled from, in canonical path
-	// order — the whole graph, not the entry alone. A host that means to load
-	// again when something changes has to watch all of them: the file that
-	// changed is rarely the file that was asked for. `watchModule` does exactly
-	// that, and this is what it watches.
+	// Every `.es` source of the Module's graph, sorted by canonical path. A
+	// host that reloads on a change watches all of them, as `watchModule` does.
 	files: Array<string>
-	// What a host came for: the Module as JavaScript. A constant is a
-	// JavaScript value — an Integer a bigint, a Rational an `EssenceRational`, an
-	// `Optional<Integer>` a `bigint | undefined` — a Function is a JavaScript
-	// Function taking and answering the same, and a Namespace an object of those.
-	// Nothing on this side has to know that Essence was involved.
+	// The Module as JavaScript. A constant is a JavaScript value, a Function a
+	// JavaScript Function taking and answering such values, and a Namespace an
+	// object of those.
 	exports: Readonly<Record<string, unknown>>
-	// The bundle's own bindings, under the names the AUTHOR wrote — `raw`
-	// undoes the Rewriter's escaping and nothing else. What comes out and what
-	// goes in here are runtime values: an Integer is `{ value: 12n }` behind a
-	// Symbol, not `12`. This is the unmarshalled door, and it stays open — a host
-	// with its own ideas about the boundary should not have to fight one.
+	// The bundle's own bindings under the names the author wrote, with no
+	// marshalling. Values here are runtime values: an Integer is `{ value: 12n }`
+	// behind a Symbol, not `12`.
 	raw: Readonly<Record<string, unknown>>
-	// This bundle's own Type key and value constructors. Every Essence
-	// value carries its Type on a Symbol minted when the bundle was evaluated, so
-	// the only values this Module's Functions accept are the ones built here.
+	// This bundle's Type key and value constructors. The Type key is a Symbol
+	// minted when the bundle is evaluated, so its Functions accept only values
+	// built through this bridge.
 	bridge: RuntimeBridge
-	// The boundary itself, bound to that bridge and to this entry — the
-	// two things marshalling can not be done without. Handed over because a host
-	// calling through `raw` needs exactly it, and building a second one correctly
-	// means knowing both.
+	// The boundary bound to that bridge and this entry, for a host that calls
+	// through `raw`.
 	marshaller: Marshaller
 }
 
@@ -98,12 +82,8 @@ export async function loadModule(
 	return attempt.module
 }
 
-// One load, as `watchModule` needs to see it: the Module OR the Error,
-// and beside either the sources that were read — a load that failed still read
-// them, and a watcher has to keep watching them to see the fix — and the hash
-// that names what they compile to, so that an edit which changes nothing (a
-// save without a change, a touch) is told apart from one that does. `loadModule`
-// is this with the Error thrown.
+// One load as `watchModule` sees it. A failed load still lists the sources it
+// read, and the hash tells an edit from a save that changed nothing.
 export type LoadAttempt = {
 	module: EssenceModule | null
 	error: EssenceCompileError | null
@@ -120,19 +100,13 @@ export async function attemptLoad(
 	let embedding = {
 		host: options.host,
 		optimisation: options.optimisation,
-		// What this package puts into the bundle that the sources do not
-		// say — the runtime bridge. Without it one file would stand for the
-		// bridged bundle and the plain one both.
+		// The bundle carries the runtime bridge, which its sources do not
+		// say. The key keeps its hash apart from a plain bundle's.
 		emitterKey: BRIDGE_KEY,
 	}
 
-	// The hash BEFORE the emit, which is the whole point of naming a
-	// bundle after what it was compiled from. The sources are read and linked —
-	// a few milliseconds — and where the file that names is already on disk,
-	// nothing is simplified, optimised, generated, bundled or written: the
-	// answer was computed by whoever asked first. Running the pipeline to the
-	// end and only then discovering the output was already there would leave the
-	// name saving one `writeFile`.
+	// Linking alone yields the hash, so a bundle already on disk skips the
+	// rest of the pipeline.
 	let linked = linkToMemory(entry, embedding)
 
 	if (!containsErrors(linked.diagnostics)) {
@@ -156,17 +130,9 @@ export async function attemptLoad(
 
 	let compiled = await compileToMemory(entry, {
 		...embedding,
-		// The bridge, and which of the conditional doors it carries —
-		// the one a Dictionary crosses through and the one asynchronous work
-		// does, each asked of this Module's own Descriptor, which is what
-		// keeps the answer a function of the sources the bundle is named
-		// after. Described here rather than beside the binding below because
-		// this is where the bundle is built; a load that finds its bundle in
-		// the cache never asks.
-		//
-		// Described ONCE for both questions. Describing a Module is a
-		// walk of its whole Surface, and asking it twice over two Descriptors
-		// would be two walks for two flags that are read in the same breath.
+		// Whether the bridge carries the Dictionary and Future doors is
+		// asked of the Module's Descriptors, so it follows from the sources.
+		// A load that finds its bundle cached never asks.
 		transformSources: (sources) => {
 			let described = describeModule(linked.surface, entry)
 			let declared = describeTypes(linked.surface, entry)
@@ -176,16 +142,12 @@ export async function attemptLoad(
 				future: carriesFuture(described, declared),
 			})
 		},
-		// The bundle is going to be written into the cache directory, and
-		// the inline source map spells its `.es` sources relative to wherever the
-		// bundle sits. The hash is not known until the compile is over, so the
-		// name is a placeholder and the DIRECTORY is what matters — which is the
-		// whole of what a relative path is measured from.
+		// The source map spells the `.es` sources relative to the bundle's
+		// directory. The hash is not known yet, so the file name is a placeholder.
 		outputFileName: bundlePath(directory, "bundle"),
 	})
 
-	// Warnings are not a refusal. `containsErrors` is what decides, rather
-	// than an empty `code`, because the two agree and only one of them says why.
+	// Warnings are not a refusal.
 	if (containsErrors(compiled.diagnostics)) {
 		return {
 			module: null,
@@ -209,10 +171,8 @@ export async function attemptLoad(
 	}
 }
 
-// A URL rather than a path, because `import()` reads a specifier and a
-// Windows path is not one. The host's own Module cache keys off it, so a second
-// load of unchanged sources resolves to the same hash, the same file and the
-// same evaluated Module — the Program inside a bundle runs once.
+// A URL, because a Windows path is not a specifier. The host's Module cache
+// keys off it, so a second load of unchanged sources evaluates nothing again.
 async function importModule(
 	entry: string,
 	surface: ExportSurface,
@@ -225,10 +185,8 @@ async function importModule(
 		unknown
 	>
 	let bridge = runtimeBridgeOf(namespace)
-	// Described ONCE and handed to both doors, which is what keeps them
-	// answering alike. The binding needs it to know what to bind; the Marshaller
-	// needs it for the Cases whose spelling no value carries — see
-	// `MarshallerOptions.module`.
+	// One Descriptor for both the binding and the Marshaller, so they answer
+	// alike.
 	let descriptor = describeModule(surface, entry)
 	let marshaller = createMarshaller(bridge, {
 		entryPath: entry,
