@@ -20,18 +20,9 @@ import {
 } from "./rename"
 import { programBodies, typedProgramSections } from "./sections"
 
-// The Call Hierarchy is single-document and stateless. Nothing survives a
-// request: an Item round-trips its `selectionRange`, so the incoming and
-// outgoing requests resolve the Declaration at that Position again, off the
-// document's current analysis.
-//
-// Callers and callees ARE the rename index's Declarations. The index already
-// knows which name at which Position binds to which Function, Method or static
-// Method, including the ones that resolve through Types rather than through a
-// Scope, so the walk below only has to ask it. A callee the index has no
-// Declaration for — a builtin, or a standard library Method living in another
-// document — is skipped rather than offered as an item nothing can be expanded
-// from; a single document is all this feature can honestly answer for.
+// The Call Hierarchy of one document, stateless: an Item round-trips its
+// `selectionRange`, and each request resolves it again. Callers and callees are
+// rename index Declarations; a callee it lacks, such as a builtin, is skipped.
 
 export type CallHierarchyItemKind =
 	| "function"
@@ -43,13 +34,11 @@ export type CallHierarchyItemKind =
 export type CallHierarchyItem = {
 	name: string
 	kind: CallHierarchyItemKind
-	// The Namespace a Method or Property belongs to — null for a free
-	// Function and for the implementation block.
+	// The Namespace a Method or Property belongs to; null for a free Function and
+	// the implementation block.
 	container: string | null
-	// `range` spans the whole declaring construct, `selectionRange` just
-	// the name, mirroring the LSP's CallHierarchyItem. `selectionRange` is what
-	// the item is re-resolved from, so it has to be the Declaration's
-	// definition and nothing else.
+	// `range` spans the whole construct, `selectionRange` the name. The Item is
+	// resolved again from `selectionRange`, so it must be the definition.
 	range: common.Position
 	selectionRange: common.Position
 }
@@ -57,8 +46,7 @@ export type CallHierarchyItem = {
 type CallSite = {
 	caller: CallHierarchyItem
 	callee: CallHierarchyItem
-	// Where the callee's name is written at the call site — what an
-	// Editor reveals when the reader picks the call out of the tree.
+	// Where the callee's name is written at the call site.
 	range: common.Position
 }
 
@@ -67,13 +55,8 @@ export type CallHierarchyCalls = {
 	ranges: Array<common.Position>
 }
 
-// The kinds a call can target. A Constant or Variable holding a Function
-// value is deliberately NOT one of them, in prepare and at call sites alike:
-// the name binds to a value, and which Function that value is at any given call
-// is a question about data flow — reassignment, conditional binding, a Function
-// returned from another Function — that a lexical single-document index cannot
-// answer. Showing the declaration of the Constant as the callee would be a
-// guess dressed as a fact.
+// The kinds a call can target. A Constant holding a Function is not one: which
+// Function it holds is a data-flow question a lexical index cannot answer.
 const callableKinds = new Set<Declaration["kind"]>([
 	"function",
 	"method",
@@ -83,19 +66,14 @@ const callableKinds = new Set<Declaration["kind"]>([
 type Context = {
 	enrichedProgram: common.typed.Program | null
 	index: RenameIndex
-	// Occurrence Position → the Declaration it binds to, so that a call
-	// site resolves its callee by the Position of the name it wrote.
+	// Occurrence Position to Declaration, to resolve a call site's callee.
 	declarationAt: Map<string, Declaration>
-	// Definition Position → the Item declared there. Built from the
-	// Parser AST, so that an Item exists for every Function and Method even
-	// when enrichment failed and the typed walk contributes nothing.
+	// Definition Position to Item, built from the Parser AST so every Item exists
+	// even when enrichment failed.
 	items: Map<string, CallHierarchyItem>
 	topLevel: CallHierarchyItem
-	// The caller everything written in the `tests { … }` block attributes
-	// to, the way a top level Statement attributes to the implementation. Null
-	// where the file wrote no block. A test is not a Declaration and can not be
-	// called either, so the whole section stands as one caller rather than one
-	// per test — what a reader asks of a Function is whether the tests reach it.
+	// The one caller for everything in the `tests` block, or null without one.
+	// Tests cannot be called, so the section stands as a single caller.
 	testsLevel: CallHierarchyItem | null
 }
 
@@ -197,8 +175,7 @@ function itemAt(
 
 	let { declaration } = occurrence
 
-	// A builtin has no definition, so it is refused here along with
-	// everything else the document does not declare.
+	// A builtin has no definition, so it is refused.
 	if (
 		!callableKinds.has(declaration.kind) ||
 		declaration.definition === null
@@ -209,10 +186,8 @@ function itemAt(
 	return context.items.get(positionKey(declaration.definition)) ?? null
 }
 
-// The synthetic caller every top level Statement attributes to. The
-// implementation block is not a Declaration and can never be called, so it only
-// ever appears as an incoming caller — asking it for ITS callers resolves
-// nothing and answers with an empty list, which is the truth.
+// The made-up caller of every top level Statement. Nothing calls it, so its
+// own callers are an empty list.
 function topLevelItem(program: parser.Program): CallHierarchyItem {
 	let position = program.implementation.position
 
@@ -231,8 +206,7 @@ function topLevelItem(program: parser.Program): CallHierarchyItem {
 	}
 }
 
-// The same for the `tests { … }` block — its own Statements, and every
-// test and suite inside it, attribute here.
+// The same for the `tests` block and every test and suite in it.
 function testsItem(program: parser.Program): CallHierarchyItem | null {
 	if (program.tests === null) {
 		return null
@@ -289,9 +263,8 @@ function group(
 /* Items */
 /*********/
 
-// Item geometry comes off the Parser AST — it survives Type errors, and
-// it is the same walk whether the request is a prepare or an expansion, so an
-// Item is byte-for-byte the one the client sent back.
+// Item geometry comes off the Parser AST, which survives Type errors, so an
+// Item is the same for a prepare and an expansion.
 function collectItems(
 	nodes: Array<parser.ImplementationNode>,
 	container: string | null,
@@ -308,8 +281,7 @@ function addItem(
 ) {
 	let key = itemKey(item)
 
-	// A re-declaration shares the first Declaration in the rename index,
-	// whose `definition` is the first name Position — so the first Item at a
+	// A re-declaration shares the first Declaration, so the first Item at a
 	// Position is the one call sites resolve to.
 	if (!items.has(key)) {
 		items.set(key, item)
@@ -334,9 +306,8 @@ function collectItemsFromNode(
 				items,
 			)
 
-			// A Function declared inside another body is a free Function
-			// of its own, not a member of whatever encloses it — so the
-			// container does not travel into bodies.
+			// A Function declared in a body is a free Function, so the container does not
+			// travel into bodies.
 			collectItems(node.value.body, null, items)
 			return
 		case "OverloadedFunctionStatement":
@@ -465,16 +436,13 @@ function collectItemsFromNode(
 
 			return
 		case "ChoiceDeclarationStatement":
-			// A Case payload's default may CALL something — a static that
-			// builds the Record it fills in — so the call it makes is an
-			// incoming edge like any other.
+			// A Case payload's default may call something, which is an incoming edge.
 			for (let defaultValue of caseDefaults(node.cases)) {
 				collectItemsFromNode(defaultValue, container, items)
 			}
 
 			return
-		// A path reads members and calls nothing, so it names no edge —
-		// `path-is-members-only` is what makes that true rather than a guess.
+		// A path only reads members (`path-is-members-only`), so it calls nothing.
 		case "MemberPath":
 		case "TypeAliasStatement":
 		case "Identifier":
@@ -509,8 +477,7 @@ function collectNamespaceItems(
 				name: property.name.content,
 				kind: "property",
 				container,
-				// A native static Property has no value to span to — its
-				// range is then just its name.
+				// A native static Property has no value, so its range is its name.
 				range: spanning(
 					property.name.position,
 					property.value?.position ?? property.name.position,
@@ -543,10 +510,8 @@ function collectNamespaceItems(
 			member.nodeType === "StaticMethodSignature" ||
 			member.nodeType === "OverloadedStaticMethodSignatures"
 
-		// The Method wrappers carry no Position of their own — the range
-		// is the span from the name to the end of the last Overload. One Item
-		// covers the whole Overload set, since the rename index gives the set
-		// one Declaration.
+		// The range runs from the name to the end of the last Overload. One Item
+		// covers the set, which the rename index gives one Declaration.
 		let range = member.name.position
 
 		for (let method of methods) {
@@ -572,8 +537,7 @@ function collectNamespaceItems(
 	}
 }
 
-// Only a provided Method is an Item. The rename index binds no call to a
-// requirement, so an Item for one would never expand into anything.
+// Only a provided Method is an Item: no call binds to a requirement.
 function collectProtocolItems(
 	node: parser.ProtocolDeclarationStatementNode,
 	items: Map<string, CallHierarchyItem>,
@@ -634,14 +598,9 @@ function spanning(a: common.Position, b: common.Position): common.Position {
 /* Call sites */
 /**************/
 
-// ONE walk of the typed AST with an explicit caller stack — the enclosing
-// named declaration is threaded down rather than searched for afterwards, so a
-// call knows its caller by construction.
-//
-// A Function VALUE pushes nothing: a lambda has no name to show and no
-// Declaration to expand, so its calls attribute to the nearest enclosing named
-// caller, which is where the reader would look for them anyway. Statements at
-// the top level attribute to the synthetic implementation caller.
+// One walk of the typed AST, threading the enclosing named caller down. A
+// Function value pushes nothing, so its calls go to the nearest named caller;
+// top level Statements go to the implementation caller.
 function collectSites(context: Context): Array<CallSite> {
 	let sites: Array<CallSite> = []
 
@@ -680,10 +639,8 @@ function callerFor(
 	return context.items.get(positionKey(position)) ?? fallback
 }
 
-// `position` is where the callee's NAME is written — an Identifier for a
-// Function, the member of a Lookup for a static Method, the member of a Method
-// Invocation otherwise. The index binds all three; anything it does not bind is
-// a name this document does not declare.
+// `position` is where the callee's name is written. A name the index does not
+// bind is one this document does not declare.
 function recordCall(
 	position: common.Position,
 	caller: CallHierarchyItem,
@@ -709,9 +666,7 @@ function recordCall(
 	sites.push({ caller, callee, range: position })
 }
 
-// `= @::length()` IS a call, and it is made by the Declaration the default
-// is written on — so it is an outgoing call of that Function or Method, exactly
-// as one written in the body is.
+// `= @::length()` is an outgoing call of the Function the default is on.
 function visitDefaults(
 	parameters: Array<common.typed.ParameterNode>,
 	caller: CallHierarchyItem,
@@ -760,13 +715,8 @@ function visitNode(
 						? member.methods
 						: [member.method]
 
-				// Every Overload body is walked, and every one of them
-				// attributes to the same Item — Overloads share a name, and so
-				// share the single Declaration the rename index gives them.
-				// Calls therefore aggregate across the Overload set, exactly as
-				// renaming does. The typed Invocation Nodes carry an
-				// `overloadedMethodIndex`, so splitting the set apart stays
-				// possible if it ever turns out to be what a reader wants.
+				// Every Overload body attributes to the one Item the set shares, as renaming
+				// does. `overloadedMethodIndex` would allow splitting them.
 				for (let method of methods) {
 					let methodCaller = callerFor(
 						member.name.position,
@@ -783,10 +733,8 @@ function visitNode(
 					visitBody(method.value.body, methodCaller, context, sites)
 				}
 
-				// A native Method has no body, and the frame the Compiler
-				// synthesizes for its defaults is where its calls live —
-				// `slice(from start: Integer = 0, to end: Integer =
-				// @::length())` calls `length`, and the hierarchy has to say so.
+				// A native Method's calls live in the frame the Compiler synthesizes for its
+				// defaults: `to end: Integer = @::length()` calls `length`.
 				for (let shim of node.nativeShims) {
 					visitDefaults(
 						shim.parameters,
@@ -835,9 +783,7 @@ function visitNode(
 		case "ReturnStatement":
 			visitNode(node.expression, caller, context, sites)
 			return
-		// A call written in an assertion is a call — without this a
-		// Function's incoming calls stopped at the implementation, and every
-		// test that exercises it went unreported.
+		// A call in an assertion counts, so tests reach the Functions they exercise.
 		case "ExpectStatement":
 		case "RequireStatement":
 			for (let expression of typedAssertionExpressions(node)) {
@@ -852,9 +798,8 @@ function visitNode(
 				node.name.nodeType === "Lookup" &&
 				node.name.base.type.type === "Namespace"
 			) {
-				// `Namespace.staticMethod(…)` — a Lookup through a
-				// Namespace, which the typed pass of the rename index binds to
-				// the static Method's Declaration.
+				// `Namespace.staticMethod(…)`, a Lookup the rename index binds
+				// to the static Method.
 				recordCall(node.name.member.position, caller, context, sites)
 			}
 
@@ -862,23 +807,12 @@ function visitNode(
 			visitArguments(node.arguments, caller, context, sites)
 			return
 		case "MethodInvocation":
-			// The receiver is walked before the call is recorded, so that
-			// a chain reports its calls in the order they are written.
+			// The receiver first, so a chain reports its calls in written order.
 			visitNode(node.base, caller, context, sites)
 
-			// A Method call on a Union receiver dispatches per member
-			// Type, and its `namespace` is then a placeholder — the statically
-			// resolved targets live one per `dispatch` case. Those are skipped:
-			// each case names its Namespace by name only, and turning a
-			// Namespace name plus a Method name back into a Declaration needs
-			// the member index rename keeps to itself. Attributing the call to
-			// the placeholder instead would name whichever Namespace happens to
-			// answer to the empty name, which is none.
-			//
-			// The same skip covers the ordinary state of a document being typed
-			// in: until enrichment resolves a receiver, `namespace.name` is the
-			// empty string, nothing in the index sits at the member's Position,
-			// and the call is simply not a call yet.
+			// A call on a Union receiver dispatches per member Type, and its `namespace`
+			// is a placeholder, so it is skipped. So is a receiver not yet resolved,
+			// whose `namespace.name` is empty.
 			if (node.dispatch === null) {
 				recordCall(node.member.position, caller, context, sites)
 			}
@@ -888,9 +822,7 @@ function visitNode(
 		case "Lookup":
 			visitNode(node.base, caller, context, sites)
 			return
-		// A Function called only under one of the two Keywords — which is
-		// every call that answers work — would be reported as called by nobody by a
-		// walk with no case here.
+		// Calls under `start` and `complete` count too.
 		case "Start":
 		case "Complete":
 			visitNode(node.expression, caller, context, sites)
@@ -906,10 +838,7 @@ function visitNode(
 			visitNode(node.value, caller, context, sites)
 
 			for (let handler of node.handlers) {
-				// A Handler holds Expressions outside its body — the
-				// literal it compares against and the Guard both hold calls,
-				// and a walk that visited only `body` would report a Function
-				// called exclusively from a `where` clause as called by nobody.
+				// A Handler's literal and Guard hold calls outside its body.
 				for (let expression of typedHandlerExpressions(handler)) {
 					visitNode(expression, caller, context, sites)
 				}
@@ -918,9 +847,7 @@ function visitNode(
 			}
 
 			return
-		// A `define` is Expressions and nothing else, so a Function called
-		// exclusively from a Condition would be reported as called by nobody by
-		// a walk that had no case here.
+		// A `define` is Expressions only, Conditions included.
 		case "Define":
 			for (let expression of defineExpressions(node)) {
 				visitNode(expression, caller, context, sites)

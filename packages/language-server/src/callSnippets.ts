@@ -2,15 +2,13 @@ import { lastRequiredParameterIndex } from "@essence-lang/compiler/helpers"
 import { printSignature, signaturesOf } from "@essence-lang/compiler/printType"
 import type { common } from "@essence-lang/interfaces"
 
-// Accepting a callable writes the call the way Essence spells it: a
-// labelled Argument is `label value`, with NO colon, so the label belongs to
-// the inserted text and only the value is a tabstop. A Parameter declared `_`
-// has no label to write and contributes the tabstop alone.
+// Accepting a callable writes the call as Essence spells it. A labelled
+// Argument is `label value`, so the label is text and only the value a
+// tabstop. A Parameter declared `_` contributes the tabstop alone.
 
 export type CallSnippet = {
 	snippet: string
-	// The signature without its name — what tells two Overloads apart in
-	// a Completion list, where they deliberately share a label.
+	// The signature without its name, which tells two Overloads apart.
 	signature: string
 }
 
@@ -18,12 +16,9 @@ export function buildCallSnippet(
 	name: string,
 	signature: common.BaseFunction,
 ): string {
-	// The TRAILING run of Parameters a call may leave out is not written
-	// at all — accepting the Completion should insert the call the writer meant,
-	// and the shortest call a defaulted signature accepts is the one it was
-	// given defaults for. A defaulted Parameter with a required one after it
-	// stays: leaving it out there would leave the tabstops in the wrong places,
-	// since the Argument after it needs its own label written before it.
+	// The trailing run of Parameters with defaults is left out, giving the
+	// shortest call. A defaulted Parameter before a required one stays, since the
+	// next Argument's label follows it.
 	let lastRequired = lastRequiredParameterIndex(signature.parameterTypes)
 	let parameters = signature.parameterTypes
 		.slice(0, lastRequired + 1)
@@ -38,11 +33,8 @@ export function buildCallSnippet(
 	return `${escapeSnippet(name)}(${parameters.join(", ")})`
 }
 
-// One CallSnippet per Overload rather than one for a "primary" pick —
-// Overloads differ in exactly the labels this inserts, so a single pick would
-// write the wrong call half the time. Null for anything not callable, which is
-// also what a failed Enrichment looks like: the caller then falls back to the
-// bare name.
+// One CallSnippet per Overload, since Overloads differ in the labels this
+// writes. Null for anything not callable, or after a failed enrichment.
 export function callSnippetsFor(
 	name: string,
 	type: common.Type,
@@ -50,10 +42,8 @@ export function callSnippetsFor(
 	return snippetsFrom(name, signaturesOf(type))
 }
 
-// A Namespace's Methods are also reachable through `.` on the Namespace
-// itself, where the receiver rides along as the first Argument —
-// `Number.isBetween(5, 1, and 10)`. That call site passes the Self Parameter
-// `signaturesOf` strips for a `::` one, so it is kept here.
+// Through `.` on the Namespace, as in `Number.isBetween(5, 1, and 10)`, the
+// receiver is the first Argument, so the Self Parameter is kept.
 export function qualifiedCallSnippetsFor(
 	name: string,
 	type: common.Type,
@@ -85,11 +75,8 @@ function snippetsFrom(
 	}))
 }
 
-// `$` opens a tabstop and `}` closes one. `$` is an ordinary Identifier
-// character, so a name or a label may carry one, and an unescaped one would
-// turn the rest of the call into snippet syntax. Exported because the Server's
-// fallback insert text is also snippet-formatted and has to spell a name the
-// same way this does.
+// `$`, `}` and `\` are snippet syntax, and `$` may occur in a name, so all
+// three are escaped. Exported for the Server's fallback insert text.
 export function escapeSnippet(text: string): string {
 	return text.replace(/[$}\\]/g, "\\$&")
 }

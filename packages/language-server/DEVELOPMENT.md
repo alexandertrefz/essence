@@ -362,6 +362,18 @@ the rest. A probe finds it. The document up to the trigger is parsed again with 
 Invocation of the made-up member carries the receiver's Type in `base.type`. A Module's probe links against the
 dependencies the Workspace already linked, so imported names resolve.
 
+`probeSourcesFor` in `src/probe.ts` builds the probe texts. Closing brackets suffice for most cursors, and String text
+and comments are blanked first so their brackets do not count. They do not suffice inside a Declaration's parameter
+list, where a default is written. `function greet(_ name: String = person` closed with `)}` has no body, so the Parser
+drops it. Text cannot tell a parameter list from an Argument list, so further readings are tried in order until one
+answers:
+
+- An open `(` closed as a parameter list and followed by `-> {} {}`, the shortest complete tail. The outermost `(` is
+  tried first, and at most `MAXIMUM_DECLARATION_READINGS` are, since each costs a parse and an enrichment.
+- A Statement head given the tail it waits for, such as the block an `if` wants.
+- A `define` arm finished inside the `define`'s own block: `otherwise` after a value, or `as {} otherwise` after a
+  Condition. A `define` without an `otherwise` arm is refused, and the Statement under the cursor would be dropped.
+
 The two triggers probe differently on purpose. A written value proves what it can about itself where a Method is
 looked up on it, so `4::` offers the Methods of `NonNegativeInteger` too. A Lookup probe would type the same `4` as
 an Integer alone.
@@ -520,3 +532,24 @@ whole cycle's counts are laid over what the session holds, since a cycle covers 
 cycle counts only some tests, so its coverage is not adopted. The picture the last whole run left stays on the right
 lines, because only an edit within existing lines is narrowed. Switching coverage on or off discards what was counted
 and every attribution.
+
+## Signature Help
+
+`findSignatureHelp` in `src/signatureHelp.ts` finds the call being typed the way Completion finds a receiver. The text
+up to the cursor is padded back into a valid Program (`src/probe.ts`) and enriched. The smallest invocation containing
+the end of that text is the call being typed, so nested calls need nothing special. A cursor exactly at a call's end
+has just closed it, so the call around it is the answer.
+
+- The active Parameter is counted from the raw text, as the top level commas between the call's opening bracket and
+  the cursor. The parsed Arguments drop an empty trailing slot, as in `greet(1, )`. Strings and comments are blanked
+  out first.
+- Once a Parameter has a default, the Nth Argument need not be the Nth Parameter: `cut(to 3)` stands at the second.
+  `activeParameterFor` walks the count against the signature as the Compiler pairs Arguments, taking a Parameter when
+  the labels agree and skipping one with a default.
+- A Method Invocation resolves its Namespace only once its Arguments match an Overload, which is what is missing while
+  the call is typed. When resolution failed, every Namespace whose target Type matches the receiver is offered, as
+  Completion's `::` list does. While the choice is open, each label is qualified as `1::<Thing>string(…)` would be.
+- A resolved Overload stays active while it has room for the Argument being typed. Otherwise the first Overload that
+  can take it wins, preferring one whose required Parameters reach that far.
+
+Each label carries the callee's name, so it shows the whole call, `append(_ String) -> String`.

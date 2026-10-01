@@ -11,36 +11,20 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { typedProgramBodies } from "./sections"
 
-// Two completion contexts need to know what is *expected* at the
-// cursor rather than what is in Scope:
-//
-// - Inside a Record literal, the members of the Record Type it is being
-//   written for.
-// - Inside a Function Invocation, the Parameter labels of the callee.
-//
-// Both are found by walking the enriched Program while carrying the Type
-// each Expression is expected to have — a Record literal picks it up from
-// its own annotation, from the declaration it is assigned to, from the
-// Parameter it is passed as, or, on the right-hand side of an update, from
-// the LEFT side's Type. The innermost construct containing the cursor
-// wins, so `greet({ … })` offers Record members inside the braces and
-// Argument labels outside them.
+// What is expected at the cursor: inside a Record literal, the members of its
+// Record Type; inside a Function Invocation, the callee's labels. Found by
+// walking the enriched Program with each Expression's expected Type.
 
 export type ArgumentContext =
 	| {
 			kind: "record"
 			memberTypes: Record<string, common.Type>
 			presentMembers: Array<string>
-			// The members the Parameter this Record answers fills in from
-			// its own default, so Completion can say which ones stopping now
-			// would leave to it. Empty everywhere else — a Record Literal
-			// written outside a call has nobody filling anything in.
+			// The members the Parameter's own default fills in, so Completion can say
+			// which a call may leave out. Empty outside a call.
 			omittableMembers: ReadonlyArray<string>
-			// Whether a bare member name is a whole member in these
-			// braces. True in a Record Literal, where `{ x }` is `{ x = x }`,
-			// and false in an update's key list, which is the one member list
-			// that is not a Literal — a bare name after `with` is already the
-			// whole value being merged in.
+			// Whether a bare name is a whole member here: true in a Record Literal, where
+			// `{ x }` is `{ x = x }`; false in an update's key list.
 			shorthand: boolean
 	  }
 	| {
@@ -53,14 +37,9 @@ type State = {
 	cursor: common.Cursor
 	best: ArgumentContext | null
 	bestPosition: common.Position | null
-	// The document's own lines. An update's key list and a braced Literal
-	// on its right-hand side are the SAME Node with the same shape — the
-	// Compiler reads `{ base with a = 1 }` and `{ base with { a = 1 } }` into
-	// one `Combination` over one `RecordValue` — so the only thing that tells
-	// them apart is the character the member list opens on, which is the
-	// reading the Formatter and the Code Actions make too. Empty where the
-	// caller has no source in hand: the shorthand is then simply not offered,
-	// which is the half of the answer that can not be wrong.
+	// The document's lines. `{ base with a = 1 }` and `{ base with { a = 1 } }`
+	// enrich to the same node, so only the opening character tells them apart.
+	// Empty without a source, and then no shorthand is offered.
 	lines: Array<string>
 }
 
@@ -121,8 +100,7 @@ function visitNode(
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// An annotated declaration is what tells a Record literal
-			// which Record Type it is written for.
+			// An annotation names the Record Type a literal is written for.
 			visitNode(node.value, node.declaredType ?? node.type, state)
 			return
 		case "VariableAssignmentStatement":
@@ -182,9 +160,7 @@ function visitNode(
 		case "ReturnStatement":
 			visitNode(node.expression, expected, state)
 			return
-		// An assertion holds its Expressions directly — there is no body
-		// to descend into — so without this an Argument being written inside a
-		// test body has no context at all. See `assertionChildren.ts`.
+		// An assertion holds its Expressions directly; see `assertionChildren.ts`.
 		case "ExpectStatement":
 		case "RequireStatement":
 			for (let expression of typedAssertionExpressions(node)) {
@@ -223,19 +199,15 @@ function visitNode(
 			return
 		}
 		case "MethodInvocation":
-			// No Argument labels for Methods — the receiver occupies the
-			// first Parameter slot and overload resolution is often still
-			// ambiguous while typing, so there is no single signature to read
-			// labels off. Record literals passed as Arguments still work.
+			// No labels for Methods: overload resolution is often still open while
+			// typing, so no single signature has them. Record Arguments still work.
 			visitNode(node.base, null, state)
 			visitArguments(node.arguments, null, state)
 			return
 		case "Lookup":
 			visitNode(node.base, null, state)
 			return
-		// The operand is a Future or a Started, and no Record shape is
-		// expected of one — what the position around the Keyword asks for says
-		// nothing about what stands under it.
+		// The operand is a Future or a Started, which expects no Record shape.
 		case "Start":
 		case "Complete":
 			visitNode(node.expression, null, state)
@@ -246,12 +218,8 @@ function visitNode(
 		case "Combination": {
 			visitNode(node.lhs, expected, state)
 
-			// What an update's right-hand side is held to is the LEFT
-			// side's Type, not the Type the update as a whole answers with:
-			// every member it names has to be one the left side already has,
-			// and `{ base with … }` written into an unannotated Constant has
-			// no expected Type at all otherwise. That is the only spelling the
-			// shorthand merge has, so this is what makes it complete.
+			// An update's right-hand side is held to the left side's Type: every member
+			// it names must exist there, even in an unannotated Constant.
 			let base = asRecordType(node.lhs.type) ?? expected
 
 			if (node.rhs.nodeType === "RecordValue") {
@@ -272,9 +240,7 @@ function visitNode(
 			visitNode(node.value, null, state)
 
 			for (let handler of node.handlers) {
-				// A Guard is a Boolean and a Matcher's literals are plain
-				// values — neither expects a Record shape of its own, so what
-				// the Match is expected to produce says nothing about them.
+				// A Guard and a Matcher's literals expect no Record shape.
 				for (let expression of typedHandlerExpressions(handler)) {
 					visitNode(expression, null, state)
 				}
@@ -283,11 +249,8 @@ function visitNode(
 			}
 
 			return
-		// Every arm's value answers the whole `define`, so each stands
-		// where the `define` stands and is held to what that position expects —
-		// which is what completes a member name inside `as { … } if …`. A
-		// Condition is a Boolean and expects no Record shape of its own, as a
-		// Guard does not.
+		// Every arm answers the whole `define`, so it is held to what the position
+		// expects. A Condition, like a Guard, expects no Record shape.
 		case "Define":
 			for (let value of defineValues(node)) {
 				visitNode(value, expected, state)
@@ -331,8 +294,7 @@ function visitNode(
 			return
 		case "CaseValue":
 			if (node.value !== null) {
-				// The payload's expected shape is the Case's Record —
-				// that is what makes labels complete inside the payload.
+				// The payload is expected to be the Case's Record.
 				visitNode(
 					node.value,
 					node.type.type === "Case"
@@ -344,9 +306,8 @@ function visitNode(
 
 			return
 		case "ChoiceDeclarationStatement":
-			// A payload default fills the payload in, so the payload's
-			// own Record is what a member name inside it is expected against —
-			// the same answer a construction's payload gets just above.
+			// A payload default is held to the payload's own Record, as a construction's
+			// payload is.
 			for (let choiceCase of node.cases) {
 				if (choiceCase.defaultValue !== null) {
 					visitNode(
@@ -369,10 +330,8 @@ function visitNode(
 	}
 }
 
-// One member list, whether it was written as a Record Literal or as an
-// update's key list. `shorthand` is the one thing the two do not share, and it
-// is decided by the caller — a Literal reaches here from anywhere and always
-// takes it; a key list reaches here from a `Combination` and never does.
+// One member list, a Record Literal or an update's key list. Only a Literal
+// takes the shorthand, which the caller decides.
 function visitRecordValue(
 	node: common.typed.RecordValueNode,
 	expected: common.Type | null,
@@ -399,15 +358,9 @@ function visitRecordValue(
 	}
 }
 
-// Whether a member list is its own Record Literal — which is what makes
-// it take the shorthand — read the only way it can be: off the character its
-// Position opens on. A Literal's opens on its own `{`; an update's key list
-// opens on its first key, because it has no braces of its own. A TYPED Literal
-// opens on the Type it names, and is a Literal by that alone.
-//
-// The cursor is inside these braces and the Position is left of it, so the
-// document's own lines answer for the probe source as well: the two agree on
-// every character before the cursor.
+// Whether a member list is its own Record Literal, read off the character its
+// Position opens on. A Literal opens on its `{` or on the Type it names, a key
+// list on its first key. The text before the cursor matches the probe's.
 function opensOnBrace(
 	node: common.typed.RecordValueNode,
 	state: State,
@@ -421,9 +374,8 @@ function opensOnBrace(
 	return line?.[node.position.start.column - 1] === "{"
 }
 
-// A call written inside a Parameter's `= expression` default offers the
-// same labels and the same Record members a call in a body does — the walk below
-// reaches bodies, and a default is not one.
+// A call in a Parameter default offers the same labels and members as one in
+// a body.
 function visitDefaults(
 	parameters: Array<common.typed.ParameterNode>,
 	state: State,
@@ -433,12 +385,8 @@ function visitDefaults(
 	}
 }
 
-// An Argument is paired with a Parameter by its LABEL once anything may be
-// left out — `f(to 3)` writes one Argument and it belongs to the SECOND
-// Parameter — so the Types a Record literal is read against are handed over
-// through that pairing rather than by index. `pairArguments` is the Compiler's
-// own walk, and using it here is what keeps Completion agreeing with what the
-// call will actually resolve to.
+// Arguments pair with Parameters by label once any may be left out:
+// `f(to 3)` belongs to the second. `pairArguments` is the Compiler's walk.
 function visitArguments(
 	nodeArguments: Array<common.typed.ArgumentNode>,
 	parameterTypes: common.BaseFunction["parameterTypes"] | null,
@@ -457,10 +405,8 @@ function visitArguments(
 				? parameterType
 				: null
 
-		// The one place a Record Literal knows which members somebody
-		// else would fill in — the Argument's own Parameter. Nothing nested
-		// inside it does: a member's Type is a Type, and a default belongs to a
-		// Parameter.
+		// The only place a Record Literal learns which members a default fills: the
+		// Argument's own Parameter.
 		if (argument.value.nodeType === "RecordValue") {
 			visitRecordValue(
 				argument.value,
@@ -477,9 +423,8 @@ function visitArguments(
 	})
 }
 
-// Exported because the dotted-KEY probe asks the same question — which
-// Parameter an Argument belongs to — before it can say which Record a path key
-// inside that Argument reaches into.
+// Exported for the path-key probe, which needs an Argument's Parameter to
+// know which Record a key reaches into.
 export function pairedParameters(
 	nodeArguments: Array<common.typed.ArgumentNode>,
 	parameterTypes: common.BaseFunction["parameterTypes"] | null,
@@ -499,10 +444,8 @@ export function pairedParameters(
 		})),
 	)
 
-	// Inverted by the Compiler's own helper, which is the same inversion
-	// `matchArguments` performs to name the Parameter a mismatching Argument was
-	// held to — one walk, so the two can not disagree about which Parameter an
-	// Argument answers.
+	// Inverted by the Compiler's helper, as `matchArguments` does, so the two
+	// agree on which Parameter an Argument answers.
 	return pairing === null ? [] : argumentPairingInverse(pairing)
 }
 

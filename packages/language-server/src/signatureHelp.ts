@@ -23,27 +23,8 @@ import { probeSourcesFor, stripNoise } from "./probe"
 import { documentProtocolSpellings } from "./protocolSpellings"
 import { typedProgramNodes } from "./sections"
 
-// Signature Help resolves the enclosing invocation the same way
-// Completion resolves a receiver: the document text up to the cursor is
-// padded back into a valid Program (`probe.ts`), enriched, and the smallest
-// FunctionInvocation or MethodInvocation node that now contains the padded
-// cursor point is the one being typed into — this also handles nested calls
-// for free, since the innermost one wins, and closing a nested call hands the
-// outer one back (see `consider`).
-//
-// The active Parameter is *not* read off the parsed Arguments — a call like
-// `greet(1, )` drops the empty trailing slot entirely, so it is counted
-// directly from the raw text instead: top level commas between the call's
-// opening bracket and the cursor.
-//
-// A Method Invocation only resolves a Namespace once its Arguments already
-// match an Overload — which is exactly what is missing while Signature Help
-// is being shown. When that resolution failed, every Namespace whose target
-// Type matches the receiver (independent of Arguments) is offered instead,
-// mirroring Completion's `::` listing.
-//
-// Labels carry the callee's name, so what is shown is the whole contract of
-// the call being written — `append(_ String) -> String`, not a bare signature.
+// Signature Help for the call being typed, found by probing as Completion
+// does. See "Signature Help" in DEVELOPMENT.md.
 
 type SignatureHelpInfo = {
 	signatures: Array<SignatureInfo>
@@ -67,8 +48,7 @@ export function findSignatureHelp(
 	cursor: common.Cursor,
 	documentPath?: string,
 	analysis: DocumentAnalysis | null = null,
-	// Told of a Compiler throw the help is answered around, so the Server
-	// can log it.
+	// Told of a Compiler throw the help is answered around, for the log.
 	onInternalError: (error: unknown) => void = () => {},
 ): SignatureHelpInfo | null {
 	return withProtocolSpellings(documentProtocolSpellings(analysis), () =>
@@ -89,8 +69,7 @@ function signatureHelpAt(
 	analysis: DocumentAnalysis | null,
 	onInternalError: (error: unknown) => void,
 ): SignatureHelpInfo | null {
-	// The same reading Completion makes, for the same reason; see
-	// `findCompletions`.
+	// The document's analysis, derived as `findCompletions` derives it.
 	let document =
 		analysis ??
 		documentAnalysisOf(documentText, documentPath, onInternalError)
@@ -101,9 +80,8 @@ function signatureHelpAt(
 		(lines[cursor.line - 1] ?? "").slice(0, cursor.column - 1),
 	].join("\n")
 
-	// The searched point is the end of `headText`, not the requested
-	// cursor — that is where the Probe's padding starts, and the two differ
-	// whenever the requested column runs past the end of its own line.
+	// The end of `headText`, where the probe's padding starts, which differs
+	// from the cursor when the cursor is past the end of its line.
 	let headLines = headText.split("\n")
 	let probeCursor: common.Cursor = {
 		line: headLines.length,
@@ -113,13 +91,9 @@ function signatureHelpAt(
 
 	let invocation: Invocation | null = null
 
-	// A call written inside a Parameter's `= expression` default is one of
-	// the readings — see `probeSourcesFor`, which is what makes a Declaration
-	// whose head the cursor sits in parse at all.
+	// A call in a Parameter default is one of the readings; see `probeSourcesFor`.
 	for (let probeSource of probeSourcesFor(headText)) {
-		// The probe types the `tests { … }` block too — a call being
-		// written inside a test body is a call, and a Program enriched without
-		// the tests holds no Node for it at all.
+		// The probe types the `tests` block too, so a call in a test body has a Node.
 		let enrichedProgram = enrichProbe(probeSource, documentPath, moduleView)
 
 		if (enrichedProgram === null) {
@@ -141,14 +115,12 @@ function signatureHelpAt(
 	}
 
 	let activeParameter = countArguments(headText, invocation.arguments.length)
-	// The labels the call has written so far — what tells a defaulted
-	// Parameter that was skipped from one that is being typed. A Method
-	// Invocation's receiver is not among them, which is exactly how
-	// `signaturesOf` hands the signature over.
+	// The labels written so far, which tell a skipped defaulted Parameter from
+	// one being typed. A Method's receiver is not among them.
 	let writtenLabels = invocation.arguments.map((argument) => argument.name)
 
-	// A Static Method is invoked through a Lookup (`Thing.show(…)`), so
-	// the callee is not always a plain Function Type.
+	// A static Method is called through a Lookup (`Thing.show(…)`), so the callee
+	// is not always a Function Type.
 	if (invocation.nodeType === "FunctionInvocation") {
 		let signatures = signaturesOf(invocation.name.type)
 
@@ -166,9 +138,8 @@ function signatureHelpAt(
 		)
 	}
 
-	// `namespace.name` is empty exactly when resolution failed (see
-	// `resolveFailedMethodInvocation` in the Enricher) — the common case
-	// while Arguments are still incomplete.
+	// `namespace.name` is empty when resolution failed
+	// (`resolveFailedMethodInvocation`), as it does while Arguments are incomplete.
 	if (invocation.namespace.name !== "") {
 		let methodType =
 			invocation.namespace.type.methods[invocation.member.name]
@@ -224,9 +195,8 @@ function signatureHelpAt(
 		return null
 	}
 
-	// Several Namespaces can offer the same Method for one receiver, and
-	// `1::<Thing>string(…)` is how a call site picks between them — so the
-	// label is qualified the same way, but only while the choice is open.
+	// While several Namespaces offer the Method, the label is qualified as
+	// `1::<Thing>string(…)` picks one.
 	let isAmbiguous =
 		new Set(candidates.map((candidate) => candidate.namespaceName)).size > 1
 
@@ -278,15 +248,9 @@ function help(
 	}
 }
 
-// A comma count is a Parameter index only while nothing may be left out.
-// Once a Parameter carries a default, the Nth Argument a call writes need not be
-// the Nth Parameter: `cut(to 3)` writes one Argument and it stands at the SECOND
-// Parameter, because the label it wrote stepped over the first. So the count is
-// walked against the signature exactly the way the Compiler pairs Arguments —
-// take the Parameter when the labels agree, skip it when it has a default.
-//
-// A signature with no default anywhere answers with the count it was given,
-// which is every signature that existed before defaults did.
+// The Parameter an Argument count stands at, walked as the Compiler pairs
+// Arguments. A Parameter is taken when the labels agree and skipped when it
+// has a default. Without defaults, the count itself.
 function activeParameterFor(
 	signature: common.BaseFunction | undefined,
 	writtenLabels: Array<string | null>,
@@ -318,10 +282,8 @@ function activeParameterFor(
 		index++
 	}
 
-	// And the Argument being typed steps over the defaults its OWN label
-	// rules out, which it can only do once one has been written — a call that
-	// has typed nothing but the comma stands at the next Parameter, whatever it
-	// turns out to be.
+	// The Argument being typed skips the defaults its own label rules out, once
+	// it has one.
 	let active = writtenLabels[activeArgument]
 
 	if (active !== undefined) {
@@ -331,10 +293,8 @@ function activeParameterFor(
 	return Math.min(index, Math.max(parameters.length - 1, 0))
 }
 
-// A Parameter's own text is shown next to that Parameter, so the
-// signature's own Documentation is reduced to its description — repeating the
-// `@param` sections underneath would say everything twice. An Overload
-// without text of its own falls back to whatever documents the set.
+// A Parameter's text shows beside it, so the signature's documentation is its
+// description alone. An Overload without text uses the set's.
 function signatureInfo(
 	signature: common.BaseFunction,
 	name: string,
@@ -355,10 +315,8 @@ function signatureInfo(
 	}
 }
 
-// A Record Parameter whose default fills some of its members in says so
-// beside the Argument being typed, which is the moment the writer needs it. The
-// `?` in the signature label is untouched: it marks a Parameter the whole
-// Argument may be left out of, and a partial default grants nothing of the sort.
+// The members a Record Parameter's default fills, shown beside the Argument.
+// The label's `?` still means only that the whole Argument may go.
 function withOmittableMembers(
 	parameter: common.Parameter | undefined,
 ): string | null {
@@ -374,9 +332,8 @@ function withOmittableMembers(
 		.join(", ")} out of this Record.`
 	let reaching = Object.keys(parameter?.defaultNesting ?? {})
 
-	// And which of them a path key may reach INTO, which is the other
-	// half of the same fact: the default writes those out member by member, so
-	// `server.port = 1` merges into what it wrote rather than replacing it.
+	// And which of them a path key may reach into: `server.port = 1` merges into
+	// what the default wrote.
 	if (reaching.length > 0) {
 		sentence += ` It may reach into ${reaching
 			.map((name) => `'${name}'`)
@@ -386,11 +343,9 @@ function withOmittableMembers(
 	return documentation === null ? sentence : `${documentation}\n\n${sentence}`
 }
 
-// An Overload the Arguments already resolved to stays active, but only
-// while it still has room for the Argument being typed — resolution runs on
-// the half written call, so `combine(2, ` resolves to the one Parameter
-// Overload that the second Argument has already ruled out. Otherwise the
-// first Overload that can still take the Argument wins.
+// A resolved Overload stays active while it has room for the Argument being
+// typed; `combine(2, ` may have resolved to one already ruled out. Otherwise
+// the first Overload that can take the Argument wins.
 function activeSignatureOf(
 	signatures: Array<common.BaseFunction>,
 	overloadedMethodIndex: number | null,
@@ -407,11 +362,8 @@ function activeSignatureOf(
 		}
 	}
 
-	// An arm whose REQUIRED count also reaches this Argument is preferred
-	// over one that only reaches it by counting Parameters a call may leave out
-	// — a call that has written this many Arguments has plainly not left those
-	// out. Falls back to the old test, so an Overload set with no default in it
-	// picks exactly what it always picked.
+	// An Overload whose required Parameters reach this Argument wins over one
+	// reaching it only through defaults.
 	let fits = signatures.findIndex(
 		(signature) =>
 			signature.parameterTypes.length > activeParameter &&
@@ -429,8 +381,7 @@ function activeSignatureOf(
 	return match === -1 ? 0 : match
 }
 
-// Static Methods are called through a Lookup, so the callee's name is
-// the path written at the call site rather than a single Identifier.
+// A static Method's name is the path written at the call site.
 function calleeName(node: common.typed.ImplementationNode): string {
 	switch (node.nodeType) {
 		case "Identifier":
@@ -442,11 +393,8 @@ function calleeName(node: common.typed.ImplementationNode): string {
 	}
 }
 
-// Counts top level commas only — nested calls, Lists and Records
-// balance their own brackets so a comma inside them does not advance the
-// active Parameter of the outer call. String and Comment content is blanked
-// out first, so that a comma or an unbalanced bracket inside a String
-// Literal argument neither advances the count nor cuts the scan short.
+// Counts top level commas only. Strings and comments are blanked out first,
+// so their commas and brackets count for nothing.
 function countArguments(headText: string, parsedArgumentCount: number): number {
 	let text = stripNoise(headText)
 	let depth = 0
@@ -510,12 +458,8 @@ function findEnclosingInvocation(
 			return
 		}
 
-		// A cursor sitting exactly at an Invocation's end has just closed
-		// it — `outer(first inner(value 1)` with the caret after the inner `)`.
-		// That Invocation is finished, so what is still being written is the
-		// call AROUND it, which is what typing `)` has to leave on screen.
-		// `contains` counts the end as inside, which is what every other reader
-		// of it wants and the one thing this one must not do.
+		// A cursor exactly at an Invocation's end has just closed it, so the call
+		// around it is the one being written, unlike what `contains` says.
 		if (isAtOrBefore(node.position.end, cursor.start)) {
 			return
 		}
@@ -526,9 +470,7 @@ function findEnclosingInvocation(
 		}
 	}
 
-	// `= cut(from 1` IS a call being written, so a cursor inside a
-	// Parameter's default has a signature to help with exactly as one in a body
-	// does.
+	// A call in a Parameter's default gets help as one in a body does.
 	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
 		for (let defaultValue of parameterDefaults(parameters)) {
 			visitNode(defaultValue)
@@ -598,9 +540,7 @@ function findEnclosingInvocation(
 			case "ReturnStatement":
 				visitNode(node.expression)
 				return
-			// `expect greet(` IS a call being written, so a cursor inside
-			// an assertion has a signature to help with exactly as one in a
-			// body does.
+			// A call in an assertion gets help too.
 			case "ExpectStatement":
 			case "RequireStatement":
 				for (let expression of typedAssertionExpressions(node)) {
@@ -647,8 +587,7 @@ function findEnclosingInvocation(
 				}
 
 				return
-			// `as total(` IS a call being written, so a cursor inside an
-			// arm has a signature to help with exactly as one in a body does.
+			// A call in a `define` arm gets help too.
 			case "Define":
 				for (let expression of defineExpressions(node)) {
 					visitNode(expression)
@@ -693,9 +632,7 @@ function findEnclosingInvocation(
 
 				return
 			case "ChoiceDeclarationStatement":
-				// A Case payload's default may hold a call, and the
-				// cursor inside its Arguments wants the same Signature Help a
-				// call in a body gets.
+				// A call in a Case payload's default gets help too.
 				for (let defaultValue of caseDefaults(node.cases)) {
 					visitNode(defaultValue)
 				}

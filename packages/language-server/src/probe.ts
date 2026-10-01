@@ -1,8 +1,6 @@
-// A "probe" turns an in-progress edit into a syntactically valid
-// Program by appending a suffix and enough closing brackets to balance
-// whatever was left open — Completion and Signature Help both need to
-// resolve Types at a cursor position that, as typed, does not parse on its
-// own (`person.`, `greet(`, …).
+// A probe makes an edit in progress, such as `person.` or `greet(`, parse. It
+// appends a suffix and enough closing brackets for what was left open. See
+// "Probes" in DEVELOPMENT.md.
 
 // Blanks String text and Comments out, one space per UTF-16 unit, so the
 // brackets and commas inside them go uncounted and offsets still line up. An
@@ -18,8 +16,8 @@ type Noise = {
 	openHoles: Array<number>
 }
 
-// `hole` is the offset of the `{` of the hole the scan is in, or -1 while
-// it is in the String's text; `depth` counts the braces open inside that hole.
+// `hole` is the offset of the `{` of the hole the scan is in, or -1 in the
+// String's text. `depth` counts the braces open inside that hole.
 type OpenString = {
 	hole: number
 	depth: number
@@ -108,19 +106,15 @@ const closers: Record<string, string> = {
 	'"{': '}"',
 }
 
-// `opensDefine` says this `{` is a `define`'s own block rather than any
-// other kind — a Record Literal, a Function body, a block an arm's VALUE opened.
-// The arm tails belong at the end of that block and nowhere else, and the
-// innermost `{` is only the same brace while an arm holds none of its own.
+// `opensDefine` marks a `define`'s own block. An arm's tail goes at the end
+// of that block, which is the innermost `{` only while no arm opened one.
 type OpenBracket = {
 	opener: string
 	opensDefine: boolean
 }
 
-// The Keyword is read as a whole word, so `redefine` opens no `define`,
-// off text `stripNoise` has blanked String text and Comments out of. As in the
-// Parser, its block is the first `{` at its own depth past its return Type: a
-// `{` where that Type still expects a Type opens a Record Type instead.
+// The Keyword is read as a whole word, off text `stripNoise` blanked. As in
+// the Parser, its block is the first `{` at its depth past its return Type.
 function openBrackets(
 	text: string,
 	openHoles: Array<number>,
@@ -190,8 +184,8 @@ function openBrackets(
 // `,` of a Type Argument list.
 const expectsType = /(->|[|<,])$/
 
-// `declarationIndex` names the one open `(` to close as a Declaration's
-// parameter list rather than as a call's Argument list — see `probeSourcesFor`.
+// `declarationIndex` names the open `(` to close as a parameter list; see
+// `probeSourcesFor`.
 function closingSuffixFor(
 	stack: Array<OpenBracket>,
 	declarationIndex: number = -1,
@@ -208,22 +202,9 @@ function closingSuffixFor(
 	return suffix
 }
 
-// Closing brackets alone are not enough when one of the open ones is a
-// DECLARATION's parameter list, which is where a `= expression` default is
-// written: `function greet(_ name: String = person` closed with `)}` is a
-// `function` with no return Type and no body, and the Parser drops the whole
-// Statement — so a cursor inside a default resolved against nothing at all.
-//
-// A parameter list can not be told from a call's Argument list by looking at the
-// text, so these are offered as FURTHER readings rather than instead of the
-// plain one: each is tried in turn and the first that answers wins. `-> {} {}`
-// is the shortest complete tail there is — the unit Type, and a body that
-// returns it by falling off its end.
-//
-// The parameter list is the OUTERMOST open `(` whenever a default holds a call,
-// so the readings run outward-in; at most `MAXIMUM_DECLARATION_READINGS` of them,
-// since each costs a parse and an enrichment of the whole document and a cursor
-// four calls deep inside a default is not what this is for.
+// Readings that close an open `(` as a Declaration's parameter list, with the
+// tail `-> {} {}`, so a cursor in a default resolves. Tried after the plain
+// reading, outermost first, at most `MAXIMUM_DECLARATION_READINGS` of them.
 const MAXIMUM_DECLARATION_READINGS = 2
 
 export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
@@ -251,47 +232,26 @@ export function probeSourcesFor(headText: string, suffix = ""): Array<string> {
 		}
 	}
 
-	// Two readings can spell the same source — a declaration reading of
-	// the outermost `(` and the `match` reading of a head that opened one —
-	// and a reading costs a parse and an enrichment; the same one twice is
-	// the same answer twice.
+	// Two readings may spell the same source, and each costs an enrichment.
 	return [...new Set(sources)]
 }
 
-// The tails a Statement's HEAD can be waiting for: an `if` wants a block,
-// a `match` wants its return Type and then one — `-> {} {}`, the shortest
-// complete tail there is.
+// The tails a Statement head may wait for: a block for an `if`, and for a
+// `match` its return Type and a block.
 const STATEMENT_TAILS = [" {}", " -> {} {}"]
 
-// The tails that finish the `define` a head stands INSIDE. An arm is
-// written `as VALUE if CONDITION` and the block has to end in an `otherwise`
-// arm, so a cursor in a value is one word short of an arm that closes the
-// block, and a cursor in a Condition is one whole arm short of it — `as {}
-// otherwise`, the shortest arm there is. Neither is optional the way a `match`
-// return Type is: a `define` with no `otherwise` arm is REFUSED, so without
-// these readings the Parser drops the whole Statement the cursor is in, and
-// with it the member access being written.
+// The tails that finish the `define` a head stands inside: `otherwise` after a
+// value, `as {} otherwise` after a Condition. A `define` without an `otherwise`
+// arm is refused, and the Parser would drop the Statement.
 const DEFINE_TAILS = [" otherwise", " as {} otherwise"]
 
-// What says the arm readings are worth building. `define` is a reserved
-// Keyword and `stripNoise` has blanked String text and Comments, so the word
-// anywhere before the cursor means a `define` was opened, perhaps closed again.
+// Whether the arm readings are worth building: `define` is reserved, so the
+// word anywhere before the cursor means one was opened.
 const definePattern = /\bdefine\b/
 
-// A tail is written immediately before the closer of the `{` whose block
-// it finishes. For a Statement waiting for a block that is the innermost open
-// one — `if greet(` closes to `if greet() {}` and not to `if greet( {})`, and
-// such a head can hold no unclosed `{` of its own, since a block is exactly what
-// it is waiting for.
-//
-// A `define` arm's tail belongs at the end of the `define`'s OWN block, which is
-// the innermost `{` only while no half-written arm opened one of its own. `as {
-// name = team.` stands two braces in, and an arm written inside the Record
-// Literal closes nothing — so a cursor there was answered by no reading at all,
-// where the same Record Literal outside a `define` answered. Falls back to the
-// innermost `{` where no open brace is a `define`'s: `definePattern` passes on
-// the Keyword standing anywhere above the cursor, including inside a `define`
-// that has been closed again.
+// A tail goes before the closer of the `{` it finishes: for a Statement head,
+// the innermost open one. For a `define` arm, the `define`'s own block, else
+// the innermost `{`.
 function tailSuffixFor(
 	stack: Array<OpenBracket>,
 	tail: string,
@@ -316,9 +276,8 @@ function tailSuffixFor(
 			index < target &&
 			stack[index]!.opensDefine
 		) {
-			// A `define` the target one is written INSIDE is one word
-			// short of closing too — its own arm's value is the `define` below
-			// it, which has just been finished, so `otherwise` is all it wants.
+			// An enclosing `define` is one word short too: its arm's value is the
+			// `define` just finished, so it wants `otherwise`.
 			suffix += ENCLOSING_DEFINE_TAIL
 		}
 
