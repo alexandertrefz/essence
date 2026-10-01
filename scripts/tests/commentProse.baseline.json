@@ -109,7 +109,6 @@
 	"packages/language-server/src/tests/codeActions.spec.ts": {"sentence-length": 164, "em-dash": 143, "all-caps": 75, "history": 6, "position": 14, "block-length": 4, "counts": 1},
 	"packages/language-server/src/tests/completion.spec.ts": {"sentence-length": 79, "em-dash": 58, "all-caps": 36, "history": 5, "position": 2, "block-length": 7, "counts": 1, "citation": 1},
 	"packages/language-server/src/tests/hover.spec.ts": {"sentence-length": 44, "em-dash": 43, "all-caps": 34, "history": 4, "position": 3, "block-length": 3},
-	"packages/language-server/src/tests/quickFixGuard.spec.ts": {"sentence-length": 34, "em-dash": 20, "all-caps": 16, "history": 2, "position": 4, "block-length": 8, "stacked": 1},
 	"packages/language-server/src/tests/rename.spec.ts": {"sentence-length": 39, "em-dash": 35, "all-caps": 19, "history": 1, "position": 1},
 	"packages/language-server/src/tests/testSession.spec.ts": {"sentence-length": 32, "em-dash": 28, "all-caps": 18, "history": 1, "position": 2, "block-length": 3, "counts": 1},
 	"packages/language-server/src/tests/workspace.spec.ts": {"sentence-length": 61, "em-dash": 48, "all-caps": 24, "history": 2, "position": 3, "block-length": 2},

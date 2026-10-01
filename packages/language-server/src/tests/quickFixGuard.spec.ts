@@ -33,32 +33,13 @@ afterAll(() => {
 	madeFolders = []
 })
 
-// The standing guard over every Quick Fix this Server offers, asked of
-// every deliberately broken file there is. Each fix, applied alone to the
-// original text:
-//   (i)   raises no report the file did not already carry, except the codes
-//         its allowance names, and without an allowance neither count rises
-//   (ii)  does not leave the Diagnostic it was offered for with the identical
-//         code, message and place, which is the definition of a loop
-//   (iii) leaves a result that still parses, unless the original did not
-//   (v)   writes only on the lines its Diagnostic stands on or their
-//         neighbours, unless a reach allowance names the fix
-//
-// And each fix starts a chain, followed for up to eight rounds or until the
-// result offers no quick fix. A round applies the quick fix offered for a report
-// the previous round raised, or else the first one offered.
-//   (iv)  no round raises the report or error count, a scaffold's round counted
-//         without the codes its allowance names; no round breaks the parse;
-//         and no fix is offered again on the Diagnostic it was applied to
-//
-// Deterministic and with no timing assertion: the corpus is a sorted directory
-// listing and every edit is a function of the text it is applied to. The
-// questions are asked by `answerFailures` and `chainFailures`, and the mutants
-// in "The guard itself" check that each of them can fail.
+// The guard over every Quick Fix, asked of every deliberately broken file.
+// `answerFailures` asks questions (i), (ii), (iii) and (v) of each fix applied
+// alone, and `chainFailures` asks (iv) of the chain it starts. The mutants in
+// "The guard itself" check that each question can fail. The corpus is a sorted
+// listing and every edit is a function of its text, so the guard is
+// deterministic.
 
-// Codes the Parser and the Lexer raise, which is what "does it still
-// parse" is asked with — a fix that leaves a buffer the Parser can not read has
-// taken the rest of the file's reports away with it.
 const SYNTAX_CODES: ReadonlySet<string> = new Set([
 	"syntax-error",
 	"unexpected-token",
@@ -67,34 +48,19 @@ const SYNTAX_CODES: ReadonlySet<string> = new Set([
 ])
 
 type Allowance = {
-	// Matched on the fix's title by PREFIX, because a title is built from
-	// the reader's own names — "Implement 'Printable'" and "Implement 'Shown'"
-	// are one fix.
+	// Matched on the fix's title by prefix, since a title holds the reader's
+	// names: "Implement 'Printable'" and "Implement 'Shown'" are one fix.
 	code: common.DiagnosticCode
 	title: string
 	reason: string
-	// What the fix is allowed to leave behind. A scaffold leaves a hole
-	// BY DESIGN, and the hole has a code: naming it here is what keeps "the
-	// count may rise" from meaning "anything may happen".
+	// The codes the fix may leave behind. A scaffold leaves a hole by design,
+	// and naming the hole's code keeps anything else from rising.
 	followUp: Array<common.DiagnosticCode>
 }
 
-// The scaffolding fixes, and nothing else. Each of these writes a hole
-// the reader fills in, so the report that stands in the hole is the fix working
-// rather than the fix failing — and each entry names the code that hole
-// reports, so a fix that starts leaving a DIFFERENT one fails here.
-//
-// Unused entries fail this spec (see "has every allowance still earned"): an
-// allowlist nobody checks is how a guard rots into a list of things that used
-// to be true.
-//
-// The scaffolds the fixers name that the corpus does not reach are
-// deliberately absent: `Make 'X' Generatable` as a Quick Fix rather than as the
-// rewrite below, the `define` arm and the `else` branch. An allowance for a fix
-// nothing here offers is a claim about the Compiler that nothing checks; the
-// day a fixture reaches one, this spec fails and whoever wrote the fixture
-// writes the reason down, which is what happened to `Implement 'X'` below when
-// the corpus grew a Namespace that declares a conformance it does not keep.
+// The scaffolding fixes, and nothing else. Each writes a hole the reader fills
+// in, and names the code that hole reports. An unused entry fails "has every
+// allowance still earned".
 const ALLOWED: Array<Allowance> = [
 	{
 		code: "ambiguous-case",
@@ -173,24 +139,18 @@ const ALLOWED: Array<Allowance> = [
 ]
 
 type ReachAllowance = {
-	// Keyed the way an Allowance is — the code the fix answers and the
-	// title it is offered under, by prefix.
+	// Keyed as an Allowance is, by the code the fix answers and its title's
+	// prefix.
 	code: common.DiagnosticCode
 	title: string
 	reason: string
-	// How far the fix may write — "elsewhere in the file" where the
-	// answer lives at a declaration the reader may have put anywhere in it,
-	// "another file" for the one kind of fix that reaches a second Module.
+	// How far the fix may write. "elsewhere in the file" covers an answer at a
+	// declaration anywhere in it, and "another file" a second Module.
 	reach: "elsewhere in the file" | "another file"
 }
 
-// The fixes that legitimately write somewhere OTHER than the lines the
-// report stands on, and why each does. Everything else edits what it
-// underlines, give or take the line above and the line below — the rule that
-// tells a fix from a rewrite of the reader's file, and the one the survey's
-// mutants got past: an honest edit carrying a renamed binding, a deleted
-// comment or a renamed Case rode along unnoticed because only the count was
-// read.
+// The fixes that write away from the lines their report stands on, and why.
+// Every other fix edits what it underlines, give or take a neighbouring line.
 const REACH_ALLOWED: Array<ReachAllowance> = [
 	{
 		code: "not-exported",
@@ -241,28 +201,20 @@ function reachAllowanceFor(entry: CodeActionEntry): ReachAllowance | undefined {
 }
 
 type RefactorAllowance = {
-	// Matched by PREFIX on the title, and pinned to the fixtures it is
-	// allowed on: a rewrite that starts raising the count somewhere else is a
-	// new fact and fails here rather than riding in on an old reason.
-	//
-	// A prefix wide enough to catch a rewrite nobody wrote it for is an
-	// allowance that excuses the wrong thing — "Make '" would cover a "Make it
-	// a Constant" nobody has written yet — so `for` narrows it to the shape the
-	// reason is about: the title reads "Make 'X' Generatable", and nothing else
-	// that starts with those five characters is excused.
+	// Matched by prefix on the title and pinned to its fixtures, so a rewrite
+	// raising the count elsewhere fails. `for` narrows a wide prefix to the
+	// titles its reason is about.
 	title: string
 	for?: RegExp
 	fixtures: Array<string>
 	reason: string
-	// How many errors it may ADD. One scaffold body is one hole.
+	// How many errors it may add. One scaffold body is one hole.
 	atMost: number
 }
 
-// The two rewrites that leave a file more broken than they found it, and
-// why each is allowed to. A refactoring is held to the weaker rule — it is
-// offered on code the Compiler is happy with and it CHANGES what a Program
-// says — but "weaker" is not "anything", so both are written down here with the
-// files they are written down for.
+// The rewrites allowed to leave a file more broken than they found it, and
+// why. A refactoring changes what a Program says, so it is held to a weaker
+// rule, but each exception is written down with its files.
 const REFACTOR_ALLOWED: Array<RefactorAllowance> = [
 	{
 		title: "Make '",
@@ -338,20 +290,16 @@ function identityOf(diagnostic: common.Diagnostic): string {
 	].join(" ")
 }
 
-// A Diagnostic as "the same report", which is what a report the fix
-// RAISED is told from one the file was already carrying. The code and the
-// message, deliberately without the position: an edit that writes a line moves
-// every report below it down one, and a report that moved is not a new one,
-// while a second `unknown-name` about a name nothing declares is — which is the
-// fix the counting rule below used to let through, answering its own report and
-// leaving an unrelated one in its place.
+// A Diagnostic as "the same report", which tells a raised report from one the
+// file already carried. It leaves out the position, since an edit that writes a
+// line moves every later report.
 function reportKey(diagnostic: common.Diagnostic): string {
 	return `${diagnostic.code} ${diagnostic.message}`
 }
 
-// What the fix left behind that the file did not already say. Shared by
-// both paths: a scaffold's holes are read off this list and matched against the
-// codes its allowance names, and a fix with no allowance may leave none at all.
+// What the fix left behind that the file did not already say. A scaffold's
+// holes must match its allowance's codes, and a fix with no allowance may leave
+// none.
 function freshReports(
 	before: Array<common.Diagnostic>,
 	after: Array<common.Diagnostic>,
@@ -361,9 +309,8 @@ function freshReports(
 	return after.filter((diagnostic) => !standing.has(reportKey(diagnostic)))
 }
 
-// The Diagnostic an action answers, as the identity a chain is followed
-// by — the code and where it was raised. Null where the action answers none,
-// which no quickfix does.
+// The Diagnostic an action answers, by code and place, which a chain follows.
+// Null where the action answers none, which no quickfix does.
 function keyOf(entry: CodeActionEntry): string | null {
 	let position = entry.diagnosticPosition
 
@@ -393,23 +340,13 @@ function parsesIn(diagnostics: Array<common.Diagnostic>): boolean {
 	return !diagnostics.some((diagnostic) => SYNTAX_CODES.has(diagnostic.code))
 }
 
-// One line of slack on each side, because an edit that writes a line ABOVE
-// the report — a Type a declaration was short of, a conformance, the closing
-// quote of the String that ran on — stands on the neighbouring line and is as
-// local as an edit gets.
+// One line of slack on each side. An edit that writes the line before the
+// report, such as a missing Type or a closing quote, is as local as an edit gets.
 const NEARBY_LINES = 1
 
-// Where a fix may write. The reader asked about ONE report, and an edit
-// somewhere else in their file is a change they did not ask for and will not
-// read — the Help audit's mutants walked in exactly here, riding along with an
-// honest edit: a binding renamed throughout, every documentation comment
-// deleted, a Choice Case renamed. Each of them left the counts alone.
-//
-// Answered with the lines the report stands on rather than with its columns: a
-// fix commonly rewrites the whole line it underlines part of, and no mutant this
-// is written against is a matter of columns. INSIDE those lines rather than
-// overlapping them, because an edit that rewrites the file from its first line
-// to its last overlaps everything.
+// Where a fix may write. An edit elsewhere in the file is a change the reader
+// did not ask for, even when the counts stay put. An edit must lie inside the
+// report's lines, since a fix often rewrites a whole line it underlines part of.
 function reachesTooFar(
 	entry: CodeActionEntry,
 	edit: CodeActionEdit,
@@ -431,9 +368,8 @@ function reachesTooFar(
 	return inside ? null : "elsewhere in the file"
 }
 
-// The guard's own questions, as a function rather than as a wall of
-// assertions, so that the mutants in "The guard itself" can be asked them too.
-// It answers the questions the fix failed, empty where it passed all of them.
+// The guard's questions as a function, so the mutants in "The guard itself"
+// can be asked them too. It answers the questions the fix failed.
 function answerFailures(
 	source: string,
 	entry: CodeActionEntry,
@@ -445,13 +381,8 @@ function answerFailures(
 		tests: true,
 	})
 
-	// (i) It raised no report the file was not already carrying — and, where
-	// it is no scaffold, neither count rose either.
-	//
-	// Counts alone said nothing about WHICH reports were counted: a fix
-	// that answered the report it was offered for and left an unrelated one in
-	// its place went four for four and passed. What a fix may leave is what its
-	// allowance names, and nothing is what everything else may leave.
+	// (i) It raised no report the file was not already carrying, apart from the
+	// codes its allowance names. Without an allowance neither count rose either.
 	let permitted = allowance?.followUp ?? []
 
 	for (let diagnostic of freshReports(before, after)) {
@@ -474,9 +405,9 @@ function answerFailures(
 		}
 	}
 
-	// (ii) The report it answered is gone, or has become a different one in
-	// that place. Found by code AND POSITION, because a showcase file carries
-	// several reports of one code and a fix answers exactly one of them.
+	// (ii) The report it answered is gone, or became a different one in that
+	// place. Found by code and position, since a file may carry several reports
+	// of one code.
 	if (entry.diagnosticCode !== null && entry.diagnosticPosition !== null) {
 		let answered = before.find(
 			(diagnostic) =>
@@ -496,7 +427,8 @@ function answerFailures(
 		}
 	}
 
-	// (iii) It still parses, unless it did not before.
+	// (iii) It still parses, unless it did not before. A buffer the Parser
+	// cannot read hides the rest of the file's reports.
 	if (parsesIn(before) && !parsesIn(after)) {
 		failures.push("(iii) the result no longer parses")
 	}
@@ -507,9 +439,8 @@ function answerFailures(
 	return failures
 }
 
-// Split out because the Module group asks this one question on its own:
-// there the answer is read off the whole graph, and an edit landing in a second
-// file is the fix working rather than the fix reaching.
+// Split out because the Module group asks this question on its own. There an
+// edit in a second file is allowed where a reach allowance says so.
 function reachFailures(entry: CodeActionEntry): Array<string> {
 	let failures: Array<string> = []
 
@@ -592,9 +523,9 @@ function roundFailures(
 	return failures
 }
 
-// The fourth question follows a fix the way a reader presses through
-// lightbulbs: apply it, read the Diagnostics again, then apply the quick fix
-// the result offers for a report that round raised, or else the first it offers.
+// (iv) follows a fix for up to `CHAIN_ROUNDS` rounds, as a reader presses
+// through lightbulbs. Each round applies the fix offered for a report the last
+// round raised, else the first fix offered.
 function chainFailures(source: string, entry: CodeActionEntry): Array<string> {
 	let failures: Array<string> = []
 	let text = source
@@ -670,9 +601,8 @@ describe("Every Quick Fix on every broken file", () => {
 		expect(showcases.length).toBeGreaterThan(20)
 	})
 
-	// Nothing may escape into the other group by accident — a single-file
-	// fixture that started offering a fix reaching a second file would be
-	// skipped in silence, and this is what stops that.
+	// A single-file fixture that started offering a fix reaching a second file
+	// would otherwise be skipped in silence.
 	it("offers only single-file edits on a single-file fixture", () => {
 		for (let showcase of showcases) {
 			let foreign = actionsOn(showcase.source).filter((entry) =>
@@ -718,10 +648,8 @@ describe("Every Quick Fix on every broken file", () => {
 	}
 })
 
-// The weaker rule for a REFACTORING, which is offered on code the
-// Compiler is happy with and is a rewrite rather than an answer: it may say
-// something new, and what it may never do is turn a file with N errors into one
-// with more.
+// The weaker rule for a refactoring, which rewrites rather than answers. It
+// may say something new, but never turn a file with N errors into one with more.
 describe("Every refactoring on every broken file", () => {
 	for (let showcase of showcases) {
 		it(`leaves ${showcase.name} no more broken than it was`, () => {
@@ -749,12 +677,9 @@ describe("Every refactoring on every broken file", () => {
 	}
 })
 
-// The Module showcase, which is the only place a fix reaches a SECOND
-// file — a name written into the export block of the Module that kept it
-// private. It runs against a real directory for the reason `workspace.spec.ts`
-// does: which path a specifier resolves to is most of what there is to get
-// wrong about a Module, and an in-memory host would answer that question by
-// assumption.
+// The Module showcase, where a fix writes a name into the export block of the
+// Module that kept it private. It runs against a real directory, since which
+// path a specifier resolves to is a fact about a filesystem.
 describe("Every Quick Fix on the Module showcase", () => {
 	let moduleDirectory = fixturePath("diagnostics", "modules")
 	let moduleFiles = Object.fromEntries(
@@ -784,10 +709,8 @@ describe("Every Quick Fix on the Module showcase", () => {
 		return root
 	}
 
-	// The whole workspace's Diagnostics, because a Module fix is judged
-	// by what the GRAPH says afterwards — an export written into one file
-	// answers a report raised in another, and reading back only the file the
-	// fix was offered on would call that a success either way.
+	// The whole workspace's Diagnostics, since an export written into one file
+	// answers a report raised in another.
 	function graphCodes(root: string): Array<string> {
 		let workspace = createWorkspace({ tests: true })
 
@@ -807,9 +730,8 @@ describe("Every Quick Fix on the Module showcase", () => {
 			})
 	}
 
-	// One fix, applied to the files as they were written, with the edits
-	// grouped per file — a Workspace Edit reaching two files is one action, and
-	// applying half of it is not what a reader does.
+	// One fix applied to the files as written, with the edits grouped per file.
+	// A Workspace Edit reaching two files is one action.
 	function withFix(entry: CodeActionEntry, onto: string): Array<string> {
 		let files = { ...moduleFiles }
 
@@ -828,8 +750,8 @@ describe("Every Quick Fix on the Module showcase", () => {
 		return graphCodes(freshFolder(files))
 	}
 
-	// And it has fixes to apply — a group that quietly stopped finding any
-	// would pass every assertion below it by never reaching one.
+	// A group that stopped finding fixes would pass every assertion by never
+	// reaching one.
 	it("has a showcase to fix", () => {
 		let root = freshFolder(moduleFiles)
 		let workspace = createWorkspace({ tests: true })
@@ -884,20 +806,16 @@ describe("Every Quick Fix on the Module showcase", () => {
 					after.filter((code) => code.endsWith("syntax-error")),
 				]).toEqual([where, []])
 
-				// And it wrote where the report stands, or where its
-				// allowance says it may. This is the one group where a fix
-				// reaches a SECOND file, which is exactly why the rule is
-				// asked here as well: "it is a Module fix" is not a reason to
-				// stop reading where the edits land.
+				// It wrote where the report stands, or where its allowance says it
+				// may. A fix that reaches a second file is still held to that.
 				expect([where, reachFailures(entry)]).toEqual([where, []])
 			}
 		})
 	}
 })
 
-// The allowlist's own guard. An entry that stops being needed is a claim
-// about the Compiler that nobody is checking any more — so it fails here, and
-// whoever fixed the fix deletes the line that excused it.
+// The allowlist's own guard. An entry that stops being needed fails here, and
+// is deleted.
 describe("The allowlist", () => {
 	it("has every allowance still earned", () => {
 		expect(
@@ -924,19 +842,13 @@ describe("The allowlist", () => {
 	})
 })
 
-// The guard's own guard: each mutant is a deliberately wrong fix, most of
-// them the honest fix carrying something no reader asked for, and each has to
-// be caught.
-//
-// Three of them ride along with an honest edit and change something else in the
-// file, which only question (v) catches, and one is caught only by following the
-// chain past its first round.
+// The guard's own guard: each mutant is a deliberately wrong fix, and each must
+// be caught. Several ride along with an honest edit, which only question (v)
+// catches, and one only the chain catches.
 describe("The guard itself", () => {
-	// Written here rather than read out of the corpus: a mutant has to
-	// know what it is corrupting — a comment, a binding, a Case — and a fixture
-	// is free to stop carrying any of the three. One misspelled name, in the
-	// middle of the file so that an edit at either end of it is plainly
-	// somewhere else.
+	// Written here rather than read from the corpus, since a mutant must know
+	// the comment, binding and Case it corrupts. The misspelled name sits mid-file,
+	// so an edit at either end is plainly elsewhere.
 	const SUBJECT = [
 		"implementation {",
 		"\t§ A note the reader wrote, which no fix has any business deleting.",
@@ -1052,10 +964,9 @@ describe("The guard itself", () => {
 		])
 	})
 
-	// The three that got past the counting guard, each of which leaves a
-	// file the Compiler is just as happy with and the reader no longer
-	// recognises. They are caught by where they WRITE, so the verdict is read
-	// for that question by name rather than for any failure at all.
+	// Each leaves a file the Compiler is as happy with and the reader no longer
+	// recognises. They are caught by where they write, so the verdict is read
+	// for question (v) by name.
 	it("catches a fix that deletes the reader's comments", () => {
 		let deletions = lines.flatMap((line, index) =>
 			line.trimStart().startsWith("§")
@@ -1092,8 +1003,8 @@ describe("The guard itself", () => {
 		).toEqual(["(v) wrote elsewhere in the file: lines 1-15"])
 	})
 
-	// Caught by no question but the chain: the fix moves the misspelled
-	// name into a declaration whose uses it masks, and the next fix unmasks them.
+	// Caught only by the chain: the fix moves the misspelled name into a
+	// declaration whose uses it masks, and the next fix unmasks them.
 	it("catches a count that rises further down the chain", () => {
 		let trap = mutant([
 			{
