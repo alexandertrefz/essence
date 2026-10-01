@@ -285,3 +285,36 @@ A Union-typed member is matched to an arm at run time by the value's `typeKeySym
 null tag takes everything no other arm claims. A tag names a kind, not a Type: every Record carries `Record`.
 Where two arms share a tag, `shape` carries the arm's Type for the runtime's `isValueOfType` check. Arms are
 ordered most specific first.
+
+## Test generators
+
+A property test draws each Parameter's value from a `TestGenerator` that the enricher derives from the
+Parameter's Type. The generator is data rather than a closure. One interpreter in the test runtime then owns
+both building a value and shrinking a failing one. A generator that could build but not shrink would
+leave the reader with whatever counterexample was drawn first.
+
+The enricher derives generators because it holds a Scope. Two leaves need one, and they are the only leaves
+that carry Expressions. A `refined` leaf checks the refinement's conjuncts as Boolean Expressions, the checks
+an author could have written. A `generated` leaf calls a Namespace's own `Generatable` conformance, as
+`Team.generate(from …)` and `…::<Team>shrink()`. Both are enriched where the test was written, so they reach
+whatever that Scope reaches. Each is emitted as a closure of the one name it binds.
+
+A `refined` leaf's `narrowing` holds what a recognised conjunct says about the values worth drawing, such as
+a lower bound. The generator then builds such values rather than drawing and discarding them. The checks
+still decide every value.
+
+## Narrowing records
+
+A condition may narrow a binding: in the branch it enters, the binding has a refined Type the code before it
+does not have. Only the enricher can tell, because a narrowing is read off the typed condition and the
+optimiser erases refinements. So the enricher records it on the node. On an `if`, `narrows` says the condition
+narrows something where it holds, and `narrowsFalse` says it narrows something where it fails. A `define`
+arm carries `narrows` and `narrowsBelow`, the second for the later arms and the `otherwise` value.
+
+The two are separate claims, and neither implies the other. `separator::isEmpty()` proves nothing about a
+String where it holds, and proves `NonEmptyString` where it fails.
+
+Coverage reads the flags, so a report can ask whether both the guarded path and the fallback ran. Mutation
+testing reads them too. Every stage after the enricher sees a conditional as bodies with no evidence in
+them. Swapping two bodies or moving an arm's answer could then run a value against a refinement nobody
+proved. The flags say where that is safe.
