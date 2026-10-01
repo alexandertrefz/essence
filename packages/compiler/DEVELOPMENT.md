@@ -261,15 +261,16 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
 9. Rewriter: `rewriter/rewrite.ts`.
 10. Formatter: `packages/formatter/src/printer.ts`.
 11. Language server, in `packages/language-server/src`: `completion.ts`, `hover.ts`, `rename.ts` and
-    `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`, `lookups.ts`, `matchOnValue.ts` and
-    `payloads.ts`. `argumentContext.ts`, `callHierarchy.ts`, `documentSymbols.ts`, `foldingRanges.ts`,
-    `inlayHints.ts`, `selectionRanges.ts`, `semanticTokens.ts`, `signatureHelp.ts` and
+    `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`, `matchOnValue.ts` and `payloads.ts`.
+    `argumentContext.ts`, `callHierarchy.ts`, `documentSymbols.ts`, `foldingRanges.ts`, `inlayHints.ts`,
+    `selectionRanges.ts`, `semanticTokens.ts`, `signatureHelp.ts`, `codeActions/lookups.ts` and
     `codeActions/typedLookups.ts` descend through the visitor. They need an edit only where a kind declares
     something callable or outlined, is a call, writes something a Hint annotates, folds, or names a Case.
     `argumentContext.ts` needs one for a kind that holds a child to an expected Type. A new Expression or
     Statement joins the levels of `selectionRanges.ts`, and the type checker asks for it there. It joins
-    `expressionKinds` in `codeActions/typedLookups.ts` the same way, and a field naming something joins
-    `namingFields` there by hand.
+    `expressionKinds` in `codeActions/typedLookups.ts` and `implementationKinds` in `codeActions/lookups.ts`
+    the same way. A field naming something joins `namingFields` in `typedLookups.ts` and `holdsValue` in
+    `lookups.ts` by hand.
 12. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
 13. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,

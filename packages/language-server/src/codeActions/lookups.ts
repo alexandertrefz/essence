@@ -1,14 +1,10 @@
 import {
-	caseDefaults,
-	memberExpression,
-	parameterDefaults,
-} from "@essence-lang/compiler/helpers"
+	findParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { assertionExpressions } from "../assertionChildren"
-import { defineExpressions } from "../defineArmChildren"
-import { matcherValueExpressions } from "../matchHandlerChildren"
-import { methodsOf, nativeSignaturesOf } from "../namespaceMembers"
+import { methodsOf } from "../namespaceMembers"
 import { isSamePosition } from "../positions"
 import { programBodies } from "../sections"
 import { containsRange, isBefore } from "./geometry"
@@ -763,56 +759,19 @@ function bodiesOf(
 	}
 }
 
-// Every Node of the Parser AST, a container before its contents. A visitor
-// answering `false` stops the walk, since most lookups want one Node.
+// Every Expression and Statement in the Program's bodies, a container before
+// its contents. A visitor answering `false` stops the walk, since most lookups
+// want one Node.
 type Visitor = (node: parser.ImplementationNode) => void | boolean
 
 export function walk(program: parser.Program, visit: Visitor) {
 	for (let body of programBodies(program)) {
-		if (!walkBody(body, visit)) {
-			return
+		for (let node of body) {
+			if (!walkNode(node, visit)) {
+				return
+			}
 		}
 	}
-}
-
-function walkBody(nodes: Array<parser.ImplementationNode>, visit: Visitor) {
-	for (let node of nodes) {
-		if (!walkNode(node, visit)) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// A Parameter's default holds Expressions the Quick Fixes apply to as well.
-function walkDefaults(parameters: Array<parser.ParameterNode>, visit: Visitor) {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		if (!walkNode(defaultValue, visit)) {
-			return false
-		}
-	}
-
-	return true
-}
-
-// A bodied entry is a Function value, and a native one may carry a default.
-function walkOverloadEntries(
-	methods: parser.OverloadedFunctionStatementNode["methods"],
-	visit: Visitor,
-) {
-	for (let method of methods) {
-		let walked =
-			method.nodeType === "FunctionValue"
-				? walkNode(method, visit)
-				: walkDefaults(method.parameters, visit)
-
-		if (!walked) {
-			return false
-		}
-	}
-
-	return true
 }
 
 // True to go on, false to stop the whole walk.
@@ -824,199 +783,108 @@ export function walkNode(
 		return false
 	}
 
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			return walkNode(node.value, visit)
-		case "FunctionStatement":
-			return (
-				walkDefaults(node.value.parameters, visit) &&
-				walkBody(node.value.body, visit)
-			)
-		case "OverloadedFunctionStatement":
-			return walkOverloadEntries(node.methods, visit)
-		case "ChoiceDeclarationStatement":
-			// A Case payload's default holds Expressions too.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				if (!walkNode(defaultValue, visit)) {
-					return false
-				}
-			}
+	// Each child's parent is its walk state, which `holdsValue` reads.
+	let step = (
+		child: ParserNode,
+		parent: ParserNode,
+		field: string,
+	): true | undefined => {
+		if (!holdsValue(parent, field, child)) {
+			return undefined
+		}
 
-			return true
-		case "NamespaceDefinitionStatement": {
-			for (let property of Object.values(node.properties)) {
-				if (
-					property.value !== null &&
-					!walkNode(property.value, visit)
-				) {
-					return false
-				}
-			}
-
-			for (let member of Object.values(node.methods)) {
-				for (let method of methodsOf(member)) {
-					if (!walkNode(method, visit)) {
-						return false
-					}
-				}
-
-				// A native signature has no body but may carry a default.
-				for (let signature of nativeSignaturesOf(member)) {
-					if (!walkDefaults(signature.parameters, visit)) {
-						return false
-					}
-				}
-			}
-
+		if (isImplementationNode(child) && visit(child) === false) {
 			return true
 		}
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let signatures =
-					member.nodeType === "OverloadedProtocolMethod" ||
-					member.nodeType === "OverloadedStaticProtocolMethod"
-						? member.signatures
-						: [member.signature]
 
-				for (let { body } of signatures) {
-					if (body !== null && !walkNode(body, visit)) {
-						return false
-					}
-				}
-			}
-
-			return true
-		case "IfStatement":
-			return walkNode(node.condition, visit) && walkBody(node.body, visit)
-		case "IfElseStatement":
-			return (
-				walkNode(node.condition, visit) &&
-				walkBody(node.trueBody, visit) &&
-				walkBody(node.falseBody, visit)
-			)
-		case "ReturnStatement":
-			return walkNode(node.expression, visit)
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of assertionExpressions(node)) {
-				if (!walkNode(expression, visit)) {
-					return false
-				}
-			}
-
-			return true
-		case "Match":
-			if (!walkNode(node.value, visit)) {
-				return false
-			}
-
-			for (let handler of node.handlers) {
-				for (let value of matcherValueExpressions(handler.matcher)) {
-					if (!walkNode(value, visit)) {
-						return false
-					}
-				}
-
-				if (handler.guard !== null && !walkNode(handler.guard, visit)) {
-					return false
-				}
-
-				if (!walkBody(handler.body, visit)) {
-					return false
-				}
-			}
-
-			return true
-		// A `define` arm holds Expressions the Quick Fixes apply to.
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				if (!walkNode(expression, visit)) {
-					return false
-				}
-			}
-
-			return true
-		case "FunctionValue":
-			return (
-				walkDefaults(node.value.parameters, visit) &&
-				walkBody(node.value.body, visit)
-			)
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				if (!walkNode(memberExpression(member), visit)) {
-					return false
-				}
-			}
-
-			return true
-		case "ListValue":
-			for (let value of node.values) {
-				if (!walkNode(value, visit)) {
-					return false
-				}
-			}
-
-			return true
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				if (
-					!walkNode(entry.key, visit) ||
-					!walkNode(entry.value, visit)
-				) {
-					return false
-				}
-			}
-
-			return true
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (
-					segment.kind === "expression" &&
-					!walkNode(segment.expression, visit)
-				) {
-					return false
-				}
-			}
-
-			return true
-		case "MethodInvocation":
-			return (
-				walkNode(node.base, visit) &&
-				walkArguments(node.arguments, visit)
-			)
-		case "FunctionInvocation":
-			return (
-				walkNode(node.name, visit) &&
-				walkArguments(node.arguments, visit)
-			)
-		case "Combination":
-			return walkNode(node.lhs, visit) && walkNode(node.rhs, visit)
-		case "Lookup":
-			return walkNode(node.base, visit)
-		case "Start":
-		case "Complete":
-			return walkNode(node.expression, visit)
-		case "RefusedValue":
-			return walkNode(node.base, visit)
-		case "CaseValue":
-			return node.value === null ? true : walkNode(node.value, visit)
-		// A MemberPath's steps are member names, not Expressions.
-		default:
-			return true
+		return findParserChild(child, step, child)
 	}
+
+	return findParserChild(node, step, node) === undefined
 }
 
-function walkArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-	visit: Visitor,
-) {
-	for (let argument of nodeArguments) {
-		if (!walkNode(argument.value, visit)) {
+// Whether the walk enters a field. Names and Types hold nothing an action
+// rewrites. See "Finding a Node" in DEVELOPMENT.md.
+function holdsValue(
+	parent: ParserNode,
+	field: string,
+	child: ParserNode,
+): boolean {
+	switch (field) {
+		case "name":
+			return parent.nodeType === "FunctionInvocation"
+		case "binder":
+		case "binding":
+			return child.nodeType === "Pattern"
+		case "member":
+		case "namespaceSpecifier":
+		case "steps":
+		case "choice":
+		case "caseName":
+		case "externalName":
+		case "internalName":
+		case "type":
+		case "returnType":
+		case "targetType":
+		case "generics":
+		case "typeArguments":
+		case "conformsTo":
+		case "snapshot":
 			return false
-		}
+		// The rewrites a lookup would offer in a refinement's predicate, such
+		// as a static call, are refused there.
+		case "predicate":
+			return false
+		default:
+			// A literal Matcher's value is the Matcher itself.
+			return parent.nodeType !== "LiteralMatcher"
 	}
-
-	return true
 }
+
+function isImplementationNode(
+	node: ParserNode,
+): node is parser.ImplementationNode {
+	return node.nodeType in implementationKinds
+}
+
+// The kinds a visitor is handed. Keyed by the union, so a new Expression or
+// Statement fails the type check until it is listed.
+const implementationKinds: Record<parser.ImplementationNode["nodeType"], true> =
+	{
+		MethodInvocation: true,
+		FunctionInvocation: true,
+		RecordValue: true,
+		StringValue: true,
+		InterpolatedStringValue: true,
+		IntegerValue: true,
+		RationalValue: true,
+		BooleanValue: true,
+		FunctionValue: true,
+		ListValue: true,
+		DictionaryValue: true,
+		Lookup: true,
+		MemberPath: true,
+		Self: true,
+		Identifier: true,
+		Combination: true,
+		Match: true,
+		Define: true,
+		CaseValue: true,
+		Start: true,
+		Complete: true,
+		RefusedValue: true,
+		ConstantDeclarationStatement: true,
+		VariableDeclarationStatement: true,
+		VariableAssignmentStatement: true,
+		NamespaceDefinitionStatement: true,
+		ProtocolDeclarationStatement: true,
+		TypeAliasStatement: true,
+		ChoiceDeclarationStatement: true,
+		IfElseStatement: true,
+		IfStatement: true,
+		ReturnStatement: true,
+		FunctionStatement: true,
+		OverloadedFunctionStatement: true,
+		ExpectStatement: true,
+		RequireStatement: true,
+	}

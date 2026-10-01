@@ -37,6 +37,28 @@ Edits are written into the source text, so the actions read the Parser AST, whos
 typed Program erases and rewrites what the text says, and is read where an action needs Types. The Parser drops a
 refused Statement, so a fix for one starts from the span its Diagnostic measured rather than from a Node.
 
+## Finding a Node
+
+Most lookups in `lookups.ts` find their Node with `walk`. It hands its visitor every Expression and Statement in the
+bodies `programBodies` lists, in that order. Each container comes before what it holds, in written order. The walk
+descends with `findParserChild`, so it stops once a lookup answers `false`. A field the visitor's table learns
+reaches every lookup unedited. A new Expression or Statement kind joins `implementationKinds`, and the type checker
+fails until it does.
+
+`holdsValue` names the fields the walk does not enter:
+
+- names: what a Declaration, a Parameter, a Method, a Case or a Record member is called, the member a Lookup, a
+  Method call or a path reads, and an Argument's label. A Function call's callee is read, so it counts as a value.
+- Types, a Snapshot's stored text, and a literal Matcher, whose value is the Matcher itself.
+- a Pattern in a Declaration or a Parameter. Its `name = value` constraints are refused there, and are walked only
+  in a Matcher, where they may decline a value.
+- a refinement's predicate. The rewrites the lookups would offer inside it are refused there, such as the static
+  call the `static-method-on-value` fix writes. A fix that needs no lookup, such as a misspelled Method's
+  suggestion, is still offered in a predicate.
+
+The type checker does not see a new field that holds a name. It must join `holdsValue`, or the walk hands its
+Identifier to every lookup as a value.
+
 ## Holes
 
 Some fixes scaffold code the reader still has to complete. They write an `otherwise` arm, the missing `case`s of a

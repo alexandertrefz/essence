@@ -4078,6 +4078,24 @@ describe("Code Actions", () => {
 				"\tconstant made = Boxes.held({ v = 9 }, 2)",
 			)
 		})
+
+		// A refinement's predicate admits only Methods of `@` with literal
+		// Arguments, so the static call the fix writes is refused there too.
+		it("should offer no rewrite inside a refinement's predicate", () => {
+			let lines = [
+				"implementation {",
+				"\tnamespace Sizes for Integer {",
+				"\t\tstatic isSmall() -> Boolean {",
+				"\t\t\t<- true",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Small = Integer where @::isSmall()",
+				"}",
+			]
+
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
 	})
 
 	describe("a Namespace's own Type Parameter", () => {
