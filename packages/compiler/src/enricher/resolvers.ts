@@ -8019,19 +8019,10 @@ function applyGenericAlias(
 		}
 	}
 
-	// An applied refinement carries the applied spelling for the same
-	// reason, so `NonEmptyList<String>` prints as written rather than as the bare
-	// Alias name every instantiation would otherwise share. An application that
-	// changed nothing at all keeps the DECLARED object — nothing to spell
-	// differently, and stamping would copy the very object a pending predicate is
-	// written into. An instantiation that bound every Parameter to a Parameter
-	// (`namespace NonEmptyList<infer Item> for NonEmptyList<Item>`) is stamped and reads
-	// terse anyway, the way an unbound Case does.
-	//
-	// The stamp is a COPY, and a copy of a predicate still being written
-	// down has to be registered or the fill will finish everything except the very
-	// object the signature ended up holding — which is why it goes through
-	// `refinementWithTypeArguments` rather than being spread here.
+	// An applied refinement spells as written, as `NonEmptyList<String>`. One
+	// the application left unchanged keeps the declared object, which a pending
+	// predicate is written into. The stamp is a copy, so it goes through
+	// `refinementWithTypeArguments`, which registers a pending copy.
 	if (
 		appliedType.type === "Refinement" &&
 		appliedType !== aliasType.aliasedType
@@ -8055,8 +8046,8 @@ function resolveIdentifierTypeDeclarationType(
 	let result = findTypeInScope(name, scope)
 
 	if (result === null) {
-		// Silent for a Type whose Declaration the Parser dropped, for the
-		// reason a value name is — see `declarationWasAbandoned`.
+		// Silent where the parser dropped the Declaration. See
+		// `declarationWasAbandoned`.
 		if (declarationWasAbandoned(scope, name, node.position)) {
 			return { type: "Error" }
 		}
@@ -8071,9 +8062,8 @@ function resolveIdentifierTypeDeclarationType(
 					notes: [
 						`A Protocol is only usable as a Generic bound ('<infer T is ${name}>') or in a conformance clause ('is ${name}').`,
 					],
-					// A Protocol in a Type position is nearly always a
-					// Parameter that meant to be bounded by it — the Type is
-					// then the Parameter, and the Protocol moves to the bound.
+					// A Protocol in a Type position usually meant a Type
+					// Parameter bounded by it.
 					helps: [
 						`Write a Type Parameter bounded by it — '<infer T is ${name}>' — and name 'T' here.`,
 					],
@@ -8091,28 +8081,15 @@ function resolveIdentifierTypeDeclarationType(
 		return { type: "Error" }
 	}
 
-	// A bare use of a Generic Type Alias applies the defaults — without
-	// a full set of defaults it is missing Type Arguments.
+	// A bare Generic Alias applies its defaults; lacking some, it is missing
+	// Type Arguments.
 	if (result.type === "GenericAlias") {
 		return applyGenericAlias(result, [], scope, node.position)
 	}
 
-	// The two asynchronous containers take their one Type Argument the way
-	// `Optional` and every generic Choice take theirs, and a bare spelling of one
-	// is refused the way a bare `Optional` is. What `primitiveTypes` hands out for
-	// the name is the applied shape with its slot left Unknown — there is no
-	// second Type standing for the unapplied form, because nothing builds a
-	// Future out of nothing — so a written `Future` used to mean `Future<Unknown>`
-	// and `complete` on one answered a VALUE of Type Unknown. That value fits
-	// every annotation there is, which is what `Unknown` means as an actual Type,
-	// and `[complete work()]` was a List of one Integer under a
-	// `List<String>` nothing refused. `Unknown` is the Compiler's own answer where
-	// it had nothing better to give; a spelling an author can write is not one of
-	// the places it belongs.
-	//
-	// Recovered as the container with an Error inside it, exactly as a wrong Type
-	// Argument count recovers: the shape is still a Future, so `complete` reads it
-	// and the Error answers for what it holds without a second Diagnostic.
+	// A bare `Future` or `Started` is refused, as a bare `Optional` is, since
+	// its Unknown slot would accept any value. It recovers as the container
+	// holding an Error, so `complete` still reads it.
 	if (
 		(result.type === "Future" || result.type === "Started") &&
 		result.valueType.type === "Unknown"
@@ -8176,16 +8153,14 @@ export function resolveGenericTypeDeclarationType(
 ): common.Type {
 	let baseType: common.Type
 
-	// The base Type is looked up raw — `resolveIdentifierTypeDeclarationType`
-	// would already apply a Generic Alias' defaults before the Type Arguments
-	// get a chance to.
+	// Looked up raw, since `resolveIdentifierTypeDeclarationType` would apply
+	// a Generic Alias' defaults first.
 	if (node.baseType.nodeType === "IdentifierTypeDeclaration") {
 		let name = node.baseType.type.content
 		let result = findTypeInScope(name, scope)
 
 		if (result === null) {
-			// Silent for a Type whose Declaration the Parser dropped — see
-			// `declarationWasAbandoned`.
+			// Silent where the parser dropped the Declaration.
 			if (!declarationWasAbandoned(scope, name, node.baseType.position)) {
 				reportError(
 					`Type '${name}' is not declared`,
@@ -8214,12 +8189,9 @@ export function resolveGenericTypeDeclarationType(
 	return applyTypeArguments(baseType, node.generics, scope, node.position)
 }
 
-// The whole of what applying Type Arguments to a base Type means — the
-// arity check, the bounds, the builtin containers' normalisation and the
-// refusal of a Type that takes none. An annotation's `Holder<Integer>` and a value's
-// `Holder<Integer>#Full` are the same application, and reaching this from both
-// is what keeps them held to the same promises rather than to two
-// implementations that drift.
+// Applies Type Arguments to a base Type: the arity, the bounds, the builtin
+// containers, and a Type that takes none. `Holder<Integer>` in an annotation
+// and in `Holder<Integer>#Full` both come here.
 export function applyTypeArguments(
 	baseType: common.Type,
 	typeArguments: Array<parser.TypeDeclarationNode>,
@@ -8230,8 +8202,7 @@ export function applyTypeArguments(
 		return baseType
 	}
 
-	// Applied Lists are normalized into plain List Types right away, so
-	// that inferred and declared List Types share a single representation.
+	// An applied List becomes a plain List Type, as an inferred one is.
 	if (baseType.type === "GenericList") {
 		if (typeArguments.length !== 1) {
 			reportError("List takes exactly 1 Type Argument", position, {
@@ -8260,13 +8231,8 @@ export function applyTypeArguments(
 		}
 	}
 
-	// The two asynchronous containers, applied the way a List is. There is
-	// no unapplied Type to normalise FROM — what `primitiveTypes` hands out for
-	// the name is the applied shape with its slot left Unknown — so the base this
-	// reads is that shape, and the application decides the slot. It is the only
-	// reader of the open form: the name reaching a Declaration with nothing
-	// applied to it is refused rather than resolved, so the slot stands open only
-	// between the lookup and this.
+	// The asynchronous containers fill the Unknown slot their name resolves
+	// to.
 	if (baseType.type === "Future" || baseType.type === "Started") {
 		let name = baseType.type
 
@@ -8293,12 +8259,8 @@ export function applyTypeArguments(
 			: { type: "Started", valueType }
 	}
 
-	// The same normalisation for the two-slot container, and the same
-	// recovery: a wrong count is reported and then a Dictionary is built out of
-	// whatever WAS written, so the Declaration underneath it still resolves
-	// against something rather than cascading Errors out of one miscount. Each
-	// slot recovers on its own — `Dictionary<String>` keeps the key it was given
-	// and leaves the value an Error.
+	// The same for a Dictionary. A wrong count is reported, and each slot
+	// recovers apart: `Dictionary<String>` keeps its key and an Error value.
 	if (baseType.type === "GenericDictionary") {
 		if (typeArguments.length !== 2) {
 			reportError("Dictionary takes exactly 2 Type Arguments", position, {
@@ -8344,8 +8306,7 @@ export function applyTypeArguments(
 	reportError("This Type takes no Type Arguments", position, {
 		code: "type-not-generic",
 		labels: [primary(position, "the Type Arguments have nowhere to go")],
-		// The Type without them, which is the whole edit — this Type is
-		// already as applied as it gets, and the brackets are what has to go.
+		// The edit removes the brackets.
 		helps: [
 			`Remove the Type Arguments — '${describeType(baseType)}' stands on its own.`,
 		],
@@ -8354,11 +8315,8 @@ export function applyTypeArguments(
 	return { type: "Error" }
 }
 
-// The application a Type wants, with a blank per Type Parameter. Written
-// from the Type's own name and its own arity, so `Optional` reads back as
-// `Optional<…>` and `Dictionary` as `Dictionary<…, …>` — a count in a Note leaves
-// the reader to work the shape out, and the bare spelling that raises this wrote
-// no brackets at all to correct.
+// The application a Type wants, with a blank per Type Parameter, such as
+// `Dictionary<…, …>`.
 function typeApplicationHelp(name: string, parameterCount: number): string {
 	let blanks = Array.from({ length: parameterCount }, () => "…").join(", ")
 
@@ -8369,18 +8327,13 @@ function typeApplicationHelp(name: string, parameterCount: number): string {
 /* Helpers */
 /***********/
 
-// `Self` is what a Protocol calls its conforming Type; the two other
-// places that reject the name report it identically, so they share this.
+// `Self` names a Protocol's conforming Type, so no Type may take the name.
 export function reportReservedTypeName(position: common.Position | null): void {
-	// A reserved TYPE name, and the Note says which. "No declaration may
-	// take it" was wider than the rule: a constant, a Function, a Case and a
-	// member called `Self` all compile, because none of them is a Type.
+	// Only a Type may not be named `Self`; a Constant or a Case may.
 	let notes = [
 		"'Self' is what a Protocol calls the Type conforming to it, so no Type may be declared under it.",
 	]
-	// One Help, and it names no replacement: which name the declaration
-	// should have is the one thing this knows nothing about. It said nothing at
-	// all before, and the edit is worth saying even where the word is not.
+	// The Help names no replacement, having none to suggest.
 	let helps = ["Choose another name."]
 
 	if (position === null) {
@@ -8402,9 +8355,8 @@ export function reportReservedTypeName(position: common.Position | null): void {
 	})
 }
 
-// The members the base actually has are listed rather than left for the
-// reader to go and look up — a Lookup fails most often because the member is
-// spelled differently, not because it is absent.
+// Reports a missing member, listing the members the base has, since a
+// misspelling is the likeliest cause.
 function reportUnknownMember(
 	memberName: string,
 	memberPosition: common.Position,
@@ -8412,12 +8364,8 @@ function reportUnknownMember(
 	memberNames: Array<string>,
 	access: MemberAccessContext | null = null,
 ): void {
-	// `box.hits++` is a Lookup whose MEMBER is `hits++` — a `.` ends a
-	// name and a `+` does not — so the increment arrives inside the member name
-	// and the Record has no such member. Answered as the operator it is, the
-	// way the bare `hits++` already was: "Did you mean 'hits'?" was a Help that
-	// drops what the line was written to do, and a reader who took it wrote a
-	// Statement that reads a member and counts nothing.
+	// `box.hits++` reads the member `hits++`, since a `+` ends no name. It
+	// is answered as the operator, as a bare `hits++` is.
 	if (reportMemberOperator(memberName, memberPosition, memberNames, access)) {
 		return
 	}
@@ -8449,13 +8397,8 @@ function reportUnknownMember(
 	)
 }
 
-// The operator hiding at the end of a member name, answered as the
-// foreign syntax it is rather than as a member nothing declares. True where it
-// reported, so the caller says nothing further.
-//
-// Only where the name without the operator IS a member: `hits++` on a Record
-// holding `hits` is the habit, and `total+` on one that has no `total` is a
-// reader who meant something this can not guess at.
+// Reports an operator at the end of a member name as foreign syntax, and
+// answers whether it did. Only where the name without it is a member.
 function reportMemberOperator(
 	memberName: string,
 	memberPosition: common.Position,
@@ -8478,12 +8421,8 @@ function reportMemberOperator(
 		return false
 	}
 
-	// And the edit is a REBUILD rather than an assignment: a Record's
-	// member can not be assigned — `box.hits = …` is its own refusal — so what
-	// goes back into the binding is the Record that differs from it, which is
-	// the sentence `foreign-syntax` writes about the same line. Spelled only
-	// where the base is one name: a deeper path rebuilds a level per step, and
-	// a Help is one line.
+	// A Record's member can not be assigned, so the edit rebuilds the
+	// Record. It is spelled only where the base is one name.
 	let base = access?.spelledBase ?? null
 
 	if (base === null || base.includes(".")) {
@@ -8492,11 +8431,8 @@ function reportMemberOperator(
 		return true
 	}
 
-	// The counting half of the table's own sentence, read back out of it
-	// rather than spelled a second time here: `compoundAssignmentHelps` answers
-	// "Write 'x = x::add(1)'." and what this needs is the `x::add(1)`, which is
-	// what stands between the ` = ` and the closing quote. One table, one
-	// answer to what `++` means.
+	// The `x::add(1)` half of what `compoundAssignmentHelps` writes, so one
+	// table says what `++` means.
 	let assignment = compoundAssignmentHelps(operator, `${base}.${read}`, null)
 	let written = assignment?.[0]?.match(/ = (.+)'\.$/)?.[1] ?? null
 
