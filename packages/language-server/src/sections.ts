@@ -17,6 +17,9 @@ export type ParserSection = {
 	// What the Section binds that no Statement declares: a table's row Parameter
 	// or the generated Parameters of `for any (a: T, b: U)`. Empty except in tests.
 	parameters: Array<parser.ParameterNode>
+	// A test's or suite's Modifiers, such as `skipped "waiting"`, written in its
+	// header beside the head. Empty except in tests and suites.
+	modifiers: Array<parser.TestModifierNode>
 	// The whole form, such as `test "…" { … }`, which the Scope covers, head
 	// included, since the name reads the row.
 	position: common.Position
@@ -54,6 +57,7 @@ export function programSections(program: parser.Program): Array<ParserSection> {
 		head: [],
 		nodes: program.implementation.nodes,
 		parameters: [],
+		modifiers: [],
 		position: program.implementation.position,
 		parent: null,
 	}
@@ -68,6 +72,7 @@ export function programSections(program: parser.Program): Array<ParserSection> {
 		head: [],
 		nodes: program.tests.nodes.filter(isStatement),
 		parameters: [],
+		modifiers: [],
 		position: program.tests.position,
 		parent: implementation,
 	}
@@ -92,6 +97,7 @@ function collectItems(
 				head: [node.name],
 				nodes: node.nodes.filter(isStatement),
 				parameters: [],
+				modifiers: node.modifiers,
 				position: node.position,
 				parent,
 			}
@@ -118,6 +124,7 @@ function testSection(
 			...(table?.parameters ?? []),
 			...(node.properties?.parameters ?? []),
 		],
+		modifiers: node.modifiers,
 		position: node.position,
 		parent,
 	}

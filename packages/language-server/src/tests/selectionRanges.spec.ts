@@ -530,3 +530,23 @@ describe("Selection Ranges around names, Types and Matchers", () => {
 		})
 	})
 })
+
+describe("Selection Ranges on a test's Modifier", () => {
+	it("should widen from a Modifier's reason out through the test", () => {
+		let source = [
+			"implementation {",
+			"}",
+			"tests {",
+			'\ttest "spells" skipped "waiting on the parser" {',
+			"\t\texpect true",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(selectionRangesOf(source, { line: 4, column: 30 })).toEqual([
+			{ start: { line: 4, column: 24 }, end: { line: 4, column: 47 } },
+			{ start: { line: 4, column: 2 }, end: { line: 6, column: 3 } },
+			{ start: { line: 3, column: 1 }, end: { line: 7, column: 2 } },
+		])
+	})
+})

@@ -241,7 +241,9 @@ keeping a Scope per Section mirrors the Enricher without knowing anything about 
 
 A test's `head` holds what is read outside its body: its name, or a table test's rows. A table test's name goes in
 `nodes`, since it is read where the row is bound and says which row ran. A table's rows are written outside the body
-and cannot name the row. `programBodies` reads both together for walks that ignore Scopes.
+and cannot name the row. `programBodies` reads both together for walks that ignore Scopes. A test's or suite's
+`modifiers`, such as `skipped "waiting"`, stand in its header too. They hold literals and bare names only, and
+reach no Scope, so `programBodies` leaves them out. Selection Ranges reads them.
 
 ## The Workspace
 

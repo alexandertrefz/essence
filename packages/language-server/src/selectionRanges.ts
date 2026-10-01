@@ -29,6 +29,10 @@ export function findSelectionRanges(
 		}
 
 		collectFromBody([...section.head, ...section.nodes], cursor, chain)
+
+		for (let modifier of section.modifiers) {
+			collectFromNode(modifier, cursor, chain)
+		}
 	}
 
 	// Innermost first, without repeats: a Statement often shares its
