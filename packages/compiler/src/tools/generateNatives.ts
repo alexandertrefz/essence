@@ -8,23 +8,12 @@ import { loadStdlib, type Stdlib } from "../enricher/stdlib"
 import { conformanceParameterName } from "../helpers/names"
 import { resolveOverloadedMethodName } from "../helpers/types"
 
-// The renderer that turns the loaded standard library into a checked-in
-// TypeScript contract for the runtime bindings: `@essence-lang/runtime`'s
-// `natives.generated.ts`. A body-less Method signature in
-// `packages/standard-library/sources/*.es` declares a native bound by name only
-// to a runtime export, and nothing between the Enricher's tables and the runtime
-// module checks that the export has the right shape. The contract writes that
-// shape as a `*Natives` type per module and holds each module to it with
-// assertions `tsc` checks: the module satisfies its type, exports nothing an
-// Essence body implements, and gives each native its declared arity. Nothing
-// imports the file, so it has no runtime footprint. Regenerate with
-// `bun run generate:natives`; `src/tests/natives.spec.ts` fails when the file
-// drifts from the renderer.
+// Renders the loaded standard library into `natives.generated.ts`, the
+// TypeScript contract that `tsc` holds the runtime's natives to. Regenerate
+// with `bun run generate:natives`. See "The natives contract" in
+// DEVELOPMENT.md.
 
-// The one place the Essence-Type → TypeScript-runtime-type mapping is
-// written. Every primitive maps to its runtime shape; the Namespace → module
-// path is the identity, so `NumberType` is imported from `./Number`, `LessType`
-// from `./Ordering`, and so on.
+// The module each runtime type is imported from.
 const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	AlgebraicType: "./Algebraic",
 	BooleanType: "./Boolean",
@@ -85,11 +74,8 @@ const RUNTIME_TYPE_MODULES: Record<string, string> = {
 	AnyType: "./type",
 }
 
-// A UnionType with one of these names has a dedicated runtime alias —
-// keyed on `UnionType.name`, which is display-only for assignability but IS the
-// runtime representation here. `Irrational` also carries a name but no runtime
-// alias and appears in no signature, so it is deliberately absent: it would
-// fall through to the structural rendering below.
+// Unions with a runtime alias, keyed on `UnionType.name`. `Irrational` has a
+// name but no alias and appears in no signature.
 const UNION_NAME_ALIASES: Record<string, string> = {
 	Ordering: "OrderingType",
 	Side: "SideType",
@@ -100,32 +86,23 @@ const UNION_NAME_ALIASES: Record<string, string> = {
 	CaseSensitivity: "CaseSensitivityType",
 	Number: "NumberType",
 	Stream: "StreamType",
-	// The three `Http.es` declares. Two of them travel INTO `Http.send`
-	// inside the Request Record, and the third is what it answers a `#Failure`
-	// with — so all three reach the one native's signature, which is what puts
-	// them here.
+	// `Http.send` takes the first two inside its Request and answers a
+	// `#Failure` with the third.
 	HttpMethod: "HttpMethodType",
 	Redirects: "RedirectsType",
 	HttpFailure: "HttpFailureType",
 }
 
-// The generic siblings of `UNION_NAME_ALIASES`, keyed on `UnionType.alias.name`
-// rather than `.name` — the display alias an APPLIED generic Choice stamps
-// (`Step<Integer, String>` sets `alias: { name: "Step", typeArguments }`). Each
-// renders as its runtime alias applied to the mapped Type Arguments —
-// `StepType<IntegerType, StringType>`. A new generic Choice reaching a signature
-// adds one entry here and its Cases below, nothing more.
+// Generic Choices, keyed on `UnionType.alias.name`, each rendered as its
+// runtime alias applied to the mapped Type Arguments.
 const GENERIC_UNION_ALIASES: Record<string, string> = {
 	Step: "StepType",
 	Optional: "OptionalType",
 	Result: "ResultType",
 }
 
-// The Cases of a generic Choice — keyed `Choice#Case`, the sibling of
-// `CASE_TYPES` for the instantiated Cases that carry `typeArguments`. Only ever
-// reached when a bare Case (rather than the whole Choice Union) appears in a
-// signature; the Union of them is mapped whole through `GENERIC_UNION_ALIASES`
-// before its Cases are visited, exactly as `Ordering`'s is.
+// The Cases of generic Choices, for a Case that appears on its own in a
+// signature.
 const GENERIC_CASE_TYPES: Record<string, string> = {
 	"Step#Continue": "ContinueType",
 	"Step#Done": "DoneType",
@@ -133,11 +110,7 @@ const GENERIC_CASE_TYPES: Record<string, string> = {
 	"Optional#Empty": "EmptyType",
 }
 
-// The runtime unit types of the builtin unit Choices — `Ordering`,
-// `Side`, `SortOrder`, `NumberFormat`, `Rounding`, `NormalizationForm`,
-// `CaseSensitivity` and `Stream` — the only Cases reachable in a signature, and
-// then only inside their own Union, which is mapped whole before its Cases are
-// ever visited.
+// The runtime types of the builtin unit Choices' Cases.
 const CASE_TYPES: Record<string, string> = {
 	"Ordering#Less": "LessType",
 	"Ordering#Equal": "EqualType",
@@ -166,17 +139,15 @@ const CASE_TYPES: Record<string, string> = {
 	"Stream#Error": "ErrorType",
 }
 
-// The mutable state threaded through one render — every runtime type name
-// referenced (so the import block lists exactly what is used) and every Protocol
-// named as a bound (so a conformance witness type is emitted for it).
+// Every runtime type a render referenced, for the imports, and every Protocol
+// named as a bound, for the witness types.
 type RenderContext = {
 	used: Set<string>
 	usedProtocols: Set<string>
 }
 
-// What one `*Natives` type carries to the assertions at the foot — its
-// text, the export names that must be ABSENT (the Essence-bodied members), and
-// the declared arity of each native Method, keyed by export name.
+// One `*Natives` type, the export names it forbids, and each native Method's
+// arity.
 type NativesSection = {
 	text: string
 	forbiddenKeys: Array<string>
@@ -187,12 +158,8 @@ function conformanceTypeName(protocolName: string): string {
 	return `${protocolName}Conformance`
 }
 
-// Parameter names are cosmetic in a Function Type — the runtime calling
-// convention is positional — but TypeScript still rejects a reserved word in the
-// slot (`with item: …` becomes `with: …`, a parse error). A reserved or absent
-// label falls back to `argument${index}`, the same spelling an unlabelled
-// Parameter already gets. The `// …` comment above the entry keeps the real
-// Essence label.
+// A reserved word can not name a Parameter in TypeScript, so it becomes
+// `argument<index>`. The comment on the entry keeps the Essence label.
 const RESERVED_PARAMETER_NAMES = new Set([
 	"with",
 	"in",
@@ -242,12 +209,8 @@ function parameterName(name: string | null, index: number): string {
 	return name
 }
 
-// Maps one Essence Type to its TypeScript runtime type. Throws, naming
-// the site, on any variant it can not render — a silent `any` would defeat the
-// whole check. `Unknown`, `Error`, an unapplied
-// `GenericList`/`GenericDictionary`/`GenericAlias` and
-// the like never occur in a resolved standard library signature; if one does,
-// this is where it surfaces.
+// Maps an Essence Type to its runtime type. Throws, naming the site, on a Type
+// it can not render, since a silent `any` would defeat the check.
 function mapType(
 	type: common.Type | common.GenericUse,
 	ctx: RenderContext,
@@ -278,10 +241,7 @@ function mapType(
 		case "List":
 			ctx.used.add("ListType")
 			return `ListType<${mapType(type.itemType, ctx, where)}>`
-		// One slot each, rendered the way a List's item Type is. A native
-		// that ANSWERS a Future — `Async.sleep`, `Http.send` — is bound to a
-		// runtime Function building one, and the contract is what holds the two
-		// spellings of the answer together.
+		// A native answering a Future builds one at run time.
 		case "Future":
 			ctx.used.add("FutureType")
 			return `FutureType<${mapType(type.valueType, ctx, where)}>`
@@ -295,11 +255,7 @@ function mapType(
 				ctx,
 				where,
 			)}, ${mapType(type.valueType, ctx, where)}>`
-		// A checked refinement erases to its base before anything runs, so
-		// a native written against one is handed exactly the runtime type its
-		// base has — a `NonZeroInteger` Parameter is an `IntegerType`. The
-		// contract can not say more than that: the predicate was decided while
-		// compiling, and TypeScript has no way to be told it holds.
+		// A refinement erases to its base, which is all a native receives.
 		case "Refinement":
 			return mapType(type.base, ctx, where)
 		case "Record": {
@@ -330,10 +286,8 @@ function mapType(
 				return alias
 			}
 
-			// An APPLIED generic Choice — `Step<State, Result>` — carries
-			// its display alias in `.alias`, so its runtime alias is applied to
-			// the mapped Type Arguments rather than spelled out as the union of
-			// its Cases (which would lose the `Step` identity the driver reads).
+			// An applied generic Choice keeps its runtime alias, which a driver
+			// reads.
 			if (
 				type.alias !== undefined &&
 				GENERIC_UNION_ALIASES[type.alias.name] !== undefined
@@ -348,9 +302,8 @@ function mapType(
 				return `${runtime}<${args}>`
 			}
 
-			// Every other Union — an anonymous one (`Integer | Rational`) or
-			// an aliased one (`Optional<Integer>` sets `alias`, not `name`) — is
-			// rendered structurally as the union of its members.
+			// Any other Union, `Optional<Integer>` included, as the union of
+			// its members.
 			return type.types
 				.map((memberType) => mapType(memberType, ctx, where))
 				.join(" | ")
@@ -358,10 +311,7 @@ function mapType(
 		case "Case": {
 			let key = `${type.choice}#${type.name}`
 
-			// An instantiated Case of a generic Choice carries
-			// `typeArguments`, so its runtime alias is applied to them —
-			// `ContinueType<State>`. The non-generic Cases below carry none and
-			// map to a bare unit Type.
+			// A generic Choice's Case applies its alias to its Type Arguments.
 			if (
 				type.typeArguments !== undefined &&
 				GENERIC_CASE_TYPES[key] !== undefined
@@ -404,13 +354,8 @@ function mapType(
 	}
 }
 
-// The number of arguments the runtime calling convention passes a native
-// — the declared Parameters (the receiver leads a non-static signature, and is
-// already the first entry of `parameterTypes`) plus one conformance witness per
-// bounded Generic. The one place this count is written: `renderArrow` below
-// renders exactly this many Parameter slots, the emitted `AssertArities` records
-// pin it under `tsc`, and `tests/builtins.spec.ts` checks the runtime function's
-// own `.length` against it.
+// The arguments the calling convention passes a native: the declared
+// Parameters, receiver included, and one witness per bounded Generic.
 export function nativeArity(fn: common.BaseFunction): number {
 	let generics = fn.generics ?? []
 
@@ -420,12 +365,8 @@ export function nativeArity(fn: common.BaseFunction): number {
 	)
 }
 
-// One Method or Property signature as a TypeScript arrow type — NEVER
-// method shorthand, so `strictFunctionTypes` applies sound contravariant
-// parameter checking to it. The receiver leads a non-static entry (index 0,
-// named `self`); each bounded Method Generic appends a trailing
-// conformance-witness Parameter, in Generic declaration order, exactly as the
-// runtime calling convention passes them — `nativeArity` counts the slots.
+// A signature as an arrow type, never method shorthand, so
+// `strictFunctionTypes` checks it. Witness Parameters follow in Generic order.
 function renderArrow(
 	fn: common.BaseFunction,
 	isStatic: boolean,
@@ -464,10 +405,8 @@ function renderArrow(
 	return `${genericParams}(${params.join(", ")}) => ${mapType(fn.returnType, ctx, where)}`
 }
 
-// A readable Essence spelling of a Type, for the `// …` comment above
-// each entry — so an overload reorder shows up as a reviewable diff. Mirrors
-// `describeType`, but expands Function Types and prints the bare Record as
-// `Record`. Cosmetic, so it never throws.
+// An Essence spelling of a Type for an entry's comment. Cosmetic, so it never
+// throws.
 function describeEssenceType(type: common.Type | common.GenericUse): string {
 	switch (type.type) {
 		case "Boolean":
@@ -494,8 +433,7 @@ function describeEssenceType(type: common.Type | common.GenericUse): string {
 			return `Dictionary<${describeEssenceType(
 				type.keyType,
 			)}, ${describeEssenceType(type.valueType)}>`
-		// Named, not spelled out — the comment is there so an Overload
-		// reorder reads as a diff, and the alias is what the Declaration wrote.
+		// Named, as the Declaration wrote it.
 		case "Refinement":
 			return type.name
 		case "Record": {
@@ -561,9 +499,7 @@ function describeSignature(
 					.join(", ")}>`
 			: ""
 
-	// The receiver is injected onto every non-static signature, so it is
-	// dropped from the comment — the reader reads the Essence source, which does
-	// not write it either.
+	// The receiver is left out, as the Essence source leaves it out.
 	let declared = isStatic ? fn.parameterTypes : fn.parameterTypes.slice(1)
 
 	let params = declared
@@ -576,19 +512,14 @@ function describeSignature(
 	return `${isStatic ? "static " : ""}${name}${genericPart}(${params}) -> ${describeEssenceType(fn.returnType)}`
 }
 
-// One entry of a `*Natives` type — the comment line and the property with
-// its arrow type, both already tab-indented for placement inside the object.
+// One `*Natives` entry: its comment and its property, tab-indented.
 function nativeEntry(comment: string, key: string, rendered: string): string {
 	return `\t// ${comment}\n\t${key}: ${rendered}`
 }
 
-// A Namespace's `*Natives` type — every native entry (Properties first,
-// in source order, then Methods, each Overload as its own mangled `__overload$N`
-// key). Also returns the export names of the Essence-bodied members, so the
-// assertion at the foot can forbid a runtime export for any of them, and the
-// declared arity of every native METHOD — Properties are values, not functions,
-// so they have none. A fully Essence Namespace has an empty `*Natives` (`{}`),
-// every member forbidden and no arities.
+// A Namespace's `*Natives` type, Properties first, then Methods, each Overload
+// under its mangled key. Also the Essence-bodied members' names and each native
+// Method's arity.
 function renderNamespace(
 	namespace: common.NamespaceType,
 	nativeBindings: Stdlib["nativeBindings"],
@@ -675,15 +606,8 @@ function renderNamespace(
 	return { text, forbiddenKeys: bodiedKeys, arities }
 }
 
-// The free Functions' `*Natives` type — every native free Function the
-// sources declare, in member-table order, each Overload its own mangled
-// `__overload$N` key, exactly as `renderNamespace` renders a Namespace's
-// Methods. A free Function belongs to no Namespace, so it is keyed by its own
-// name and rendered static (no receiver Parameter to inject). Returns the export
-// names of any Essence-bodied free Function so the assertion can forbid a runtime
-// export for it. `loop` is the sole inhabitant — the `while` and general entries
-// are native, the `until` and counted ones are written in Essence and forbidden
-// here.
+// The free Functions' `*Natives` type, rendered as a Namespace's static
+// Methods. `loop` is the only one.
 function renderFunctionsNatives(
 	stdlib: Stdlib,
 	ctx: RenderContext,
@@ -745,10 +669,8 @@ function renderFunctionsNatives(
 	return { text, forbiddenKeys: bodiedKeys, arities }
 }
 
-// The absence and arity assertions of one module, in that order — the two
-// checks the positive `*Natives` assignment can not make. Both are skipped when
-// they would have nothing to say: a Namespace with no Essence-bodied member
-// needs no absence check, and one with no native Method no arity record.
+// The absence and arity assertions of one module, each left out where it
+// would check nothing.
 function renderExtraAssertions(
 	exportPrefix: string,
 	module: string,
@@ -767,8 +689,7 @@ function renderExtraAssertions(
 	}
 
 	if (section.arities.length > 0) {
-		// One `member: N` entry per line, so a signature that gains or
-		// loses a Parameter is a one-line diff rather than a re-flowed wall.
+		// One entry per line, so a changed arity is a one-line diff.
 		let arities = section.arities
 			.map(([key, arity]) => `\t${key}: ${arity}`)
 			.join("\n")
@@ -781,9 +702,7 @@ function renderExtraAssertions(
 	return lines
 }
 
-// The functions module's half of the contract — the same shape
-// `renderModuleAssertion` builds for a Namespace, but the module is `./functions`
-// rather than the identity of a Namespace name, so it is spelled out here.
+// The free Functions' assertions, against `./functions`.
 function renderFunctionsAssertion(section: NativesSection): string {
 	let module = `typeof import("./functions")`
 
@@ -796,15 +715,9 @@ function renderFunctionsAssertion(section: NativesSection): string {
 	return lines.join("\n")
 }
 
-// The witness object a bounded Type Parameter is fulfilled with — the
-// Protocol's whole surface with `Self` bound to the Parameter. Throws on the
-// shapes the witness can not transcribe (an overloaded Protocol Method, or a
-// Protocol Method with its own bounded Generic); none occur in the current
-// Protocols.
-//
-// A provided Method is in a witness at the requirement's own arity: the
-// conformer's override, or the shared const curried with a witness of its own
-// Protocol. A native may call it, so this declares it as the Compiler emits it.
+// The witness type for a bounded Type Parameter: the Protocol's surface with
+// `Self` bound. A provided Method appears at the requirement's own arity.
+// Throws on shapes it can not transcribe, which no Protocol has.
 function renderConformanceType(
 	protocol: common.ProtocolType,
 	ctx: RenderContext,
@@ -867,32 +780,7 @@ function renderImports(used: Set<string>): string {
 		.join("\n")
 }
 
-// The POSITIVE direction of the contract — each runtime module must
-// satisfy its `*Natives` type. `typeof import("./Boolean")` is the module's
-// full export shape; assigning it to `BooleanNatives` checks module ⊇ contract,
-// so a missing native (`Property 'x' is missing`) or a wrongly-typed one
-// (wrong arity, receiver, conformance Parameter or Type) fails on that property,
-// while EXTRA exports (`createBoolean`, `Record.entries`) are correctly
-// permitted — a reference, unlike an object literal, is not excess-checked.
-// Assigning to an empty `{}` (a fully Essence Namespace) is always fine, so the
-// positive assertion never troubles a converted Namespace.
-//
-// When the Namespace has any Essence-implemented Method, a SECOND assertion
-// forbids a runtime export for it via `AssertNoEssenceExports`. That helper is
-// keyof-based rather than an intersection with a `?: never` type: an empty
-// `{}` intersected with a weak `{ member?: never }` is itself weak, so the
-// intersection form raised a FALSE `TS2559` ("has no properties in common") the
-// moment `*Natives` went empty. The keyof form is non-weak and holds whether
-// `*Natives` is empty or not.
-//
-// A THIRD assertion pins the arity of every native Method via `AssertArities`.
-// The positive direction can not: a runtime function taking FEWER Parameters
-// than the declaration is assignable to the declared arrow Type, so `$<Namespace>`
-// happily accepts a native that ignores its last argument.
-//
-// The `declare const` carries no runtime value; nothing imports this file, so
-// the `export const`s are never evaluated. The Namespace → module path is the
-// identity.
+// A module's assertions. See "The assertions" in DEVELOPMENT.md.
 function renderModuleAssertion(
 	namespace: common.NamespaceType,
 	section: NativesSection,
@@ -922,28 +810,15 @@ const HEADER = `// GENERATED by \`bun run generate:natives\` — do not edit by 
 // \`packages/compiler/src/tests/natives.spec.ts\` fails when it drifts from the
 // renderer.`
 
-// The absence check. A Method implemented in Essence must NOT also be a
-// runtime export — the leftover TypeScript would rot out of step with the
-// Essence that replaced it. \`Forbidden\` is the union of those export names;
-// when the Module exports none of them the type is \`true\` and the assignment
-// \`= true\` holds, otherwise it is an error tuple naming the offending export.
-// Keyed on \`keyof\` rather than an intersection with a \`?: never\` type, so it
-// stays sound when a fully converted Namespace's \`*Natives\` is the empty \`{}\`
-// — a \`{}\` intersected with a weak \`{ member?: never }\` is itself weak and
-// would falsely reject a module that correctly lacks the member.
+// Forbids a runtime export for a Method implemented in Essence. Built on
+// `keyof`, which stays sound when `*Natives` is empty.
 const ASSERT_HELPER = `type AssertNoEssenceExports<Module, Forbidden extends string> =
 	Extract<keyof Module, Forbidden> extends never
 		? true
 		: ["a Method implemented in Essence must not be a runtime export", Extract<keyof Module, Forbidden>]`
 
-// The arity check — the one direction structural assignability can not
-// see, since a function taking FEWER Parameters is assignable to a wider Type.
-// \`Parameters<T>['length']\` is a LITERAL only for a plain signature: a default
-// Parameter widens it to a union (\`1 | 2\`), a rest Parameter to \`number\`, and
-// neither satisfies the declared literal — which is exactly right, because the
-// runtime convention passes every argument positionally and a native must spell
-// all of them out. A member the Module does not export at all is left to the
-// positive assertion, which already reports it as missing.
+// Pins each native's arity, which assignability can not check. A default or
+// rest Parameter widens the arity, so it fails too.
 const ASSERT_ARITY_HELPER = `type NativeArity<Member> = Member extends (...args: infer Arguments) => unknown
 	? Arguments["length"]
 	: never
@@ -959,28 +834,21 @@ type AssertArities<Module, Arities extends Record<string, number>> =
 		? true
 		: ["a native must take exactly the Parameters its declaration does, with no default or rest Parameter", MismatchedArities<Module, Arities>]`
 
-// Pure — takes the loaded standard library and returns the module text,
-// so the drift test can render and compare without touching the file system.
-// The Namespaces arrive already in `builtinMemberOrder` and every table is
-// iterated in insertion (source) order, so the output is deterministic.
+// Pure, so the drift spec can render without the file system. The output is
+// deterministic, since every table is read in source order.
 export function renderNativesModule(stdlib: Stdlib): string {
 	let ctx: RenderContext = {
 		used: new Set(),
 		usedProtocols: new Set(),
 	}
 
-	// Rendered before the imports and conformance types are assembled, so
-	// that `ctx` records every runtime type and every bounded Protocol first.
-	// Each render reports the export names of its Essence-bodied members, so the
-	// assertion below forbids a runtime export for exactly those.
+	// Rendered first, so `ctx` has recorded every type and Protocol it uses.
 	let namespaces = stdlib.namespaces.map((namespace) => ({
 		namespace,
 		...renderNamespace(namespace, stdlib.nativeBindings, ctx),
 	}))
 
-	// Rendered alongside the Namespaces and through the same `ctx`, so its
-	// runtime types join the import block. The free Functions belong to no
-	// Namespace, so they are one extra `*Natives` type and one extra assertion.
+	// Through the same `ctx`, so its types join the imports.
 	let functions = renderFunctionsNatives(stdlib, ctx)
 
 	let namespaceSections = namespaces.map((entry) => entry.text)
