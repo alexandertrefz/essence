@@ -75,9 +75,9 @@ export function displayChoiceName(identity: string): string {
 	return identity.slice(identity.lastIndexOf("#") + 1)
 }
 
-// The nominal identity of a Protocol, by the Choice rule. One declared
-// anywhere but its Program's top level also carries the Position of its name,
-// because it may shadow another of its name in the same Module.
+// The nominal identity of a Protocol, by the Choice rule. One declared below
+// its Program's top level also carries its name's Position, since it may shadow
+// another of its name in the same Module.
 export function protocolIdentity(
 	modulePath: string | null,
 	name: string,
@@ -1019,24 +1019,16 @@ function lastStep(path: string): string {
 
 // #endregion
 
-// The question a value of this Type answers with a Boolean. Every Type has
-// `::is(…)` through Equatable, and the four shapes written where a Boolean was
-// wanted each have a better one: an Optional is asked whether it holds anything,
-// a String and a List whether they carry anything, a number where it stands.
-// Named rather than described, because the whole of the reader's next edit is one
-// Method call and the NAME of it is the part they have not got.
-//
-// Two reports ask it — a Condition with no truth in it, and a `where` clause that
-// answers a value instead of a question — and one answer keeps them saying the
-// same thing about the same Type.
+// The Method a value of this Type answers a Boolean question with, for a
+// Condition or a `where` clause that answers a value. Every Type has `::is(…)`,
+// but an Optional, a String, a List and a number each have a better one.
 export function booleanQuestionFor(type: common.Type): string {
 	if (type.type === "Refinement") {
 		return booleanQuestionFor(type.base)
 	}
 
-	// An Optional is a Choice, so it arrives as its Union — under its own
-	// name where the Declaration is reached directly, and under the Alias's where
-	// `Optional<Integer>` was applied.
+	// An Optional arrives as its Union, named `Optional` directly or as the Alias of
+	// an applied `Optional<Integer>`.
 	if (
 		type.type === "UnionType" &&
 		(type.name === "Optional" || type.alias?.name === "Optional")
@@ -1057,30 +1049,20 @@ export function booleanQuestionFor(type: common.Type): string {
 	}
 }
 
-// What a Future or a Started IS, in the clause every report about a
-// forgotten `complete` opens with. Several reports say it — a Type mismatch in
-// an ordinary position, one in return position, a Method call on the wrapper
-// instead of on the value, and work standing where a value was wanted — and
-// each of them goes on differently, because what a reader should DO about it is
-// different in each. What they must not differ about is the state of the work,
-// which is this.
+// The state of the work, in the clause every report about a forgotten
+// `complete` opens with.
 export function asynchronyState(mismatch: AsynchronyMismatch): string {
 	return mismatch === "unstarted"
 		? "This describes work that has not run"
 		: "This is still in flight"
 }
 
-// The same question the Helps below ask, answered as DATA. A Quick Fix
-// reads this rather than a Help's sentence: the wording is written per site and
-// is free to change, and a fix keyed on prose breaks silently when it does.
-// `not-a-future` carries nothing, because there is no edit to make — what a body
-// has to do about it is build a future, which is a judgement.
+// The asynchrony mismatch as data, which a Quick Fix reads in place of a Help's
+// wording. `not-a-future` carries none, since building a future is a judgement.
 export function asynchronyData(
 	expected: common.Type,
 	actual: common.Type,
-	// See `asynchronyHelps`. The fix this data offers WRITES the word, so
-	// it is withheld wherever the word would be refused — a Quick Fix must never
-	// hand the reader a second Diagnostic in place of the first.
+	// The fix writes `complete`, so it is withheld where the word would be refused.
 	canWait: boolean = true,
 ): common.DiagnosticData | undefined {
 	if (!canWait) {
@@ -1094,31 +1076,16 @@ export function asynchronyData(
 		: undefined
 }
 
-// The Helps a mismatch gets where the difference is one missing word about
-// asynchrony rather than a wrong value. `asynchronyMismatch` decides WHICH of
-// the three it is, by assignability.
-//
-// This is the ordinary positions' wording — an Argument, a Declaration, an
-// Assignment, a `define` arm — where the value is the thing to change.
+// The Helps for a mismatch that is one word about asynchrony short, as
+// `asynchronyMismatch` decides, in a position where the value is what to change.
 export function asynchronyHelps(
 	expected: common.Type,
 	actual: common.Type,
-	// Whether the body around this position may write `complete` at all.
-	// `false` swaps the word out: a `complete` in a body that answers no Future
-	// is `complete-outside-future`, so offering it there — and offering a Quick
-	// Fix that writes it — sent the reader from one refusal to the next. What is
-	// offered instead is the pair `asynchronyEvidence` offers on the same
-	// footing: reach through the Future, or declare the body one that waits.
-	//
-	// Defaulted, because most positions are inside a body that can wait and the
-	// ones that are not have to look it up.
+	// Whether the body around this position may write `complete`. Where it may
+	// not, the Help reaches through with `::map` or makes the body one that waits.
 	canWait: boolean = true,
-	// And WHY it may not, where the answer is one of the four barriers
-	// rather than an ordinary body. "Declare the enclosing Function
-	// '-> Future<…>'" is no edit at all inside a property body, which has no
-	// enclosing Function, and none inside a Parameter's default, which is filled
-	// in before the Function's own asynchrony begins — so where a barrier
-	// answered, the edit it names is the barrier's own.
+	// The barrier that refused the word, if any, whose own edit the Help then
+	// names, since such a position has no enclosing Function to declare.
 	barrier: enricher.CompletionBarrier | null = null,
 ): Array<string> {
 	let mismatch = asynchronyMismatch(expected, actual)
@@ -1150,10 +1117,8 @@ export function asynchronyHelps(
 	}
 }
 
-// And the same three in RETURN position, where the body is the thing to
-// change and one of them reads completely differently: a body that declares a
-// future and hands back a bare value has not written a future anywhere, and
-// whether it completes anything is what decides what it should do about that.
+// The same Helps in return position, where the body is what to change. A body
+// that completes nothing must return a future it builds.
 export function returnAsynchronyHelps(
 	expected: common.Type,
 	actual: common.Type,
@@ -1179,24 +1144,9 @@ export function returnAsynchronyHelps(
 	}
 }
 
-// What a position that can not suspend has to be told, per position. The
-// four used to share one Note listing all four and one Help offering all three
-// edits, and only one line of each was ever about the reader: a property body
-// was told to complete the work "above this position", where the generated value
-// it completes does not exist yet, and then to move it into a completing
-// Function, which is a Future again in a position that still can not wait.
-//
-// A property body is the one with no edit at all — a generated value can only be
-// waited on by machinery the runner does not have — so what it is offered is the
-// other test form rather than a spelling that would be refused. The other three
-// all reach the same answer from a different direction: the work is completed
-// where waiting IS allowed, and the position reads the Constant.
-//
-// Here rather than in the Enricher because `complete-outside-future` is not the
-// only report that stands in one of these positions. Every report that has to
-// WITHHOLD the word stands in one too, and each of them used to end in "declare
-// the enclosing Function '-> Future<…>'" — which a property body has not got at
-// all, and which changes nothing for a Parameter's default.
+// The note and Helps for each position that can not suspend. Each but a property
+// body completes the work earlier, into a Constant the position reads. A property
+// body is offered a `test` of its own, since nothing in a `for any` run can wait.
 export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 	note: string
 	helps: Array<string>
@@ -1231,9 +1181,7 @@ export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 				],
 			}
 		default:
-			// No barrier named, which is a Scope that answered nothing at
-			// all rather than one of the four. Nothing is known about the
-			// position, so nothing is claimed about it.
+			// No barrier named, so nothing is claimed about the position.
 			return {
 				note: "'complete' suspends, and this position is filled in before any asynchrony around it begins.",
 				helps: [],
@@ -1241,28 +1189,14 @@ export function barredCompletion(barrier: enricher.CompletionBarrier | null): {
 	}
 }
 
-// A Future or a Started where a value was wanted, which is the forgotten
-// `complete` wearing another Diagnostic's clothes: a hole told that
-// `Future<Integer>` is not Printable, an Argument told that it does not conform
-// to a bound. Both are one word short, and both would otherwise send the reader
-// off to make Futures Printable — which compiles, and prints a description of
-// the work instead of the answer.
-//
-// `waits` is the caller's answer to "may this body write the word here", which is
-// `completionContextOf`: a completing body and a Program's top level may, and
-// every other position may not. Where it may, the Help is the shared sentence
-// every other report about a forgotten `complete` uses and the payload a Quick
-// Fix reads rides with it; where it may not, no Help carries the state and the
-// Notes say it instead, because the edit is to the enclosing Declaration.
-//
-// Null for everything that is not work, which leaves each caller's own report
-// exactly as it was.
+// The notes and Helps for a Future or a Started where a value was wanted, such
+// as a hole that needs a Printable value. Null for anything that is not work.
+// `waits` says whether the body may write `complete`, from `completionContextOf`.
 export function unwaitedWorkReport(
 	type: common.Type,
 	waits: boolean,
-	// And which of the four barriers said no, where one did — see
-	// `barredCompletion`. Null is an ordinary body that answers something other
-	// than a Future, whose edit is to its own Declaration.
+	// The barrier that refused the word, as in `barredCompletion`. Null for an
+	// ordinary body, whose edit is to its own Declaration.
 	barrier: enricher.CompletionBarrier | null = null,
 ): {
 	notes: Array<string>
