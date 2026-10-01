@@ -13,9 +13,8 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// End-to-end, because narrowing is a decision the Enricher makes and the
-// Validator judges: the Enricher replaces the Scope entry, and what that is
-// worth only shows up in the annotation the Validator then refuses.
+// The Enricher decides a slot and the Validator judges the annotations
+// against it, so these specs run both.
 function errorsFor(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics } = enrich(parse(source))
 
@@ -28,10 +27,9 @@ function codesFor(source: string): Array<string> {
 	return errorsFor(source).map((diagnostic) => diagnostic.code)
 }
 
-// Writes the emitted Program to a throwaway module and imports it so its
-// top-level `Terminal.inspect` calls run, capturing `console.log` — the decided item
-// Type is what picks the witness a Method is handed, so what the Program PRINTS
-// is the only place a Type that was decided wrongly can be caught.
+// Runs the emitted Program and captures what `Terminal.inspect` prints. The
+// decided item Type picks the witness a Method is handed, so a wrong decision
+// shows only in the output.
 async function run(source: string): Promise<Array<string>> {
 	let parsed = parseWithDiagnostics(source)
 
@@ -65,11 +63,9 @@ async function run(source: string): Promise<Array<string>> {
 	return output
 }
 
-// An empty List Literal is typed `List<Unknown>`, and that Type fits
-// EVERY List. A Variable declared from one therefore used to launder its items:
-// `variable items = []` followed by `items = [1, 2]` kept the undecided Type, so
-// `constant strings: List<String> = items` was accepted and every String Method
-// then ran on Integers — a clean compile answering wrongly.
+// `List<Unknown>` fits every List, so a slot left undecided would let
+// `constant strings: List<String> = items` accept Integers. See "Undecided
+// slots" in packages/compiler/src/enricher/DEVELOPMENT.md.
 describe("Unknown Slot Narrowing", () => {
 	describe("a Variable declared from an empty List Literal", () => {
 		it("decides its item Type at the first assignment that says so", async () => {
@@ -99,9 +95,8 @@ describe("Unknown Slot Narrowing", () => {
 			expect(errors[0].code).toBe("assignment-type-mismatch")
 		})
 
-		// The decision is final. Widening to `List<Integer | String>`
-		// would make the Variable hold something neither assignment wrote, and
-		// there is a place to say that already — the declaration's annotation.
+		// The decision is final. A Variable meant to hold both says so in its
+		// annotation.
 		it("refuses a later assignment that disagrees with the decision", () => {
 			expect(
 				codesFor(`implementation {
@@ -113,13 +108,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// The Union matched on is `Integer | String` only because a Match
-		// needs something to narrow at all — nothing here turns on WHICH Types
-		// those are. What is pinned is that the decision the first Handler made
-		// still binds the second one: the Handlers are separate bodies, and the
-		// slot they share is the Variable's, not either body's. The Handlers
-		// answer unit, the empty Record `{}`, because their value is not what
-		// is under test.
+		// The Handlers are separate bodies, but the slot belongs to the
+		// Variable, so the first Handler's decision binds the second.
 		it("refuses the second of two Handlers that disagree", () => {
 			expect(
 				codesFor(`implementation {
@@ -142,8 +132,7 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// An annotated declaration decided its item Type itself, so
-		// there is no slot left for an assignment to fill and nothing changes.
+		// An annotated declaration leaves no slot for an assignment to decide.
 		it("leaves an annotated declaration to its annotation", async () => {
 			expect(
 				await run(`implementation {
@@ -180,11 +169,9 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// `append` answers a `NonEmptyList<String>`, a refinement over the
-		// List the Variable is being handed — and a write is a write however the
-		// value that made it is spelled. The run is what proves it: `sort` needs
-		// an Orderable of the item Type, and an undecided item Type has none, so
-		// this Program did not compile at all before the write decided the slot.
+		// `append` answers a `NonEmptyList<String>`, which decides the slot like
+		// any write. `sort` needs an Orderable item Type, which an undecided slot
+		// lacks, so compiling at all shows the decision.
 		it("decides its item Type from a write that answers a Refinement", async () => {
 			expect(
 				await run(`implementation {
@@ -210,10 +197,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// The shape the hole was reported as, which no annotation is
-		// written in at all: `Number.sum` takes a List of Numbers, an undecided
-		// item Type fit that, and the Program compiled and then added Strings
-		// up. Decided, there is simply no overload to call.
+		// Without an annotation, an undecided slot would fit `Number.sum`'s List
+		// of Numbers. A decided one fits no Overload.
 		it("keeps the decided items out of a Method that wanted Numbers", () => {
 			expect(
 				codesFor(`implementation {
@@ -226,10 +211,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["no-matching-overload"])
 		})
 
-		// The second call is made ON the refinement the first answered —
-		// `NonEmptyList` declares no `append` of its own, so it flows into its
-		// base to be dispatched — and answers a refinement again. One write is
-		// one decision however many calls built the value it wrote.
+		// The second `append` is called on the refinement the first answered.
+		// One write is one decision however many calls built its value.
 		it("decides it from a chain of calls answering a Refinement", async () => {
 			expect(
 				await run(`implementation {
@@ -242,10 +225,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(['[ "a", "b" ]'])
 		})
 
-		// Pinned to the refinement's BASE, never to the refinement. The
-		// Variable's earlier value was the empty List the Declaration wrote, and
-		// nothing proved that one holds anything — so `NonEmptyList<String>` is
-		// a Type the name never had, and an empty List is still a value it takes.
+		// The slot is decided as the refinement's base. The Variable once held
+		// an empty List, so it never had the Type `NonEmptyList<String>`.
 		it("pins to the base of the Refinement rather than to the Refinement", async () => {
 			expect(
 				await run(`implementation {
@@ -260,9 +241,8 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
-	// Two slots and nothing else new — `[=]` decides neither, and both are
-	// decided by the first write that says what they hold, exactly as a List's
-	// one item Type is.
+	// `[=]` leaves both slots undecided, and the first write decides them as a
+	// List's item Type is decided.
 	describe("a Variable declared from an empty Dictionary Literal", () => {
 		it("decides both slots from a write that answers a Refinement", async () => {
 			expect(
@@ -301,10 +281,8 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
-	// An update WRITES the members it names, so it decides the ones the
-	// original left undecided — the same rule as an assignment's, one level in.
-	// Reading the base's blank back out of the update would let `{ box with
-	// items = ["a"] }` stand for a Record whose `items` fits every List.
+	// An update writes the members it names, so it decides the slots the
+	// original left undecided, as an assignment does.
 	describe("a Record member declared from an empty List Literal", () => {
 		it("is decided by the update that writes it", () => {
 			expect(
@@ -342,9 +320,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(['[ "a" ]', '"0"'])
 		})
 
-		// Both halves at once — the update decides the member, and the
-		// assignment it feeds decides the Variable from the Record the update
-		// answered.
+		// The update decides the member, and the assignment decides the
+		// Variable from the Record the update answered.
 		it("is decided through an assignment that updates in place", async () => {
 			expect(
 				await run(`implementation {
@@ -357,9 +334,7 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(['[ "x" ]'])
 		})
 
-		// A member's two slots are decided the way its one item Type is —
-		// `{ base with ages = ["alex" = 39] }` over a `base` whose `ages` came
-		// from `[=]` leaked both of them.
+		// A Dictionary member's two slots are decided as an item Type is.
 		it("decides both slots of a Dictionary member", () => {
 			expect(
 				codesFor(`implementation {
@@ -371,9 +346,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["assignment-type-mismatch"])
 		})
 
-		// And the same without an annotation to carry it — the decided
-		// member is what the Method the update's answer is read with gets,
-		// which is where an undecided one did its damage.
+		// Without an annotation, a Method reading the member gets the decided
+		// Type.
 		it("hands the decided member to the Methods that read it", () => {
 			expect(
 				codesFor(`implementation {
@@ -394,10 +368,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["partial-type-mismatch"])
 		})
 
-		// An Error decides nothing, so there is no write here to refuse.
-		// The slot stayed open BECAUSE the name is not declared, and reporting
-		// the Partial on top of that would charge the author twice for one
-		// mistake — which is what an Error means everywhere else in the match.
+		// An Error decides nothing, and the slot is open only because the name
+		// is undeclared. Reporting the update too would report one mistake twice.
 		it("says nothing of an update whose value is already an Error", () => {
 			expect(
 				codesFor(`implementation {
@@ -407,8 +379,7 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["unknown-name"])
 		})
 
-		// And still reports what the Error does not excuse: a member the
-		// original does not have is a second mistake, not the same one.
+		// A member the original does not have is a second mistake.
 		it("still refuses an update naming a member that is not there", () => {
 			expect(
 				codesFor(`implementation {
@@ -419,10 +390,9 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
-	// The one place a later assignment comes too late. A literal's body is
-	// checked once, where it is written, so a captured `items` is checked as a
-	// `List<Unknown>` — which fits `List<String>` — and no decision made further
-	// down can go back and make that body's Types true.
+	// A literal's body is checked once, where it is written, against a
+	// `List<Unknown>` that fits `List<String>`. A later decision cannot correct
+	// it, so the capture is refused.
 	describe("a Function Literal capturing one", () => {
 		it("refuses the capture", () => {
 			let errors = errorsFor(`implementation {
@@ -439,10 +409,8 @@ describe("Unknown Slot Narrowing", () => {
 			expect(errors[0].code).toBe("uninferable-item-type")
 		})
 
-		// The write below the capture answers a refinement, which decides
-		// the slot — and still not in time. Nothing about WHICH write decides a
-		// slot moves the line a capture is refused at: the body was checked
-		// where it was written.
+		// A later write that answers a refinement decides the slot too late as
+		// well.
 		it("refuses it above a write that answers a Refinement", () => {
 			let errors = errorsFor(`implementation {
 				variable items = []
@@ -488,8 +456,7 @@ describe("Unknown Slot Narrowing", () => {
 			).toEqual(["[ 1, 2 ]"])
 		})
 
-		// A Parameter of the same name is not a capture — it is the
-		// literal's own, declared below the boundary the check walks out from.
+		// A Parameter of the same name is the literal's own, not a capture.
 		it("says nothing about a Parameter that shadows one", () => {
 			expect(
 				codesFor(`implementation {
@@ -521,12 +488,9 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
-	// What a reader is told where the refusal still lands. `List<Unknown>`
-	// on the EXPECTED side of a mismatch names no Type anybody can act on — it
-	// is the blank the Declaration left — so the Diagnostic has to say that it
-	// is a blank and where it is filled in. The annotation is spelled at the
-	// depth the blank actually sits: an example that answers a different
-	// Declaration is worse than none.
+	// `List<Unknown>` as the expected Type names nothing a reader can act on.
+	// The Diagnostic says it is a blank the Declaration left, and spells the
+	// annotation at the depth the blank sits.
 	describe("the refusal a reader is shown", () => {
 		function undecidedHelp(source: string): string {
 			let errors = errorsFor(source)
@@ -594,8 +558,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toContain("'variable box: { items: List<Integer> }'")
 		})
 
-		// The update names the value it updates by Expression rather than
-		// by name, so there is no annotation to write out — the shape is.
+		// An update names its value by Expression, not by name, so the Help
+		// spells the shape rather than an annotation.
 		it("spells the shape where an update refuses a member", () => {
 			let errors = errorsFor(`implementation {
 				constant box = { items = [] }
@@ -611,9 +575,8 @@ describe("Unknown Slot Narrowing", () => {
 			)
 		})
 
-		// Said only about a blank. A slot an assignment DECIDED is a Type
-		// like any other, and a later assignment that disagrees with it is
-		// refused for what it holds — there is nothing undecided to explain.
+		// A decided slot is a Type like any other, so a disagreeing assignment
+		// gets no explanation about blanks.
 		it("says nothing about a slot an earlier write decided", () => {
 			let errors = errorsFor(`implementation {
 				variable items = []
@@ -629,10 +592,9 @@ describe("Unknown Slot Narrowing", () => {
 			)
 		})
 
-		// And said only about the blank that DID the refusing. A Type can
-		// hold a blank the value it turned away never met, and a sentence about
-		// that one answers a question nobody asked — here the Integers in `items`
-		// are what is wrong, and `others` is a blank both sides carry.
+		// The explanation is only about a blank that did the refusing. Here
+		// the Integers in `items` are wrong, and `others` is a blank both sides
+		// carry.
 		it("says nothing about a blank standing beside the refusal", () => {
 			let errors = errorsFor(`implementation {
 				variable box = { items = [], others = [] }
@@ -662,10 +624,8 @@ describe("Unknown Slot Narrowing", () => {
 			)
 		})
 
-		// A blank can stand in one arm of a Union, and the reader is shown
-		// it there — `declared as List<Unknown> | String here` names a half of a
-		// Type nobody can act on, and the annotation that answers it is the whole
-		// Union with that arm filled in.
+		// For a blank in one arm of a Union, the Help spells the whole Union
+		// with that arm filled in.
 		it("explains a blank standing in one arm of a Union", () => {
 			let source = `implementation {
 				variable x = define {
@@ -684,9 +644,8 @@ describe("Unknown Slot Narrowing", () => {
 			)
 		})
 
-		// A Function literal's return Type is inferred, so a combiner over
-		// a seed nothing decided returns a blank — which is what every `<-` in it
-		// is measured against, and the only Type the report can name.
+		// A combiner over an undecided seed infers a return Type with a blank.
+		// Every `<-` is measured against it, so the report names that Type.
 		it("explains the blank a combiner's every branch is refused against", () => {
 			let errors = errorsFor(`implementation {
 				constant mixed = [1, 2]::reduce(startingWith [], (current, number) {
@@ -737,10 +696,8 @@ describe("Unknown Slot Narrowing", () => {
 			).toBe(true)
 		})
 
-		// A capture names a Declaration, so its Help spells one — under the
-		// keyword that Declaration used and around whatever holds the blank. It
-		// used to spell `variable f: List<Integer>` whatever it was answering,
-		// which under a `constant` holding a Future is wrong twice over.
+		// The Help spells the capture's own Declaration, with its keyword and
+		// around whatever holds the blank.
 		it("spells a capture's annotation from its own Declaration", () => {
 			let errors = errorsFor(`implementation {
 				function gather() -> Future<List<Integer>> {
@@ -761,9 +718,8 @@ describe("Unknown Slot Narrowing", () => {
 		})
 	})
 
-	// An undecided item Type is a slot nothing has filled, not a promise
-	// to hold nothing — an empty List Literal still fits every annotated List,
-	// which is the whole reason it is written without one.
+	// An undecided item Type is an unfilled slot, not a promise to hold
+	// nothing, so an empty List Literal fits every annotated List.
 	it("keeps an empty List Literal assignable to any List", async () => {
 		expect(
 			await run(`implementation {
