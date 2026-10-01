@@ -1,27 +1,17 @@
-// Commands and their Options are described once, here, and everything
-// else is derived from that description: the parseArgs configuration, the help
-// screens, the "unknown option" suggestions and the shell-facing usage lines.
-// A flag that exists but is undocumented, or documented but unparsed, is not
-// possible by construction, except for a passthrough Command: its Options are
-// documented here and parsed by the tool it hands its arguments to.
+// Commands and their Options are described once, here. The `parseArgs` setup,
+// the help screens, the suggestions and the usage lines all derive from it. A
+// passthrough Command's Options are documented here but parsed by its delegate.
 
-// The same table is rendered under several names — the binary is
-// installed as `essence` and as `esc`, and user-facing text has to say the one
-// that was typed. Every spec string that names the program writes this
-// placeholder instead of a name, and the help renderer substitutes it; a second
-// copy of the table per name would be a second table to keep true.
+// Stands for the name the binary was invoked as, `essence` or `esc`, in every
+// spec string. The help renderer substitutes it.
 export const PROGRAM = "{program}"
 
-// The name to render when a caller does not say which. Both executables
-// in bin/ name themselves, so this is only reached by something driving the CLI
-// in-process — a spec, or a script written before the second name existed.
+// The name to render when a caller names none. Both executables in `bin/` name
+// themselves, so only an in-process caller such as a spec reaches this.
 export const DEFAULT_PROGRAM_NAME = "esc"
 
-// The project file's name, written into the Help in the several places
-// that name it. Spelled here rather than imported from the Compiler because
-// this table is data about the command line and imports nothing; the Compiler's
-// `PROJECT_FILE_NAME` is what every reader of the file itself uses, and the two
-// are checked against each other by a spec.
+// The project file's name for the Help. This table imports nothing, and a spec
+// checks it against the Compiler's `PROJECT_FILE_NAME`.
 export const PROJECT_FILE = "essence.json"
 
 export function withProgramName(text: string, programName: string): string {
@@ -56,10 +46,9 @@ export type CommandSpec = {
 	options: Array<OptionSpec>
 	examples: Array<Example>
 	acceptsProgramArguments?: boolean
-	// A passthrough Command hands every argument after its name to another
-	// tool, which parses them itself. Its Options are documented here so that
-	// `help` can answer for it, but they are never parsed here — and the global
-	// Options are not among them, because they reach nothing that reads them.
+	// A passthrough Command hands every argument after its name to another tool. Its
+	// Options are documented for `help` but never parsed here, and the global
+	// Options do not apply.
 	passthrough?: true
 }
 
@@ -134,13 +123,9 @@ const sourcemapOption: OptionSpec = {
 	summary: "Emit a source map next to the output",
 }
 
-// `--no-sourcemap`, `--no-minify` and `--no-embed` are the way out of
-// the settings `build.sourcemap`, `build.minify` and `build.embed`, written
-// once in essence.json and in force for every run. A project that always emits
-// a map still needs a build without one on demand, and a flag that could only
-// ever turn a thing ON would leave that project no way to ask. The flag wins
-// over the setting in both directions, and saying both flags at once is refused
-// before anything runs.
+// `--no-sourcemap`, `--no-minify` and `--no-embed` override the settings
+// `build.sourcemap`, `build.minify` and `build.embed` for one run. A flag beats
+// the setting either way, and both twins at once are refused.
 const noSourcemapOption: OptionSpec = {
 	name: "no-sourcemap",
 	type: "boolean",
@@ -159,11 +144,8 @@ const noMinifyOption: OptionSpec = {
 	summary: "Emit unminified JavaScript, whatever the project configured",
 }
 
-// A build compiles what a Program DOES and drops what it proves, which is
-// what keeps a `tests { … }` block free. This is the one way to ask for a
-// bundle with the block in it, and it exists for the debugger: stepping through
-// one test means having a bundle that holds it, and the adapter reaches the
-// Compiler by spawning this command.
+// A build drops the `tests` block. This flag keeps it, for the debugger: the
+// adapter spawns this command to get a bundle holding the test it steps through.
 const testsOption: OptionSpec = {
 	name: "tests",
 	type: "boolean",
@@ -175,10 +157,8 @@ const testsOption: OptionSpec = {
 		"stepping through.",
 }
 
-// Optimisation is on for every build, and these two are how it is turned
-// down. Both exist for the same reason the passes have names at all: when a
-// Program misbehaves, the question "does it still do that with the optimiser
-// off?" has to be answerable in one run, and "which pass is it?" in a few more.
+// Optimisation is on for every build, and these turn it down, so a misbehaving
+// Program can be run without the Optimiser or without one pass.
 const noOptimiseOption: OptionSpec = {
 	name: "no-optimise",
 	type: "boolean",
@@ -202,13 +182,8 @@ const withoutOptimisationOption: OptionSpec = {
 		"emits a correct Program, and turning one off is how a suspect is named.",
 }
 
-// The one flag that changes what the OUTPUT IS rather than how it was
-// made: a bundle a JavaScript host can load and marshal, and the Descriptor that
-// says how. Off by default, because everything else `esc build` writes is a
-// program to run and this is a Module to import.
-//
-// Not on `run`, which spawns what it built — a bundle for a host to import
-// is not a program to execute, and the two are asked for by different people.
+// Builds a Module for a JavaScript host to import, with a Descriptor saying how
+// to marshal its values. Not on `run`, which executes what it builds.
 const embedOption: OptionSpec = {
 	name: "embed",
 	type: "boolean",
@@ -757,12 +732,8 @@ export const commands: Array<CommandSpec> = [
 					"cases it took and the smallest value it could shrink the " +
 					"failure to.",
 			},
-			// A test run compiles, so the two ways of turning the
-			// Optimiser down belong here as much as they belong to `build` —
-			// "does it still do that with the optimiser off?" is a question
-			// asked of a failing TEST more often than of a build. Neither
-			// touches --coverage: instrumentation is a pass being turned on,
-			// and `--no-optimise --coverage` still counts.
+			// A test run compiles, so it can turn the Optimiser down too. Neither flag
+			// touches `--coverage`, whose instrumentation pass still runs.
 			noOptimiseOption,
 			withoutOptimisationOption,
 			jobsOption,
@@ -813,10 +784,8 @@ export const commands: Array<CommandSpec> = [
 	{
 		name: "init",
 		aliases: [],
-		// The summary names the file by what it IS rather than by its
-		// name, because the overview is rendered under whichever name the
-		// binary was invoked as and may not say the other one — and the file is
-		// called `essence.json` whichever that was. The description says it.
+		// The summary describes the file rather than naming it, and the description
+		// names it.
 		summary: "Write the file a project's settings live in",
 		description: [
 			`Writes an ${PROJECT_FILE} into the working directory — the file ` +
@@ -980,9 +949,8 @@ export function findCommand(name: string): CommandSpec | undefined {
 	)
 }
 
-// The command an invocation falls back to when none is named, resolved
-// here rather than looked up by name at each call site, so that it cannot be
-// missing.
+// The command an invocation falls back to when none is named, resolved once so
+// it cannot be missing.
 export const defaultCommand: CommandSpec = commands[0]
 
 export function optionsFor(command: CommandSpec): Array<OptionSpec> {

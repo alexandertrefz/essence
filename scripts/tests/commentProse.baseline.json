@@ -15,7 +15,6 @@
 	"packages/ariadne/src/report.spec.ts": {"sentence-length": 3, "em-dash": 1},
 	"packages/ariadne/src/write.ts": {"sentence-length": 6, "em-dash": 3, "all-caps": 5},
 	"packages/cli/src/actions.ts": {"sentence-length": 9, "em-dash": 7, "all-caps": 3, "position": 1, "block-length": 2},
-	"packages/cli/src/commands.ts": {"sentence-length": 15, "em-dash": 6, "all-caps": 3, "block-length": 2},
 	"packages/cli/src/compile.ts": {"sentence-length": 7, "em-dash": 5, "all-caps": 3},
 	"packages/cli/src/context.ts": {"sentence-length": 2, "em-dash": 2, "all-caps": 1, "block-length": 1, "stacked": 1},
 	"packages/cli/src/execute.ts": {"sentence-length": 5, "em-dash": 5},
