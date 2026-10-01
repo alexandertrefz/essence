@@ -823,3 +823,70 @@ joined `set-cookie` can not be split again, since a cookie's `Expires` holds a c
 
 `hostFetch` looks `fetch` up on every call, for the reason `Terminal.ts` looks up its streams, as "Writing to the
 host" describes.
+
+## Futures
+
+`Future.ts` holds both the runtime of asynchrony and the `Future` Namespace's natives, since the two share a name. The
+emitted code imports the module as `$future`, and a Namespace call reads it as `Future`.
+
+A Future is a description. Building one runs nothing: it holds a `run`, and each start calls `run` once. So a
+Future may be started any number of times, and `::attempt` is an Essence body that completes its receiver again. A
+Started is one run of a description. It holds the promise the run answered with and the controller that stops it.
+Completing it twice answers the same value twice and runs nothing more.
+
+Everything runs on the one JavaScript thread. `start` calls `run` at once rather than scheduling it, so a Future with
+nothing to wait for has finished before `start` answers. The answer is a promise either way. `FutureList::all` buys
+waiting at once, not computing at once.
+
+`start` answers a Started, or a value that describes no work, with itself, and `complete` answers such a value as
+its own answer. Both are Warnings, `needless-start` and `needless-complete`, so the Program runs, and the keyword is
+the no-op the Warning describes.
+
+A Future and a Started render as their bare kind and compare by identity. One holds a closure and the other a
+promise, and neither has parts a reader could use. Their kinds are registered by the first construction, for the
+reason "Registering the Dictionary kind" gives.
+
+### Run contexts
+
+A run belongs to a context: the signal the work reads and the controller that stops it. Each start makes a child of
+the context it was written in. Stopping a run then stops everything it started, and nothing else. A top-level start
+gets a fresh `root` each time, so two top-level starts are independent.
+
+Where the host has `AbortSignal.any`, a child's signal is the union of its parent's and its own, and the engine keeps
+the books. `childOf` looks the function up on every call, so the module keeps no top-level side effect. A host
+without it gets one listener on the parent that forwards a stop.
+
+That listener has to come off, or a Program's root holds one per start for its whole life. It may not come off at
+the run's end alone. A finished run can not be stopped, but a context started under it can, and a stop reaches that
+context through the listener. So `childOf` counts holds: one for the run, and one on the parent for each child
+still open under it. The listener comes off when the count reaches zero, or when the child stops on its own, which
+never settles. The holds live in a `WeakMap`, so a `Context` stays the signal and the controller alone.
+
+### Throws inside a run
+
+A Future can not fail: a failure is a value in Essence, carried by a Result. So a throw out of `run` is a bug in the
+Compiler or a native. `runUnder` keeps it on the run's promise rather than raising it at the `start`, which is not
+where the work is.
+
+A run nobody completes is what a `start` in Statement position means, and `unobserved-started` is only Information.
+A throw out of such a run would reach the host's unhandled-rejection hook and end the process. So `started` marks
+every Started's promise as handled. That consumes nothing: a later `complete` awaits the same promise and sees the
+same throw. `start`, `Started::map` and `Started::within` all build their Started through it, since each builds a
+promise of its own.
+
+### Stopping a run
+
+Stopping a run signals the work and drops its answer. No Program ever reads the answer of a stopped run. `::within`
+starts its receiver, so the run belongs to it alone and is stopped at the deadline. The answer is an Optional, so a
+run that took too long is a value rather than a failure. `Started::within` stops waiting instead, since others may
+wait on the same run. `NonEmptyFutureList::race` stops every run but the winner, which it tells apart by index.
+
+`ResultFutureList::firstValue` skips failures, so it can not be written on `Promise.race`. It settles once, behind a
+flag. A second value arriving after the choice must not stop the other runs, which by then include the winner.
+
+### Timers
+
+`setTimeout` keeps its delay in a signed 32-bit integer, and a host fires an overflowed delay after one millisecond. An Essence
+Integer is unbounded. So `waitFor` arms the timer in chunks of at most `LONGEST_DELAY` and re-arms until the time is
+spent. A delay past what a number holds is `Infinity`, which never spends, and a negative one is no time at all. A
+`::within` deadline is called off when its own context stops, so no timer holds the host open for nobody.
