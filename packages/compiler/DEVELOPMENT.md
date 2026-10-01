@@ -264,20 +264,21 @@ kind is missing. A switch with a `default` stays silent, so walk the whole list.
    does `mutation/index.ts`.
 10. Rewriter: `rewriter/rewrite.ts`.
 11. Formatter: `packages/formatter/src/printer.ts`.
-12. Language server, in `packages/language-server/src`: `completion.ts`, `hover.ts`, `rename.ts` and
-    `snippetContext.ts`; in `codeActions/`, `extractConstant.ts`. `argumentContext.ts`, `callHierarchy.ts`,
-    `documentSymbols.ts`, `foldingRanges.ts`, `inlayHints.ts`, `selectionRanges.ts`, `semanticTokens.ts`,
+12. Language server, in `packages/language-server/src`: `completion.ts`, `rename.ts` and `snippetContext.ts`;
+    in `codeActions/`, `extractConstant.ts`. `argumentContext.ts`, `callHierarchy.ts`, `documentSymbols.ts`,
+    `foldingRanges.ts`, `hover.ts`, `inlayHints.ts`, `selectionRanges.ts`, `semanticTokens.ts`,
     `signatureHelp.ts`, `codeActions/lookups.ts`, `codeActions/matchOnValue.ts`, `codeActions/payloads.ts` and
     `codeActions/typedLookups.ts` descend through the visitor. They need an edit only where a kind declares
     something callable or outlined, is a call, writes something a Hint annotates, folds, or names a Case.
-    `argumentContext.ts` needs one for a kind that holds a child to an expected Type. A new Expression or
-    Statement joins the levels of `selectionRanges.ts`, and the type checker asks for it there. It joins
-    `expressionKinds` in `codeActions/typedLookups.ts` and `implementationKinds` in `codeActions/lookups.ts`
-    the same way. A field naming something joins `namingFields` in `typedLookups.ts` and `holdsValue` in
-    `lookups.ts` by hand. `payloads.ts` needs no edit. In `matchOnValue.ts`, a new kind that reads a value a
-    Match can take apart joins its scaffolded cases. A kind that asks a Type of a value it holds hands it on in
-    `visitNode`, and a new name field joins `names`. A subtree where no Match may stand is skipped, as
-    `TypeAliasStatement`'s predicate is.
+    `hover.ts` needs one where a kind answers on Hover for its own span. `argumentContext.ts` needs one for a
+    kind that holds a child to an expected Type. A new Expression or Statement joins the levels of
+    `selectionRanges.ts`, and the type checker asks for it there. It joins `expressionKinds` in
+    `codeActions/typedLookups.ts` and `implementationKinds` in `codeActions/lookups.ts` the same way. A field
+    naming something joins `namingFields` in `typedLookups.ts` and `holdsValue` in `lookups.ts` by hand.
+    `payloads.ts` needs no edit. In `matchOnValue.ts`, a new kind that reads a value a Match can take apart
+    joins its scaffolded cases. A kind that asks a Type of a value it holds hands it on in `visitNode`, and a
+    new name field joins `names`. A subtree where no Match may stand is skipped, as `TypeAliasStatement`'s
+    predicate is.
 13. Editor grammar: a new keyword goes into `packages/vscode-extension/syntaxes/essence.tmLanguage.json`,
     checked by `packages/vscode-extension/tests/grammar.spec.ts`. The website highlights with the same file.
 14. Specs: `tests/parser.spec.ts` and its snapshot, `tests/parserRecovery.spec.ts`, `tests/enricher.spec.ts`,

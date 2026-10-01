@@ -1,8 +1,6 @@
 import { builtinProtocols } from "@essence-lang/compiler/enricher/builtins"
 import {
-	caseDefaults,
 	isSynthesizedName,
-	parameterDefaults,
 	parameterInternalName,
 	recordDefaultMembers,
 	recordDefaultNesting,
@@ -19,14 +17,13 @@ import {
 } from "@essence-lang/compiler/printType"
 import {
 	forEachParserChild,
+	forEachTypedChild,
 	type ParserNode,
+	type TypedNode,
 } from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { typedAssertionExpressions } from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
 import { documentationOf, renderDocumentation } from "./documentation"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isSmaller } from "./positions"
 import { protocolSpellings } from "./protocolSpellings"
 import { typedProgramNodes, typedProgramSections } from "./sections"
@@ -109,7 +106,9 @@ function hoverAt(
 
 	// Every body the Program holds, test bodies included.
 	for (let section of typedProgramSections(program)) {
-		visitBody([...section.head, ...section.nodes], state)
+		for (let node of [...section.head, ...section.nodes]) {
+			visitNode(node, state)
+		}
 
 		// `for any (a: Integer)` names a value no Statement declares, so the
 		// Parameter answers for its own span.
@@ -359,23 +358,16 @@ function describeSignatures(
 /* Walkers */
 /***********/
 
-function visitBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	state: State,
-) {
-	for (let node of nodes) {
-		visitNode(node, state)
-	}
-}
-
-function visitNode(node: common.typed.ImplementationNode, state: State) {
+// Offers what a node answers, then lets the shared visitor descend, so a kind
+// or a field the visitor learns later is walked here too.
+function visitNode(node: TypedNode, state: State): void {
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
-			// The Constant a Pattern stores its value in has a made-up name, so only its
-			// value is visited.
+			// The Constant a Pattern or a `require` stores its value in has a made-up
+			// name, which is left out.
 			if (node.synthesized === "base" || node.synthesized === "subject") {
-				visitNode(node.value, state)
+				visitDeclaration(node, state, null)
 				return
 			}
 
@@ -388,12 +380,7 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				node.name.content,
 				node.documentation,
 			)
-			visitIdentifier(node.name, state, undefined, node.documentation)
-			visitNode(node.value, state)
-			return
-		case "VariableAssignmentStatement":
-			visitIdentifier(node.name, state)
-			visitNode(node.value, state)
+			visitDeclaration(node, state, node.name.content, node.documentation)
 			return
 		// A declaration reads back with its keyword, as written.
 		case "FunctionStatement":
@@ -403,180 +390,43 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				node.type,
 				`function ${node.name.content}`,
 			)
-			visitIdentifier(node.name, state, `function ${node.name.content}`)
-			visitFunctionDefinition(node.value, state)
+			visitDeclaration(node, state, `function ${node.name.content}`)
 			return
 		case "NamespaceDefinitionStatement":
-			// A Namespace with conformance clauses reads back as its whole
-			// declaration head, spelled by hand like a Protocol or Choice. One
-			// without keeps the plain Hover.
-			if (node.conformsTo.length > 0) {
-				let generics =
-					node.type.generics.length === 0
-						? ""
-						: `<${node.type.generics
-								.map(printGenericDeclaration)
-								.join(", ")}>`
-
-				let target =
-					node.targetType === null
-						? ""
-						: ` for ${printType(node.targetType)}`
-
-				let content = `namespace ${node.name.content}${generics}${target}${printConformanceClauses(
-					node.conformsTo,
-				)}`
-
-				for (let position of [node.headPosition, node.name.position]) {
-					if (wins(state, position)) {
-						state.best = {
-							position,
-							content,
-							documentation: renderDocumentation(
-								node.documentation,
-							),
-						}
-					}
-				}
-			} else {
-				consider(
-					state,
-					node.headPosition,
-					node.type,
-					node.name.content,
-					node.documentation,
-				)
-				visitIdentifier(node.name, state, undefined, node.documentation)
-			}
-
-			// A Method's Generics include the Namespace's, so only a Namespace without
-			// Methods needs these.
-			visitGenericDeclarations(node.generics, state)
-
-			// `is Comparable` reads back as that Protocol, on the Protocol Identifier's
-			// span. A `where` condition names a Generic and a Protocol.
-			for (let clause of node.conformsTo) {
-				visitProtocolReference(clause.name, clause.position, state)
-
-				for (let condition of clause.conditions) {
-					let generic = node.generics.find(
-						(candidate) => candidate.name === condition.generic,
-					)
-
-					if (
-						generic !== undefined &&
-						wins(state, condition.genericPosition)
-					) {
-						state.best = {
-							position: condition.genericPosition,
-							content: printTypedGenericDeclaration(generic),
-							documentation: null,
-						}
-					}
-
-					visitProtocolReference(
-						condition.protocol,
-						condition.protocolPosition,
-						state,
-					)
-				}
-			}
-
-			for (let property of Object.values(node.properties)) {
-				visitIdentifier(
-					property.name,
-					state,
-					`static ${property.name.content}`,
-					property.documentation,
-				)
-				visitNode(property.value, state)
-			}
-
-			for (let [name, member] of Object.entries(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				let isStatic =
-					member.nodeType === "StaticMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-
-				let label = isStatic ? `static ${name}` : name
-
-				// The name is typed as the Method itself, so it describes every Overload.
-				visitIdentifier(member.name, state, label)
-
-				for (let method of methods) {
-					consider(
-						state,
-						method.value.headPosition,
-						method.type,
-						label,
-					)
-					visitFunctionDefinition(method.value, state)
-				}
-			}
-
-			// A native Method's Parameters are reached only through the frame the
-			// Compiler synthesizes for its defaults.
-			for (let shim of node.nativeShims) {
-				for (let defaultValue of parameterDefaults(shim.parameters)) {
-					visitNode(defaultValue, state)
-				}
-			}
-
-			visitNativeSignatures(node, state)
+			visitNamespace(node, state)
+			return
+		case "SimpleMethod":
+		case "StaticMethod":
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			visitMethod(node, state)
+			return
+		// A native Method's Parameters are reached only through the frame the
+		// Compiler synthesizes for its defaults. `visitNativeSignatures` answers
+		// for the rest.
+		case "NativeShim":
+			forEachTypedChild(node, visitDefaultValue, state)
 			return
 		case "TypeAliasStatement":
 			visitTypeAlias(node, state)
 			return
-		case "ProtocolDeclarationStatement": {
-			let content = describeProtocol(node.name.content, node.protocolType)
-
-			for (let position of [node.headPosition, node.name.position]) {
-				if (wins(state, position)) {
-					state.best = {
-						position,
-						content,
-						documentation: renderDocumentation(node.documentation),
-					}
-				}
-			}
-
-			// `visitProtocolBodies` answers a provided Method's name and head; its
-			// Parameters and body are typed here.
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					visitFunctionDefinition(method.value, state)
-				}
-			}
-
-			visitProtocolBodies(node, state)
+		case "ProtocolDeclarationStatement":
+			visitProtocol(node, state)
 			return
-		}
-		case "IfStatement":
-			visitNode(node.condition, state)
-			visitBody(node.body, state)
+		case "ChoiceDeclarationStatement":
+			visitChoice(node, state)
 			return
-		case "IfElseStatement":
-			visitNode(node.condition, state)
-			visitBody(node.trueBody, state)
-			visitBody(node.falseBody, state)
+		case "GenericDeclaration":
+			visitGenericDeclaration(node, state)
+			return
+		case "Parameter":
+			visitParameter(node, state)
 			return
 		// The `<-` says what the Statement returns. An `if` offers no candidate:
 		// nothing useful can be said about the keyword.
 		case "ReturnStatement":
 			consider(state, node.position, node.expression.type, null)
-			visitNode(node.expression, state)
-			return
+			break
 		// What a `require` Matcher proved, as a Match Handler's Matcher reads, at the
 		// Matcher's span. Its bindings are Constants of the body.
 		case "ExpectStatement":
@@ -593,104 +443,47 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 				}
 			}
 
-			for (let expression of typedAssertionExpressions(node)) {
-				visitNode(expression, state)
-			}
-
-			return
+			break
 		case "Identifier":
 			// A Pattern's bindings read off a Constant with a made-up name at the
 			// Pattern's span, so it is skipped. Each binder answers for its own.
-			if (isSynthesizedName(node.content)) {
-				return
-			}
-
-			visitIdentifier(node, state)
-			return
-		case "MethodInvocation": {
-			consider(state, node.position, node.type, null)
-			visitNode(node.base, state)
-
-			// The Method name resolves through the Namespace; with Overloads, the invoked
-			// signature is picked out.
-			let signatures = invokedSignatures(node)
-
-			if (signatures !== null) {
-				considerSignatures(
-					state,
-					node.member.position,
-					signatures,
-					node.member.name,
-					documentationOf(
-						node.namespace.type.methods[node.member.name],
-					),
-					// A Method from a Protocol names that Protocol, so the reader can find its
-					// declaration. A bounded receiver's witness answers per member.
-					node.namespace.type.providedBy ??
-						node.namespace.type.providedMembers?.[
-							node.member.name
-						] ??
-						null,
-				)
-			}
-
-			visitArguments(node.arguments, state)
-			return
-		}
-		case "FunctionInvocation":
-			consider(state, node.position, node.type, null)
-			visitNode(node.name, state)
-			visitArguments(node.arguments, state)
-			return
-		case "Lookup": {
-			consider(state, node.position, node.type, null)
-			visitNode(node.base, state)
-
-			// As for a MethodInvocation, so `Integer.isNot` names `Equatable` as
-			// `5::isNot(3)` does.
-			let signatures =
-				node.providedBy === undefined
-					? null
-					: signaturesOf(node.member.type)
-
-			if (node.providedBy !== undefined && signatures !== null) {
-				considerSignatures(
-					state,
-					node.member.position,
-					signatures,
-					node.member.content,
-					documentationOf(node.member.type),
-					node.providedBy,
-				)
-			} else {
-				visitIdentifier(node.member, state)
+			if (!isSynthesizedName(node.content)) {
+				visitIdentifier(node, state)
 			}
 
 			return
-		}
-		case "Combination":
-			consider(state, node.position, node.type, null)
-			visitNode(node.lhs, state)
-			visitNode(node.rhs, state)
+		case "MethodInvocation":
+			visitMethodInvocation(node, state)
+			return
+		case "Lookup":
+			visitLookup(node, state)
 			return
 		// What the Keyword answers with: `complete` reads back as the Value awaited,
 		// `start` as the `Started` it put in flight. The operand keeps its own Hover.
 		case "Start":
 		case "Complete":
+		// The `define` keyword answers with the whole Expression's Type, as a
+		// `match` does.
+		case "Define":
+		// The literal answers with its own Type, as a written List does.
+		case "DictionaryValue":
+		case "FunctionInvocation":
+		case "Combination":
+		case "RecordValue":
+		case "ListValue":
+		case "InterpolatedStringValue":
+		case "StringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
 			consider(state, node.position, node.type, null)
-			visitNode(node.expression, state)
-			return
-		// The refused value is an `Error`; what precedes the brackets still answers.
-		case "RefusedValue":
-			visitNode(node.base, state)
-			return
+			break
 		case "Match":
 			consider(state, node.position, node.type, null)
-			visitNode(node.value, state)
 
+			// A Case Matcher's payload reads as a constructed Case does, instantiated
+			// for an applied generic Choice by the scrutinee.
 			for (let handler of node.handlers) {
-				// A Case Matcher's payload reads as a constructed Case does,
-				// instantiated for an applied generic Choice by the scrutinee.
 				if (
 					handler.matcher.type === "Case" &&
 					wins(state, handler.matcherPosition)
@@ -701,61 +494,9 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 						documentation: null,
 					}
 				}
-
-				for (let expression of typedHandlerExpressions(handler)) {
-					visitNode(expression, state)
-				}
-
-				visitBody(handler.body, state)
 			}
 
-			return
-		// The `define` keyword answers with the whole Expression's Type, as a
-		// `match` does.
-		case "Define":
-			consider(state, node.position, node.type, null)
-
-			for (let expression of defineExpressions(node)) {
-				visitNode(expression, state)
-			}
-
-			return
-		case "RecordValue":
-			consider(state, node.position, node.type, null)
-
-			for (let member of Object.values(node.members)) {
-				visitNode(member, state)
-			}
-
-			return
-		case "ListValue":
-			consider(state, node.position, node.type, null)
-
-			for (let value of node.values) {
-				visitNode(value, state)
-			}
-
-			return
-		// The literal answers with its own Type, as a written List does.
-		case "DictionaryValue":
-			consider(state, node.position, node.type, null)
-
-			for (let entry of node.entries) {
-				visitNode(entry.key, state)
-				visitNode(entry.value, state)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			consider(state, node.position, node.type, null)
-
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					visitNode(segment.expression, state)
-				}
-			}
-
-			return
+			break
 		case "FunctionValue":
 			// A member path is a Function literal the Compiler wrote. The path answers
 			// with its signature and each step with the member it reads; its `_0`
@@ -768,102 +509,169 @@ function visitNode(node: common.typed.ImplementationNode, state: State) {
 			}
 
 			consider(state, node.value.headPosition, node.type, null)
-			visitFunctionDefinition(node.value, state)
-			return
+			break
 		case "Self":
 			consider(state, node.position, node.type, "@")
 			return
+		// The refused value is an `Error`; what precedes the brackets still answers.
+		case "RefusedValue":
+			break
 		case "CaseValue":
-			consider(state, node.position, node.type, null)
-
-			// The Choice's half names the Union, the Case's half the constructed Case.
-			if (node.choice !== null) {
-				visitIdentifier(node.choice, state)
-			}
-
-			if (node.type.type === "Case") {
-				if (wins(state, node.caseName.position)) {
-					state.best = {
-						position: node.caseName.position,
-						content: printCaseWithPayload(node.type),
-						documentation: null,
-					}
-				}
-			} else {
-				visitIdentifier(node.caseName, state)
-			}
-
-			if (node.value !== null) {
-				visitNode(node.value, state)
-			}
-
-			return
-		case "ChoiceDeclarationStatement": {
-			// Spelled by hand like a Protocol's: the keyword, the name, and each Case
-			// with its payload.
-			let caseLine = (caseType: common.CaseType): string => {
-				let members = Object.entries(caseType.members).map(
-					([memberName, memberType]) =>
-						`${memberName}: ${printType(memberType)}`,
-				)
-
-				return members.length === 0
-					? `#${caseType.name}`
-					: `#${caseType.name} { ${members.join(", ")} }`
-			}
-
-			// A generic Choice reads back with its Type Parameters, `choice Step<State,
-			// Answer>`, and its payloads in terms of them.
-			let generics =
-				node.type.type === "GenericAlias" &&
-				node.type.generics.length > 0
-					? `<${node.type.generics
-							.map(printGenericDeclaration)
-							.join(", ")}>`
-					: ""
-
-			let content = [
-				`choice ${node.name.content}${generics}`,
-				...node.cases.map((choiceCase) => caseLine(choiceCase.type)),
-			].join("\n")
-
-			for (let position of [node.headPosition, node.name.position]) {
-				if (wins(state, position)) {
-					state.best = {
-						position,
-						content,
-						documentation: renderDocumentation(node.documentation),
-					}
-				}
-			}
-
-			visitGenericDeclarations(node.generics, state)
-
-			for (let choiceCase of node.cases) {
-				if (wins(state, choiceCase.name.position)) {
-					state.best = {
-						position: choiceCase.name.position,
-						content: printCaseWithPayload(choiceCase.type),
-						documentation: null,
-					}
-				}
-			}
-
-			// A payload default's Expressions answer with their own Types.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				visitNode(defaultValue, state)
-			}
-
-			visitChoicePayloads(node, state)
-			return
-		}
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			consider(state, node.position, node.type, null)
+			visitCaseValue(node, state)
 			return
 	}
+
+	forEachTypedChild(node, visitNode, state)
+}
+
+// Descends into a declaration whose own name answers as `label`, with what
+// the declaration documents. A null `label` leaves the name out.
+function visitDeclaration(
+	node: TypedNode,
+	state: State,
+	label: string | null,
+	declared: common.Documentation | null = null,
+) {
+	forEachTypedChild(
+		node,
+		(child, state, field, _key, container) => {
+			if (
+				field !== "name" ||
+				container !== undefined ||
+				child.nodeType !== "Identifier"
+			) {
+				visitNode(child, state)
+			} else if (label !== null) {
+				visitIdentifier(child, state, label, declared)
+			}
+		},
+		state,
+	)
+}
+
+function visitNamespace(
+	node: common.typed.NamespaceDefinitionStatementNode,
+	state: State,
+) {
+	// A Namespace with conformance clauses reads back as its whole declaration
+	// head, spelled by hand like a Protocol or Choice. One without keeps the
+	// plain Hover.
+	let readsAsHead = node.conformsTo.length > 0
+
+	if (readsAsHead) {
+		let generics =
+			node.type.generics.length === 0
+				? ""
+				: `<${node.type.generics.map(printGenericDeclaration).join(", ")}>`
+
+		let target =
+			node.targetType === null ? "" : ` for ${printType(node.targetType)}`
+
+		let content = `namespace ${node.name.content}${generics}${target}${printConformanceClauses(
+			node.conformsTo,
+		)}`
+
+		for (let position of [node.headPosition, node.name.position]) {
+			if (wins(state, position)) {
+				state.best = {
+					position,
+					content,
+					documentation: renderDocumentation(node.documentation),
+				}
+			}
+		}
+	} else {
+		consider(
+			state,
+			node.headPosition,
+			node.type,
+			node.name.content,
+			node.documentation,
+		)
+	}
+
+	// `is Comparable` reads back as that Protocol, on the Protocol Identifier's
+	// span. A `where` condition names a Generic and a Protocol.
+	for (let clause of node.conformsTo) {
+		visitProtocolReference(clause.name, clause.position, state)
+
+		for (let condition of clause.conditions) {
+			let generic = node.generics.find(
+				(candidate) => candidate.name === condition.generic,
+			)
+
+			if (
+				generic !== undefined &&
+				wins(state, condition.genericPosition)
+			) {
+				state.best = {
+					position: condition.genericPosition,
+					content: printTypedGenericDeclaration(generic),
+					documentation: null,
+				}
+			}
+
+			visitProtocolReference(
+				condition.protocol,
+				condition.protocolPosition,
+				state,
+			)
+		}
+	}
+
+	// A static property reads back with its keyword.
+	forEachTypedChild(
+		node,
+		(child, state, field, key, container) => {
+			if (field !== "name" || child.nodeType !== "Identifier") {
+				visitNode(child, state)
+			} else if (container === "properties") {
+				visitIdentifier(
+					child,
+					state,
+					`static ${child.content}`,
+					node.properties[String(key)]?.documentation ?? null,
+				)
+			} else if (!readsAsHead) {
+				visitIdentifier(child, state, undefined, node.documentation)
+			}
+		},
+		state,
+	)
+
+	visitNativeSignatures(node, state)
+}
+
+// A Namespace's Method. Its name is typed as the Method itself, so it
+// describes every Overload, and each body's head as that Overload.
+function visitMethod(
+	node:
+		| common.typed.SimpleMethod
+		| common.typed.StaticMethod
+		| common.typed.OverloadedMethod
+		| common.typed.OverloadedStaticMethod,
+	state: State,
+) {
+	let label =
+		node.nodeType === "StaticMethod" ||
+		node.nodeType === "OverloadedStaticMethod"
+			? `static ${node.name.content}`
+			: node.name.content
+
+	forEachTypedChild(
+		node,
+		(child, state, field) => {
+			if (field === "name" && child.nodeType === "Identifier") {
+				visitIdentifier(child, state, label)
+			} else if (child.nodeType === "FunctionValue") {
+				consider(state, child.value.headPosition, child.type, label)
+				forEachTypedChild(child, visitNode, state)
+			} else {
+				visitNode(child, state)
+			}
+		},
+		state,
+	)
 }
 
 function visitTypeAlias(
@@ -892,11 +700,271 @@ function visitTypeAlias(
 		node.name.content,
 		node.documentation,
 	)
-	visitGenericDeclarations(node.generics, state)
+	visitDeclaration(node, state, null)
+}
 
-	if (node.predicate !== null) {
-		visitNode(node.predicate, state)
+function visitProtocol(
+	node: common.typed.ProtocolDeclarationStatementNode,
+	state: State,
+) {
+	let content = describeProtocol(node.name.content, node.protocolType)
+
+	for (let position of [node.headPosition, node.name.position]) {
+		if (wins(state, position)) {
+			state.best = {
+				position,
+				content,
+				documentation: renderDocumentation(node.documentation),
+			}
+		}
 	}
+
+	// `visitProtocolBodies` answers a provided Method's name and head; its
+	// Parameters and body are typed here.
+	forEachTypedChild(
+		node,
+		(child, state, field) => {
+			if (field === "methods") {
+				forEachTypedChild(child, visitProvidedBody, state)
+			} else if (field !== "name") {
+				visitNode(child, state)
+			}
+		},
+		state,
+	)
+
+	visitProtocolBodies(node, state)
+}
+
+function visitProvidedBody(child: TypedNode, state: State, field: string) {
+	if (child.nodeType === "FunctionValue") {
+		forEachTypedChild(child, visitNode, state)
+	} else if (field !== "name") {
+		visitNode(child, state)
+	}
+}
+
+function visitChoice(
+	node: common.typed.ChoiceDeclarationStatementNode,
+	state: State,
+) {
+	// Spelled by hand like a Protocol's: the keyword, the name, and each Case
+	// with its payload.
+	let caseLine = (caseType: common.CaseType): string => {
+		let members = Object.entries(caseType.members).map(
+			([memberName, memberType]) =>
+				`${memberName}: ${printType(memberType)}`,
+		)
+
+		return members.length === 0
+			? `#${caseType.name}`
+			: `#${caseType.name} { ${members.join(", ")} }`
+	}
+
+	// A generic Choice reads back with its Type Parameters, `choice Step<State,
+	// Answer>`, and its payloads in terms of them.
+	let generics =
+		node.type.type === "GenericAlias" && node.type.generics.length > 0
+			? `<${node.type.generics.map(printGenericDeclaration).join(", ")}>`
+			: ""
+
+	let content = [
+		`choice ${node.name.content}${generics}`,
+		...node.cases.map((choiceCase) => caseLine(choiceCase.type)),
+	].join("\n")
+
+	for (let position of [node.headPosition, node.name.position]) {
+		if (wins(state, position)) {
+			state.best = {
+				position,
+				content,
+				documentation: renderDocumentation(node.documentation),
+			}
+		}
+	}
+
+	// Each Case's name reads as its payload. A payload default's Expressions
+	// answer with their own Types.
+	forEachTypedChild(
+		node,
+		(child, state, field, key, container) => {
+			if (field !== "name" || child.nodeType !== "Identifier") {
+				visitNode(child, state)
+			} else if (container === "cases" && wins(state, child.position)) {
+				state.best = {
+					position: child.position,
+					content: printCaseWithPayload(node.cases[Number(key)].type),
+					documentation: null,
+				}
+			}
+		},
+		state,
+	)
+
+	visitChoicePayloads(node, state)
+}
+
+// A Type Parameter as declared, as a whole. The typed node keeps its name and
+// bound as plain strings without Positions.
+function visitGenericDeclaration(
+	generic: common.typed.GenericDeclarationNode,
+	state: State,
+) {
+	if (wins(state, generic.position)) {
+		state.best = {
+			position: generic.position,
+			content: printTypedGenericDeclaration(generic),
+			documentation: null,
+		}
+	}
+}
+
+function visitParameter(parameter: common.typed.ParameterNode, state: State) {
+	// The Parameter as written, so a bare `_` or the `:` answers with the
+	// Parameter. Offered before the narrower names it contains.
+	let declaredType =
+		parameter.internalName?.type ?? parameter.externalName?.type ?? null
+	// On each span the Parameter offers: as written, its label, and its name.
+	let note = omittableMembersNote(parameter)
+
+	if (declaredType !== null) {
+		consider(state, parameter.position, declaredType, null, null, note)
+	}
+
+	forEachTypedChild(
+		parameter,
+		(child, state, field) => {
+			if (field === "externalName" && child.nodeType === "Identifier") {
+				if (child !== parameter.internalName) {
+					visitIdentifier(child, state, child.content, null, note)
+				}
+			} else if (
+				field === "internalName" &&
+				child.nodeType === "Identifier"
+			) {
+				// A Pattern Parameter's internal name is made up, so it is not offered.
+				// The names the Pattern binds are Constants of the body.
+				if (!isSynthesizedName(child.content)) {
+					visitIdentifier(child, state, child.content, null, note)
+				}
+			} else {
+				// A default's Expressions answer for themselves, as in `= @::length()`.
+				visitNode(child, state)
+			}
+		},
+		state,
+	)
+}
+
+function visitDefaultValue(child: TypedNode, state: State, field: string) {
+	if (field === "defaultValue") {
+		visitNode(child, state)
+	} else if (child.nodeType === "Parameter") {
+		forEachTypedChild(child, visitDefaultValue, state)
+	}
+}
+
+function visitMethodInvocation(
+	node: common.typed.MethodInvocationNode,
+	state: State,
+) {
+	consider(state, node.position, node.type, null)
+
+	forEachTypedChild(
+		node,
+		(child, state, field) => {
+			visitNode(child, state)
+
+			// The Method name stands between the receiver and the Arguments.
+			if (field === "base") {
+				visitInvokedMethod(node, state)
+			}
+		},
+		state,
+	)
+}
+
+// The Method name resolves through the Namespace; with Overloads, the invoked
+// signature is picked out.
+function visitInvokedMethod(
+	node: common.typed.MethodInvocationNode,
+	state: State,
+) {
+	let signatures = invokedSignatures(node)
+
+	if (signatures === null) {
+		return
+	}
+
+	considerSignatures(
+		state,
+		node.member.position,
+		signatures,
+		node.member.name,
+		documentationOf(node.namespace.type.methods[node.member.name]),
+		// A Method from a Protocol names that Protocol, so the reader can find its
+		// declaration. A bounded receiver's witness answers per member.
+		node.namespace.type.providedBy ??
+			node.namespace.type.providedMembers?.[node.member.name] ??
+			null,
+	)
+}
+
+function visitLookup(node: common.typed.LookupNode, state: State) {
+	consider(state, node.position, node.type, null)
+
+	forEachTypedChild(
+		node,
+		(child, state, field) => {
+			if (field !== "member" || child.nodeType !== "Identifier") {
+				visitNode(child, state)
+
+				return
+			}
+
+			// As for a MethodInvocation, so `Integer.isNot` names `Equatable` as
+			// `5::isNot(3)` does.
+			let signatures =
+				node.providedBy === undefined ? null : signaturesOf(child.type)
+
+			if (node.providedBy !== undefined && signatures !== null) {
+				considerSignatures(
+					state,
+					child.position,
+					signatures,
+					child.content,
+					documentationOf(child.type),
+					node.providedBy,
+				)
+			} else {
+				visitIdentifier(child, state)
+			}
+		},
+		state,
+	)
+}
+
+function visitCaseValue(node: common.typed.CaseValueNode, state: State) {
+	consider(state, node.position, node.type, null)
+
+	// The Choice's half names the Union, the Case's half the constructed Case.
+	forEachTypedChild(
+		node,
+		(child, state, field) => {
+			if (field !== "caseName" || child.nodeType !== "Identifier") {
+				visitNode(child, state)
+			} else if (node.type.type !== "Case") {
+				visitIdentifier(child, state)
+			} else if (wins(state, child.position)) {
+				state.best = {
+					position: child.position,
+					content: printCaseWithPayload(node.type),
+					documentation: null,
+				}
+			}
+		},
+		state,
+	)
 }
 
 // What a refined Type Alias refines, or null. A generic one wraps the
@@ -983,23 +1051,6 @@ function describeProtocol(
 		: `protocol ${name}\n${requirements}`
 }
 
-// A Type Parameter as declared, as a whole. The typed node keeps its name and
-// bound as plain strings without Positions.
-function visitGenericDeclarations(
-	generics: Array<common.typed.GenericDeclarationNode>,
-	state: State,
-) {
-	for (let generic of generics) {
-		if (wins(state, generic.position)) {
-			state.best = {
-				position: generic.position,
-				content: printTypedGenericDeclaration(generic),
-				documentation: null,
-			}
-		}
-	}
-}
-
 function visitIdentifier(
 	node: common.typed.IdentifierNode,
 	state: State,
@@ -1030,15 +1081,6 @@ function visitProtocolReference(
 	}
 }
 
-function visitArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	state: State,
-) {
-	for (let argument of nodeArguments) {
-		visitNode(argument.value, state)
-	}
-}
-
 // Outwards in, so the innermost step containing the cursor wins. Only the
 // Lookups are the author's; the Parameter and root Identifier are not.
 function visitMemberPathSteps(
@@ -1059,61 +1101,6 @@ function visitMemberPathSteps(
 
 		expression = expression.base
 	}
-}
-
-function visitFunctionDefinition(
-	definition: common.typed.FunctionDefinitionNode,
-	state: State,
-) {
-	visitGenericDeclarations(definition.generics, state)
-
-	for (let parameter of definition.parameters) {
-		// The Parameter as written, so a bare `_` or the `:` answers with the
-		// Parameter. Offered before the narrower names it contains.
-		let declaredType =
-			parameter.internalName?.type ?? parameter.externalName?.type ?? null
-		// On each span the Parameter offers: as written, its label, and its name.
-		let note = omittableMembersNote(parameter)
-
-		if (declaredType !== null) {
-			consider(state, parameter.position, declaredType, null, null, note)
-		}
-
-		if (
-			parameter.externalName !== null &&
-			parameter.externalName !== parameter.internalName
-		) {
-			visitIdentifier(
-				parameter.externalName,
-				state,
-				parameter.externalName.content,
-				null,
-				note,
-			)
-		}
-
-		// A Pattern Parameter's internal name is made up, so it is not offered. The
-		// names the Pattern binds are Constants of the body.
-		if (
-			parameter.internalName !== null &&
-			!isSynthesizedName(parameter.internalName.content)
-		) {
-			visitIdentifier(
-				parameter.internalName,
-				state,
-				parameter.internalName.content,
-				null,
-				note,
-			)
-		}
-
-		// A default's Expressions answer for themselves, as in `= @::length()`.
-		if (parameter.defaultValue !== null) {
-			visitNode(parameter.defaultValue, state)
-		}
-	}
-
-	visitBody(definition.body, state)
 }
 
 // The members a Record Parameter's default fills in, as one sentence: the

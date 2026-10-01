@@ -217,16 +217,6 @@
 			"rules": { "complexity": ["error", { "max": 65 }] }
 		},
 		{
-			"files": ["packages/language-server/src/hover.ts"],
-			"rules": {
-				"max-lines-per-function": [
-					"error",
-					{ "max": 407, "skipComments": true, "skipBlankLines": true }
-				],
-				"complexity": ["error", { "max": 96 }]
-			}
-		},
-		{
 			"files": ["packages/language-server/src/inlayHints.ts"],
 			"rules": { "complexity": ["error", { "max": 59 }] }
 		},

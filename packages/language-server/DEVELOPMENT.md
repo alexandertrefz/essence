@@ -426,6 +426,12 @@ containing the cursor wins, and a tie goes to the later one. Children are offere
 Identifier inside a larger Expression describes the Identifier. A Type is printed only for a candidate that wins its
 turn, not for every node.
 
+The walk descends through the shared visitor's `forEachTypedChild`, so it reaches the children of a kind or a field the
+visitor learns with no edit here. `visitNode` lists only the kinds that offer a candidate of their own: a value's Type,
+or a name read back with a label, such as a declaration's or a static property's. Every other kind only descends, so a
+new kind answers for its own span once it joins that list. Two parts are left out on purpose. A native shim is entered
+only for its defaults, and a provided Method's name and head are left to `visitProtocolBodies`.
+
 A line's margins answer nothing: its indentation, the space after its last character, and a blank line. A space
 between two tokens belongs to whatever spans them, such as `a + b`, and answers as that.
 
