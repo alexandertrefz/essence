@@ -1,7 +1,4 @@
-import {
-	memberExpression,
-	patternBindings,
-} from "@essence-lang/compiler/helpers"
+import { patternBindings } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
 	printSignatureSummary,
@@ -9,14 +6,14 @@ import {
 	signaturesOf,
 	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
+import {
+	forEachParserChild,
+	forEachTypedChild,
+	type ParserNode,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import {
-	assertionExpressions,
-	typedAssertionExpressions,
-} from "./assertionChildren"
-import { defineExpressions } from "./defineArmChildren"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { isAtOrBefore } from "./positions"
 import { protocolSpellings } from "./protocolSpellings"
 import { typedProgramBodies } from "./sections"
@@ -61,12 +58,15 @@ export function findDocumentSymbols(
 	// document does.
 	imported: Record<string, common.ProtocolType> = {},
 ): Array<DocumentSymbolEntry> {
+	let symbols: Array<DocumentSymbolEntry> = []
+
+	collectSymbols(program.implementation, symbols)
+
 	// The tests, read off the Parser too. A test or suite is named by a String,
 	// shown as written.
-	let symbols = [
-		...symbolsOfBody(program.implementation.nodes),
-		...testsSymbols(program),
-	]
+	if (program.tests !== null) {
+		collectSymbols(program.tests, symbols)
+	}
 
 	if (enrichedProgram !== null) {
 		symbols = withDetails(
@@ -120,57 +120,279 @@ function exportSymbols(program: parser.Program): DocumentSymbolEntry | null {
 	}
 }
 
-function testsSymbols(program: parser.Program): Array<DocumentSymbolEntry> {
-	return program.tests === null ? [] : testsNodeSymbols(program.tests.nodes)
+// Each entry `node` declares joins `into`. A named construct collects what it
+// holds as its own children, and any other node is transparent.
+function collectSymbols(
+	node: ParserNode,
+	into: Array<DocumentSymbolEntry>,
+): void {
+	switch (node.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+			into.push(declarationSymbol(node))
+			return
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+			into.push(owning(node, entry(node.name, "function", node.position)))
+			return
+		case "TypeAliasStatement":
+			into.push(
+				owning(
+					node,
+					entry(
+						node.name,
+						"typeAlias",
+						node.position,
+						recordTypeMembers(node.type),
+					),
+				),
+			)
+			return
+		case "ChoiceDeclarationStatement":
+			into.push(choiceSymbol(node))
+			return
+		case "NamespaceDefinitionStatement":
+			into.push(namespaceSymbol(node))
+			return
+		case "ProtocolDeclarationStatement":
+			into.push(protocolSymbol(node))
+			return
+		case "Test":
+		case "Suite":
+			into.push(
+				owning(node, {
+					name: writtenName(node.name),
+					kind: node.nodeType === "Test" ? "test" : "suite",
+					detail: modifierDetail(node.modifiers),
+					range: node.position,
+					selectionRange: node.name.position,
+					children: [],
+				}),
+			)
+			return
+	}
+
+	forEachParserChild(node, collectSymbols, into)
 }
 
-function testsNodeSymbols(
-	nodes: Array<parser.TestsNode>,
-): Array<DocumentSymbolEntry> {
-	return nodes.flatMap((node) => {
-		if (node.nodeType === "Test") {
-			return [
-				{
-					name: writtenName(node.name),
-					kind: "test" as const,
-					detail: modifierDetail(node.modifiers),
-					range: node.position,
-					selectionRange: node.name.position,
-					// The head too: the name, a table's rows and the Parameters'
-					// defaults stand before the body.
-					children: [
-						...symbolsOfNode(node.name),
-						...(node.table === null
-							? []
-							: [
-									...symbolsOfNode(node.table.value),
-									...symbolsOfDefaults(node.table.parameters),
-								]),
-						...symbolsOfDefaults(node.properties?.parameters ?? []),
-						...symbolsOfBody(node.body),
-					],
-				},
-			]
-		}
+// The entry, with what `node` holds as its children.
+function owning(
+	node: ParserNode,
+	symbol: DocumentSymbolEntry,
+): DocumentSymbolEntry {
+	forEachParserChild(node, collectSymbols, symbol.children)
 
-		if (node.nodeType === "Suite") {
-			return [
-				{
-					name: writtenName(node.name),
-					kind: "suite" as const,
-					detail: modifierDetail(node.modifiers),
-					range: node.position,
-					selectionRange: node.name.position,
-					children: [
-						...symbolsOfNode(node.name),
-						...testsNodeSymbols(node.nodes),
-					],
-				},
-			]
-		}
+	return symbol
+}
 
-		return symbolsOfNode(node)
+function entry(
+	name: parser.IdentifierNode,
+	kind: DocumentSymbolKind,
+	range: common.Position,
+	children: Array<DocumentSymbolEntry> = [],
+): DocumentSymbolEntry {
+	return {
+		name: name.content,
+		kind,
+		detail: null,
+		range,
+		selectionRange: name.position,
+		children,
+	}
+}
+
+// A Declaration whose name is a Pattern is one entry, titled by what it binds,
+// with a child per bound name.
+function declarationSymbol(
+	node:
+		| parser.ConstantDeclarationStatementNode
+		| parser.VariableDeclarationStatementNode,
+): DocumentSymbolEntry {
+	let kind: DocumentSymbolKind =
+		node.nodeType === "ConstantDeclarationStatement"
+			? "constant"
+			: "variable"
+
+	if (node.name.nodeType !== "Pattern") {
+		return owning(node, entry(node.name, kind, node.position))
+	}
+
+	let bindings = patternBindings(node.name)
+
+	return owning(node, {
+		name: `{ ${bindings.map((binding) => binding.name.content).join(", ")} }`,
+		kind,
+		detail: null,
+		range: node.position,
+		selectionRange: node.name.position,
+		children: bindings.map((binding) => ({
+			name: binding.name.content,
+			kind,
+			detail: null,
+			range: binding.name.position,
+			selectionRange: binding.name.position,
+			children: [],
+		})),
 	})
+}
+
+function choiceSymbol(
+	node: parser.ChoiceDeclarationStatementNode,
+): DocumentSymbolEntry {
+	let cases = node.cases.map((choiceCase) => ({
+		name: `#${choiceCase.name.content}`,
+		kind: "case" as const,
+		detail: null,
+		// The range runs to the end of the payload default, which may declare an
+		// entry of its own.
+		range: unionOfPositions(
+			choiceCase.name.position,
+			choiceCase.defaultValue?.position ??
+				choiceCase.type?.position ??
+				choiceCase.name.position,
+		),
+		selectionRange: choiceCase.name.position,
+		children:
+			choiceCase.type === null ? [] : recordTypeMembers(choiceCase.type),
+	}))
+	let symbol = entry(node.name, "choice", node.position, cases)
+
+	forEachParserChild(node, (child, _state, _field, key, container) => {
+		collectSymbols(
+			child,
+			container === "cases"
+				? cases[key as number].children
+				: symbol.children,
+		)
+	})
+
+	return symbol
+}
+
+// Each property and Method collects what its own value, defaults and bodies
+// declare.
+function namespaceSymbol(
+	node: parser.NamespaceDefinitionStatementNode,
+): DocumentSymbolEntry {
+	let properties = new Map<string, DocumentSymbolEntry>()
+	let methods = new Map<string, DocumentSymbolEntry>()
+
+	for (let [key, property] of Object.entries(node.properties)) {
+		properties.set(key, {
+			name: property.name.content,
+			kind: "property",
+			detail: null,
+			range: unionOfPositions(
+				property.name.position,
+				// A native static Property has no value, so its range is its name.
+				property.value?.position ?? property.name.position,
+			),
+			selectionRange: property.name.position,
+			children: [],
+		})
+	}
+
+	for (let [key, member] of Object.entries(node.methods)) {
+		let overloads =
+			member.nodeType === "OverloadedMethod" ||
+			member.nodeType === "OverloadedStaticMethod" ||
+			member.nodeType === "OverloadedMethodSignatures" ||
+			member.nodeType === "OverloadedStaticMethodSignatures"
+				? member.methods
+				: member.nodeType === "SimpleMethodSignature" ||
+					  member.nodeType === "StaticMethodSignature"
+					? [member.signature]
+					: [member.method]
+
+		let isStatic =
+			member.nodeType === "StaticMethod" ||
+			member.nodeType === "OverloadedStaticMethod" ||
+			member.nodeType === "StaticMethodSignature" ||
+			member.nodeType === "OverloadedStaticMethodSignatures"
+
+		// The range runs from the name to the end of the last Overload.
+		let range = member.name.position
+
+		for (let overload of overloads) {
+			range = unionOfPositions(range, overload.position)
+		}
+
+		methods.set(key, {
+			name: member.name.content,
+			kind: isStatic ? "staticMethod" : "method",
+			detail: null,
+			range,
+			selectionRange: member.name.position,
+			children: [],
+		})
+	}
+
+	let symbol = entry(node.name, "namespace", node.position, [
+		...properties.values(),
+		...methods.values(),
+	])
+
+	forEachParserChild(node, (child, _state, field, key, container) => {
+		let owner =
+			container === "properties"
+				? properties.get(key as string)
+				: field === "methods"
+					? methods.get(key as string)
+					: symbol
+
+		collectSymbols(child, (owner ?? symbol).children)
+	})
+
+	return symbol
+}
+
+function protocolSymbol(
+	node: parser.ProtocolDeclarationStatementNode,
+): DocumentSymbolEntry {
+	let members = new Map<string, DocumentSymbolEntry>()
+
+	for (let [key, member] of Object.entries(node.methods)) {
+		let signatures =
+			member.nodeType === "OverloadedProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+				? member.signatures
+				: [member.signature]
+
+		let isStatic =
+			member.nodeType === "StaticProtocolMethod" ||
+			member.nodeType === "OverloadedStaticProtocolMethod"
+
+		let range = member.name.position
+
+		for (let signature of signatures) {
+			// A provided Method's symbol spans its block too, so the outline selects it.
+			range = unionOfPositions(
+				range,
+				signature.body?.position ?? signature.position,
+			)
+		}
+
+		members.set(key, {
+			name: member.name.content,
+			kind: isStatic ? "staticMethod" : "method",
+			detail: null,
+			range,
+			selectionRange: member.name.position,
+			children: [],
+		})
+	}
+
+	let symbol = entry(node.name, "protocol", node.position, [
+		...members.values(),
+	])
+
+	forEachParserChild(node, (child, _state, field, key) => {
+		let owner = field === "methods" ? members.get(key as string) : symbol
+
+		collectSymbols(child, (owner ?? symbol).children)
+	})
+
+	return symbol
 }
 
 // The name as written, braces and all, rather than a rendering nothing has
@@ -203,324 +425,6 @@ function modifierDetail(
 		: modifiers.map((modifier) => modifier.name.content).join(" ")
 }
 
-function symbolsOfBody(
-	nodes: Array<parser.ImplementationNode>,
-): Array<DocumentSymbolEntry> {
-	return nodes.flatMap(symbolsOfNode)
-}
-
-// A Parameter's default is an Expression outside the body, written before it.
-function symbolsOfFunction(
-	definition: parser.FunctionDefinitionNode,
-): Array<DocumentSymbolEntry> {
-	return [
-		...symbolsOfDefaults(definition.parameters),
-		...symbolsOfBody(definition.body),
-	]
-}
-
-function symbolsOfDefaults(
-	parameters: Array<parser.ParameterNode>,
-): Array<DocumentSymbolEntry> {
-	return parameters.flatMap((parameter) =>
-		parameter.defaultValue === null
-			? []
-			: symbolsOfNode(parameter.defaultValue),
-	)
-}
-
-function symbolsOfNode(
-	node: parser.ImplementationNode,
-): Array<DocumentSymbolEntry> {
-	let symbol = symbolForStatement(node)
-
-	if (symbol !== null) {
-		return [symbol]
-	}
-
-	switch (node.nodeType) {
-		case "VariableAssignmentStatement":
-			return symbolsOfNode(node.value)
-		case "ReturnStatement":
-			return symbolsOfNode(node.expression)
-		case "IfStatement":
-			return [
-				...symbolsOfNode(node.condition),
-				...symbolsOfBody(node.body),
-			]
-		case "IfElseStatement":
-			return [
-				...symbolsOfNode(node.condition),
-				...symbolsOfBody(node.trueBody),
-				...symbolsOfBody(node.falseBody),
-			]
-		case "Match":
-			return [
-				...symbolsOfNode(node.value),
-				...node.handlers.flatMap((handler) => [
-					...(handler.guard === null
-						? []
-						: symbolsOfNode(handler.guard)),
-					...symbolsOfBody(handler.body),
-				]),
-			]
-		// An arm declares nothing, but a Function literal among its values outlines
-		// as any other.
-		case "Define":
-			return defineExpressions(node).flatMap(symbolsOfNode)
-		case "FunctionValue":
-			return symbolsOfFunction(node.value)
-		case "FunctionInvocation":
-			return [
-				...symbolsOfNode(node.name),
-				...symbolsOfArguments(node.arguments),
-			]
-		case "MethodInvocation":
-			return [
-				...symbolsOfNode(node.base),
-				...symbolsOfArguments(node.arguments),
-			]
-		case "Lookup":
-			return symbolsOfNode(node.base)
-		case "Start":
-		case "Complete":
-			return symbolsOfNode(node.expression)
-		case "RefusedValue":
-			return symbolsOfNode(node.base)
-		case "Combination":
-			return [...symbolsOfNode(node.lhs), ...symbolsOfNode(node.rhs)]
-		case "RecordValue":
-			return Object.values(node.members).flatMap((member) =>
-				symbolsOfNode(memberExpression(member)),
-			)
-		case "ListValue":
-			return node.values.flatMap(symbolsOfNode)
-		case "DictionaryValue":
-			return node.entries.flatMap((entry) => [
-				...symbolsOfNode(entry.key),
-				...symbolsOfNode(entry.value),
-			])
-		case "InterpolatedStringValue":
-			return node.segments.flatMap((segment) =>
-				segment.kind === "expression"
-					? symbolsOfNode(segment.expression)
-					: [],
-			)
-		case "CaseValue":
-			return node.value === null ? [] : symbolsOfNode(node.value)
-		case "ExpectStatement":
-		case "RequireStatement":
-			return assertionExpressions(node).flatMap(symbolsOfNode)
-		default:
-			return []
-	}
-}
-
-function symbolsOfArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-): Array<DocumentSymbolEntry> {
-	return nodeArguments.flatMap((argument) => symbolsOfNode(argument.value))
-}
-
-// A Declaration whose name is a Pattern is one entry, titled by what it binds,
-// with a child per bound name.
-function patternSymbols(
-	node:
-		| parser.ConstantDeclarationStatementNode
-		| parser.VariableDeclarationStatementNode,
-	pattern: parser.PatternNode,
-	kind: "constant" | "variable",
-): DocumentSymbolEntry {
-	let bindings = patternBindings(pattern)
-
-	return {
-		name: `{ ${bindings.map((binding) => binding.name.content).join(", ")} }`,
-		kind,
-		detail: null,
-		range: node.position,
-		selectionRange: pattern.position,
-		children: [
-			...bindings.map((binding) => ({
-				name: binding.name.content,
-				kind,
-				detail: null,
-				range: binding.name.position,
-				selectionRange: binding.name.position,
-				children: [],
-			})),
-			...symbolsOfNode(node.value),
-		],
-	}
-}
-
-function symbolForStatement(
-	node: parser.ImplementationNode,
-): DocumentSymbolEntry | null {
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-			// A Pattern names no one thing, so each bound name gets an entry.
-			if (node.name.nodeType === "Pattern") {
-				return patternSymbols(node, node.name, "constant")
-			}
-
-			return {
-				name: node.name.content,
-				kind: "constant",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: symbolsOfNode(node.value),
-			}
-		case "VariableDeclarationStatement":
-			if (node.name.nodeType === "Pattern") {
-				return patternSymbols(node, node.name, "variable")
-			}
-
-			return {
-				name: node.name.content,
-				kind: "variable",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: symbolsOfNode(node.value),
-			}
-		case "FunctionStatement":
-			return {
-				name: node.name.content,
-				kind: "function",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: symbolsOfFunction(node.value),
-			}
-		case "OverloadedFunctionStatement":
-			return {
-				name: node.name.content,
-				kind: "function",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: node.methods.flatMap((method) =>
-					method.nodeType === "FunctionValue"
-						? symbolsOfFunction(method.value)
-						: symbolsOfDefaults(method.parameters),
-				),
-			}
-		case "TypeAliasStatement":
-			return {
-				name: node.name.content,
-				kind: "typeAlias",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: [
-					...recordTypeMembers(node.type),
-					...(node.predicate === null
-						? []
-						: symbolsOfNode(node.predicate)),
-				],
-			}
-		case "ChoiceDeclarationStatement":
-			return {
-				name: node.name.content,
-				kind: "choice",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: node.cases.map((choiceCase) => ({
-					name: `#${choiceCase.name.content}`,
-					kind: "case" as const,
-					detail: null,
-					// The range runs to the end of the payload default, which may
-					// declare an entry of its own.
-					range: unionOfPositions(
-						choiceCase.name.position,
-						choiceCase.defaultValue?.position ??
-							choiceCase.type?.position ??
-							choiceCase.name.position,
-					),
-					selectionRange: choiceCase.name.position,
-					children: [
-						...recordTypeMembers(
-							choiceCase.type ?? {
-								nodeType: "RecordTypeDeclaration",
-								members: {},
-								position: choiceCase.name.position,
-							},
-						),
-						...(choiceCase.defaultValue === null
-							? []
-							: symbolsOfNode(choiceCase.defaultValue)),
-					],
-				})),
-			}
-		case "NamespaceDefinitionStatement":
-			return {
-				name: node.name.content,
-				kind: "namespace",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: namespaceMembers(node),
-			}
-		case "ProtocolDeclarationStatement":
-			return {
-				name: node.name.content,
-				kind: "protocol",
-				detail: null,
-				range: node.position,
-				selectionRange: node.name.position,
-				children: protocolMembers(node),
-			}
-		default:
-			return null
-	}
-}
-
-function protocolMembers(
-	node: parser.ProtocolDeclarationStatementNode,
-): Array<DocumentSymbolEntry> {
-	let members: Array<DocumentSymbolEntry> = []
-
-	for (let member of Object.values(node.methods)) {
-		let signatures =
-			member.nodeType === "OverloadedProtocolMethod" ||
-			member.nodeType === "OverloadedStaticProtocolMethod"
-				? member.signatures
-				: [member.signature]
-
-		let isStatic =
-			member.nodeType === "StaticProtocolMethod" ||
-			member.nodeType === "OverloadedStaticProtocolMethod"
-
-		let range = member.name.position
-		let children: Array<DocumentSymbolEntry> = []
-
-		for (let signature of signatures) {
-			// A provided Method's symbol spans its block too, so the outline selects it.
-			range = unionOfPositions(
-				range,
-				signature.body?.position ?? signature.position,
-			)
-
-			if (signature.body !== null) {
-				children.push(...symbolsOfFunction(signature.body.value))
-			}
-		}
-
-		members.push({
-			name: member.name.content,
-			kind: isStatic ? "staticMethod" : "method",
-			detail: null,
-			range,
-			selectionRange: member.name.position,
-			children,
-		})
-	}
-
-	return members
-}
-
 function recordTypeMembers(
 	type: parser.TypeDeclarationNode,
 ): Array<DocumentSymbolEntry> {
@@ -538,71 +442,6 @@ function recordTypeMembers(
 			children: [],
 		}
 	})
-}
-
-function namespaceMembers(
-	node: parser.NamespaceDefinitionStatementNode,
-): Array<DocumentSymbolEntry> {
-	let members: Array<DocumentSymbolEntry> = []
-
-	for (let property of Object.values(node.properties)) {
-		members.push({
-			name: property.name.content,
-			kind: "property",
-			detail: null,
-			range: unionOfPositions(
-				property.name.position,
-				// A native static Property has no value, so its range is its name.
-				property.value?.position ?? property.name.position,
-			),
-			selectionRange: property.name.position,
-			children:
-				property.value === null ? [] : symbolsOfNode(property.value),
-		})
-	}
-
-	for (let member of Object.values(node.methods)) {
-		let methods =
-			member.nodeType === "OverloadedMethod" ||
-			member.nodeType === "OverloadedStaticMethod" ||
-			member.nodeType === "OverloadedMethodSignatures" ||
-			member.nodeType === "OverloadedStaticMethodSignatures"
-				? member.methods
-				: member.nodeType === "SimpleMethodSignature" ||
-					  member.nodeType === "StaticMethodSignature"
-					? [member.signature]
-					: [member.method]
-
-		let isStatic =
-			member.nodeType === "StaticMethod" ||
-			member.nodeType === "OverloadedStaticMethod" ||
-			member.nodeType === "StaticMethodSignature" ||
-			member.nodeType === "OverloadedStaticMethodSignatures"
-
-		// The range runs from the name to the end of the last Overload.
-		let range = member.name.position
-		let children: Array<DocumentSymbolEntry> = []
-
-		for (let method of methods) {
-			range = unionOfPositions(range, method.position)
-			children.push(
-				...(method.nodeType === "FunctionValue"
-					? symbolsOfFunction(method.value)
-					: symbolsOfDefaults(method.parameters)),
-			)
-		}
-
-		members.push({
-			name: member.name.content,
-			kind: isStatic ? "staticMethod" : "method",
-			detail: null,
-			range,
-			selectionRange: member.name.position,
-			children,
-		})
-	}
-
-	return members
 }
 
 function unionOfPositions(
@@ -646,36 +485,51 @@ function detailsOf(program: common.typed.Program): Details {
 
 	// The tests section's bodies too, so their Constants show Types.
 	for (let body of typedProgramBodies(program)) {
-		collectDetails(body, details)
+		for (let node of body) {
+			collectDetails(node, details)
+		}
 	}
 
 	return details
 }
 
-function collectDetails(
-	nodes: Array<common.typed.ImplementationNode>,
-	details: Details,
-) {
-	for (let node of nodes) {
-		collectDetail(node, details)
+function collectDetails(node: TypedNode, details: Details): void {
+	switch (node.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+			record(details, node.name.position.start, typeDetail(node.type))
+			break
+		case "FunctionStatement":
+			record(
+				details,
+				node.name.position.start,
+				signatureDetail(node.type),
+			)
+			break
+		case "NamespaceDefinitionStatement":
+			recordMemberDetails(node, details)
+			break
+		case "ChoiceDeclarationStatement":
+			for (let choiceCase of node.cases) {
+				record(
+					details,
+					choiceCase.name.position.start,
+					printCaseWithPayload(choiceCase.type),
+				)
+			}
+
+			break
 	}
+
+	forEachTypedChild(node, collectDetails, details)
 }
 
-function collectFunctionDetails(
-	definition: common.typed.FunctionDefinitionNode,
-	details: Details,
-) {
-	collectDefaultDetails(definition.parameters, details)
-	collectDetails(definition.body, details)
-}
-
-function collectNamespaceDetails(
+function recordMemberDetails(
 	node: common.typed.NamespaceDefinitionStatementNode,
 	details: Details,
 ) {
 	for (let property of Object.values(node.properties)) {
 		record(details, property.name.position.start, typeDetail(property.type))
-		collectDetail(property.value, details)
 	}
 
 	for (let [name, member] of Object.entries(node.methods)) {
@@ -688,207 +542,6 @@ function collectNamespaceDetails(
 				signatureDetail(methodType),
 			)
 		}
-
-		let methods =
-			member.nodeType === "OverloadedMethod" ||
-			member.nodeType === "OverloadedStaticMethod"
-				? member.methods
-				: [member.method]
-
-		for (let method of methods) {
-			collectFunctionDetails(method.value, details)
-		}
-	}
-
-	// A native Method's defaults stand in the frame made for them.
-	for (let shim of node.nativeShims) {
-		collectDefaultDetails(shim.parameters, details)
-	}
-}
-
-function collectCaseDetails(
-	node: common.typed.ChoiceDeclarationStatementNode,
-	details: Details,
-) {
-	for (let choiceCase of node.cases) {
-		record(
-			details,
-			choiceCase.name.position.start,
-			printCaseWithPayload(choiceCase.type),
-		)
-
-		if (choiceCase.defaultValue !== null) {
-			collectDetail(choiceCase.defaultValue, details)
-		}
-	}
-}
-
-function collectDefaultDetails(
-	parameters: Array<common.typed.ParameterNode>,
-	details: Details,
-) {
-	for (let parameter of parameters) {
-		if (parameter.defaultValue !== null) {
-			collectDetail(parameter.defaultValue, details)
-		}
-	}
-}
-
-function collectDetail(
-	node: common.typed.ImplementationNode,
-	details: Details,
-) {
-	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-			record(details, node.name.position.start, typeDetail(node.type))
-			collectDetail(node.value, details)
-			return
-		case "VariableAssignmentStatement":
-			collectDetail(node.value, details)
-			return
-		case "FunctionStatement":
-			record(
-				details,
-				node.name.position.start,
-				signatureDetail(node.type),
-			)
-			collectFunctionDetails(node.value, details)
-			return
-		case "NamespaceDefinitionStatement":
-			collectNamespaceDetails(node, details)
-			return
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					collectFunctionDetails(method.value, details)
-				}
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			collectCaseDetails(node, details)
-			return
-		case "TypeAliasStatement":
-			if (node.predicate !== null) {
-				collectDetail(node.predicate, details)
-			}
-
-			return
-		case "IfStatement":
-			collectDetail(node.condition, details)
-			collectDetails(node.body, details)
-			return
-		case "IfElseStatement":
-			collectDetail(node.condition, details)
-			collectDetails(node.trueBody, details)
-			collectDetails(node.falseBody, details)
-			return
-		case "ReturnStatement":
-			collectDetail(node.expression, details)
-			return
-		case "ExpectStatement":
-		case "RequireStatement":
-			for (let expression of typedAssertionExpressions(node)) {
-				collectDetail(expression, details)
-			}
-
-			return
-		case "Match":
-			collectDetail(node.value, details)
-
-			for (let handler of node.handlers) {
-				// Reaches what a Guard or Matcher literal declares, as the Parser walk does.
-				for (let expression of typedHandlerExpressions(handler)) {
-					collectDetail(expression, details)
-				}
-
-				collectDetails(handler.body, details)
-			}
-
-			return
-		// Reaches what an arm's value declares, as the Parser walk does.
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				collectDetail(expression, details)
-			}
-
-			return
-		case "FunctionValue":
-			collectFunctionDetails(node.value, details)
-			return
-		case "FunctionInvocation":
-			collectDetail(node.name, details)
-			collectArgumentDetails(node.arguments, details)
-			return
-		case "MethodInvocation":
-			collectDetail(node.base, details)
-			collectArgumentDetails(node.arguments, details)
-			return
-		case "Lookup":
-			collectDetail(node.base, details)
-			return
-		case "Start":
-		case "Complete":
-			collectDetail(node.expression, details)
-			return
-		case "RefusedValue":
-			collectDetail(node.base, details)
-			return
-		case "Combination":
-			collectDetail(node.lhs, details)
-			collectDetail(node.rhs, details)
-			return
-		case "RecordValue":
-			for (let member of Object.values(node.members)) {
-				collectDetail(member, details)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				collectDetail(value, details)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				collectDetail(entry.key, details)
-				collectDetail(entry.value, details)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					collectDetail(segment.expression, details)
-				}
-			}
-
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				collectDetail(node.value, details)
-			}
-
-			return
-		default:
-			return
-	}
-}
-
-function collectArgumentDetails(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	details: Details,
-) {
-	for (let argument of nodeArguments) {
-		collectDetail(argument.value, details)
 	}
 }
 

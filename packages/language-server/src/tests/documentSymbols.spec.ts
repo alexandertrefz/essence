@@ -256,6 +256,28 @@ describe("Document Symbols", () => {
 			).toEqual(["text"])
 		})
 
+		it("should nest what a property's value declares under the property", () => {
+			let symbols = symbolsOf(
+				[
+					"implementation {",
+					"\tnamespace Thing for Integer {",
+					"\t\tstatic make = () -> Integer {",
+					"\t\t\tconstant made = 42",
+					"\t\t\t<- made",
+					"\t\t}",
+					"\t}",
+					"}",
+				].join("\n"),
+			)
+
+			expect(
+				symbols[0].children.map((child) => [
+					child.name,
+					child.children.map((nested) => nested.name),
+				]),
+			).toEqual([["make", ["made"]]])
+		})
+
 		// An `if` has no name of its own, so its body's declarations join
 		// the Function around it rather than hiding under an unnameable entry.
 		it("should list a declaration made inside an `if` flat", () => {
