@@ -1428,7 +1428,7 @@ class DescentParser {
 	}
 
 	// What may stand in a tests section or a `suite`'s body: a test, a nested
-	// suite, or any Statement an implementation block takes, as setup or helper.
+	// suite, or any Statement an implementation block takes.
 	protected parseTestsNode(): parser.TestsNode {
 		if (this.startsTestItem(this.peekOrFail())) {
 			return this.parseTestItem()
@@ -7784,22 +7784,9 @@ class DescentParser {
 			: { ...account, position: lexeme.position }
 	}
 
-	// What stands after a `,` in a list — the next member, this list's own
-	// closing bracket, which is the trailing comma a reader writes on purpose,
-	// or a mistake. The mistake this answers is the third: a bracket that closes
-	// SOMETHING ELSE, which says the list was never closed and that the bracket
-	// standing here belongs to whatever holds it.
-	//
-	// The list's own opener is in hand here and nowhere the member readers can
-	// reach, so without this the report came out of `parseIdentifier` — "Expected
-	// an Identifier but found ')'", about a member nobody was writing, with no
-	// word about the `{` it is short of. The same file WITHOUT the trailing comma
-	// was answered "Expected '}' but found ')'" and the brace was named, because
-	// the reader that closes the list is the one that met the `)`. The comma was
-	// the whole difference.
-	//
-	// Only the brackets, and the end of the input. Everything else that can not
-	// begin a member is text the member readers say more about than this could.
+	// After a `,`, a closing bracket other than the list's own, or the end of
+	// the input, says the list was never closed. It is reported as the list's
+	// close would be, naming where the list opened.
 	protected refuseListContinuation(
 		closing: lexer.TokenType,
 		opening: Token,
@@ -7826,76 +7813,21 @@ class DescentParser {
 		})
 	}
 
-	// A reading kept wherever it parsed at all — the same text is often
-	// read twice (a typed Record Literal, then a Record Literal), and the
-	// first reading that holds together is the one that was written.
+	// A reading kept wherever it parses. See "Speculation" in DEVELOPMENT.md.
 	protected backtrack<T>(parseAttempt: () => T): T | null {
 		return this.speculate(parseAttempt, () => true)
 	}
 
-	// A speculation that is thrown away must leave nothing behind — not
-	// the Tokens it read, not the Diagnostics it reported, which are about a
-	// shape the Program was never in, and not the suppression latch an attempt
-	// that ran to the end of the input left set: rewinding the Diagnostics
-	// while the latch survived is how a broken file once parsed in silence.
-	// Only the reading that is kept gets to report on the text.
-	//
-	// `keeps` is what a reading that SUCCEEDED is still judged by, asked with
-	// the stream standing behind it: the Matcher of `require MATCHER = EXPR`
-	// is told from an Expression by the `=` behind it and by nothing inside
-	// it, so text that read as a Matcher was not necessarily written as one.
-	//
-	// A CODED refusal is not a failed reading — see `refusesTheText`. It
-	// is a verdict about text that was written, and no other reading of that
-	// text is going to ACCEPT it: `.5` is half a decimal wherever it stands.
-	// The readings a speculation would hand it back to either refuse it in the
-	// same words, as every one that reads its member values with the Expression
-	// parser does, or fail on it in worse ones — a Record Matcher reads its
-	// member values as written literals, and a `.` is no literal at all, so it
-	// says only "Expected a literal value". So a coded refusal is re-raised to
-	// the Statement loop that reports it, instead of being given back for a
-	// second reading to answer for it: `{ x = .5 }` used to be answered with
-	// "Expected 'with' but found '='".
-	//
-	// What the re-raise leaves behind is the mirror of what a rewind leaves:
-	//
-	//   - The Tokens stay where the refusal stood. A refusal site reads what it
-	//     is refusing before it throws — the digits behind a `.`, the fraction
-	//     behind a `1.5/`, the `::` behind a member path — on purpose, so that
-	//     no tail of it is read again as a Statement of its own. Rewinding to
-	//     the start of the speculation would hand that tail back to
-	//     resynchronisation.
-	//
-	//     Those are the refusals that reach here at all. Of the rest,
-	//     `nesting-too-deep` is given back by name, being about the reading
-	//     rather than about the text, and every other one is raised in a
-	//     Statement position — a Matcher behind an `is`, a snapshot behind a
-	//     Matcher, a `test` outside a tests section — where the Statement loop
-	//     it stands in reports and resynchronises it before any enclosing
-	//     speculation hears of it.
-	//   - The suppression latch is RESTORED, which is what a rewind does and
-	//     the whole of what this has to do: a re-raise leaves the state a
-	//     rewind leaves, the Tokens excepted. The attempt can not have set it —
-	//     the latch goes up where the input has ENDED, and every coded refusal
-	//     peeks a Token before it throws — so this is the mirror of the line
-	//     below rather than a hazard of its own. Restored, it still holds
-	//     wherever it was already set before the speculation: there the refusal
-	//     is a cascade of a Diagnostic that has been reported.
-	//   - The Diagnostics are REWOUND. What the abandoned reading reported on
-	//     the way to the refusal is still about a shape the Program was never
-	//     in, and the Statement holding them is dropped whole. The refusal
-	//     itself travels in the ParseError rather than in the collection, so
-	//     it is untouched by this — leaving exactly one Diagnostic for it.
+	// Tries one reading and keeps it where it parses and `keeps` agrees. A
+	// thrown-away reading leaves nothing behind, and a refusal of the text is
+	// re-raised. See "Speculation" in DEVELOPMENT.md.
 	protected speculate<T>(
 		parseAttempt: () => T,
 		keeps: () => boolean,
 	): T | null {
 		let saved = this.tokens.save()
 		let savedSuppressDiagnostics = this.suppressDiagnostics
-		// And the `complete` count with them, for the reason the
-		// Diagnostics are rewound: a reading that is thrown away must not leave
-		// the body around it marked as completing on the strength of a word it
-		// read in a shape the Program was never in.
+		// A thrown-away reading must not mark the body around it completing.
 		let savedCompletesSeen = this.completesSeen
 		let diagnosticMark = markDiagnostics()
 		let depth = this.speculationDepth
@@ -7906,10 +7838,8 @@ class DescentParser {
 			let result = parseAttempt()
 
 			if (keeps()) {
-				// A reading that HELD answers for the readings tried
-				// beside it — they were about text this one has now spanned —
-				// and for every group speculated inside it, which resolved on
-				// the way.
+				// A reading that held settles its siblings and every group
+				// speculated inside it.
 				this.forgetFailuresFrom(depth)
 
 				return result
@@ -7920,16 +7850,8 @@ class DescentParser {
 			}
 
 			if (refusesTheText(error)) {
-				// A REPORTED refusal keeps both, which is the one place
-				// the two paragraphs above do not hold. Its account travels in
-				// the Diagnostic collection rather than in the ParseError —
-				// the loop that made it recovered and read on, so there was
-				// nothing left to throw — and rewinding would leave the
-				// Statement dropped with nothing said about why. It is also
-				// the one refusal that does NOT peek a Token before it throws,
-				// so the latch may be one the attempt itself set over an input
-				// that has ended, and restoring it would ask every enclosing
-				// block to report a cascade of that.
+				// A reported refusal keeps its Diagnostics and the latch. See
+				// "Refusals of the text" in DEVELOPMENT.md.
 				if (error.reported) {
 					throw error
 				}
@@ -7941,10 +7863,8 @@ class DescentParser {
 				throw error
 			}
 
-			// Recorded BEFORE the rewind below, which is the only moment
-			// the stream still stands where this reading stopped. A reading
-			// that `keeps` turned down is not recorded — it read the text to
-			// its end, and what it failed is a test of the text AROUND it.
+			// Recorded before the rewind, while the stream stands where this
+			// reading stopped.
 			this.noteFurthestFailure(error, depth)
 		} finally {
 			this.speculationDepth = depth
@@ -7958,23 +7878,8 @@ class DescentParser {
 		return null
 	}
 
-	// Kept where it got further than whatever stands here already. Ties go
-	// to the reading tried FIRST, which is the order the alternatives are
-	// written in — a Record Literal before a Record update, an Argument's
-	// Expression before its label — and that order is itself a judgement about
-	// which reading the text is likelier to have been written as.
-	//
-	// A `nesting-too-deep` is kept like any other, though `rewoundCodes`
-	// gives it back for a reason — an attempt recurs a level deeper than the
-	// reading it stands in for, so it can exhaust the budget where the reading
-	// that is kept fits inside it, and RE-RAISING it would refuse a Program this
-	// Parser accepts. Recording it refuses nothing: a reading that holds clears
-	// the record on its way out, so only a Statement that is being dropped
-	// anyway can ever be answered with one. And for that Statement it is the
-	// true account — `{ x = <a thousand brackets> }` is text that really is
-	// nested too deeply, and leaving it out answered that with "Expected 'with'"
-	// at the first member, which is the very thing this mechanism is here to
-	// stop.
+	// Records a failure that got further than the one recorded. A tie goes to
+	// the reading tried first. See "The furthest failure" in DEVELOPMENT.md.
 	private noteFurthestFailure(error: ParseError, depth: number): void {
 		let offset = this.tokens.offset
 
@@ -7990,13 +7895,8 @@ class DescentParser {
 		this.furthestFailureDepth = depth
 	}
 
-	// Forgets a recorded failure once nothing is left that it could be an
-	// alternative READING of — either because a sibling reading held, or because
-	// the Statement loop has moved on to the next element. `depth` is the level
-	// that has resolved: a failure recorded AT it was a reading of the text that
-	// is now settled, one recorded INSIDE it belongs to a group that resolved on
-	// the way, and one recorded outside it is still a live alternative of the
-	// construction this text stands in.
+	// Forgets a failure recorded at or inside the level `depth` that has just
+	// resolved. See "The furthest failure" in DEVELOPMENT.md.
 	private forgetFailuresFrom(depth: number): void {
 		if (
 			this.furthestFailure !== null &&
@@ -8014,10 +7914,8 @@ export type ParseResult = {
 	diagnostics: Array<common.Diagnostic>
 }
 
-// Parse errors are reported as Diagnostics rather than thrown — the
-// parser recovers and always produces a Program (broken Statements are
-// dropped). `parseWithDiagnostics` is the full form the compiler driver
-// uses; `parse` is the convenience form for callers that only need the AST.
+// Parse errors are reported as Diagnostics, and the parser always produces
+// a Program, dropping broken Statements. See "Error recovery" in DEVELOPMENT.md.
 export function parseWithDiagnostics(
 	chunk: string,
 	options?: ParserOptions,
@@ -8033,15 +7931,9 @@ export function parse(chunk: string, options?: ParserOptions): parser.Program {
 	return parseWithDiagnostics(chunk, options).program
 }
 
-// A bare run of Statements rather than a Program — what an `@example`
-// block holds. It is parsed from a text the caller built, in which every line
-// but the example's own is blank and each of the example's stands at the column
-// it stands at in the file: so every Position the parse produces is the
-// Position it has in the source, and a Diagnostic about an example underlines
-// the `§§` line it was written on.
-//
-// `insideTestBody` is set, because what an example holds IS a test body — an
-// example that asserts nothing proves nothing, and `expect` is how it does.
+// The Statements of an `@example` block, read as a test body. The caller
+// blanks every other line of the file, so each Position is the one in the
+// source.
 export function parseTestBody(
 	chunk: string,
 	options: ParserOptions = {},
