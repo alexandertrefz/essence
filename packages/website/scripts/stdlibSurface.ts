@@ -1,32 +1,8 @@
 /*
- * The standard library's documented surface, read off the parsed sources.
- *
- * Every declaration the reference publishes — the Namespaces and their
- * members, the Choices, the Type Aliases, the Protocols and the free Function
- * family `loop` — with the `§§` block written above each one already split into
- * a description, one line per `@param`, a `@returns` and the `@example` blocks.
- * The Compiler does that splitting for the Language Server, and this asks the
- * same question of the same AST rather than reading the sources with a regular
- * expression. What the editor shows on hover and what this site publishes are
- * then the same text by construction.
- *
- * Signatures are SLICED from the source rather than printed back from the AST.
- * A printer would have to re-decide every spacing question the sources have
- * already answered, and would drift from them the first time it disagreed; a
- * slice is what was written, including the generic bounds and the labels.
- *
- * Documentation is read per ENTRY. An `overload` block carries one `§§` block
- * for the set and one for each entry, and the `@param` lines sit on the entries
- * — reading only the set's block is what once published 161 overloads with no
- * Parameters at all.
- *
- * On top of what is written, this computes what a conformance hands a Namespace
- * without a line in the file: the Methods a Protocol provides, and the ones a
- * Choice derives. Completion lists those, so the reference has to.
- *
- * Nothing here writes anything. `libraryPages.ts` places this on pages,
- * `generateStdlibDocs.ts` writes them, and `tests/stdlibMembers.spec.ts` holds
- * the written pages to account against it.
+ * The standard library's documented surface, read off the parsed sources, with
+ * each `§§` block split as the Compiler splits it for the Language Server. It
+ * also adds the Methods conformances provide. See "The standard library
+ * reference" in DEVELOPMENT.md.
  */
 
 import { parseStdlibSource } from "@essence-lang/compiler/enricher/stdlib"
@@ -42,17 +18,13 @@ export interface Documentation {
 }
 
 export interface Parameter {
-	/** The label a call writes — `where`, `defaultingTo` — or `_` for a positional one. */
+	/** The label a call writes, such as `where`, or `_` for a positional one. */
 	label: string
 	/** As written. */
 	type: string
 	/** The `= …` a caller may leave out, as written; null where there is none. */
 	default: string | null
-	/**
-	 * The `@param` line written for this Parameter. Matched by POSITION, the
-	 * way the Compiler matches them — the first line documents the first
-	 * Parameter — so a line's name is never what decides where it goes.
-	 */
+	/** The `@param` line for this Parameter, matched by position as the Compiler matches it. */
 	description: string | null
 }
 
@@ -84,7 +56,7 @@ export interface Member {
 
 export interface Namespace {
 	name: string
-	/** `namespace List<infer ItemType> for List<ItemType>` — the conformances are read separately. */
+	/** As in `namespace List<infer ItemType> for List<ItemType>`, without its conformances. */
 	declaration: string
 	/** The `for` Type as written; null for a Namespace with no target (`Terminal`). */
 	targetType: string | null
@@ -110,7 +82,7 @@ export interface Choice {
 
 export interface Alias {
 	name: string
-	/** `NonEmptyList<ItemType>` — the name with its Type Parameters. */
+	/** The name with its Type Parameters: `NonEmptyList<ItemType>`. */
 	written: string
 	/** The whole `type … = …` line, as written. */
 	declaration: string
@@ -147,7 +119,7 @@ export interface Protocol {
 	line: number
 }
 
-/** A free Function — `loop` is the only one — and its entries. */
+/** A free Function, such as `loop`, and its entries. */
 export interface FunctionFamily {
 	name: string
 	/** `overload function loop` */
@@ -159,8 +131,8 @@ export interface FunctionFamily {
 }
 
 /**
- * A Method a Namespace answers without a line of its own: provided by the body
- * a Protocol wrote, or derived for a Choice from its Cases.
+ * A Method a Namespace answers without writing it. A Protocol provides its body,
+ * or a Choice derives it from its Cases.
  */
 export interface ProvidedMember {
 	/** The Namespace that receives it. */
@@ -215,12 +187,8 @@ function sliceSource(text: string, position: common.Position): string {
 }
 
 /*
- * A signature spans several lines when its parameters do, and those lines carry
- * the indentation of being nested inside `declarations { namespace { … } }`.
- * The first line has none of it — the slice starts mid-line — so the block
- * arrives with its continuations pushed several tabs to the right of its own
- * opening. This takes that nesting back off, leaving the indentation the
- * parameters have relative to the declaration, which is the shape to print.
+ * Takes the declaration's nesting off a multi-line signature's continuation
+ * lines. See "Signature slices" in DEVELOPMENT.md.
  */
 function dedentContinuations(signature: string, indent: number): string {
 	let [first, ...rest] = signature.split("\n")
@@ -248,9 +216,8 @@ function sliceDeclaration(text: string, position: common.Position): string {
 }
 
 /*
- * An `@example` block keeps the spaces written after `§§`, and a block is
- * indented under its tag, so every line arrives with the same few spaces in
- * front. Those come off; the indentation the code has within itself stays.
+ * Takes off the indentation every line of an `@example` block shares, keeping
+ * the code's own.
  */
 function dedentExample(lines: string[]): string {
 	let indents = lines
@@ -306,16 +273,8 @@ function definitionOf(entry: Node): Node {
 }
 
 /*
- * One entry of a Method — an overload is several. A body-less signature already
- * ends at its return Type, so its own span is the whole of what to show; a
- * bodied one runs on into its implementation, and is cut at the return Type so
- * that the page shows a signature rather than a copy of the standard library.
- *
- * Both spans begin at the parameter list, which leaves the generics out — and
- * the generics are the half a reader most needs, because that is where the
- * bound is written: `contains<ItemType is Equatable>` is the difference
- * between a Method every List has and one a List of Records does not. So the
- * start is pulled back to the `<` when there is one.
+ * One entry's signature, from its generics to its return Type. See "Signature
+ * slices" in DEVELOPMENT.md.
  */
 function entrySignature(entry: Node, text: string): string {
 	let definition = definitionOf(entry)
@@ -339,8 +298,8 @@ function entrySignature(entry: Node, text: string): string {
 }
 
 /*
- * A Parameter's Type as one line. A Function Type written over several lines
- * is the same Type, and a table cell has no room for the layout.
+ * A Parameter's Type on one line, since a table cell has no room for a
+ * multi-line Function Type.
  */
 function oneLineType(type: string): string {
 	return type
@@ -358,9 +317,8 @@ function readParameters(
 
 	return (definition.parameters ?? []).map(
 		(parameter: Node, index: number): Parameter => ({
-			// `_ text: String` carries no external name and `count: Integer`
-			// reuses one Identifier for both, so a missing external name is the
-			// positional one.
+			// `_ text: String` has no external name, while `count: Integer` uses
+			// one Identifier for both. So no external name means positional.
 			label: parameter.externalName?.content ?? "_",
 			type:
 				parameter.type == null
@@ -419,8 +377,8 @@ function readMethod(name: string, member: Node, text: string): Member {
 	return {
 		name,
 		kind: isStaticMember ? "static method" : "method",
-		// An `overload` block carries one block for the set; a single Method's
-		// block is its entry's, and is read there.
+		// An `overload` block has one block for the set. A single Method's block
+		// is its entry's, read there.
 		documentation:
 			member.methods === undefined
 				? null
@@ -567,8 +525,7 @@ function readProtocol(node: Node, text: string, fileName: string): Protocol {
 					let start = signature.position.start
 
 					return {
-						// A Protocol's signature is cut at its return Type for the
-						// reason a bodied Method's is: a provided one runs on into
+						// Cut at the return Type, since a provided Method runs on into
 						// its body.
 						signature: `${prefix}${dedentContinuations(
 							sliceSource(text, {
@@ -646,20 +603,8 @@ function substituteSelf(entry: Entry, target: string): Entry {
 }
 
 /*
- * What a Namespace answers without writing it.
- *
- * A conformance brings every provided Method of its Protocol and of every
- * Protocol that one extends — `Orderable` brings `Comparable`'s four
- * inequalities along with its own two — unless the Namespace writes the Method
- * itself, which is what `Integer` does with all six of `Comparable`'s. The
- * condition travels with the Method: a List answers `isLessThan` only where its
- * items are `Comparable`.
- *
- * A Choice needs no conformance for some of it. Every Choice answers `is`,
- * Case against Case; a Choice of payload-free Cases also answers the static
- * `cases()`, and prints its Case names once its Namespace declares `Printable`,
- * with nothing written in the body. Each of the three was checked against the
- * Compiler, not read off a comment.
+ * What a Namespace answers without writing it. See "Provided and derived
+ * Methods" in DEVELOPMENT.md.
  */
 function computeProvided(
 	namespaces: Namespace[],
@@ -728,7 +673,7 @@ function computeProvided(
 		}
 
 		// Only the Namespace over the Choice itself. `NestedOptional` is for an
-		// Optional too, but its `is` is the one `Optional`'s Namespace writes.
+		// Optional too, but uses the `is` that `Optional`'s Namespace writes.
 		let choice =
 			namespace.targetHead === namespace.name
 				? choiceByName.get(namespace.name)
@@ -786,9 +731,8 @@ export function readSurface(): Surface {
 		let text = file.sourceText
 		let { program, diagnostics } = parseStdlibSource(file.filePath, text)
 
-		// A standard library that does not parse is not something to paper over
-		// with a partial reference — the pages would silently lose whatever the
-		// parser gave up on.
+		// A partial reference would silently lose whatever the parser gave up on.
+		// So an unparsable standard library is an error.
 		if (diagnostics.length > 0) {
 			throw new Error(
 				`${fileName} produced ${diagnostics.length} parse diagnostics; the reference cannot be generated from a source that does not parse.`,
@@ -816,10 +760,8 @@ export function readSurface(): Surface {
 					functions.push(readFunctionFamily(node, text, fileName))
 					break
 				case "FunctionStatement":
-					// Every free Function the library declares today is an entry of
-					// `loop`. A single one would need its own reading — its span
-					// starts at the keyword, not at the parameter list — and a
-					// silent gap in the reference is the worse way to find out.
+					// A single free Function needs its own reading, since its span
+					// starts at the keyword. Throwing beats a silent gap.
 					throw new Error(
 						`${fileName} declares the free Function ${node.name.content}, which stdlibSurface.ts does not read yet.`,
 					)
