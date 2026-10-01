@@ -26,3 +26,31 @@ a `default-type-mismatch` already, so the nesting leaves it out.
 Both take the two fields they read, `nodeType` and `members`, rather than a Node type. The parsed, typed and
 simplified Record Literals all carry them. `recordDefaultMembers` sorts its list, so two structurally equal
 signatures carry equal lists.
+
+## Erasing refinements
+
+A checked refinement such as `NonZeroInteger` is the same value as its base at run time, and its predicate is
+decided while compiling. `eraseRefinements` replaces every refinement in a Type or a simplified Program with its
+base. The optimiser runs it before any pass, and the Enricher and the Validator call it on single Types.
+
+It walks every field reflectively, where `optimiser/walk.ts` names each Node kind. A pass that misses a kind
+only misses an optimisation, but an erasure that misses a field lets a refinement reach the Rewriter. A
+reflective walk also covers the fields of Node kinds, intrinsics and Type shapes added later. `typeWalkFinds` in
+`types.ts` reads a Type the same way. The Rewriter checks each Type descriptor with `typeContainsRefinement` and
+throws an internal error rather than emit a refinement.
+
+Nothing is mutated. A value that holds no refinement comes back as itself. A Program that refines nothing costs
+a traversal and no allocation, and caches keyed by identity keep their entries.
+
+The work runs in two passes so that a cyclic graph erases whole. A rebuild that learns what changed while it
+recurses would answer a back-edge before it knows. So `refinementBearing` first finds every object a refinement
+can be reached from, where a cycle is only an edge to an object already visited. `rebuild` then copies those
+objects alone. It registers each copy before filling it in, so a back-edge lands on the copy, and the erased
+graph has the original's shape. The Enricher refuses a Type declaration that names itself as
+`recursive-type-declaration`, so the cycle case is defence.
+
+A rebuilt Record drops its `name` and `alias`. It is rebuilt only because a member erased, so it is not the
+Alias it was written as. A Diagnostic must not call it that. `withoutRefinements` in `types.ts`
+does the same. A Union keeps both: a Type descriptor is emitted field by field, so dropping them would change
+the emitted bytes. A Record's spelling never reaches emission, since the Rewriter takes it off with
+`withoutRecordNames`. A Case's `name` stays as well, since it says which Case a value is.
