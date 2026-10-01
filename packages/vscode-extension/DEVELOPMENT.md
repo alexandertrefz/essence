@@ -232,6 +232,68 @@ a cycle with no files therefore means coverage was turned off, and every mark
 goes. The Choices always replace what is held, since the Server works that
 answer out across the whole session.
 
+## Gutter marks
+
+`testView.js` marks each line of a test with a square in the gutter, coloured
+by what the test last did. VS Code's own Testing gutter already draws its icon
+on a test's first line, so the marks cover the test's lines rather than one
+icon there. A square is used rather than a bar, because a source-control gutter
+draws a bar beside a changed line. A green bar meaning "passed" would be read
+as "added".
+
+A failed `expect` is marked with a dot on its own line, so it reads apart from
+the squares. It also reaches the overview ruler, where a failure scrolled off
+the screen can be found. Both glyphs are drawn in the same 18-unit box, and
+`contain` scales the box to the gutter's cell. The glyphs therefore keep their
+relative sizes at any line height.
+
+The colours are baked into the icons, since a gutter icon is an image and
+cannot follow the theme. They are fixed colours that read on light and dark
+backgrounds alike. Coverage reuses three of them. Green marks a line the tests
+ran, amber one they ran but not whole, and grey one nothing ran. The coverage
+marks are drawn whether or not VS Code's coverage view is open, so the file
+itself shows what the tests reached.
+
+## Runs and cycles
+
+The Server owns the run and re-runs on every edit. A run VS Code asks for is a
+request through `essence/runTests`, and its results arrive on the ordinary
+`essence/testRun` notifications, numbered by cycle. `testView.js` keeps each
+open TestRun in `runs`, by the cycle it answers.
+
+The Server sends a cycle's `start` notification from inside the request
+handler, so it often arrives before the response that names the cycle. The run
+waits in `requested` meanwhile, and a `start` with the reason `request` adopts
+it.
+
+A request made while a cycle is in flight is deferred. Its response names the
+cycle that will run it before any notification carries that number, and
+another cycle may start and end in between. The number is held in `promised`
+until a notification names it. The response does not say whether the request
+was deferred, so every number is held. Two gestures deferred into one cycle get
+the same number, and the run pressed last is kept.
+
+A cycle that never ends would leave its run spinning, for example when the
+session is switched off or a Worker dies. So a newer cycle's `start` ends every
+older open run that is not promised. An `end` sweeps nothing. A promised cycle
+that found nothing to run ends under its own number without starting. Sweeping
+then would end an older cycle that is still compiling.
+
+Cancelling a run only stops VS Code waiting. A cycle is a Worker compiling and
+cannot be stopped; its results still arrive, and the next batch draws them.
+
+What a request asks for follows from how the Server selects tests:
+
+- A whole file is asked for as a file, since a test written since the last
+  cycle has no id yet.
+- An empty request asks for the whole workspace. A list of the files this
+  client knows would miss a file whose first test was just written.
+- Naming ids narrows the whole cycle, so a selection of both ids and files is
+  spelled out in ids.
+- A lens sends both its ids and its file. The Server can match ids only
+  against a run it has already done. Before the first run, or while
+  `essence.tests.enabled` is off, it has none, and ids alone would run nothing.
+
 ## Packaging
 
 ```sh

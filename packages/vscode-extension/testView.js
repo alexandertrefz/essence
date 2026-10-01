@@ -23,28 +23,17 @@ import {
 	treeOf,
 } from "./testModel.js"
 
-// The half of the Test Explorer that talks to VS Code. Everything it
-// DECIDES is in `testModel.js`; what is left here is the API — a
-// TestController, its run profiles, the decorations, and the bookkeeping that
-// ties a run VS Code asked for to the notification that answers it.
+// The half of the Test Explorer that talks to VS Code. `testModel.ts` decides
+// everything; this file holds the controller, run profiles and decorations.
 //
-// The Server owns the run. It holds the session, the compiled bundles and
-// the results, and it re-runs on every edit whether or not anybody pressed
-// anything — so a "run" here is a REQUEST, and its results arrive on the same
-// notification an edit produces. That is why run objects are kept by cycle
-// number rather than awaited.
+// The Server owns the run and re-runs on every edit, so a run here is a
+// request whose results arrive on an ordinary notification. Run objects are
+// therefore kept by cycle number rather than awaited.
 
 // #region Drawing
 
-// The colours are baked into the icons rather than taken from the theme: a
-// gutter icon is an image, and VS Code has no themable one. These are the values
-// its own testing icons use, which read on a light and a dark background alike.
-//
-// Coverage is drawn in three of the same colours, because it is the same
-// news about different lines: the green of a passing test for a line the tests
-// ran, the amber of a test something silenced for a line they ran but not
-// whole, and the grey of a skipped test for a line nothing ran. A fourth colour
-// in the gutter would be a fourth thing to learn.
+// Baked into the icons, since a gutter icon is an image and cannot follow the
+// theme. See "Gutter marks" in DEVELOPMENT.md.
 const COLOURS = {
 	passed: "#3fb950",
 	failed: "#f85149",
@@ -61,20 +50,9 @@ function icon(svg) {
 	)
 }
 
-// A square beside each of the LINES OF A TEST, rather than a mark on its
-// first line alone. VS Code's own Testing gutter already owns that first line —
-// it draws the run/pass/fail icon there — and a second icon on it would be two
-// answers to one question. What it does not draw is the body, which is what a
-// reader scrolling a file is looking at.
-//
-// A square and not a bar, because a bar in a gutter already means
-// something: it is what a source-control gutter draws beside a changed line,
-// and a green bar that meant "passed" here and "added" two columns over would
-// be read as the second. A square is the shape a coverage gutter is read in.
-//
-// Both glyphs are drawn in the same 18-unit box, which `contain` scales
-// to the glyph margin's cell — so the square and the dot keep their sizes
-// relative to each other whatever the line height is.
+// A square beside each line of a test, not a bar, which a source-control
+// gutter uses. Both glyphs share an 18-unit box that `contain` scales, so they
+// keep their relative sizes.
 function square(colour) {
 	return icon(
 		`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">` +
@@ -103,10 +81,8 @@ function createDecorations() {
 		failed: gutter(COLOURS.failed),
 		skipped: gutter(COLOURS.skipped),
 		notFocused: gutter(COLOURS.notFocused),
-		// The one line inside a test that failed, which the test's own
-		// square cannot point at. A dot rather than a square, so the two read apart at a
-		// glance, and it reaches the overview ruler because a failure scrolled
-		// off the screen is the one a reader is looking for.
+		// The failed line inside a test, as a dot so it reads apart from
+		// the squares. It reaches the overview ruler, to find it off screen.
 		expects: vscode.window.createTextEditorDecorationType({
 			gutterIconPath: dot(COLOURS.failed),
 			gutterIconSize: "contain",
@@ -114,22 +90,16 @@ function createDecorations() {
 			overviewRulerLane: vscode.OverviewRulerLane.Right,
 			rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
 		}),
-		// What a coverage run counted, line by line. VS Code's own
-		// coverage view draws this too — once a reader has opened it — and this
-		// is drawn whether or not they have: what a coverage run is FOR is being
-		// told, while reading the file, what the tests reached. Three marks: a
-		// line the tests ran, a line they ran but not whole — a branch on it
-		// nothing took, an arm nothing reached; which, the coverage view says
-		// under the statement's branches, since a square can not — and a line
-		// nothing ran.
+		// What a coverage run counted, line by line, drawn whether or not
+		// VS Code's coverage view is open.
 		covered: gutter(COLOURS.covered),
 		partial: gutter(COLOURS.partial),
 		uncovered: gutter(COLOURS.uncovered),
 	}
 }
 
-// Positions are the Compiler's throughout — 1-based line, 1-based column —
-// and VS Code's are 0-based in both. Converted here and nowhere else.
+// The compiler's 1-based positions to VS Code's 0-based ones, here and
+// nowhere else.
 function toRange(range) {
 	return new vscode.Range(
 		range.start.line - 1,
@@ -139,9 +109,8 @@ function toRange(range) {
 	)
 }
 
-// One decoration per LINE. A gutter icon over a range is drawn once for
-// each line the range covers, and spelling that out is cheaper than depending
-// on it.
+// One decoration per line, rather than relying on how VS Code draws a gutter
+// icon over a range.
 function lineRanges(marks) {
 	let ranges = []
 
@@ -170,10 +139,8 @@ function testItemsUnder(item, into) {
 
 export function createTestView(options) {
 	let state = createState()
-	// Every item this controller holds, by id, so that an edit which MOVES
-	// a test keeps its item — its state, its expansion, its selection — rather
-	// than replacing it with an identical one. The id is structural, so a test
-	// stops being itself only when its name or its suite changes.
+	// Every item this controller holds, by id, so a moved test keeps its
+	// item, state and selection. The id changes only with its name or suite.
 	let items = new Map()
 	let controller = vscode.tests.createTestController(
 		"essence",
@@ -181,20 +148,15 @@ export function createTestView(options) {
 	)
 	let output = vscode.window.createOutputChannel("Essence Tests")
 	let decorations = createDecorations()
-	// The runs VS Code is showing, by the cycle number each answers. A
-	// notification is what ends one, and most notifications answer a cycle
-	// nobody asked for — every edit produces one.
+	// The runs VS Code is showing, by the cycle each answers. Most cycles
+	// answer an edit rather than a run.
 	let runs = new Map()
-	// A run made for a request whose cycle number has not come back yet.
-	// The Server sends the `start` notification from inside the request handler,
-	// so the notification routinely arrives BEFORE the response naming the cycle
-	// it belongs to.
+	// A run whose request has not answered its cycle yet. The `start`
+	// notification often arrives before that answer.
 	let requested = null
-	// The cycle numbers the Server has PROMISED but not yet started. A
-	// request that lands while a cycle is in flight is deferred and answered
-	// with the number of the cycle that will run it, so its number exists before
-	// anything carries it — and another cycle can start, and end, in between.
-	// Held so that such a number is not read as an older cycle that died.
+	// Cycles the Server has promised but not started: a request during a
+	// cycle is answered with a later one. Held so it is not taken for a dead
+	// cycle.
 	let promised = new Set()
 	let tagProfiles = new Map()
 
@@ -227,16 +189,13 @@ export function createTestView(options) {
 				controller.createTestItem(node.id, node.label, uri)
 
 			item.label = node.label
-			// The Explorer sorts by label unless it is told otherwise, and
-			// the order a file's tests are READ in is the order they were
-			// written in.
+			// The Explorer sorts by label otherwise; tests keep source order.
 			item.sortText = String(index).padStart(6, "0")
 			items.set(node.id, item)
 
 			if (node.kind === "suite") {
-				// A suite has no Position of its own — the manifest
-				// carries tests, and a suite is the path they share — so it gets
-				// no range, and VS Code lists it in the Explorer only.
+				// A suite has no Position of its own, so it gets no range
+				// and appears in the Explorer only.
 				item.range = undefined
 				item.tags = []
 				syncChildren(item.children, node.children, uri)
@@ -255,9 +214,8 @@ export function createTestView(options) {
 		collection.replace(children)
 	}
 
-	// Everything under an item stops being known when the item goes. An
-	// entry left behind for an item nothing holds any more would be re-adopted
-	// by the next test to be given that id.
+	// Drops an item and everything under it, so the next test given that id
+	// gets a new item.
 	function forget(item) {
 		items.delete(item.id)
 		item.children.forEach(forget)
@@ -316,18 +274,15 @@ export function createTestView(options) {
 			new vscode.TestRunRequest(
 				itemsOfFiles(notification.files),
 				undefined,
-				// The run is attributed to the coverage profile exactly
-				// when there is coverage to attach — VS Code shows what a run
-				// counted through the profile it ran under, and a run that
-				// counted nothing under a Coverage profile would show an empty
-				// report rather than none.
+				// The coverage profile only when there is coverage to
+				// attach, since VS Code would show an empty report otherwise.
 				(notification.coverage?.files.length ?? 0) > 0
 					? coverageProfile
 					: undefined,
 			),
 			"Essence tests",
-			// A cycle nobody asked for is not worth a line in the Test
-			// Results history; a burst of typing would otherwise be twenty.
+			// Not persisted: a burst of typing would flood the Test Results
+			// history.
 			false,
 		)
 
@@ -369,10 +324,9 @@ export function createTestView(options) {
 		return built
 	}
 
-	// Every test of every file the cycle covered, told to VS Code. A file
-	// the batch had nothing for is reported out of what the client still holds:
-	// an item left enqueued spins forever, and what it last did is a truer
-	// answer than a spinner.
+	// Every test of every file the cycle covered, told to VS Code. A file the
+	// batch had nothing for reports what the client still holds, so no item is
+	// left enqueued.
 	function report(notification) {
 		let run = beginRun(notification)
 
@@ -398,9 +352,8 @@ export function createTestView(options) {
 				let text = outputOf(record)
 
 				if (text !== "") {
-					// The Test Results terminal is a terminal: it needs
-					// carriage returns, and text that carries only newlines
-					// staircases down the screen.
+					// The Test Results terminal needs carriage returns, or
+					// the lines staircase.
 					run.appendOutput(
 						text.replaceAll("\r\n", "\n").replaceAll("\n", "\r\n"),
 						undefined,
@@ -422,10 +375,8 @@ export function createTestView(options) {
 						)
 						break
 					default:
-						// Skipped, not focused and deselected are all "did
-						// not run" as far as VS Code has words for it. Which of
-						// the three it was is on the item's description, where
-						// the reason is worth reading.
+						// VS Code has one word for every test that did not
+						// run. The item's description says which it was.
 						run.skipped(item)
 						break
 				}
@@ -436,13 +387,9 @@ export function createTestView(options) {
 		run.end()
 	}
 
-	// What the run counted, told to VS Code — the summary per file here,
-	// and the per-line detail on demand through the profile below. A Match arm
-	// and a Choice Case are reported as DECLARATIONS: they are things the
-	// source declares, they are counted one by one, and an exhaustive language
-	// can say which of them nothing reached without guessing. That is the
-	// closest thing the Testing API has to what this language knows, and it
-	// wants no view of its own.
+	// What the run counted, as a summary per file. `coverageProfile` loads the
+	// detail on demand. Match arms and Choice Cases are reported as
+	// declarations.
 	function addCoverage(run, notification) {
 		let coverage = notification.coverage
 
@@ -479,8 +426,7 @@ export function createTestView(options) {
 		}
 	}
 
-	// Asked for once a reader opens the coverage view on a file, which is
-	// why the detail is built here rather than sent with every cycle.
+	// Built when the coverage view opens a file, rather than with every cycle.
 	function detailedCoverage(fileCoverage) {
 		let file = fileCoverage.uri.fsPath
 		let coverage = coverageOf(state, file)
@@ -572,15 +518,9 @@ export function createTestView(options) {
 
 	// #region Running
 
-	// What a request asks the Server for. A whole FILE is asked for as a
-	// file rather than as the ids it held last time — a test written since the
-	// last cycle has no id here yet, and running the file is what finds it.
-	//
-	// And a request over NOTHING asks for nothing in particular, which
-	// the Server reads as the whole workspace. Listing the files this client
-	// knows instead would leave out the file whose first test was written a
-	// moment ago — the one case where "run everything" is what a reader means
-	// and this side could not know it.
+	// What a request asks the Server for. A whole file is asked for as a file,
+	// and an empty request as the whole workspace. See "Runs and cycles" in
+	// DEVELOPMENT.md.
 	function selectionOf(request) {
 		if (request.include === undefined || request.include.length === 0) {
 			return { ids: [], files: [] }
@@ -604,9 +544,8 @@ export function createTestView(options) {
 			}
 		}
 
-		// Naming ids narrows the whole cycle, files included — so a
-		// selection holding both is spelled out entirely in ids, or the files in
-		// it would run only the tests the other half named.
+		// Ids narrow the whole cycle, so a selection holding both is
+		// spelled out in ids.
 		if (ids.length > 0 && files.length > 0) {
 			for (let item of itemsOfFiles(files)) {
 				for (let test of testItemsUnder(item, [])) {
@@ -626,10 +565,8 @@ export function createTestView(options) {
 		let cycle = null
 
 		token?.onCancellationRequested(() => {
-			// The Server cannot be told to stop — a cycle is a Worker
-			// compiling, and cancelling it would throw away a compile that is
-			// about to answer. What cancelling means here is that VS Code stops
-			// waiting; the results still arrive, and the next batch draws them.
+			// A cycle cannot be stopped, so cancelling only stops VS Code
+			// waiting. The results still arrive and the next batch draws them.
 			if (cycle !== null) {
 				runs.delete(cycle)
 				promised.delete(cycle)
@@ -658,29 +595,18 @@ export function createTestView(options) {
 
 		if (requested === testRun) {
 			requested = null
-			// Two gestures made while one cycle is in flight are deferred
-			// into the same cycle and answered with the same number, so a run
-			// may already be registered under it. Two runs can not both be the
-			// one that ends, and the one pressed last is the one to keep.
+			// Two deferred gestures may share a cycle; the one pressed last
+			// is kept.
 			runs.get(answer.run)?.end()
 			runs.set(answer.run, testRun)
-			// Remembered as promised until that cycle starts, since a
-			// deferred request is answered before anything carries its number.
-			//
-			// For every answer, not only for a deferred one, because the
-			// answer does not say which it was — `RunTestsResult` carries the
-			// number and nothing else. It costs nothing: a cycle that started
-			// straight away deletes its own number as its `start` arrives, and
-			// until then it is the newest number there is, so nothing sweeps on
-			// it either way.
+			// `RunTestsResult` does not say whether the request was deferred,
+			// so every answer is promised until a notification names it.
 			promised.add(answer.run)
 		}
 	}
 
-	// Marked as waiting before the Server has said anything, so that a
-	// gesture answers instantly rather than after a round trip. The `start`
-	// notification marks the same tests again, which costs nothing and covers
-	// the tests this side could not name.
+	// Marked as waiting at once rather than after a round trip. The `start`
+	// notification marks them again, with any this side could not name.
 	function enqueue(testRun, items) {
 		for (let item of items) {
 			for (let test of testItemsUnder(item, [])) {
@@ -700,17 +626,9 @@ export function createTestView(options) {
 		await ask(testRun, selectionOf(request), token)
 	}
 
-	// A debug session is not a test run: it compiles the file WITH its
-	// tests section, launches a runner under the adapter and hands the reader
-	// the debugger. The Test Explorer's own results come from the live session
-	// and are not what a stepped-through test writes, so the TestRun VS Code
-	// hands over is ended at once rather than left open on a run nothing will
-	// report into.
-	//
-	// One session per FILE, in sequence: a session steps through one
-	// bundle, and a bundle is one file's. Almost every gesture is one test in
-	// one file; a selection reaching more waits for each session to end before
-	// the next one starts, so a reader is never handed two debuggers at once.
+	// A debug session is not a test run, so the TestRun VS Code hands over is
+	// ended at once. Each file gets a session in turn, so a reader never gets
+	// two debuggers at once.
 	async function debug(request) {
 		controller.createTestRun(request).end()
 
@@ -745,10 +663,8 @@ export function createTestView(options) {
 				} in ${path.basename(configuration.program)}`,
 			)
 
-			// Listened for BEFORE the session starts. A test that passes
-			// in a millisecond ends its session before `startDebugging` has
-			// answered, and a listener registered after that answer would be
-			// waiting for an event that has already been and gone.
+			// Listened for before the session starts, since a fast test can
+			// end it before `startDebugging` answers.
 			let ending = sessionEnding(configuration.name)
 			let started = await vscode.debug.startDebugging(
 				folder,
@@ -766,11 +682,8 @@ export function createTestView(options) {
 		}
 	}
 
-	// Resolved when the session this configuration named ends.
-	// `startDebugging` answers as soon as one has STARTED, so without waiting
-	// here a selection covering two files would open both debuggers at once —
-	// and the name is checked because a reader may be debugging something else
-	// beside this.
+	// Resolved when the session of that name ends, since `startDebugging`
+	// answers once it starts. Another session the reader runs is ignored.
 	function sessionEnding(name) {
 		let subscription = null
 		/** @type {Promise<void>} */
@@ -790,8 +703,7 @@ export function createTestView(options) {
 		return { ended, cancel: () => subscription?.dispose() }
 	}
 
-	// What the Debug lens sends: the ids it carries, or the file it sits
-	// in where nothing has run yet and no id is known.
+	// What the Debug lens sends: its ids, or its file before any id is known.
 	async function debugIds(ids, files) {
 		let covered = ids
 			.map((id) => items.get(id))
@@ -816,9 +728,8 @@ export function createTestView(options) {
 		)
 	}
 
-	// One profile per tag any test of the workspace carries, rebuilt as
-	// those tags change: VS Code offers a profile whether or not anything would
-	// run under it, so a tag nothing carries any more must stop offering one.
+	// One profile per tag any test carries. A tag nothing carries loses its
+	// profile, since VS Code would still offer it.
 	function syncTagProfiles() {
 		let tags = new Set(tagsOf(state))
 
@@ -847,11 +758,8 @@ export function createTestView(options) {
 		}
 	}
 
-	// A file that is GONE stops being reported on rather than being
-	// reported as empty — the session simply stops naming it in a batch — so
-	// the news that its tests no longer exist can only come from the file
-	// system. Deletions only: a create or a change is a run, and a run says
-	// what it found.
+	// The session stops naming a deleted file rather than reporting it empty,
+	// so only the file system says it is gone. Creates and changes are runs.
 	let deletions = vscode.workspace.createFileSystemWatcher(
 		"**/*.es",
 		true,
@@ -876,21 +784,15 @@ export function createTestView(options) {
 		(request, token) => run(request, token),
 		true,
 	)
-	// The debugger this repository already has, pointed at a test rather
-	// than a Program: the file is compiled with its tests section and a runner
-	// beside the bundle asks the registry for the tests selected, so a
-	// breakpoint in a test body is a breakpoint like any other.
+	// The debugger, pointed at the selected tests rather than a Program.
 	let debugProfile = controller.createRunProfile(
 		"Debug",
 		vscode.TestRunProfileKind.Debug,
 		(request) => debug(request),
 		false,
 	)
-	// Running WITH COVERAGE is the same run — the Server owns it, and it
-	// counts what it reaches only when `essence.tests.coverage` says so. So the
-	// gesture turns that setting on: pressing "Run with Coverage" and being
-	// shown nothing because a setting was off is the worst of the readings, and
-	// the setting is written where a reader can see it and turn it back off.
+	// The same run, which counts only when `essence.tests.coverage` is on.
+	// So the gesture turns the setting on, where a reader can turn it off.
 	let coverageProfile = controller.createRunProfile(
 		"Run with Coverage",
 		vscode.TestRunProfileKind.Coverage,
@@ -911,9 +813,8 @@ export function createTestView(options) {
 			return
 		}
 
-		// Workspace settings need a workspace. A single file opened on
-		// its own has none, and writing there rejects — so the setting goes to
-		// the user's own where there is nowhere else to put it.
+		// A single file opened on its own has no workspace settings, so the
+		// user's settings take it.
 		let folders = vscode.workspace.workspaceFolders ?? []
 		let target =
 			folders.length === 0
@@ -923,27 +824,21 @@ export function createTestView(options) {
 		try {
 			await settings.update("coverage", true, target)
 		} catch (error) {
-			// And a setting that could not be written is not a reason to
-			// refuse the run. The tests still run; what is missing is the
-			// counting, and the line below says so.
+			// The tests still run; only the counting is missing.
 			log(`could not turn essence.tests.coverage on: ${String(error)}`)
 
 			return
 		}
 
-		// The Server reads its configuration on its own schedule and has
-		// to compile again before anything is counted, so the run this press
-		// starts is very likely the last uninstrumented one. The cycle after it
-		// fills the coverage view in.
+		// The Server must read the setting and compile again, so counting
+		// likely starts with the cycle after this run.
 		log(
 			"turned essence.tests.coverage on — every run counts what it " +
 				"reaches from the next cycle on, until it is turned off",
 		)
 	}
 
-	// Refresh is the gesture for "I do not believe what I am looking at",
-	// which is a run of everything rather than of what this client happens to
-	// hold.
+	// Refresh runs everything, not only what this client holds.
 	controller.refreshHandler = () => options.runTests({ ids: [], files: [] })
 
 	// #endregion
@@ -961,25 +856,11 @@ export function createTestView(options) {
 			return
 		}
 
-		// A number the Server is speaking about is not owed any more —
-		// whether this is its own cycle starting, or the end that closes out a
-		// cycle which found nothing left to run.
+		// A cycle the Server names is no longer owed.
 		promised.delete(notification.run)
 
-		// A cycle that never ended — the session was switched off, or a
-		// Worker died — would leave VS Code spinning forever. A newer cycle
-		// STARTING is the news that no older one is coming back.
-		//
-		// Unless it has not come yet. A deferred request is answered with
-		// the number of the cycle that will run it, and a cycle asked for in the
-		// window before that one starts takes a higher number and runs first —
-		// so a promised number is a run still owed rather than a run that died.
-		//
-		// On a start and on nothing else. An END says the cycle it names
-		// is over and says nothing whatever about the ones before it: a promised
-		// cycle that found nothing to run ends under its own number without ever
-		// starting, and sweeping there closed out a lower-numbered cycle that
-		// was still compiling.
+		// A newer cycle's start ends every older open run that is not
+		// promised. See "Runs and cycles" in DEVELOPMENT.md.
 		if (notification.kind === "start") {
 			for (let [number, open] of runs) {
 				if (number < notification.run && !promised.has(number)) {
@@ -1045,23 +926,14 @@ export function createTestView(options) {
 		)
 	}
 
-	// What the Run lens sends. It goes through here rather than straight to
-	// the Server so that a run started from a lens shows in the Test Explorer
-	// like every other one — and so that a lens pressed before anything has run,
-	// where no id is known yet, still runs the file it sits in.
+	// What the Run lens sends, through the Test Explorer like every other run.
+	// Before any id is known, it runs the lens's file.
 	async function runIds(ids, files) {
 		let covered = ids
 			.map((id) => items.get(id))
 			.filter((item) => item !== undefined)
 
-		// Both halves, always. The ids say WHICH tests and the files say
-		// where they live, and the Server can only work the second out from the
-		// results of a run it has already done — so a lens pressed before
-		// anything has run, or while `essence.tests.enabled` is off (which
-		// clears what the session remembers), sent ids the Server could match
-		// against nothing and ran no test at all. The setting switches off the
-		// automatic runs; a run asked for in so many words is exactly what it
-		// leaves working.
+		// Both ids and files. See "Runs and cycles" in DEVELOPMENT.md.
 		await ask(
 			enqueue(
 				controller.createTestRun(new vscode.TestRunRequest(covered)),
@@ -1072,11 +944,9 @@ export function createTestView(options) {
 		)
 	}
 
-	// What the "Accept snapshot" lens sends. It is a run like any other,
-	// asked to RECORD whatever the tests produce — the Server writes the
-	// `__snapshots__` companions itself and hands the sources back as an edit,
-	// so what lands in a buffer arrives through `workspace/applyEdit` and is
-	// undoable like anything else a reader did.
+	// What the "Accept snapshot" lens sends: a run that records what the
+	// tests produce. Sources come back through `workspace/applyEdit`, so the
+	// change can be undone.
 	async function acceptSnapshots(ids, files) {
 		let covered = ids
 			.map((id) => items.get(id))
@@ -1087,7 +957,7 @@ export function createTestView(options) {
 				controller.createTestRun(new vscode.TestRunRequest(covered)),
 				covered,
 			),
-			// Both halves, for the reason the Run lens sends both.
+			// Both ids and files, as the Run lens sends.
 			{
 				ids: covered.length === 0 ? [] : ids,
 				files,
@@ -1097,9 +967,8 @@ export function createTestView(options) {
 		)
 	}
 
-	// A Language Server that restarted is a session that starts over: it
-	// re-runs everything it finds, so what this holds is at best a copy and at
-	// worst a file it will never mention again.
+	// A restarted Language Server starts a new session that re-runs
+	// everything, so all held state goes.
 	function reset() {
 		state = createState()
 		items.clear()
@@ -1110,22 +979,16 @@ export function createTestView(options) {
 		}
 
 		runs.clear()
-		// And nothing is owed any more either — the numbers were promised
-		// by a session that no longer exists, and the next one counts from one,
-		// so a number left here would be read as a promise about somebody
-		// else's cycle.
+		// The next session counts cycles from one again.
 		promised.clear()
 		requested = null
-		// A tag is a tag some test carries, and no test carries anything
-		// any more.
+		// No test carries a tag any more.
 		syncTagProfiles()
 		redraw()
 	}
 
 	function dispose() {
-		// Every open run, promised or running: the extension is going
-		// away, and a run left open is a spinner VS Code keeps turning with
-		// nothing behind it.
+		// Every open run, or VS Code keeps spinning for it.
 		for (let run of runs.values()) {
 			run.end()
 		}
@@ -1160,7 +1023,7 @@ export function createTestView(options) {
 		runFailed,
 		reset,
 		dispose,
-		// An editor that has just become visible has never been drawn on.
+		// For an editor that has just become visible.
 		drawEditor: draw,
 		show: () => output.show(true),
 	}
