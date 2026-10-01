@@ -209,11 +209,11 @@
 			"files": [
 				"packages/language-server/src/codeActions/matchOnValue.ts"
 			],
-			"rules": { "complexity": ["error", { "max": 56 }] }
+			"rules": { "complexity": ["error", { "max": 57 }] }
 		},
 		{
 			"files": ["packages/language-server/src/codeActions/payloads.ts"],
-			"rules": { "complexity": ["error", { "max": 55 }] }
+			"rules": { "complexity": ["error", { "max": 57 }] }
 		},
 		{
 			"files": ["packages/language-server/src/completion.ts"],

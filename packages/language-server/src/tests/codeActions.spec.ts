@@ -6947,6 +6947,61 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// Only the standard library declares natives, so the document is analysed
+	// as one of its files.
+	describe("Rewrites in a native Method's default", () => {
+		let lines = [
+			"import {",
+			'\tfrom "./Optional.es" { Optional }',
+			"}",
+			"",
+			"declarations {",
+			"\tchoice Holder {",
+			"\t\tHeld { value: Integer },",
+			"\t\tNothing,",
+			"\t}",
+			"",
+			"\tnamespace Holder for Holder {}",
+			"",
+			"\tnamespace Defaults {",
+			"\t\tstatic fallback() -> Optional<Integer>",
+			"",
+			"\t\tstatic run(with holder: Holder = #Held(1)) -> Integer",
+			"",
+			"\t\tstatic pick(from other: Optional<Integer> = Defaults.fallback()) -> Integer",
+			"\t}",
+			"}",
+		]
+
+		let actionsAt = (range: common.Position): Array<CodeActionEntry> =>
+			findCodeActions(
+				lines.join("\n"),
+				range,
+				path.join(STDLIB_DIRECTORY, "Defaults.es"),
+			)
+
+		it("should expand a payload written as a native Method's default", () => {
+			let refactors = actionsAt(spanOf(lines, 16, "1")).filter((entry) =>
+				entry.title.includes("payload"),
+			)
+
+			expect(titles(refactors)).toEqual([
+				"Expand the payload to '{ value = … }'",
+			])
+			expect(applied(lines, refactors[0] as CodeActionEntry)[15]).toBe(
+				"\t\tstatic run(with holder: Holder = #Held({ value = 1 })) -> Integer",
+			)
+		})
+
+		it("should scaffold a Match on a native Method's default", () => {
+			expect(
+				titles(
+					actionsAt(spanOf(lines, 18, "Defaults.fallback()")),
+				).filter((title) => title.startsWith("Match on")),
+			).toEqual(["Match on 'Defaults.fallback()'"])
+		})
+	})
+
 	// The mirror of the `constant-reassignment` fix. The rename index records
 	// every site that writes the name, so a Variable written only once is known.
 	describe("Constant declarations", () => {

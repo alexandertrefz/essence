@@ -1,4 +1,4 @@
-import { caseDefaults } from "@essence-lang/compiler/helpers"
+import { caseDefaults, parameterDefaults } from "@essence-lang/compiler/helpers"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { typedAssertionExpressions } from "../assertionChildren"
@@ -228,6 +228,13 @@ function visitNode(
 
 				for (let method of methods) {
 					visitFunctionDefinition(method.value, carried)
+				}
+			}
+
+			// A native Method has no body, but its defaults are written values.
+			for (let shim of node.nativeShims) {
+				for (let defaultValue of parameterDefaults(shim.parameters)) {
+					visitNode(defaultValue, carried)
 				}
 			}
 

@@ -188,6 +188,11 @@ function visitNode(
 				}
 			}
 
+			// A native Method has no body, but its defaults are written values.
+			for (let shim of node.nativeShims) {
+				visitDefaults(shim.parameters, visit)
+			}
+
 			return
 		case "ProtocolDeclarationStatement":
 			for (let member of Object.values(node.methods)) {
@@ -328,13 +333,19 @@ function visitFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	visit: Visit,
 ) {
-	for (let parameter of definition.parameters) {
+	visitDefaults(definition.parameters, visit)
+	visitBody(definition.body, definition.returnType, visit)
+}
+
+function visitDefaults(
+	parameters: Array<common.typed.ParameterNode>,
+	visit: Visit,
+) {
+	for (let parameter of parameters) {
 		if (parameter.defaultValue !== null) {
 			visitNode(parameter.defaultValue, parameter.type, visit)
 		}
 	}
-
-	visitBody(definition.body, definition.returnType, visit)
 }
 
 function visitArguments(
