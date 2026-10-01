@@ -9,34 +9,19 @@ import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { contains, isAtOrBefore } from "./positions"
 import { typedProgramSections } from "./sections"
 
-// What a bare NAME names in the TYPE space where the cursor stands — the
-// Language Server's mirror of the Enricher's `findTypeInScope`, which is the
-// rail `Colour.cases()` and `Item.is(a, b)` compile through. A base that names
-// a Type reads its members off a Namespace nobody declared, so there is no
-// declaration to look them up on until the Type itself is known.
-//
-// Read off the typed Program rather than probed for, which is what makes
-// this necessary at all. A probe appends an invented member to the text and
-// enriches it, and the Enricher answers this rail only for a member the
-// fabricated Namespace OFFERS — so the invented name types the base as an
-// Error, and a probe can only confirm a Type whose members are already known.
-// That is the very question being asked here.
+// What a bare name names in the Type space at the cursor, mirroring the
+// Enricher's `findTypeInScope`, as `Colour.cases()` needs. Read off the typed
+// Program: a probe types such a base as an Error.
 export function typeNamedAt(
 	name: string,
 	cursor: common.Cursor,
 	program: common.typed.Program,
-	// What the document's import block bound, for a Module. An imported
-	// Choice is declared in another file, so no Statement of this Program
-	// declares it and the walk below can never answer for it — and the typed
-	// import entries are no better: one carries the VALUE where a name came
-	// across as both, which is the reading a probe already tried.
+	// What the import block bound, for a Module. An imported Choice is declared
+	// elsewhere, and a typed import entry carries the value where a name is both.
 	imported: ImportedNames | null = null,
 ): common.Type | null {
-	// The innermost Scope that declares the name wins, exactly as it does
-	// in the Enricher — a Type Parameter called `Colour` shadows the Choice of
-	// that name for the length of the body it is declared on. Depth is what
-	// says which of two answers stands further in, since the walk meets a
-	// sibling Statement of an outer body AFTER the body it descended into.
+	// The innermost declaring Scope wins, as in the Enricher. Depth says which
+	// stands further in, since the walk meets an outer sibling after the body.
 	let found: {
 		type: common.Type | null
 		depth: number
@@ -47,10 +32,8 @@ export function typeNamedAt(
 		bound: null,
 	}
 	let visited = new WeakSet<object>()
-	// Where the Enricher typed a Declaration, its Type holds each bound's
-	// identity and that answer is taken. A bound it left untyped is resolved to
-	// the innermost Protocol of its name declared around it, once the walk has
-	// met every Protocol on the way in.
+	// A bound the Enricher typed carries its identity. An untyped one resolves to
+	// the innermost Protocol of its name declared around it.
 	let protocols: Array<{ type: common.ProtocolType; depth: number }> = []
 
 	function record(type: common.Type, depth: number, bound: string | null) {
@@ -61,10 +44,8 @@ export function typeNamedAt(
 		}
 	}
 
-	// A typed Generic Declaration holds its bound as written, and a
-	// GenericUse holds the Protocol's identity, which is what the listings
-	// read. A Type Parameter stands in a Scope of its own, so only a Protocol
-	// declared further out than it reaches its bound.
+	// A typed Generic Declaration holds its bound as written, a GenericUse the
+	// Protocol's identity. Only a Protocol declared further out reaches the bound.
 	function boundIdentity(bound: string, depth: number): string {
 		let innermost: { type: common.ProtocolType; depth: number } | null =
 			null
@@ -107,11 +88,8 @@ export function typeNamedAt(
 				continue
 			}
 
-			// An UNBOUNDED Type Parameter is recorded too. It offers
-			// nothing — a Namespace is only fabricated for a bound — but it
-			// still shadows an outer Choice of the same name, and answering
-			// with that Choice's Cases would offer what the name does not
-			// reach.
+			// An unbounded Type Parameter offers nothing, but still shadows an outer
+			// Choice of its name.
 			let answer = resolved.find((entry) => entry.name === name)
 
 			if (answer === undefined) {
@@ -141,9 +119,7 @@ export function typeNamedAt(
 		}
 	}
 
-	// Only a body the cursor STANDS IN is descended into: what the
-	// Function beside this one declares is out of reach where the cursor is,
-	// and a Type Parameter of it names nothing here.
+	// Only a body the cursor stands in is descended into.
 	function visitNode(node: common.typed.ImplementationNode, depth: number) {
 		switch (node.nodeType) {
 			case "ChoiceDeclarationStatement":
@@ -163,10 +139,8 @@ export function typeNamedAt(
 					return
 				}
 
-				// The Type Parameters stand in a Scope of their own
-				// between the one the Function is declared in and its body —
-				// which is what lets a Choice declared IN the body shadow a
-				// Type Parameter of the same name.
+				// The Type Parameters' Scope stands between the declaring Scope
+				// and the body, so a Choice declared in the body shadows them.
 				readGenerics(node.value.generics, node.type, depth + 1)
 				visitBody(node.value.body, depth + 2)
 
@@ -208,9 +182,8 @@ export function typeNamedAt(
 				}
 
 				return
-			// Only the arm the cursor stands in, since what a sibling arm
-			// declares is out of reach there. A typed body holds no braces, so
-			// the `else` arm is the one from its first Statement on.
+			// Only the arm the cursor stands in. The `else` arm starts at its first
+			// Statement, since a typed body holds no braces.
 			case "IfElseStatement": {
 				if (!contains(node.position, cursor)) {
 					return
@@ -253,12 +226,8 @@ export function typeNamedAt(
 
 				return
 			}
-			// A Function LITERAL is a Scope like a declared one, and the
-			// only one an Expression opens: its own Type Parameters, and
-			// everything its body declares, are in reach inside it and nowhere
-			// else. Read on the same terms `FunctionStatement` is, which is
-			// what makes `<infer T is Equatable>(…) { <- T.` and the `choice`
-			// written in a literal's body answer at all.
+			// A Function literal is a Scope, the only one an Expression opens: its Type
+			// Parameters and body are in reach only inside it.
 			case "FunctionValue":
 				if (!contains(node.position, cursor)) {
 					return
@@ -276,17 +245,9 @@ export function typeNamedAt(
 		}
 	}
 
-	// Every Expression a Node holds, whatever kind it is. The walk above
-	// names the Nodes that open a Scope or declare a name; everything else is
-	// descended into blindly, because a Function literal can be written in any
-	// Expression position there is — an Argument, a Record member, a `define`
-	// arm — and a list of the ones that can hold one is a list of every
-	// Expression Node in the language, kept in step by hand.
-	//
-	// Types are stepped over: they are most of what a typed Program weighs,
-	// they hold no Statement, and they are where its only cycles are. A
-	// `visited` set stands behind them, because a Language Server that walks
-	// into a cycle stops answering at all.
+	// Every Expression a node holds, descended blindly, since a Function literal
+	// may stand in any Expression position. Types are skipped: they hold no
+	// Statement and are where the cycles are; `visited` guards the rest.
 	function visitChildren(node: object, depth: number) {
 		for (let [key, entry] of Object.entries(node)) {
 			if (
@@ -325,20 +286,9 @@ export function typeNamedAt(
 		visitChildren(value, depth)
 	}
 
-	// The implementation, and every Section the cursor stands in — a
-	// Section is a Scope, and the tests block is a CHILD of the implementation,
-	// so what a file declares is in reach inside a test while what one test
-	// declares is in reach nowhere else. Each Section further in counts as a
-	// step deeper, which is what lets a test shadow the file it tests.
-	//
-	// The bodies a Statement opens AND the ones an Expression does — a
-	// Function literal is a Scope, and both its own Type Parameters and
-	// whatever its body declares are in reach only inside it. A literal that
-	// writes a BOUND can not be stored or passed, since a bounded Function
-	// carries hidden conformance Parameters that exist at a direct invocation
-	// alone — but the Validator is what says so, and a writer halfway through
-	// one is asking this question of the Enricher's answer, which types the
-	// literal and its Type Parameters like any other.
+	// The implementation and every Section the cursor stands in, each a step
+	// deeper, so a test shadows its file. Also the bodies Statements and Function
+	// literals open, typed even where the Validator would refuse a bound literal.
 	let depth = 0
 
 	for (let section of typedProgramSections(program)) {
@@ -361,13 +311,7 @@ export function typeNamedAt(
 		}
 	}
 
-	// The import block stands between what the file declares and the
-	// builtins, exactly as it does in the Scope linking seeds: a Choice this
-	// file declares shadows one it imports, and an imported `Side` is the one
-	// its own `Side` names.
-	//
-	// The builtins are the outermost Scope, so they answer last and only
-	// for a name the document declares nothing under — a Program writing its
-	// own `choice Side` means that one.
+	// The import block answers after the file's own declarations and before the
+	// builtins, as linking seeds the Scope.
 	return found.type ?? imported?.types[name] ?? builtinTypes()[name] ?? null
 }
