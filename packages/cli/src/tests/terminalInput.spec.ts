@@ -8,19 +8,13 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { EXIT_SUCCESS } from "../actions"
 
-// `Terminal.readLine`, `readAll` and `ask` read descriptor 0, and nothing
-// short of a real process has one. So this file compiles a Program once and
-// then RUNS it, as a child with its input piped in — the only place in the
-// suite where what a Program reads is what a person at a keyboard would have
-// given it. The line rules themselves are pinned in
-// `packages/runtime/src/tests/reading.spec.ts`, against a staged source; what
-// is pinned here is that a compiled Program on a real host reads the same
-// lines, and that the CLI hands its own input over.
+// `Terminal.readLine`, `readAll` and `ask` read descriptor 0, which only a real
+// process has. So a compiled Program runs as a child with piped input. The line
+// rules are pinned in `packages/runtime/src/tests/reading.spec.ts`; this pins a
+// real host, and that the CLI hands its input over.
 
-// A cache of this run's own, passed to the child rather than assigned
-// into this process — `cli.spec.ts` runs in the same process and owns the
-// assignment there, and two specs assigning one variable is a race whichever
-// order they load in.
+// A cache of this run's own, passed to the child rather than assigned here,
+// since `cli.spec.ts` assigns the variable in this process.
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-input-cache-"))
 let workspace = mkdtempSync(path.join(tmpdir(), "essence-input-"))
 
@@ -31,15 +25,13 @@ afterAll(() => {
 
 const binary = fileURLToPath(import.meta.resolve("../../bin/essence"))
 
-// The environment is handed over rather than inherited: Bun does not
-// carry a `process.env` a spec assigned into a child.
+// Passed explicitly, since Bun does not give a child a spec's `process.env`
+// assignments.
 function childEnvironment(): NodeJS.ProcessEnv {
 	return { ...process.env, ESSENCE_CLI_CACHE: bundleCache }
 }
 
-// Compiled ONCE, in `beforeAll`, and run per test. A compile is most of a
-// second and the reading is none of it, so a build per case would spend a
-// dozen seconds saying the same thing about the same bundle.
+// Compiled once, in `beforeAll`, and run per test.
 async function build(name: string, source: string): Promise<string> {
 	let sourceFile = path.join(workspace, `${name}.es`)
 
@@ -71,8 +63,8 @@ async function run(bundle: string, input: string): Promise<Run> {
 	}
 }
 
-// Every line, one per line of output, and the count after them — so a
-// case says both what the lines were and where the input ended.
+// Each line read, then the count, so a case shows the lines and where input
+// ended.
 const LINES = [
 	"implementation {",
 	"	function drain(_ count: Integer) -> Integer {",
@@ -107,8 +99,8 @@ describe("a Program reading its input", () => {
 		expect(finished.code).toBe(EXIT_SUCCESS)
 	})
 
-	// A text an editor wrote without a final newline still ends in a
-	// line, and the count is what says the line was not dropped.
+	// Text without a final newline still ends in a line, and the count shows it was
+	// kept.
 	it("reads a last line that ends without a break", async () => {
 		expect((await run(lines, "alpha\nbeta")).out).toBe(
 			'"alpha"\n"beta"\nlines: 2\n',
@@ -125,18 +117,15 @@ describe("a Program reading its input", () => {
 		expect((await run(lines, "")).out).toBe("lines: 0\n")
 	})
 
-	// The break a Windows host writes is one break, not a line ending in
-	// a stray carriage return — which is what a Program comparing a line
-	// against a written String would otherwise find.
+	// A Windows line break is one break, not a line ending in a stray carriage
+	// return.
 	it("reads a Windows break as one break", async () => {
 		expect((await run(lines, "alpha\r\nbeta\r\n")).out).toBe(
 			'"alpha"\n"beta"\nlines: 2\n',
 		)
 	})
 
-	// Larger than the buffer the runtime reads with, so that the answer
-	// depends on the pieces being joined rather than on one crossing having
-	// held the whole input.
+	// Larger than the runtime's read buffer, so the pieces must be joined.
 	it("reads an input longer than one read of the host", async () => {
 		let long = `${"x".repeat(70_000)}\ny\n`
 		let finished = await run(lines, long)
@@ -163,8 +152,7 @@ describe("a Program reading everything at once", () => {
 		)
 	})
 
-	// Unchanged, break at the end included — a Program that reads its
-	// input and writes it back writes what it was given.
+	// Unchanged, final break included.
 	it("answers the text exactly", async () => {
 		expect((await run(all, "alpha\nbeta\n")).out).toBe(
 			"length: 11\nalpha\nbeta\n",
@@ -193,9 +181,8 @@ describe("a Program asking a question", () => {
 		)
 	})
 
-	// The prompt carries no newline of its own, so the answer a person
-	// types lands on the line the question is on — which is why `ask` is a
-	// `write` rather than a `print`.
+	// The prompt has no newline, so the answer lands on the question's line; `ask`
+	// writes rather than prints.
 	it("writes the prompt with no newline, then reads the answer", async () => {
 		expect((await run(ask, "Ada\n")).out).toBe("name? hello, Ada\n")
 	})
@@ -205,11 +192,9 @@ describe("a Program asking a question", () => {
 	})
 })
 
-// A read is an effect, and the Optimiser's purity table is an allowlist
-// that `Terminal` is deliberately absent from. Two reads in one Expression look
-// alike to any pass comparing Expressions, and they are not alike: the first
-// answers one line and the second the next. `terminal.spec.ts` pins that both
-// survive into the emitted JavaScript; this pins that both actually run.
+// A read is an effect, and `Terminal` is absent from the Optimiser's purity
+// allowlist. Two reads in one Expression answer different lines. `terminal.spec.ts`
+// pins both are emitted; this pins both run.
 describe("two reads in one Expression", () => {
 	let twice = ""
 
@@ -234,11 +219,9 @@ describe("two reads in one Expression", () => {
 	})
 })
 
-// The CLI runs a Program as a child of its own with the streams
-// inherited, so a Program reading its input is reading whatever the CLI was
-// given. Under --json the report is alone on stdout and the Program's own
-// output goes to stderr, and the input still arrives — which is the pairing a
-// script piping into `essence run … --json | jq` depends on.
+// The CLI runs a Program as a child with inherited streams, so it reads the
+// CLI's input. Under `--json` its output goes to stderr and input still arrives,
+// as `essence run … --json | jq` needs.
 describe("essence run", () => {
 	it("hands its own input to the Program", async () => {
 		let finished = await spawnAndWait(

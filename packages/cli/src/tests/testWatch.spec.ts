@@ -14,21 +14,16 @@ import type { TestEvent } from "@essence-lang/runtime/Testing"
 
 import { createDependentsIndex, createSourceWatcher } from "../watcher"
 
-// The live half of `essence test`. The affected-set computation and the
-// file watching are unit tested here because they are what "re-run only what a
-// change reached" MEANS; the session itself is driven as a child process,
-// because a watch never returns and every part of it — the debounce, the
-// staging, the resolver — is a property of a whole process rather than of a
-// function.
+// The live half of `essence test`. The affected set and the file watching are
+// unit tested. The session runs as a child process, since a watch never returns.
 
 const essence = fileURLToPath(
 	new URL("../../bin/essence", import.meta.url).href,
 )
 
 let bundleCache = mkdtempSync(path.join(tmpdir(), "essence-watch-cache-"))
-// A watching session reads no result cache — it holds the bundles it has
-// already loaded — but the sessions here are CHILD processes and inherit this
-// environment, so the variable is pointed somewhere harmless all the same.
+// A watch session reads no result cache, but its children inherit this
+// environment, so the variable points somewhere harmless.
 let resultCache = mkdtempSync(path.join(tmpdir(), "essence-watch-results-"))
 let previousCache: string | undefined
 let previousResults: string | undefined
@@ -122,12 +117,8 @@ describe("The affected set", () => {
 	})
 })
 
-// A report is WAITED FOR, never slept through. The platform delivers a
-// directory event when it delivers it: on an idle machine that is a few
-// milliseconds, and on one running three test suites at once it was measured
-// past the 400 ms these tests once slept — so they failed while the watcher
-// was right. A deadline is the only timing left, and it is generous, because
-// it is only ever reached when the watcher is wrong.
+// A report is waited for, never slept through: a busy machine delivers directory
+// events late. The generous deadline is reached only when the watcher is wrong.
 function arrival(): { arrived: Promise<void>; arrive: () => void } {
 	let arrive = (): void => {}
 	let arrived = new Promise<void>((resolve) => {
@@ -154,10 +145,8 @@ function within(
 	})
 }
 
-// Under the per-test budget `scripts/testBudget.ts` sets, and
-// deliberately so. A deadline that fires after the test has timed out rejects
-// a Promise nobody is waiting on, which bun reports as an unattributed
-// "unhandled error between tests": a second failure for the price of one.
+// Under the per-test budget `scripts/testBudget.ts` sets. A deadline firing after
+// the test timed out would surface as a second, unattributed error.
 const DEADLINE = 4000
 
 describe("The source watcher", () => {
@@ -182,16 +171,14 @@ describe("The source watcher", () => {
 		try {
 			await watcher.watch([changed, still])
 
-			// The signature is `mtimeMs:size`, so the text has to differ
-			// in length for a save landing inside one millisecond to count.
+			// The signature is `mtimeMs:size`, so the text changes length, in case the save
+			// lands within one millisecond.
 			writeFileSync(changed, "one and a half")
 
 			await within(DEADLINE, arrived, "the change")
 
-			// One more debounce window, so that a file that did NOT
-			// change has had every chance to be reported wrongly. This wait
-			// can only make the test fail for a watcher that is wrong, never
-			// for a machine that is slow.
+			// One more debounce window, so an unchanged file has every chance to be reported
+			// wrongly. This wait can only fail a wrong watcher.
 			await new Promise((resolve) => setTimeout(resolve, 50))
 
 			expect(seen).toEqual([[changed]])
@@ -231,10 +218,9 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// The timer is the fallback for an event the platform never delivers
-	// — measured, not imagined; see the NOTE atop watcher.ts. A directory
-	// watcher that reports nothing stands in for that platform here, so what
-	// these two prove is the timer on its own.
+	// The timer covers events the platform never delivers. A silent directory
+	// watcher stands in for that, so these prove the timer alone. See "Watching files"
+	// in DEVELOPMENT.md.
 	const silent = (): { close(): void; on(): void } => ({
 		close() {},
 		on() {},
@@ -303,8 +289,7 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// An idle tick must report nothing: a session that heard "something
-	// happened" every half second would rebuild for ever.
+	// An idle tick reports nothing, or a session would rebuild forever.
 	it("says nothing from a tick where nothing changed", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
 		let watched = path.join(directory, "Watched.es")
@@ -334,8 +319,8 @@ describe("The source watcher", () => {
 		}
 	})
 
-	// The timer is closed with the watchers; `poll` is short here so a
-	// tick that outlived `close` would be caught inside the wait.
+	// The timer closes with the watchers; `poll` is short, so a tick outliving
+	// `close` is caught within the wait.
 	it("says nothing once it is closed", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-watcher-"))
 		let watched = path.join(directory, "Watched.es")
@@ -365,20 +350,15 @@ describe("The source watcher", () => {
 	})
 })
 
-// One session driven as a child process, with `--json` so that what it
-// did is readable rather than drawn. Every assertion waits for a NUMBER of
-// completed runs rather than for a length of time: a compile takes as long as
-// the machine takes, and a test that sleeps for it is a test that fails on a
-// busy one.
+// One session as a child process, with `--json` so its runs are readable.
+// Assertions wait for a number of completed runs, never for a length of time.
 type Session = {
 	pid: number
 	runs: () => Array<Array<TestEvent>>
 	waitForRuns: (count: number) => Promise<Array<Array<TestEvent>>>
 	waitForEvent: (kind: TestEvent["kind"]) => Promise<boolean>
-	// Awaited rather than fired and forgotten. A watch session that
-	// outlives its test goes on compiling in the background, and the suites
-	// running after it are the ones that pay for it. One the signal does not
-	// end in time is killed, and answers null.
+	// Awaited, so no session outlives its test and keeps compiling. One the signal
+	// does not end in time is killed, and answers null.
 	stop: (signal?: NodeJS.Signals) => Promise<number | null>
 }
 
@@ -470,8 +450,7 @@ function startSession(
 		async stop(signal: NodeJS.Signals = "SIGTERM"): Promise<number | null> {
 			child.kill(signal)
 
-			// What `exited` answers rather than `exitCode`, which is null
-			// for a process the signal's default action ended.
+			// `exited` rather than `exitCode`, which is null for a process a signal ended.
 			let code = await Promise.race([
 				child.exited,
 				new Promise<null>((resolve) =>
@@ -595,9 +574,7 @@ describe("essence test --watch", () => {
 					expect(first).toBeDefined()
 					expect(namesOf(first!).sort()).toEqual(["adds", "doubles"])
 
-					// A Module only the reader imports. What has to
-					// happen is that the reader's test runs again and the
-					// other file's does not.
+					// A Module only the reader imports, so only the reader's test reruns.
 					writeFileSync(
 						path.join(directory, "Library.es"),
 						library.replace("with 2", "with 2 "),
@@ -642,9 +619,8 @@ describe("essence test --watch", () => {
 		})
 	}, 60_000)
 
-	// A focus silences every other test of the RUN, across files. So the
-	// answer changing is the one edit whose consequences reach further than the
-	// module graph does, and everything has to run again.
+	// A focus silences every test of the run, across files, so a change in focus
+	// reruns everything.
 	it("re-runs everything when a focus appears", async () => {
 		await withProject(
 			{ "Other.tests.es": other, "More.tests.es": reader2 },
@@ -675,14 +651,9 @@ describe("essence test --watch", () => {
 		)
 	}, 60_000)
 
-	// A watching coverage run is incremental for free — an entry nothing
-	// reached keeps the events it had, coverage among them — so what is worth
-	// pinning is exactly that: the cycle carries only what it re-ran, and the
-	// file it did not touch is still in the picture the report draws.
-	//
-	// A `Foo.tests.es` of imports and tests has nothing to count and
-	// reports nothing; what a coverage run is ABOUT is the implementation
-	// Modules its tests reach.
+	// A watching coverage run carries only what each cycle reran, and an untouched
+	// file's coverage stays in the report. A `Foo.tests.es` counts nothing itself:
+	// coverage is about the implementation Modules its tests reach.
 	it("counts only the files a cycle re-ran", async () => {
 		const second = [
 			"implementation {",
@@ -770,9 +741,8 @@ describe("essence test --watch", () => {
 		})
 	}, 60_000)
 
-	// A session ends by a signal as often as by a keypress: a closing
-	// terminal sends SIGHUP and a supervisor sends SIGTERM. The session stages
-	// into a temporary directory of the test's own, so what is there is its.
+	// A session ends by signal as often as by keypress: SIGHUP from a closing
+	// terminal, SIGTERM from a supervisor. It stages into this test's own directory.
 	for (let [signal, status] of [
 		["SIGTERM", 143],
 		["SIGHUP", 129],
@@ -810,9 +780,9 @@ describe("essence test --watch", () => {
 		}, 60_000)
 	}
 
-	// The tests run on the session's own thread, and a handler waits for
-	// the thread, so a test that never yields leaves a signal its default
-	// action. What that leaves behind, the next session sweeps.
+	// The tests run on the session's own thread, and a handler waits for it.
+	// So a test that never yields leaves a signal its default action, and the
+	// next session sweeps what that leaves.
 	it("stops on SIGTERM while a test spins, and the next session sweeps its staging", async () => {
 		let temporary = mkdtempSync(
 			path.join(tmpdir(), "essence-watch-temporary-"),
