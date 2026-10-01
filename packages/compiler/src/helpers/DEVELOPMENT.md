@@ -106,3 +106,34 @@ answers `Open` where `Terminal.inspect` writes `Door#Open`. `Optional` and `Resu
 
 `conditionallyStructuralPrintableNamespaces` holds `List` and `Dictionary`. They render their items or entries, so
 they are structural exactly when what they hold is.
+
+## Undecided slots
+
+An empty `[]` or `[=]` leaves a slot `Unknown`: a List's item Type, or a Dictionary's key or value Type. No
+Program can spell `Unknown`, so a mismatch that names `List<Unknown>` names nothing a reader can act on.
+`undecidedSlotEvidence` adds a note saying the slot is a blank, and a Help with the annotation that would decide
+it. `undecidedSlotAnnotation` gives the same annotation to a report about a Declaration, spelled with the keyword
+the Declaration was written with.
+
+`refusedSlotIn` finds the blank the sentence is about, walking the expected Type and the refused value's Type
+together:
+
+- Where both have the same shape, a slot answers only where the expected side is a blank and the written side
+  decides it. `decidesAnUndecidedSlot` asks that by the rule `matchTypes` refused with. A Record is walked over
+  the members both sides have, since an update says nothing about a member it does not name.
+- Where the shapes differ, the value stood opposite the expected Type whole, as `items = "a"` does against
+  `List<Unknown>`. The blank is then looked for in the expected Type alone, unless the value is itself a blank.
+- A Union's arms pair with nothing, since the value was refused by all of them at once, so each arm is searched
+  alone.
+- A refinement decides nothing its base has not, so the walk looks through it. It looks through a `Future` or a
+  `Started` the same way, since a blank inside one comes from an empty Literal it was built around.
+
+A null written Type asks the one-sided question outright. A capture is refused because the body around it can
+not be checked again, so nothing stands opposite its blank.
+
+`spelledWithDecidedSlots` fills each blank to spell the annotation at the depth the blank sits, so
+`List<List<Unknown>>` reads back as `List<List<Integer>>`. A blank opposite a written Type that decides it takes
+that Type, so the Help repeats what the reader wrote. Elsewhere an example stands in: `Integer`, or `String` for
+a Dictionary key. Then the Help says "for instance", so a made-up Type is not read as the answer. A refinement
+is filled in its Type Arguments as well as its base, since `describeType` prints a refinement from its
+Arguments.
