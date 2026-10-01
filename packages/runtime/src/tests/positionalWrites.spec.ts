@@ -61,24 +61,11 @@ import { createString } from "../String"
 import { getStringRepresentation } from "../Terminal"
 import { type AnyType, isValueOfType, typeKeySymbol } from "../type"
 
-// THE DIFFERENTIAL SPEC for positional writes. `replace` writes a run
-// Array IN PLACE where it can — `listWrites.ts` holds the why — and every box
-// that shares that Array is then behind on it and has to catch up before it is
-// read. Nothing in the language can see any of that, and this file is what says
-// so: random sequences of operations are run against a plain JavaScript Array
-// that models the same values, and every answer either can give is compared.
-//
-// What makes it a spec rather than a search is the fixed seeds. The same
-// sequences run on every machine and in every order, so a failure here is a
-// failure anybody can reproduce by its seed and nothing is ever "flaky because
-// the fuzzer found something new".
-//
-// Two shapes of use are what this is really for. PERSISTENT use keeps
-// every value the run ever built and reads them all again at the end, forwards
-// and backwards, so a box that was left behind five writes ago has to say what
-// it holds. REENTRANT use runs a walk whose callback writes the very List being
-// walked, which is the one way an in-place write could be seen from Essence —
-// and is why the readers that hand a raw run to user code seal it.
+// `replace` writes a run Array in place where it can, and every box sharing it
+// must catch up before it is read. Random operations over fixed seeds run
+// against a plain Array model. Every value is read again at the end, and walks
+// whose callbacks write the walked List check the seals. See "The List write
+// log" in packages/runtime/DEVELOPMENT.md.
 
 const integers = (values: Array<number>): ListType<IntegerType> =>
 	createList(values.map((value) => createInteger(BigInt(value))))
@@ -96,11 +83,8 @@ const integerPrinting = {
 
 const ascending = { [typeKeySymbol]: "SortOrder#Ascending" } as const
 
-// The walk a generic Choice's derived `Equatable` runs — the descriptor
-// says the Case's one member is a List of the Type Parameter, so every item
-// is compared by the witness, which is user code with BOTH runs held. It is
-// in this file rather than beside the Choice tests because what it is being
-// asked here is a question about `List`'s runs.
+// A generic Choice's derived `Equatable` hands each item of a List member to
+// the witness, which is user code, while both runs are held.
 const choiceHoldingListIs = boundChoiceIs({
 	"Held#Items": { items: { k: "list", of: { k: "w", i: 0 } } },
 })
@@ -108,9 +92,8 @@ const choiceHoldingListIs = boundChoiceIs({
 const holding = (items: ListType<IntegerType>) =>
 	({ [typeKeySymbol]: "Held#Items", items }) as never
 
-// Reports the second Argument, because a key scan calls the witness as
-// `is(storedKey, key)`: the second is the item the walk has just reached, and
-// the first is one it has passed, which can never show a write still ahead.
+// Reports the second Argument: a key scan calls `is(storedKey, key)`, and only
+// the item just reached can show a write still ahead.
 function visitingKey(visit: (item: IntegerType) => void) {
 	return {
 		is: (first: IntegerType, second: IntegerType) => (
@@ -120,9 +103,8 @@ function visitingKey(visit: (item: IntegerType) => void) {
 	}
 }
 
-// A Type Parameter's witness is declared over `AnyType`, since it
-// stands for whatever the Program bound the Parameter to — the two casts are
-// what "this Program bound it to Integer" looks like from here.
+// A Type Parameter's witness is declared over `AnyType`, so the casts stand
+// for a Program that bound it to Integer.
 const holdingWitness = (visit: (item: IntegerType) => void) => ({
 	is: (first: AnyType, second: AnyType) => (
 		visit(second as IntegerType),
@@ -139,9 +121,8 @@ const integerList: common.Type = {
 
 const stringList: common.Type = { type: "List", itemType: { type: "String" } }
 
-// The items a box answers, read through the two-run walk rather than
-// through `materialise`, which would demote an upgraded box — most of what is
-// being held here is what a box is still holding after it has been read.
+// Reads a box's items without `materialise`, which would demote an upgraded
+// box.
 const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
 	let view = viewOf(originalList)
 	let items: Array<number> = []
@@ -157,9 +138,8 @@ const itemsOf = (originalList: ListType<IntegerType>): Array<number> => {
 	return items
 }
 
-// A counted generator rather than `Math.random`, so a seed names one
-// sequence for good. Any small xorshift would do; what matters is that it is
-// written here and never changes.
+// A fixed xorshift rather than `Math.random`, so a seed names one sequence for
+// good.
 const generatorFrom = (seed: number): (() => number) => {
 	let state = seed * 2654435761 + 1
 
@@ -173,12 +153,9 @@ const generatorFrom = (seed: number): (() => number) => {
 	}
 }
 
-// A box that ALREADY CARRIES A LOG, which is what nearly everything below
-// needs. A box has none until a positional write mints one — the first write on
-// a bare Array copies, and the COPY is what the log is attached to — so a test
-// that writes a fresh List once has tested the old copying path and nothing
-// else. One write of the item that is already there mints the log and changes
-// no item, which is the shortest way to a box the next write can write in place.
+// A box that already carries a log. The first write on a bare Array copies and
+// gives the copy a log, so rewriting the first item mints one and changes
+// nothing.
 const logged = (values: Array<number>): ListType<IntegerType> => {
 	let fresh = integers(values)
 	let first = values.length === 0 ? 0 : values[0]
@@ -189,9 +166,8 @@ const logged = (values: Array<number>): ListType<IntegerType> => {
 	return minted
 }
 
-// The write that makes every OTHER box on a run stale — in place, so the
-// Array changes under them. It answers the new box, and the receiver is the one
-// left behind.
+// Writes in place, so every other box on the run goes stale, the receiver
+// included.
 const written = (
 	box: ListType<IntegerType>,
 	value: number,
@@ -206,14 +182,8 @@ const trackedOf = (items: Array<number>): Tracked => ({
 	items: items.slice(),
 })
 
-// EVERY READER A STALE BOX CAN MEET, each asked of one value and checked
-// against the model. A reader is here because it reaches the items some way of
-// its own: the walk and `materialise` through the sealing readers, `item(at:)`
-// and the two total ones through the reader that must NOT seal, `length` and
-// `slice` through the counting one, the growers through the three that read a
-// box's fields raw, equality and ordering through their views, the printer, the
-// two that key items through `keyEncoding`, and the type test, which walks a
-// List's runs raw in the Module every Program carries.
+// Every reader a stale box can meet, each reaching the items its own way, and
+// each checked against the model.
 const readers: Array<[string, (tracked: Tracked) => void]> = [
 	[
 		"walk",
@@ -401,24 +371,15 @@ type ComparisonWitness = {
 	compare: (first: IntegerType, second: IntegerType) => OrderingType
 }
 
-// Whichever way the comparison at hand says "these two hold the same
-// items" — an ordering of `Equal`, or a Boolean `true`.
+// Whether a comparison says the two hold the same items: `Equal` or `true`.
 const saysEqual = (answer: AnyType): boolean =>
 	answer[typeKeySymbol] === "Ordering#Equal" ||
 	(answer as unknown as BooleanType).value === true
 
-// A COMPARISON WHOSE ARGUMENT IS FRESHLY LOGGED, which is the only state
-// a missing seal can be seen in: the twin carries a log, is current for it and
-// has never been read, so a write from inside the witness would land in the very
-// Array the comparison is reading. A twin anything had read first would already
-// be sealed and the turn would prove nothing.
-//
-// The twin holds the receiver's own items, so `Equal` is the answer owed
-// whatever the schedule did beforehand, and the witness writes the twin at a
-// position the walk has NOT yet reached — never position 0, whose items are
-// both read before the first witness call. That is what makes the ANSWER the
-// assertion: both Lists are intact afterwards and only the answer about them
-// could have been corrupted.
+// A comparison against a freshly logged twin, the only state in which a missing
+// seal shows: the witness writes the Array being read. The twin holds the
+// receiver's items and is written past position 0, so `Equal` is owed and only
+// the answer can be corrupted.
 function comparedAgainstATwin(
 	comparing: (
 		first: ListType<IntegerType>,
@@ -460,17 +421,9 @@ function comparedAgainstATwin(
 	}
 }
 
-// EVERY EDIT THAT CAN MAKE A NEW VALUE OUT OF AN OLD ONE, including the
-// three positions `replace` treats apart — inside the List, counted back from
-// the end, and outside it, where the receiver is answered untouched. The
-// operations that SHARE a run are what put two boxes on one Array, which is the
-// only way a write in place can be seen at all, so `append`, `prepend`, `slice`
-// and `remove` matter here as much as `replace` does.
-//
-// The last three are not edits but COMPARISONS, and they are in this
-// table because what they answer is the one thing a missing seal corrupts. They
-// leave the twin they compared against in the pool, so the schedule goes on
-// reading it like any other value.
+// Every edit that makes a new value from an old one. The sharing edits put two
+// boxes on one Array, which is how an in-place write could be seen. The
+// comparisons at the end leave their twin in the pool.
 const edits: Array<
 	[string, (tracked: Tracked, next: () => number) => Tracked]
 > = [
@@ -642,12 +595,9 @@ const edits: Array<
 	],
 ]
 
-// One run: a pool of values that only ever GROWS, an edit per turn on a
-// value picked out of it at random, and a reader asked of a second value picked
-// the same way. Nothing is ever dropped, so a value five hundred writes old is
-// still in the pool at the end, and the last thing the run does is read every
-// value in it — forwards, and then backwards, because catching a box up leaves
-// it changed and the order a chain is read in must not matter.
+// A pool that only grows: each turn edits one random value and reads another.
+// At the end every value is read forwards and then backwards, since catching a
+// box up changes it.
 const runSchedule = (seed: number, turns: number): void => {
 	let next = generatorFrom(seed)
 	let pool: Array<Tracked> = [
@@ -667,13 +617,9 @@ const runSchedule = (seed: number, turns: number): void => {
 
 		pool.push(grown)
 
-		// DERIVE, WRITE, THEN READ WHAT WAS DERIVED. A box only goes
-		// behind when the box it shares a run with is written IN PLACE, and
-		// that only happens where a log already exists — so a schedule that
-		// merely picked operations at random would spend nearly all of its
-		// turns on the copying path and prove nothing about this one. Every
-		// turn therefore derives from the value just made, writes the value
-		// itself a few times, and reads the derivatives afterwards.
+		// A box falls behind only when its run is written in place, which needs a
+		// log. So each turn derives from the new value, writes it, and then reads
+		// the derivatives.
 		let derived: Array<Tracked> = []
 
 		for (let share = 0; share < 3; share++) {
@@ -718,10 +664,8 @@ const runSchedule = (seed: number, turns: number): void => {
 }
 
 describe("positional writes against a model", () => {
-	// Twelve seeds and sixty turns each, which is a few seconds and
-	// covers every edit against every reader many times over. The seeds are
-	// written out rather than counted, so that a failing one can be deleted
-	// from the list while it is being fixed without renumbering the rest.
+	// The seeds are written out, so a failing one can be removed while it is
+	// fixed without renumbering the rest.
 	for (let seed of [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233]) {
 		test(`seed ${seed}`, () => {
 			runSchedule(seed, 60)
@@ -730,11 +674,8 @@ describe("positional writes against a model", () => {
 })
 
 describe("persistent use", () => {
-	// One value written over and over, with every version kept. Each is a
-	// box left further behind on the same Array than the last, and each has to
-	// answer exactly the items it was made with. The positions REPEAT, so one
-	// log holds the same position more than once — which is the only shape that
-	// can tell undoing the log backwards from undoing it forwards apart.
+	// Positions repeat, so one log holds a position more than once, which tells
+	// undoing the log backwards from undoing it forwards.
 	test("every version of a chain answers its own items", () => {
 		let versions: Array<Tracked> = [
 			{
@@ -765,11 +706,7 @@ describe("persistent use", () => {
 		}
 	})
 
-	// The branching shape, which is the one an in-place write can not
-	// help: the OLD value is written again and again, so every write but the
-	// first finds its receiver behind and catches it up. It has to answer the
-	// same thing it always did, which is the whole of what is claimed here —
-	// what it costs is `optimisations` business, not this file's.
+	// Every write after the first finds its receiver behind and catches it up.
 	test("writing the same old value over and over answers every time", () => {
 		let base = logged([0, 1, 2, 3, 4, 5, 6, 7])
 
@@ -784,11 +721,9 @@ describe("persistent use", () => {
 		}
 	})
 
-	// EVERY SITE THAT SHARES A BACK RUN, each asked the same question: a
-	// box handed a logged Array must be handed the version it views with it, or
-	// it reads whatever the next write leaves there. The source is written IN
-	// PLACE after the box is derived and before it is read, which is the only
-	// order in which a forgotten log shows.
+	// Every operation that shares a back run must hand the box the log version it
+	// views. The source is written after the box is derived and before it is
+	// read, the order in which a forgotten log shows.
 	const sharers: Array<
 		[
 			string,
@@ -867,9 +802,8 @@ describe("persistent use", () => {
 			let source = logged([0, 1, 2, 3, 4, 5, 6, 7])
 			let [derived, expected] = share(source)
 
-			// Three writes, so the derived box is three versions behind
-			// and a log that is undone the wrong way round answers the wrong
-			// items rather than the right ones by luck.
+			// Three writes, so a log undone the wrong way round answers the wrong
+			// items.
 			let once = written(source, 91, 1)
 			let twice = written(once, 92, 2)
 
@@ -880,10 +814,8 @@ describe("persistent use", () => {
 		})
 	}
 
-	// The GROWERS reading a box that is BEHIND. `append` and `prepend`
-	// read a box's fields without a view, so each catches its receiver up
-	// itself — a box that pushed onto the Array it is behind on would hand the
-	// answer items it never held.
+	// `append` and `prepend` read a box's fields without a view, so each catches
+	// its receiver up itself.
 	test("growing a box that is behind answers its items and the new one", () => {
 		let stale = () => {
 			let base = logged([0, 1, 2, 3])
@@ -908,14 +840,9 @@ describe("persistent use", () => {
 		expect(Number(length(stale()).value)).toBe(4)
 	})
 
-	// WHAT `prepend`'s CATCH-UP IS FOR, which is cost rather than
-	// soundness — `prepend` hands the answer the receiver's `writes` pair, so an
-	// answer made from a receiver that is behind is behind the same way and
-	// repairs itself when it is read. What the eager repair buys is that the two
-	// of them share ONE repaired Array, and the copies are what says so: a
-	// stale box prepended to and then read, with the answer read as well, makes
-	// one new Array between them. Without the line each of them catches up on
-	// its own and there are two.
+	// `prepend` hands the answer the receiver's `writes`, so a stale answer would
+	// repair itself when read. Catching up first lets the two share one repaired
+	// Array.
 	test("prepending to a box that is behind repairs the run once, not twice", () => {
 		let source = logged([0, 1, 2, 3, 4])
 		let ahead = written(source, 91, 1)
@@ -934,18 +861,10 @@ describe("persistent use", () => {
 		expect(arrays.size).toBe(1)
 	})
 
-	// A receiver whose SEAM MOVES under it. Cutting an interior window
-	// rebuilds both of the receiver's runs as fresh Arrays of its own, so the
-	// log it was carrying describes an Array it no longer holds — and a write
-	// that went on recording into that log would be telling every box still on
-	// the old Array to undo a position in a different one. This is the shape
-	// that found it: a box derived before the cut, read after two writes made
-	// past it.
-	//
-	// Six items of eight, because the move is made under THE THREE
-	// QUARTERS RULE — a window of a half is copied outright now and moves no
-	// seam, so a smaller window here would leave the test asserting about a path
-	// it never took. The front run the cut leaves behind is what says it did.
+	// Cutting an interior window rebuilds both runs as fresh Arrays, so the
+	// receiver drops its log. Otherwise its writes would tell boxes on the old
+	// Array to undo positions in another. Six of eight items, since only a window
+	// of three quarters or more moves the seam.
 	test("a box whose seam moves lets go of the log it was carrying", () => {
 		let source = logged([0, 1, 2, 3, 4, 5, 6, 7])
 		let derived = append(source, createInteger(60n))
@@ -963,9 +882,7 @@ describe("persistent use", () => {
 		expect(itemsOf(source)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
 	})
 
-	// An upgraded receiver — two runs, and a position in each. A front
-	// run is never written in place, so this is the half that still copies, and
-	// it has to agree with the flat half item for item.
+	// A front run is never written in place, so a front write copies.
 	test("a two-run box answers a write in either run", () => {
 		let built = prepend(
 			prepend(logged([3, 4, 5]), createInteger(2n)),
@@ -981,21 +898,10 @@ describe("persistent use", () => {
 })
 
 describe("reentrancy", () => {
-	// THE HAZARD THE SEAL IS FOR, asked of EVERY native that hands a raw
-	// run to code that may call back into Essence. Each walk below is run over a
-	// List that carries a log and is current for it, with a callback that writes
-	// that very List — so without the seal the write would land in the Array the
-	// walk is holding, and the walk would visit an item nobody ever put there.
-	// The walk must visit exactly the items the List held at entry, which is
-	// what it visited when every write copied.
-	//
-	// The list is what makes the audit checkable: a native that takes a
-	// Function or a conformance and reads its receiver belongs here, and one
-	// that is missing is a native that may have forgotten to seal.
-	//
-	// `mode` takes neither and runs no user code, so it is not here.
-	// `Dictionary.of(_:)` walks entry Records rather than Integers, so it has a
-	// test of its own.
+	// Each walk runs over a List current for its log, with a callback writing that
+	// List. Without the seal the write would land in the Array the walk holds. A
+	// native that takes a Function or a conformance and reads its receiver belongs
+	// here. `mode` runs no user code, and `Dictionary.of(_:)` has its own test.
 	const walks: Array<
 		[
 			string,
@@ -1127,9 +1033,8 @@ describe("reentrancy", () => {
 					),
 				}),
 		],
-		// `sort(in:)` and `sort(by:)` compare a copy of the run, so these two
-		// entries hold with or without the seal. They are here because every native
-		// taking a comparison is.
+		// `sort(in:)` and `sort(by:)` compare a copy of the run and hold without
+		// the seal, but every native taking a comparison is listed.
 		[
 			"sort(in:)",
 			(list, visit) =>
@@ -1285,23 +1190,11 @@ describe("reentrancy", () => {
 		expect(keysOf(latest)).toEqual([1, 2, 3, 4, 99])
 	})
 
-	// THE OTHER HALF OF THE HAZARD, and the one the sweep above can not
-	// see: a native holding a SECOND List's raw run across the same user code.
-	// The sweep above passes one box as both operands, so the receiver's seal
-	// covers the argument and the argument path is never walked — which is how
-	// `is` shipped reading an unsealed argument and stayed green through every
-	// guard in this file. Each entry here is given a DISTINCT argument, freshly
-	// logged and never yet read, and the callback writes THAT one.
-	//
-	// The argument is never read before the call. Sealing is permanent
-	// and per-Array, so one `itemsOf` of it beforehand would close its log and
-	// no missing seal could be seen again.
-	//
-	// Each entry says what the native OWES for two Lists holding equal
-	// items, and the answer is checked as well as the items visited. That is what
-	// makes the entries sharp: a missing seal need not show up in either List —
-	// both are intact afterwards — and shows up only in what the native ANSWERED
-	// about them, which is what an Essence Program sees.
+	// A native may also hold a second List's raw run across user code. The
+	// `walks` table passes one box as both operands, so the receiver's seal
+	// covers the argument. Each entry here gets a distinct argument, logged and
+	// never read, which its callback writes. Reading it first would seal it for
+	// good. A missing seal shows only in the answer, which each entry states.
 	const argumentWalks: Array<
 		[
 			string,
@@ -1390,10 +1283,8 @@ describe("reentrancy", () => {
 		})
 	}
 
-	// The fold seeded with the very List it walks — the shape the first
-	// reentrancy rule was written for, now with a WRITE in it rather than an
-	// append. The accumulator IS the walked box, so its first write would land
-	// in the run the walk is reading.
+	// The accumulator is the walked box, so its first write would land in the
+	// run being read.
 	test("a fold seeded with the List it walks answers the entry items", () => {
 		let list = logged([1, 2, 3, 4, 5])
 		let visited: Array<number> = []
@@ -1411,13 +1302,8 @@ describe("reentrancy", () => {
 })
 
 describe("what a write actually costs", () => {
-	// THE CLAIM THE WHOLE CHANGE IS FOR, made as WORK rather than as
-	// time: filling a List cell by cell must not copy the List per cell. The
-	// Array a box holds is what says so — a copy is a new one — so counting the
-	// DISTINCT Arrays a chain passes through counts the copies it made. One for
-	// the first write, which mints the log, and one more when the log grows
-	// longer than the run and the next write starts a fresh one. Before this,
-	// every turn made its own: two thousand of them for two thousand cells.
+	// Each distinct Array is a copy. The first write mints the log, and a write
+	// after the log outgrows the run starts a fresh one.
 	test("filling a List cell by cell makes a handful of Arrays, not one per cell", () => {
 		for (let size of [500, 1_000, 2_000]) {
 			let cells = createList(
@@ -1441,10 +1327,8 @@ describe("what a write actually costs", () => {
 		}
 	})
 
-	// And the other half of it — reading a cell must not close the run to
-	// writes, or "read the cell before, write this one" would copy per turn.
-	// A DP table is exactly that, and it makes no more Arrays than the fill
-	// above does.
+	// Reading a cell must not close the run to writes, or a table that reads the
+	// previous cell before each write would copy per turn.
 	test("reading a cell between writes does not put the copy back", () => {
 		let size = 1_000
 		let cells = createList(
@@ -1468,10 +1352,8 @@ describe("what a write actually costs", () => {
 		expect(Number(lastItem(cells).value)).toBe(size - 1)
 	})
 
-	// The log is BOUNDED, so what a chain holds stays proportional to the
-	// List: writing many times over a short List must not grow a log longer
-	// than the run. Past the bound a write copies and starts a fresh log, which
-	// is what keeps the memory bounded and the work per write constant.
+	// Past the run's length a write copies and starts a fresh log, which keeps
+	// the memory bounded and the work per write constant.
 	test("a log never grows longer than the run it belongs to", () => {
 		let cells = createList(
 			Array.from({ length: 16 }, () => createInteger(0n)),
