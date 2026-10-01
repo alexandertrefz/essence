@@ -1467,6 +1467,8 @@ describe("Benchmarks", () => {
 // The counters as emitted JavaScript uses them: one call per Module answers a
 // Function, called wherever control arrives.
 describe("The coverage counters", () => {
+	// `counters` keeps every Module it registers until the process ends, so a
+	// test run again finds its own registration last.
 	const point = (line: number, overrides = {}) => ({
 		kind: "statement" as const,
 		label: "",
@@ -1491,7 +1493,9 @@ describe("The coverage counters", () => {
 		count(0)
 		count(1)
 
-		let report = coverage().find((each) => each.module === "/Counted.es")
+		let report = coverage().findLast(
+			(each) => each.module === "/Counted.es",
+		)
 
 		expect(report?.points.map((each) => each.count)).toEqual([2, 1])
 	})
@@ -1510,7 +1514,7 @@ describe("The coverage counters", () => {
 		count(2)
 		beginCoverageRun()
 
-		let report = coverage().find((each) => each.module === "/Loaded.es")
+		let report = coverage().findLast((each) => each.module === "/Loaded.es")
 
 		expect(report?.loaded).toEqual([0, 2])
 	})
@@ -1634,7 +1638,7 @@ describe("The coverage counters", () => {
 				count(0)
 				seen.count = context
 					.coverage()
-					.find(
+					.findLast(
 						(each) => each.module === "/Asked.es",
 					)?.points[0]?.count
 			})
@@ -1693,7 +1697,7 @@ describe("The coverage counters", () => {
 		})
 		let countsOf = () =>
 			coverage()
-				.find((each) => each.module === "/Twice.es")
+				.findLast((each) => each.module === "/Twice.es")
 				?.points.map((each) => each.count)
 
 		// What a Module's top-level Statements did as it was evaluated.
