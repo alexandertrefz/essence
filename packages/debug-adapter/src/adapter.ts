@@ -9,10 +9,8 @@ export {
 export { adapterCapabilities, EssenceDebugSession } from "./session"
 export type { AdapterOptions }
 
-// One DAP session over stdio — exactly what a `DebugAdapterExecutable`
-// spawn, or `DebugClient` in a spec, expects to find on the other end. stdout
-// is the protocol channel, so nothing in the adapter may ever print to it;
-// logging belongs on stderr.
+// One DAP session over stdio. stdout is the protocol channel, so the adapter
+// never prints to it; logging goes to stderr.
 export function startAdapter(options: AdapterOptions = {}): void {
 	let session = new EssenceDebugSession(options)
 

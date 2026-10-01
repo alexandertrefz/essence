@@ -1,20 +1,16 @@
 import type { BundleMap, OriginalPosition } from "./maps"
 import { demangleName } from "./names"
 
-// How a CDP stack becomes the one the user reads. Three kinds of frame
-// come up from the debuggee: `user` frames that map to a `.es` line, standard
-// library frames — unmapped, but named `$es_<Namespace>_<member>` — and glue:
-// dispatch trampolines, the inlined runtime, module bootstrap. Glue is hidden
-// by default (`glueFrames: "subtle"` shows it greyed out); standard library
-// frames stay, subtle, under their Essence names — they are the frames a user
-// DOES want to see of a `sorted` that called their comparator.
+// How a CDP stack becomes the one the user reads: user, standard library and
+// glue frames, with a `match` shown as one frame. See "The call stack" in
+// DEVELOPMENT.md.
 
 export type CdpCallFrame = {
 	callFrameId: string
 	functionName: string
 	location: { scriptId: string; lineNumber: number; columnNumber?: number }
-	// Carried by every real pause and read by `scopes`; the frame
-	// presentation itself never looks inside.
+	// Carried by every real pause and read by `scopes`, not by
+	// `presentFrames`.
 	scopeChain?: Array<{
 		type: string
 		name?: string
@@ -23,14 +19,13 @@ export type CdpCallFrame = {
 }
 
 export type PresentedFrame = {
-	// Which raw CDP frame this presents — `scopes` reads the frame's
-	// scope chain off it, so a merged frame keeps the INNER index, whose
-	// chain holds the handler's own bindings.
+	// The raw CDP frame whose scope chain `scopes` reads. A merged frame keeps
+	// the inner index, whose chain holds the handler's own bindings.
 	callFrameIndex: number
 	name: string
 	kind: "user" | "stdlib" | "glue"
-	// 1-based line, 0-based column — the map's own conventions; the
-	// session converts for the client.
+	// 1-based line and 0-based column, as the map has them. The session
+	// converts for the client.
 	source: OriginalPosition | null
 }
 
@@ -65,15 +60,9 @@ export function presentFrames(
 		}
 	})
 
-	// The match merge. A `match` lowers to an immediately-invoked
-	// function, so pausing inside a handler shows an anonymous frame over the
-	// enclosing function — one construct, two frames. The anonymous frame
-	// absorbs its caller's NAME while keeping its own position and scope
-	// chain, and the caller's frame disappears. The guard is deliberate: only
-	// an anonymous frame, only user-mapped, only over a user frame of the
-	// same source — a Function value passed to the standard library sits over
-	// glue instead, and V8 names one bound to a declaration after it, so
-	// neither is absorbed.
+	// An anonymous user frame over a user frame of the same source is a
+	// `match`, and takes its caller's name. See "The call stack" in
+	// DEVELOPMENT.md.
 	let merged: Array<PresentedFrame> = []
 	let index = 0
 
@@ -103,10 +92,8 @@ export function presentFrames(
 		(frame) => glueFrames === "subtle" || frame.kind !== "glue",
 	)
 
-	// What is left anonymous after the merge is one of two things: a
-	// module's own top level — the LAST user frame there is, best named after
-	// its file — or a match sitting over glue, which reads as the construct
-	// it is.
+	// Still anonymous after the merge: the module's top level, the last user
+	// frame, named after its file; or a `match` over glue, named `match`.
 	let lastUserIndex = presented.findLastIndex(
 		(frame) => frame.kind === "user",
 	)

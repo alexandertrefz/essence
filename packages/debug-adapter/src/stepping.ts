@@ -1,11 +1,7 @@
 import type { BundleMap } from "./maps"
 
-// What V8 is told to step over. `Debugger.setBlackboxedRanges` takes a
-// list of TOGGLE positions — the interval before the first is plain, the one
-// after it blackboxed, and so on — so the bundle's mapped lines are collected
-// into runs and everything between them, prelude and runtime alike, becomes
-// territory a step passes straight through. Breakpoints inside blackboxed
-// ranges still hit; only stepping is carried over them.
+// What V8 is told to step over: everything between the runs of the bundle's
+// mapped lines. See "Stepping" in DEVELOPMENT.md.
 
 type ScriptPosition = {
 	lineNumber: number
@@ -38,11 +34,9 @@ export function blackboxPositions(map: BundleMap): Array<ScriptPosition> {
 		return []
 	}
 
-	// Blackboxing starts at the top of the file — the first toggle at
-	// 0:0 switches it ON — and every run of mapped lines switches it off and
-	// back on around itself. A run that begins at line 0 makes the leading
-	// toggle pair degenerate, so it is dropped rather than sent as an empty
-	// interval.
+	// The interval before the first toggle is plain, so the toggle at 0:0
+	// starts blackboxing. A run starting at line 0 would leave an empty
+	// interval, so its leading pair is dropped.
 	let positions: Array<ScriptPosition> = [{ lineNumber: 0, columnNumber: 0 }]
 
 	for (let [start, end] of runs) {

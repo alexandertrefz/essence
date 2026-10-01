@@ -1,7 +1,6 @@
-// The debuggee side of the adapter: Chrome DevTools Protocol over a
-// WebSocket, spoken with the global `WebSocket` both Node and Bun ship — the
-// surface used (the Debugger and Runtime domains) is small enough that a
-// client library would mostly be weight.
+// The debuggee side of the adapter: Chrome DevTools Protocol over the global
+// `WebSocket`. Only the Debugger and Runtime domains are used, too little to
+// need a client library.
 
 type PendingCommand = {
 	resolve: (result: unknown) => void
@@ -22,9 +21,8 @@ export class CdpConnection {
 			this.receive(String(event.data))
 		})
 		socket.addEventListener("close", () => {
-			// Commands still in flight when the debuggee dies would hang
-			// their callers forever — a session that ends mid-step must
-			// settle, not stall.
+			// Commands in flight when the debuggee dies are rejected, so a
+			// session that ends mid-step settles rather than hangs.
 			for (let [, command] of this.pending) {
 				command.reject(new Error("the inspector connection closed"))
 			}

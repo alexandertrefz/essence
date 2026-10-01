@@ -1,13 +1,10 @@
 import { demangleName, isCompilerBinding } from "./names"
 
-// The pure half of the Variables view: which bindings a scope shows and
-// under what names. The CDP traffic around it — property reads, the batched
-// in-debuggee rendering — lives with the session, which owns the connection.
+// The pure half of the Variables view: which bindings a scope shows and under
+// what names. The session does the CDP traffic.
 
-// Null hides the binding. The compiler's own names never surface, a
-// placeholder parameter (`_0` stands where no name was bound) has nothing to
-// show, and the receiver every Method is emitted with reads back as the
-// `self` the author's `@` means.
+// Null hides the binding: a compiler name, or a placeholder parameter such as
+// `_0` for an unnamed one. The emitted receiver `_self` reads as `self`.
 export function presentScopeVariableName(name: string): string | null {
 	if (isCompilerBinding(name)) {
 		return null
@@ -24,10 +21,8 @@ export function presentScopeVariableName(name: string): string | null {
 	return demangleName(name)
 }
 
-// Which of a paused frame's scopes are worth a row. The module and
-// global scopes hold the bundle's own machinery — imports, the hoisted
-// prelude — which the scope filter above would empty out one binding at a
-// time anyway.
+// Which of a paused frame's scopes get a row. The module and global scopes
+// hold the bundle's imports and prelude, none of which the author wrote.
 export function isPresentableScope(scopeType: string): boolean {
 	return (
 		scopeType === "local" ||
@@ -47,9 +42,8 @@ export type RemoteObject = {
 	description?: string
 }
 
-// A live value, re-spelled as a `callFunctionOn` argument — by
-// reference when it is an object, by its wire spelling when it is a bigint,
-// by value otherwise.
+// A live value as a `callFunctionOn` argument: by reference for an object, by
+// its unserializable spelling for a bigint, by value otherwise.
 export function toCallArgument(value: RemoteObject): object {
 	if (value.objectId !== undefined) {
 		return { objectId: value.objectId }
@@ -62,8 +56,7 @@ export function toCallArgument(value: RemoteObject): object {
 	return { value: value.value }
 }
 
-// What a value shows when the in-debuggee renderer answered nothing —
-// it was not an Essence value, so CDP's own description is the honest line.
+// What a value that is not an Essence value shows: CDP's own description.
 export function fallbackDisplay(value: RemoteObject): string {
 	return value.description ?? String(value.value)
 }

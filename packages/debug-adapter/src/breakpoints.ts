@@ -1,18 +1,15 @@
 import type { BundleMap, GeneratedPosition } from "./maps"
 
-// The pure half of `setBreakpoints`: which CDP breakpoints one request
-// wants, and what the client is told about each. DAP semantics are
-// replace-per-source — the session keeps the ledger of what is currently set
-// and removes it when the same source is asked about again; this module only
-// translates.
+// The pure half of `setBreakpoints`: which CDP breakpoints one request wants,
+// and what the client is told about each. DAP replaces a source's breakpoints
+// per request; the session removes the old ones.
 
 type PlannedBreakpoint = {
 	// What the client asked for, answered back in request order.
 	requestedLine: number
 	verified: boolean
-	// The `.es` line the debugger will genuinely stop on — a breakpoint
-	// on a blank line slides to the next statement, and saying so is what
-	// moves the red dot.
+	// The `.es` line the debugger stops on. A breakpoint on a blank line
+	// slides to the next statement, and reporting that moves the client's dot.
 	line: number
 	generated: GeneratedPosition | null
 	message: string | null
@@ -51,9 +48,8 @@ export function planBreakpoints(
 			}
 		}
 
-		// The snap-back: the generated position the breakpoint lands on
-		// is asked where IT came from, so the line reported verified is the
-		// one execution will actually pause on.
+		// The generated position is mapped back, so the verified line is the
+		// one execution pauses on.
 		let original = map.originalPositionFor(generated)
 
 		return {

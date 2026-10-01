@@ -1,20 +1,21 @@
-// The Rewriter's naming, read backwards — what a JavaScript frame or
-// binding is called in Essence. Every rule here mirrors one in
-// `packages/compiler/src/rewriter/rewrite.ts`, and each is injective there, so
-// reading them back cannot guess wrong: `$user_` mangling keeps `[A-Za-z0-9$]`
-// and writes every other character as `_<hex>_` (no Essence identifier
-// contains `_` — the Lexer reads it as a Symbol); a reserved word is
-// `_`-prefixed; an overload is `__overload$N`; a standard library Method is
-// `$es_<Namespace>_<member>`, and a Protocol's provided Method
-// `$es_<Protocol>__<member>` or `$es_<Protocol>_<n>__<member>`.
+// The compiler's naming read backwards: what a JavaScript frame or binding is
+// called in Essence. Each rule mirrors an injective one in
+// `packages/compiler/src/rewriter/rewrite.ts`, so reading it back is exact.
+//
+// - `$user_` mangling keeps `[A-Za-z0-9$]` and writes any other character as
+//   `_<hex>_`. No Essence identifier holds a `_`, which lexes as a Symbol.
+// - A reserved word is prefixed with `_`, and an overload ends `__overload$N`.
+// - A standard library Method is `$es_<Namespace>_<member>`.
+// - A Protocol's provided Method is `$es_<Protocol>__<member>` or
+//   `$es_<Protocol>_<n>__<member>`.
 
 const mangledNamePrefix = "$user_"
 const stdlibMethodPrefix = "$es_"
 const overloadSuffix = /__overload\$\d+$/
 const providedMethod = /^([^_]+)(?:_\d+)?__(.+)$/
 
-// The same list the Rewriter escapes — a `_new` in a frame is the
-// user's `new`, while `_self` (not reserved) is the compiler's receiver.
+// The words the Rewriter escapes. A `_new` in a frame is the user's `new`,
+// while `_self` is the compiler's receiver.
 const reservedJavaScriptWords = new Set([
 	"break",
 	"case",
@@ -76,9 +77,8 @@ function demangleUserName(mangled: string): string {
 
 import { isSynthesizedName } from "@essence-lang/compiler/helpers"
 
-// One emitted name, answered as the author spelled it. The overload
-// suffix goes first — it is appended to an already-escaped name — and what
-// remains is exactly one of the Rewriter's cases, or already the name itself.
+// One emitted name as the author spelled it. The overload suffix is appended
+// to an escaped name, so it comes off first.
 export function demangleName(name: string): string {
 	let base = name.replace(overloadSuffix, "")
 
@@ -110,8 +110,9 @@ export function demangleName(name: string): string {
 	return base
 }
 
-// The forward direction, for `evaluate` — a single identifier the user
-// types is retried under the name the emitted JavaScript actually binds.
+// The forward direction, for `evaluate`: a single identifier the user types is
+// retried under its escaped name. Unlike `escapeName`, it leaves names in
+// `compilerOwnedNames` unmangled.
 export function escapeNameForEvaluation(name: string): string {
 	if (reservedJavaScriptWords.has(name)) {
 		return `_${name}`
@@ -132,19 +133,16 @@ export function escapeNameForEvaluation(name: string): string {
 	return mangled
 }
 
-// Whether a binding is the compiler's own rather than the author's —
-// what the Variables view leaves out of a scope.
+// Whether a binding is the compiler's own rather than the author's, which the
+// Variables view leaves out of a scope.
 export function isCompilerBinding(name: string): boolean {
 	return (
 		name === "$type" ||
 		name === "$helpers" ||
 		name === "$_" ||
-		// What a Pattern holds its value in while it reads the members
-		// off — `$pattern_6_12`, `$parameter_9_4`. The names the Pattern BINDS
-		// are the author's and stay; this is the one the Compiler made up, and
-		// it is the first Enricher-produced binding a reader could ever have
-		// seen, since every other one belongs to the Optimiser and a debug
-		// session compiles without it.
+		// The binding a Pattern reads its members off, such as
+		// `$pattern_6_12`. The names the Pattern binds are the author's and
+		// stay.
 		isSynthesizedName(name) ||
 		name.startsWith(stdlibMethodPrefix) ||
 		name.endsWith("__conformance")

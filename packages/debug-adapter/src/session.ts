@@ -40,9 +40,8 @@ import {
 	toCallArgument,
 } from "./variables"
 
-// Module-level and exported, so the spec can read what the adapter
-// promises without starting one — the same shape `serverCapabilities` has in
-// the Language Server.
+// Exported, so a spec can read what the adapter promises without starting
+// one.
 export const adapterCapabilities: DebugProtocol.Capabilities = {
 	supportsConfigurationDoneRequest: true,
 	supportsExceptionInfoRequest: true,
@@ -63,31 +62,21 @@ export const adapterCapabilities: DebugProtocol.Capabilities = {
 	],
 }
 
-// The object group every handle the Variables view mints in the debuggee
-// belongs to. A row expands through one `callFunctionOn` that BUILDS an array
-// over there, and `Runtime.getProperties` wraps what it answers in the group of
-// the object it was asked about — so naming the group on that one call is what
-// puts the entry Records read back off the array into it too.
-//
-// It is the Dictionary path this is really about. A List's items are the
-// Program's OWN values, reachable from the box a reader is looking at whether
-// the debugger holds a handle to them or not; a Dictionary's entries are minted
-// by `essenceDictionaryEntries` and nothing but the handle holds them. Released
-// nowhere, a session that opened one Dictionary row per pause would leave one
-// Record per entry standing in the debuggee for as long as it ran.
+// The object group of every handle the Variables view mints in the debuggee,
+// released on each pause and resume. See "Releasing handles" in
+// DEVELOPMENT.md.
 const VARIABLE_OBJECT_GROUP = "essence-variables"
 
 export type AdapterOptions = {
-	// What compiling means is the host's to say — `essence dap` injects
-	// its in-process pipeline, `bin/esdap` a spawn of the CLI. Absent, a
-	// launch that names no precompiled `artifact` fails with a clear message.
+	// `essence dap` injects its in-process pipeline, `bin/esdap` a spawn of
+	// the CLI. Without one, a launch needs a precompiled `artifact`.
 	compile?: CompileFunction
 }
 
 type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	program?: string
-	// A precompiled bundle, its `.map` beside it — the way to debug
-	// without compiling, and the way a host without a compiler still works.
+	// A precompiled bundle with its `.map` beside it, debugged without
+	// compiling.
 	artifact?: string
 	args?: Array<string>
 	cwd?: string
@@ -96,24 +85,21 @@ type EssenceLaunchArguments = DebugProtocol.LaunchRequestArguments & {
 	keepArtifacts?: boolean
 	glueFrames?: "hide" | "subtle"
 	runtimeExecutable?: string
-	// The structural ids of the tests to debug. Present at all — the
-	// empty Array included, which means every test of the file — the `program`
-	// is compiled WITH its `tests { … }` block and the session launches a
-	// runner that asks the bundle for those tests. Absent, a launch is what it
-	// has always been: the Program itself, run.
+	// The structural ids of the tests to debug, where an empty Array means
+	// every test. When present, `program` is compiled with its `tests { … }`
+	// block and a runner runs those tests instead of the Program.
 	tests?: Array<string>
 }
 
-// The emitted bundle runs on one thread; DAP still speaks in thread
-// ids, so there is exactly one, and it is this.
+// The bundle runs on one thread, and DAP still speaks in thread ids.
 const MAIN_THREAD_ID = 1
 
 type Debuggee = {
 	child: ChildProcess
 	cdp: CdpConnection
 	bundlePath: string
-	// The URL Node knows the bundle's script under — what a CDP
-	// breakpoint is addressed to.
+	// The URL Node knows the bundle's script under, which a CDP breakpoint
+	// is addressed to.
 	bundleUrl: string
 	map: BundleMap | null
 	scratchDirectory: string | null
@@ -127,9 +113,8 @@ type PausedParameters = {
 	data?: unknown
 }
 
-// What a `variablesReference` stands for: a scope's bindings, an
-// object's own members, or a List or a Dictionary — whose items and entries are
-// the ones its view holds, which the debuggee has to be asked for.
+// What a `variablesReference` stands for: a scope's bindings, an object's own
+// members, or a List or Dictionary, whose view the debuggee is asked for.
 type VariableContainer = {
 	kind: "scope" | "members" | "list" | "dictionary"
 	objectId: string
@@ -150,9 +135,8 @@ export class EssenceDebugSession extends DebugSession {
 
 		this.compile = options.compile ?? null
 
-		// The debuggee side speaks CDP, which is 0-based on both axes —
-		// the base class's convert helpers translate to whatever the client
-		// declared in `initialize`.
+		// CDP is 0-based on both axes. The base class converts to whatever
+		// the client declared in `initialize`.
 		this.setDebuggerLinesStartAt1(false)
 		this.setDebuggerColumnsStartAt1(false)
 	}
@@ -169,10 +153,9 @@ export class EssenceDebugSession extends DebugSession {
 		response: DebugProtocol.LaunchResponse,
 		args: EssenceLaunchArguments,
 	): Promise<void> {
-		// "Run Without Debugging" arrives as `noDebug` — the program
-		// still runs under the adapter, but nothing pauses it: the client
-		// sends no breakpoints, and exceptions and `stopOnEntry` stand down
-		// here.
+		// "Run Without Debugging" arrives as `noDebug`. The program still
+		// runs under the adapter, but the client sends no breakpoints and
+		// exceptions and `stopOnEntry` pause nothing.
 		this.stopOnEntry = args.stopOnEntry === true && args.noDebug !== true
 		this.glueFramesMode = args.glueFrames === "subtle" ? "subtle" : "hide"
 
@@ -194,10 +177,8 @@ export class EssenceDebugSession extends DebugSession {
 		try {
 			let launched = await launchProgram({
 				runtime: args.runtimeExecutable ?? "node",
-				// What is LAUNCHED and what is MAPPED are two files when
-				// the launch names tests: the runner beside the bundle is the
-				// entry, and the bundle is what breakpoints are addressed to.
-				// They are the same file for every other launch.
+				// A launch that names tests runs the runner beside the
+				// bundle; breakpoints still address the bundle.
 				entryPath: entryPath ?? bundlePath!,
 				programArguments: args.args ?? [],
 				cwd: args.cwd ?? path.dirname(sourcePath),
@@ -230,9 +211,8 @@ export class EssenceDebugSession extends DebugSession {
 
 		let { child, cdp } = this.debuggee
 
-		// The exit path is wired before anything can run. `ExitedEvent`
-		// carries the code, `TerminatedEvent` ends the session — and both are
-		// sent exactly once, however the program went down.
+		// Wired before anything runs. `ExitedEvent` carries the code and
+		// `TerminatedEvent` ends the session, each sent exactly once.
 		child.on("exit", (code, signal) => {
 			this.removeScratchDirectory(
 				this.debuggee?.scratchDirectory ?? null,
@@ -245,19 +225,16 @@ export class EssenceDebugSession extends DebugSession {
 			this.onPaused(params),
 		)
 
-		// A finished program does not exit while an inspector client is
-		// attached — Node prints "Waiting for the debugger to disconnect..."
-		// and holds the process for exactly that. The context being destroyed
-		// IS the program's end, so the disconnect is answered here, which lets
-		// the child exit and carry its real exit code to the handler above.
+		// Node keeps a finished program alive while an inspector is attached.
+		// The destroyed context is the program's end, so disconnecting lets
+		// the child exit with its real code.
 		cdp.on("Runtime.executionContextDestroyed", () => {
 			cdp.close()
 		})
 
-		// The moment the bundle's script exists, everything its map
-		// does not cover is declared blackboxed — V8 then carries every step
-		// over the prelude and the runtime natively, and the manual loop in
-		// `onPaused` is only the safety net.
+		// Everything the bundle's map does not cover is blackboxed, so V8
+		// steps over the prelude and runtime itself. See "Stepping" in
+		// DEVELOPMENT.md.
 		cdp.on<{ scriptId: string; url: string }>(
 			"Debugger.scriptParsed",
 			(params) => {
@@ -284,11 +261,9 @@ export class EssenceDebugSession extends DebugSession {
 			},
 		)
 
-		// The entry pause: `--inspect-brk` holds the program before its
-		// first statement, and the engine only starts once
-		// `Runtime.runIfWaitingForDebugger` is sent — so the pause that
-		// follows it is awaited HERE, and never surfaces as a stop. It is the
-		// window in which the client sets its breakpoints.
+		// `--inspect-brk` holds the program before its first statement. The
+		// pause after `Runtime.runIfWaitingForDebugger` is awaited here and
+		// never shown; the client sets its breakpoints during it.
 		let entryPause = new Promise<void>((resolve) => {
 			let seen = false
 
@@ -312,17 +287,12 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
-	// Which pauses reach the client: the entry pause is the adapter's
-	// own and `configurationDone` decides what becomes of it, so it is
-	// swallowed here — `lastPause` is only ever a pause the program earned.
+	// The entry pause is the adapter's own, and `configurationDone` decides
+	// what becomes of it, so `onPaused` does not report it.
 	private entryPauseSeen = false
 
-	// The manual smart step, alive between a step request and the stop
-	// it earns. Blackboxing does most of the carrying; this loop covers what
-	// it cannot — a landing in unmapped code is stepped onwards, a `next`
-	// that lands on the SAME `.es` line goes again (one source line can be
-	// several generated statements) — and a spent budget stops right where it
-	// is, so a user is never silently run away from.
+	// The manual step, alive between a step request and the stop it earns.
+	// See "Stepping" in DEVELOPMENT.md.
 	private pendingStep: {
 		kind: "next" | "stepIn" | "stepOut"
 		stopReason: "step" | "entry"
@@ -370,8 +340,8 @@ export class EssenceDebugSession extends DebugSession {
 			step.budget -= 1
 
 			if (original === null) {
-				// Unmapped ground. A step-in keeps drilling forward; a
-				// next or step-out climbs back out of the glue it landed in.
+				// Unmapped code. A step-in keeps going forward; a next or
+				// step-out climbs back out of the glue it landed in.
 				this.debuggee?.cdp
 					.send(
 						step.kind === "stepIn"
@@ -456,11 +426,9 @@ export class EssenceDebugSession extends DebugSession {
 	): Promise<void> {
 		if (this.debuggee !== null) {
 			if (this.stopOnEntry) {
-				// The raw entry pause sits at the bundle's first
-				// statement — runtime glue. "Stop on entry" means the first
-				// statement the AUTHOR wrote, so the entry is a smart step:
-				// blackboxing carries it over the glue, and the pending step's
-				// reason makes the landing read as `entry`, not `step`.
+				// The entry pause sits in runtime glue, so stopping on entry
+				// steps in to the author's first statement and reports the
+				// stop as `entry`.
 				this.beginStep("stepIn", "entry")
 				await this.debuggee.cdp
 					.send("Debugger.stepInto")
@@ -488,9 +456,8 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendResponse(response)
 	}
 
-	// What is currently set per client source — DAP's `setBreakpoints`
-	// REPLACES a source's set wholesale, so the previous CDP breakpoints are
-	// removed before the new ones are planted.
+	// The CDP breakpoints set per client source. `setBreakpoints` replaces a
+	// source's set, so the previous ones are removed first.
 	private breakpointLedger = new Map<string, Array<string>>()
 
 	protected override async setBreakPointsRequest(
@@ -557,9 +524,8 @@ export class EssenceDebugSession extends DebugSession {
 
 				identifiers.push(result.breakpointId)
 
-				// V8 may itself slide the breakpoint to the nearest
-				// breakable position; where THAT came from is the line the
-				// red dot belongs on.
+				// V8 may slide the breakpoint to the nearest breakable
+				// position, so that position's source line is reported.
 				let actual = result.locations[0]
 				let line = plan.line
 
@@ -630,9 +596,8 @@ export class EssenceDebugSession extends DebugSession {
 			return
 		}
 
-		// Presented once per stop and kept — a frame's DAP id is its
-		// index in here, which is what `scopes` resolves back to the raw CDP
-		// frame whose chain it reads.
+		// Kept per stop: a frame's DAP id is its index here, which `scopes`
+		// resolves back to the raw CDP frame.
 		this.presentedFrames = presentFrames(
 			pause.callFrames,
 			debuggee.map,
@@ -653,8 +618,7 @@ export class EssenceDebugSession extends DebugSession {
 						id: start + offset,
 						name: frame.name,
 						line: frame.source?.line ?? 0,
-						// The map speaks 0-based columns, the client
-						// 1-based ones.
+						// The map's columns are 0-based, the client's 1-based.
 						column:
 							frame.source === null ? 0 : frame.source.column + 1,
 					}
@@ -742,24 +706,15 @@ export class EssenceDebugSession extends DebugSession {
 				},
 			)
 		} else if (container.kind === "members") {
-			// The tag rides on a symbol — reported by `getProperties`
-			// as a `Symbol($type)` row — and the display already spelled it.
+			// The tag's `Symbol($type)` row is left out, since the display
+			// already shows the tag.
 			entries = (await this.ownProperties(container.objectId)).filter(
 				(entry) => !entry.name.startsWith("Symbol("),
 			)
 		} else {
-			// A List's items are NOT its inner array's, and a
-			// Dictionary's entries are not its store's slots. Both hold a
-			// structure SHARED with the other boxes of their chain: a List's
-			// array can run past what this box views and a box that was
-			// prepended to holds a second, reversed run in front of it, while a
-			// store carries versions stamped past this box's generation and
-			// tombstoned slots for the keys it no longer holds. So the debuggee
-			// is asked for the logical items, in order, as an array of its own,
-			// and those are what the row expands to. A box that will not answer
-			// expands to nothing rather than to items it does not have. The
-			// box's own properties are never read here: the inner array and the
-			// store are the one thing they hold that must not be shown.
+			// A List or Dictionary shares its Arrays or store with its chain,
+			// so the debuggee is asked for the box's view instead of its
+			// properties. A box that does not answer expands to nothing.
 			let items = await this.viewedItems(
 				container.objectId,
 				container.kind === "list"
@@ -774,11 +729,8 @@ export class EssenceDebugSession extends DebugSession {
 					/^\d+$/.test(entry.name),
 				)
 
-				// The array was built for this one expansion and the
-				// items are held by their own handles now, so the debuggee is
-				// told to let it go. Nothing else here leaves an object behind
-				// — every other call answers by value — and a session that
-				// steps through list-heavy code expands rows without end.
+				// The Array was built for this expansion and the items have
+				// their own handles now, so the Array is released.
 				await this.releaseObject(items)
 			}
 		}
@@ -849,10 +801,9 @@ export class EssenceDebugSession extends DebugSession {
 		}
 	}
 
-	// The box, handed to itself as the call's argument, answers a fresh
-	// array of what its view holds — a List's items, a Dictionary's entries —
-	// kept over there, by reference, so that every one of them is still the
-	// live value the row below it expands.
+	// The box, passed to itself as the argument, answers a new Array of what
+	// its view holds. The Array stays in the debuggee, so each item is the
+	// live value its row expands.
 	private async viewedItems(
 		objectId: string,
 		source: string,
@@ -880,11 +831,8 @@ export class EssenceDebugSession extends DebugSession {
 		}
 	}
 
-	// Everything this pane pinned over there, let go where the handles
-	// naming it are dropped — a new pause and a resume, which are the two
-	// moments a `variablesReference` stops meaning anything. The array itself is
-	// released as soon as it has been read; what this is for is what was read
-	// OUT of it, which `getProperties` handed back in this same group.
+	// Releases what the Variables view holds in the debuggee, on each pause
+	// and resume. See "Releasing handles" in DEVELOPMENT.md.
 	private releaseVariableObjects(): void {
 		this.debuggee?.cdp
 			.send("Runtime.releaseObjectGroup", {
@@ -892,7 +840,7 @@ export class EssenceDebugSession extends DebugSession {
 			})
 			.catch(() => {
 				// A debuggee that has minted nothing yet, or a session
-				// closing under us. There is nothing to let go either way.
+				// closing. There is nothing to release either way.
 			})
 	}
 
@@ -907,15 +855,13 @@ export class EssenceDebugSession extends DebugSession {
 			await debuggee.cdp.send("Runtime.releaseObject", { objectId })
 		} catch {
 			// A handle the debuggee has already dropped, or a session
-			// closing under us. Either way there is nothing left to release.
+			// closing. There is nothing to release either way.
 		}
 	}
 
-	// One round trip per container: every value goes over as a live
-	// argument, one JSON answer comes back. A scope object sometimes refuses
-	// to be a call target, so the first member that IS an object stands in;
-	// and a batch that fails entirely degrades to default descriptions, never
-	// to a failed request.
+	// One round trip per container. A scope object sometimes refuses to be a
+	// call target, so the first member that is an object stands in. A failed
+	// batch falls back to default descriptions.
 	private async describeValues(
 		targetObjectId: string,
 		entries: Array<{ name: string; value: RemoteObject }>,
@@ -971,11 +917,9 @@ export class EssenceDebugSession extends DebugSession {
 				: undefined
 		let description = data?.description ?? "An exception was thrown."
 
-		// A thrown Error's `description` is its message with V8's OWN
-		// stack behind it — bundle positions, glue and all. The first line is
-		// the message (`noCaseMatched`'s is already Essence-phrased and comes
-		// through untouched); the stack shown in details is the SESSION's,
-		// mapped and filtered like any other.
+		// A thrown Error's `description` is its message followed by V8's
+		// stack of bundle positions. Only the message is kept; the stack shown
+		// is the session's mapped one.
 		response.body = {
 			exceptionId: data?.className ?? "Error",
 			description: description.split("\n")[0]!,
@@ -1040,10 +984,9 @@ export class EssenceDebugSession extends DebugSession {
 
 		let result = await evaluate(args.expression)
 
-		// The console speaks JavaScript over the compiled frame — that
-		// is documented — but a single identifier deserves one mercy: a name
-		// the emitted Program binds differently (`ok?`, `new`) is retried
-		// under its emitted spelling before the failure is reported.
+		// The console evaluates JavaScript in the compiled frame. A single
+		// identifier the bundle binds differently, such as `ok?` or `new`, is
+		// retried under its emitted spelling.
 		if (
 			result.exceptionDetails !== undefined &&
 			/^\S+$/.test(args.expression)
@@ -1128,8 +1071,8 @@ export class EssenceDebugSession extends DebugSession {
 		this.variableHandles.reset()
 		this.releaseVariableObjects()
 		await this.debuggee?.cdp.send("Debugger.resume").catch(() => {
-			// A resume can race the program's own exit; the exit path
-			// already reports what happened.
+			// A resume can race the program's exit, which the exit path
+			// reports.
 		})
 	}
 
@@ -1143,14 +1086,9 @@ export class EssenceDebugSession extends DebugSession {
 		this.sendEvent(new TerminatedEvent())
 	}
 
-	// What `launch` runs: the named `artifact` verbatim, or the program
-	// compiled into a scratch directory that lives exactly as long as the
-	// session (`keepArtifacts` keeps it for reading, and says where it is).
-	//
-	// `entryPath` is what node is pointed at and `bundlePath` what the
-	// map describes. They differ for one launch: a session debugging a test
-	// launches a runner beside the bundle, because a test bundle publishes its
-	// registry and runs nothing on its own. Absent, the bundle is the entry.
+	// The named `artifact` as it is, or the program compiled into a scratch
+	// directory that lives as long as the session. `keepArtifacts` keeps it
+	// and names it. `entryPath`, when given, is a test runner beside the bundle.
 	private async prepareBundle(args: EssenceLaunchArguments): Promise<{
 		bundlePath?: string
 		entryPath?: string
@@ -1180,17 +1118,13 @@ export class EssenceDebugSession extends DebugSession {
 			}
 		}
 
-		// Canonicalised the moment it exists. On macOS the temporary
-		// directory is a symlink — `/var/folders/…` for `/private/var/…` — and
-		// Node registers the script under its REAL path, so a breakpoint
-		// addressed to the symlinked spelling would never match its URL.
+		// On macOS the temporary directory is a symlink, and Node registers
+		// the script under its real path, which a breakpoint's URL must match.
 		let scratchDirectory = realpathSync(
 			mkdtempSync(path.join(tmpdir(), "essence-dap-")),
 		)
-		// `.mjs` for a test bundle, `.js` for everything else. A runner
-		// importing the bundle beside it is read as the module it is only if
-		// the extension says so, and the extension is the one thing about the
-		// name that is free to change.
+		// A test bundle is `.mjs`, so the runner's `import` reads it as a
+		// module.
 		let tests = Array.isArray(args.tests)
 		let outputFile = path.join(
 			scratchDirectory,
@@ -1229,10 +1163,8 @@ export class EssenceDebugSession extends DebugSession {
 			return { bundlePath: compiled.bundlePath, scratchDirectory }
 		}
 
-		// Beside the bundle, in the directory that goes with the session.
-		// The runner imports the bundle by name, so the two must be siblings —
-		// and being a second file is what keeps the bundle byte for byte the
-		// file its map describes.
+		// The runner imports the bundle by name, so they are siblings. A
+		// separate file keeps the bundle the exact file its map describes.
 		let entryPath = path.join(scratchDirectory, "run-tests.mjs")
 
 		writeFileSync(
@@ -1271,9 +1203,8 @@ export class EssenceDebugSession extends DebugSession {
 		if (debuggee.child.exitCode === null) {
 			debuggee.child.kill()
 
-			// A program that ignores SIGTERM would outlive its session;
-			// the escalation is unreferenced so a clean exit is not held open
-			// by a live timer.
+			// A program that ignores SIGTERM is killed after two seconds. The
+			// timer is unreferenced so it does not hold a clean exit open.
 			let escalation = setTimeout(() => {
 				if (debuggee.child.exitCode === null) {
 					debuggee.child.kill("SIGKILL")

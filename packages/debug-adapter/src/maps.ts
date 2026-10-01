@@ -4,11 +4,9 @@ import * as path from "node:path"
 import type { RawSourceMap } from "source-map"
 import { SourceMapConsumer } from "source-map"
 
-// The bundle's map, wrapped in the two questions a session asks of it:
-// where a source line landed in the bundle (breakpoints) and where a bundle
-// position came from (stacks, stops). Conventions are pinned HERE and nowhere
-// else: `.es` lines are 1-based and columns 0-based — the source-map library's
-// own — and generated positions are CDP's, 0-based on both axes.
+// The bundle's map, asked where a source line landed in the bundle and where
+// a bundle position came from. `.es` lines are 1-based and columns 0-based, as
+// the source-map library has them; generated positions are CDP's, 0-based.
 
 export type GeneratedPosition = {
 	line: number
@@ -30,8 +28,8 @@ export class BundleMap {
 		this.sources = [...raw.sources]
 	}
 
-	// Null when the bundle carries no map beside it — a session without
-	// one still runs; it just binds no breakpoints and maps no frames.
+	// Null when the bundle has no map beside it. Such a session still runs,
+	// but binds no breakpoints and maps no frames.
 	static load(bundlePath: string): BundleMap | null {
 		try {
 			return new BundleMap(
@@ -44,9 +42,8 @@ export class BundleMap {
 		}
 	}
 
-	// The map's sources are the compiler's canonical absolute paths; a
-	// client may spell the same file its own way, so the lookup normalises
-	// before it compares.
+	// The map's sources are absolute paths, and a client may spell a file
+	// differently, so both are normalised before comparing.
 	sourceFor(clientPath: string): string | null {
 		let normalised = path.normalize(clientPath)
 
@@ -61,9 +58,9 @@ export class BundleMap {
 		source: string,
 		line: number,
 	): GeneratedPosition | null {
-		// A breakpoint on a blank or comment line should slide to the
-		// next mapped statement, which is what LEAST_UPPER_BOUND answers; the
-		// GREATEST_LOWER_BOUND retry catches a line after the last statement.
+		// `LEAST_UPPER_BOUND` slides a breakpoint on a blank or comment line
+		// to the next statement; `GREATEST_LOWER_BOUND` catches a line after
+		// the last one.
 		for (let bias of [
 			SourceMapConsumer.LEAST_UPPER_BOUND,
 			SourceMapConsumer.GREATEST_LOWER_BOUND,
@@ -103,8 +100,8 @@ export class BundleMap {
 		}
 	}
 
-	// Every mapping of the bundle, generated side, 0-based — what the
-	// stepping logic derives its blackboxed ranges from.
+	// Every mapping of the bundle, with 0-based generated lines, from which
+	// stepping derives its blackboxed ranges.
 	eachMapping(
 		visit: (mapping: {
 			generatedLine: number

@@ -2,12 +2,10 @@ import { spawn } from "node:child_process"
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
-// How a launch gets its bundle. The adapter does not depend on the CLI —
-// the CLI depends on the ADAPTER, and `essence dap` injects a compile built
-// from its own in-process pipeline — so what compiling MEANS is a capability
-// the host hands in, the same way the Language Server is handed
-// `openDocument`. `compileViaCli` is the fallback for hosts that are not the
-// CLI: `bin/esdap`, and any DAP client that spawned the adapter directly.
+// How a launch gets its bundle. The CLI depends on the adapter, not the other
+// way round, so the host hands in a compile: `essence dap` injects its
+// in-process pipeline. `compileViaCli` serves every other host, such as
+// `bin/esdap`.
 
 export type CompileDiagnostic = {
 	file: string
@@ -20,16 +18,14 @@ export type CompileDiagnostic = {
 
 export type CompileResult = {
 	ok: boolean
-	// Absolute path of the emitted bundle, with its `.map` beside it —
-	// null exactly when `ok` is false.
+	// Absolute path of the emitted bundle, with its `.map` beside it. Null
+	// exactly when `ok` is false.
 	bundlePath: string | null
 	diagnostics: Array<CompileDiagnostic>
 }
 
-// What a launch asks of a compile beyond "compile this". One member, and
-// it is the debugger's own: a session stepping through a test needs the
-// `tests { … }` block a build drops, because the block IS the code it steps
-// through.
+// A session stepping through a test sets `tests`, to keep the `tests { … }`
+// block a build drops.
 type CompileOptions = {
 	tests?: boolean
 }
@@ -40,9 +36,9 @@ export type CompileFunction = (
 	options?: CompileOptions,
 ) => Promise<CompileResult>
 
-// The `--json` report, reduced to what a failed launch reports. The
-// shape mirrors `packages/cli/src/json.ts` — reproduced rather than imported,
-// for the same no-dependency reason as above.
+// The `--json` report, reduced to what a failed launch reports. It mirrors
+// `packages/cli/src/json.ts`, copied because the adapter does not depend on
+// the CLI.
 type JSONReport = {
 	ok: boolean
 	files: Array<{
@@ -53,12 +49,9 @@ type JSONReport = {
 	}>
 }
 
-// Which `essence` compiles when none was injected: the CLI sitting
-// beside this package first — `packages/cli/bin/essence` in a checkout, where
-// `bin/esdap` runs from, and `@essence-lang/cli/bin/essence.js` in a published
-// install, where the relative depth is the same — and PATH otherwise. Every
-// candidate carries its own shebang, Bun's or Node's, so the command IS the
-// path.
+// The CLI beside this package first, `bin/essence` in a checkout and
+// `bin/essence.js` in an install, then `PATH`. Each carries its own shebang, so
+// the path is the command.
 function resolveCliCommand(): Array<string> {
 	for (let binaryName of ["essence", "essence.js"]) {
 		let siblingBinary = path.resolve(
@@ -91,16 +84,12 @@ export function compileViaCli(): CompileFunction {
 					"--out",
 					outputFile,
 					"--sourcemap",
-					// `--tests` compiles the block a build drops, so
-					// that the bundle holds the test the session was asked to
-					// step through. It still runs nothing on load.
+					// The bundle holds the test the session steps through, and
+					// still runs nothing on load.
 					...(options.tests === true ? ["--tests"] : []),
-					// The Program as WRITTEN, which is what a debug
-					// session steps through — the same choice `essence dap`
-					// makes when it injects its own compile, made here so that
-					// a host reaching the CLI this way debugs the same
-					// JavaScript. Half the Optimiser's registry exists to drop
-					// Statements, bindings and tests a debugger stops on.
+					// A debug session steps through the Program as written, as
+					// `essence dap` does. Optimisation drops Statements,
+					// bindings and tests a debugger stops on.
 					"--no-optimise",
 					"--json",
 					"--quiet",
@@ -115,9 +104,8 @@ export function compileViaCli(): CompileFunction {
 			child.stdout.on("data", (chunk) => {
 				stdout += chunk
 			})
-			// stdout is the adapter's protocol channel, so the CLI's
-			// own noise must go to stderr — where a DAP client shows it as
-			// adapter logging, if anywhere.
+			// stdout is the adapter's protocol channel, so the CLI's stderr
+			// goes to the adapter's stderr, which a DAP client shows as logging.
 			child.stderr.on("data", (chunk) => {
 				process.stderr.write(String(chunk))
 			})
@@ -143,9 +131,8 @@ export function compileViaCli(): CompileFunction {
 				try {
 					report = JSON.parse(stdout) as JSONReport
 				} catch {
-					// A CLI that died before printing leaves stdout
-					// empty or partial; that is the placeless diagnostic
-					// below.
+					// A CLI that died before printing leaves stdout empty or
+					// partial, reported as a diagnostic with no place.
 				}
 
 				if (report === null) {
