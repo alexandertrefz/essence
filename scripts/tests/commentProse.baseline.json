@@ -1,8 +1,4 @@
 {
-	"examples/league/league.spec.ts": {"sentence-length": 4, "em-dash": 3, "all-caps": 1},
-	"examples/quote-server/essence.ts": {"sentence-length": 1},
-	"examples/quote-server/quote-server.spec.ts": {"sentence-length": 3, "em-dash": 4, "all-caps": 2},
-	"examples/quote-server/server.ts": {"sentence-length": 3, "em-dash": 3, "all-caps": 1},
 	"examples/site-check/check.ts": {"sentence-length": 2, "em-dash": 1},
 	"examples/site-check/essence.ts": {"sentence-length": 1},
 	"examples/site-check/site-check.spec.ts": {"sentence-length": 5, "em-dash": 3, "all-caps": 1},

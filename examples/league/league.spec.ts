@@ -5,10 +5,8 @@ import * as path from "node:path"
 
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
-// The showcase's own tests are Essence — `Standings.es` writes a
-// `tests { … }` section and `Season.tests.es` is a file of nothing else. What
-// is left here is the one thing a bun spec can say that they can not: that
-// `essence test` finds them, runs them and answers with the exit code CI reads.
+// The example's own tests are Essence, in `Standings.es` and `Season.tests.es`.
+// This checks that `essence test` finds and runs them, and exits as CI reads.
 const EXAMPLE = import.meta.dirname
 const ESSENCE = path.join(
 	EXAMPLE,
@@ -20,11 +18,9 @@ const ESSENCE = path.join(
 	"essence",
 )
 
-// A bundle cache of this run's own, so that a spec compiling the example
-// neither answers out of the user's cache nor fills it — and a result cache
-// beside it, for the same reason and one more: this spec runs `essence test` in
-// the example's OWN directory, so an answer left in the user's store would be
-// replayed by the next run a reader does there by hand.
+// Bundle and result caches of this run's own, so the spec neither reads nor
+// fills the user's. It runs `essence test` in the example's directory, where a
+// reader's next run would replay a stored answer.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-league-cache-"))
 const results = mkdtempSync(path.join(tmpdir(), "essence-league-results-"))
 
@@ -54,7 +50,6 @@ async function test(
 
 describe("examples/league", () => {
 	// The budget `scripts/testBudget.ts` gives every spec, written out.
-	// Spawning `essence test` over the example is bounded, deterministic work.
 	it("passes its own tests", async () => {
 		let { code, out } = await test(EXAMPLE)
 
@@ -99,12 +94,9 @@ describe("examples/league", () => {
 			expect(run.stderr).toBe("")
 			expect(run.code).toBe(0)
 
-			// Every claim this program makes, and nothing about the shape
-			// around them. The table's own layout is asserted by the Essence
-			// tests in `Season.tests.es`, against `Table.render` directly; what
-			// is left here is `Main.es`'s own reading of the season, which is
-			// written nowhere a tests section can reach — a Program's body is
-			// not a Method anybody can call.
+			// Every claim the program makes, not its layout, which
+			// `Season.tests.es` checks against `Table.render`. A Program's body is
+			// not callable, so only a run can check `Main.es`.
 			let printed = run.stdout
 
 			for (let claim of [
@@ -125,9 +117,8 @@ describe("examples/league", () => {
 		}
 	})
 
-	// A test that fails, in a directory of its own, so that the exit code
-	// CI reads is proven against a run that really did fail rather than assumed
-	// from the run that passed.
+	// A failing test in a directory of its own, proving the exit code on a run
+	// that really failed.
 	it("exits non-zero when a test fails", async () => {
 		let directory = mkdtempSync(path.join(tmpdir(), "essence-failing-"))
 

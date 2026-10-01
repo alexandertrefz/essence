@@ -6,22 +6,17 @@ import * as path from "node:path"
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 import type { Subprocess } from "bun"
 
-// The pricing rules are tested where they are written — `Pricing.es`,
-// `Money.es` and `Catalog.es` each carry a `tests { … }` section, and
-// `essence test` runs them. What is left here is what only a bun spec can say:
-// that the BOUNDARY carries those answers out — the JSON a client sends
-// becoming Essence values, a Choice becoming `{ $case: … }`, a body the
-// decoder can not read becoming a 400 that names the path — and that the
-// project typechecks against the declarations the plugin wrote.
+// The pricing rules are tested in their own `tests` sections. This checks the
+// boundary: JSON becoming Essence values, a Choice becoming `{ $case: … }`, an
+// unreadable body becoming a 400 naming the path. It also typechecks the
+// project against the plugin's declarations.
 const EXAMPLE = import.meta.dirname
 const REPOSITORY = path.join(EXAMPLE, "..", "..")
 const ESSENCE = path.join(REPOSITORY, "packages", "cli", "bin", "essence")
 
-// A bundle cache of this run's own, so that a spec compiling the rules
-// neither answers out of the user's cache nor fills it — and a result cache
-// beside it, for the same reason and one more: this spec runs `essence test` in
-// the example's OWN directory, so an answer left in the user's store would be
-// replayed by the next run a reader does there by hand.
+// Bundle and result caches of this run's own, so the spec neither reads nor
+// fills the user's. It runs `essence test` in the example's directory, where a
+// reader's next run would replay a stored answer.
 const cache = mkdtempSync(path.join(tmpdir(), "essence-quote-cache-"))
 const results = mkdtempSync(path.join(tmpdir(), "essence-quote-results-"))
 
@@ -100,9 +95,8 @@ describe("examples/quote-server", () => {
 		expect(products.map((product) => product.sku)).toContain("BEAN-250")
 	})
 
-	// The same order `Pricing.es` prices in its own tests, asked for
-	// over HTTP — so what is being checked here is that every member of the
-	// Case survives the crossing, not that the arithmetic is right.
+	// An order `Pricing.es` prices in its own tests, asked over HTTP, so this
+	// checks that every member of the Case survives the crossing.
 	it("carries a price out as plain JSON, member for member", async () => {
 		let { status, json } = await post({
 			lines: [

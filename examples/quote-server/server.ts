@@ -4,19 +4,14 @@ import {
 	EssenceMarshalError,
 } from "@essence-lang/client/errors"
 
-// An ordinary import. The Bun plugin registered in `essence.ts` (see
-// `bunfig.toml`) compiles the Module graph behind it and serves it as
-// marshalled JavaScript: `quote` is a Function taking a plain object and
-// answering one, `catalog` is an Array of them, and `Pricing.d.es.ts` beside
-// the source is what TypeScript reads their Types from. Under `bun --hot`, an
-// edit to any `.es` file in the graph reloads this module with the new rules.
+// An ordinary import. The Bun plugin registered in `essence.ts` compiles the
+// Module graph to marshalled JavaScript, typed by `Pricing.d.es.ts`. Under
+// `bun --hot`, an edit to any `.es` file reloads this module.
 import { catalog, type Order, quote } from "./rules/Pricing.es"
 
-// JavaScript's JSON has no spelling for a bigint, and every Integer
-// crosses the boundary as one — the Type never depends on how big a value
-// happens to be. Every amount here is cents, well inside what a double holds
-// exactly, so a Number is a faithful spelling on the way out. A host that
-// dealt in amounts past 2^53 would send them as strings instead.
+// JSON cannot spell a bigint, and every Integer crosses as one. Amounts here are
+// cents, well within a double's exact range, so a Number is faithful. Larger
+// amounts would go out as strings.
 function toJSON(value: unknown, status: number = 200): Response {
 	return new Response(
 		JSON.stringify(
@@ -46,16 +41,13 @@ const server = Bun.serve({
 				}
 
 				try {
-					// The boundary is the validation. `quote` declares what an
-					// Order is — the keys, their Types, that `zone` is one of three
-					// names, that `coupon` may be missing — and a body that does not
-					// fit is refused BEFORE any rule runs, with the path to the
-					// member that did not fit. Nothing here checks a field by hand.
+					// The boundary validates. A body that does not fit `quote`'s
+					// Order is refused before any rule runs, naming the path to
+					// the member at fault.
 					let answer = quote(body as Input<Order>)
 
-					// A Choice comes back tagged. `Rejected` is a well-formed
-					// order the shop can not price — a different status from a body
-					// the boundary refused.
+					// A Choice comes back tagged. `Rejected` is a well-formed order
+					// the shop cannot price, unlike a body the boundary refused.
 					if (answer.$case === "Quote#Rejected") {
 						return toJSON(answer, 422)
 					}
