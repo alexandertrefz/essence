@@ -13,46 +13,25 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// The one claim about a List that is a claim about TIME rather than about
-// what it answers, and the only kind a correctness test can not make. Building
-// a List by appending or prepending used to copy the whole backing Array per
-// turn, which is quadratic: 40,000 appends measured about a second, and 60,000
-// of them about 1.6 s in a JavaScript loop doing nothing else. Sharing the tail
-// makes both ends amortised O(1), and the same 60,000 measure tens of
-// milliseconds. The threshold is a second — an order of magnitude above what
-// the linear build costs on the slowest machine this is likely to run on, and
-// well under what the quadratic one costs on the fastest.
+// Claims about how long a List takes rather than what it answers. Appending
+// and prepending are amortised O(1), so a build of `TURNS` items stays far
+// under the ceiling, which a quadratic build exceeds.
 const TURNS = 60_000
 const CEILING_MILLISECONDS = 1_000
 
-// The same claim for the other direction — taking a List APART one item
-// at a time, and reading it as it goes, which is what every walk below does.
-// These are held to a RATIO rather than to a ceiling. What they claim is that a
-// Program's cost grows with the length of its List rather than with the square
-// of it, and that is a claim about the SHAPE of four measurements rather than
-// about any one of them — so it holds on a machine under any load, where an
-// absolute ceiling has to sit an order of magnitude above the linear figure to
-// be safe and can then only catch a regression costing more than that. Doubling
-// the length doubles a linear cost and quadruples a quadratic one, so the guard
-// is three against a doubling: no linear Program reaches it and no quadratic one
-// misses it. Measured on this machine at the four lengths below, subprocess
-// startup inside every figure: the head/tail walk ran 30, 31, 35 and 44 ms —
-// ratios of 1.0, 1.1 and 1.3 — where before the half rule it ran 47, 111, 344
-// and 1274, which is 2.4, 3.1 and 3.7.
+// Taking a List apart one item at a time is held to a ratio rather than a
+// ceiling, so the claim holds under any load. Doubling the length doubles a
+// linear cost and quadruples a quadratic one, so the guard is three per
+// doubling.
 const WALK_LENGTHS = [10_000, 20_000, 40_000, 80_000]
 const GROWTH_PER_DOUBLING = 3
 
-// Best of three at each length, because one slow run anywhere in the four
-// moves a ratio twice — up at its own length and down at the next — and a guard
-// that a scheduling hiccup can fail is a guard nobody trusts.
+// Best of several at each length, since one slow run moves two ratios.
 const ATTEMPTS = 3
 
-// A subprocess rather than an import, because what is being measured is
-// the Program's own wall time and a test runner's process has already paid for
-// whatever it loaded — and because a build this size allocates enough that
-// leaving it in the runner's heap would be felt by whatever runs next. The
-// startup Bun charges for the subprocess is inside the figure, which is the
-// honest direction: it makes the measurement larger, not smaller.
+// A subprocess measures the Program's own wall time and keeps its allocations
+// out of the runner's heap. Its startup is inside the figure, which only makes
+// it larger.
 async function millisecondsToRun(
 	source: string,
 	printed: string,
@@ -77,9 +56,8 @@ async function millisecondsToRun(
 		let result = await spawnAndWait([process.execPath, file])
 		let elapsed = performance.now() - start
 
-		// The Program prints the length it answered, and it is checked
-		// here — a build that threw, or one that answered a List of the wrong
-		// length, would otherwise be the fastest run of all.
+		// A build that threw or answered the wrong length would otherwise be
+		// the fastest run of all.
 		expect(result.stderr).toBe("")
 		expect(result.stdout.trim()).toBe(printed)
 
@@ -89,9 +67,8 @@ async function millisecondsToRun(
 	}
 }
 
-// The seed carries one item so that the walk's State is a List of
-// Integers from the first turn, and the printed length is one more than the
-// number of turns because of it.
+// The seed's one item makes the State a List of Integers from the first turn,
+// and makes the printed length one more than the turns.
 function buildingSource(method: string): string {
 	return `implementation {
 	constant built = loop(from 1, through ${TURNS}, startingWith [0], (
@@ -103,26 +80,11 @@ function buildingSource(method: string): string {
 }`
 }
 
-// Every doubling held to the same ratio, rather than the whole span held
-// to one — a Program that turns quadratic only past some length fails at the
-// doubling where it does, and the message names it. Compiling happens outside
-// the figure, since the timer starts at the spawn, so asking for the same length
-// three times costs the test its own wall time and costs the measurement
-// nothing.
-//
-// The lengths are measured one at a time and the walk STOPS at the first
-// doubling that is too steep, which is what keeps a failure quick: a quadratic
-// Program is caught at twenty or forty thousand and is never asked for eighty,
-// where it would run for long enough to be killed by the runner's own timeout
-// and report that instead of its growth.
-// A TOO-STEEP READING IS TAKEN TWICE BEFORE IT IS BELIEVED, and both of
-// its lengths are measured again — the rule `stringPerformance.spec.ts` follows,
-// for its reason. Every figure here carries a subprocess spawn, several suites
-// can share the machine, and a spawn that stalls under load moves a ratio of two
-// small figures further than any regression in these Methods could: two of
-// these cases went red at loads of 17 and 52 with their claims perfectly true.
-// A Program that really did turn quadratic reads steep every time it is asked,
-// so asking twice costs a failing run a few seconds and a passing run nothing.
+// Each doubling is held to the ratio, and measuring stops at the first steep
+// one, before a quadratic Program meets the runner's timeout. A steep reading
+// counts only after both lengths are measured again, as in
+// `stringPerformance.spec.ts`. A spawn stalled by load can fake one, but a
+// quadratic Program reads steep every time.
 async function expectLinearGrowth(
 	sourceFor: (length: number) => string,
 	printedFor: (length: number) => string,
@@ -175,12 +137,9 @@ async function expectLinearGrowth(
 	expect(tooSteep).toEqual([])
 }
 
-// The List is built by prepending, so every item of it lives in the front
-// run — and then it is emptied from that end, one item per turn, which is where
-// the front run pays for itself. Or it is built by appending, so every item
-// lives in the back run and the first step of the drain has to move them. The
-// seed carries one item that is never removed, so the drain runs out of turns
-// rather than out of items and the printed length is one.
+// A prepended List keeps its items in the front run. An appended one keeps
+// them in the back run, which the drain's first step has to move. The seed's
+// item is never removed, so the printed length is one.
 function drainingSource(
 	built: "prepend" | "append",
 	turns: number,
@@ -201,9 +160,8 @@ function drainingSource(
 }`
 }
 
-// The walk's State is a Record of what is left and what has been added
-// up, so that one source stands for every shape of walk — the body is the whole
-// of the difference between them.
+// The State is what is left and what has been added up, so one source serves
+// every walk and only the body differs.
 function walkingSource(length: number, walk: string): string {
 	return `implementation {
 	constant items = List.of(integersFrom 1, through ${length})
@@ -216,10 +174,8 @@ function walkingSource(length: number, walk: string): string {
 }`
 }
 
-// The sum each walk prints, checked for the reason the drains' length is:
-// a build that threw, or one that added up the wrong items, would otherwise be
-// the fastest run of all. The two full walks add up every item; the two-ended
-// one stops at the middle and adds up the first half.
+// The sum each walk prints, checked so a wrong walk is not the fastest. The
+// two-ended walk stops at the middle and adds up the first half.
 function printedSumFor(name: string, length: number): string {
 	if (name === "both ends") {
 		let half = length / 2
@@ -243,11 +199,9 @@ describe("List performance", () => {
 		).toBeLessThan(CEILING_MILLISECONDS)
 	})
 
-	// The four drains, each held to its growth rather than to a ceiling.
-	// `remove(at 0)` on a prepend-built List shrinks the front run by one and
-	// shares both runs; on an append-built one the box upgrades itself once and
-	// the rest of the drain is windows. Both used to slice and rejoin the List at
-	// every step, which is quadratic the way the copying builds were.
+	// `remove(at 0)` on a prepend-built List shrinks the front run and shares
+	// both runs. On an append-built one the box upgrades itself once, and the
+	// rest of the drain is windows.
 	for (let [built, step] of [
 		["prepend", "remove(at 0)"],
 		["prepend", "removeFirst()"],
@@ -262,11 +216,9 @@ describe("List performance", () => {
 		})
 	}
 
-	// THE CANONICAL FUNCTIONAL WALK — take the head, go on with the tail —
-	// which is `item(at 0)` on a box `slice` has just answered a window for.
-	// Reading one item of that window used to copy the whole of it, so the walk
-	// moved n−k items a turn and was quadratic while the drains beside it, which
-	// read nothing, were flat. The half rule in `List.ts` is what this holds.
+	// Take the head and go on with the tail, reading a window `slice` has just
+	// answered. `trimUnderHalfRule` in `List.ts` trims a window only when it
+	// views less than half its Array, which keeps the walk linear.
 	for (let [name, walk] of [
 		[
 			"head/tail",
@@ -293,10 +245,8 @@ describe("List performance", () => {
 		}`,
 		],
 		[
-			// Both ends a turn, which is a palindrome check's shape. The
-			// window it asks for holds NEITHER end of the box it is cut from,
-			// and could be shared by nobody until such a box learned to move its
-			// seam into the middle of the window.
+			// Both ends a turn, as a palindrome check walks. The window holds
+			// neither end of its box, so the box moves its seam into it.
 			"both ends",
 			`match state.rest::firstItem() -> Step<{ rest: List<Integer>, sum: Integer }, Integer> {
 			case #Empty { <- #Done(state.sum) }
