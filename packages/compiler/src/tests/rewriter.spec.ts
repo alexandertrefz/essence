@@ -674,17 +674,19 @@ describe("Rewriter", () => {
 					).toEqual(["a", "b", "c"])
 				})
 
-				it("splits an empty splitter by code point, keeping astral characters whole", () => {
+				it("splits an empty splitter by grapheme cluster, keeping astral characters and flags whole", () => {
 					// JavaScript's `split("")` would tear the emoji into lone
-					// surrogates. This one splits by grapheme cluster, as the
-					// native `characters()` does.
-					let emoji = string.createString("a\u{1F600}b")
+					// surrogates, and a split by code point would part the flag's two
+					// letters. This one splits as the native `characters()` does.
+					let text = string.createString(
+						"a\u{1F600}\u{1F1E9}\u{1F1EA}b",
+					)
 
 					expect(
 						string
-							.split__overload$1(emoji, string.createString(""))
+							.split__overload$1(text, string.createString(""))
 							.value.map((piece) => piece.value),
-					).toEqual(["a", "\u{1F600}", "b"])
+					).toEqual(["a", "\u{1F600}", "\u{1F1E9}\u{1F1EA}", "b"])
 				})
 
 				it("splits correctly using a substring", () => {
