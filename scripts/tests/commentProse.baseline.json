@@ -429,7 +429,6 @@
 	"packages/language-server/src/tests/textEdits.ts": {"sentence-length": 1},
 	"packages/language-server/src/tests/workspace.spec.ts": {"sentence-length": 61, "em-dash": 48, "all-caps": 24, "history": 2, "position": 3, "block-length": 2},
 	"packages/language-server/src/workspace.ts": {"sentence-length": 102, "em-dash": 71, "all-caps": 47, "history": 1, "position": 4, "block-length": 25, "counts": 2},
-	"packages/runtime/src/Algebraic.ts": {"sentence-length": 35, "em-dash": 32, "all-caps": 5, "position": 7, "block-length": 8, "counts": 2},
 	"packages/runtime/src/CaseSensitivity.ts": {"sentence-length": 2, "em-dash": 1},
 	"packages/runtime/src/Dictionary.ts": {"sentence-length": 100, "em-dash": 52, "all-caps": 37, "position": 9, "block-length": 19},
 	"packages/runtime/src/Division.ts": {"sentence-length": 1, "em-dash": 2, "all-caps": 1},

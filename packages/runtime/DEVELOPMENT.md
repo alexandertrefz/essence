@@ -207,6 +207,68 @@ is never reached.
 ### Reading a Transcendental's digits
 
 `round`, `approximate` and `decimalExponent` refine the value's enclosure until the question at the asked width is
-decided, through the grid readers in `Algebraic.ts`. A single-base value is irrational, so it never sits on a
+decided, as "Reading digits off an enclosure" describes. A single-base value is irrational, so it never sits on a
 rounding step or a power of ten, and the refinement ends. A several-base value sitting on one would make a form such
 as `b·π + c·e` rational, so those readings stop at the same cutoff and throw.
+
+## Algebraic numbers
+
+An `Algebraic` is a value of the quadratic slice of the real algebraic irrationals:
+`rationalPart + coefficient·√radicand`, with both parts held as reduced bigint rationals.
+
+INVARIANT: the radicand is at least 2 and not a perfect square, and the coefficient is never zero. A value that
+would break either is answered as a `Rational` instead, so an Algebraic is irrational by construction.
+
+`createAlgebraic` is the gateway for a new radicand. It splits the radicand into `square² · squarefree` and moves the
+square into the coefficient, so `√12` becomes `2·√3`. An operation that keeps its operand's radicand, which is every
+operation but a root and a product across radicals, goes through `rebuildAlgebraic` instead. That skips the
+factoring, and still collapses a cancelled radical to a Rational.
+
+### Radicands past the trial-division bound
+
+`extractSquarePart` divides out every factor up to `TRIAL_DIVISION_BOUND`, then asks only whether the remainder is a
+perfect square. So the cost of a large prime radicand is bounded. A radicand `p²·q` with both `p` and `q` past the
+bound stays as written, and two spellings of one radical can then meet.
+
+`overCommonRadicand` brings them together. Two radicands name one radical exactly when their product is a perfect
+square: `√d = (s/e)·√e` with `s = √(d·e)`. The larger radicand is rewritten over the smaller, and the caller runs its
+same-radicand arithmetic. So a sum, a product, an ordering or an equality across two spellings answers what it
+answers for one. Two different squarefree radicands never share a radical, and `null` says so.
+
+### Exact Algebraic signs
+
+Every comparison of Algebraics is exact; no approximation is consulted. `signOfLinearRadical` decides the sign of
+`a + b·√d`: where `a` and `b` have opposite signs, comparing `a²` with `b²·d` says which term dominates. Zero would
+make `√d` rational, so it never happens, but the function answers it rather than throws.
+
+Over two different radicals, `signOfTwoRadicalDifference` decides `a + b·√d − c·√e`. Where both sides share a sign,
+it squares them, which leaves a form over `√d` against a rational, and hands that to `signOfLinearRadical`. The
+squaring is an identity, so the radicands need not be squarefree.
+
+### Arithmetic across radicands
+
+The slice is closed under a sum or a product over one radical, and a product may collapse: `√2·√2` is `2`. Across
+different radicals only a product of two pure radicals stays inside, as `b·b'·√(d·e)`. Every other mix leaves the
+slice, and the Method answers empty. The reciprocal is the conjugate over its norm, `(a − b·√d)/(a² − b²·d)`, and the
+norm is never zero, so dividing by an Algebraic never fails. The slice is closed under Integer powers too, so `raise`
+takes a negative exponent as exactly as a positive one.
+
+## Reading digits off an enclosure
+
+The irrationals answer `round`, `approximate` and `decimalExponent` from a certified enclosure: an interval of scaled
+integers `low ≤ value·10^digits ≤ high`. `scaledIntervalOf` encloses an Algebraic and `scaledTranscendentalInterval`
+encloses a Transcendental.
+
+`roundedOnDecimalGrid` in `Algebraic.ts` takes the enclosure at `places + guard` digits and rounds both ends at
+`places` with `roundScaled`. When they agree, that step is the answer. Otherwise it doubles the guard, starting from
+8 digits. The ends disagree only while the value lies within the enclosure's width of a point the rule steps at. That
+point is a multiple of the grid for `#Down`, `#Up` and `#TowardZero`, and a half-step for the nearest rules. A value
+on such a point is rational, so for an irrational the loop ends.
+
+`decimalExponentOnEnclosure` reads the largest power of ten not greater than the value's distance from zero. When the
+enclosure excludes zero and both ends have the same digit count, that count names the power. Otherwise it doubles the
+digits. An irrational is never zero or a power of ten, so the loop ends.
+
+Both take `limitDigits` for a Transcendental over several bases, whose value might sit on such a point without
+anyone being able to prove otherwise. The limit is on the width of the enclosure, not on how far the refinement went
+past `places`. So a grid already past the limit answers `null` before any enclosure is taken.

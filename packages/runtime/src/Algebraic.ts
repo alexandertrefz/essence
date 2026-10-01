@@ -20,16 +20,8 @@ import type { StringType } from "./String"
 import { createString } from "./String"
 import { typeKeySymbol } from "./type"
 
-// The quadratic slice of the real algebraic irrationals: every value is
-// `rationalPart + radicalCoefficient·√radicand`, held exactly as reduced
-// bigint rationals. Invariants: the radicand is at least 2 and is not a perfect
-// square, and the radicalCoefficient is never zero — a value that would break
-// either is returned as a Rational instead, so an Algebraic is irrational by
-// construction. The radicand is squarefree as far as `extractSquarePart`
-// normalises it, which is every square factor whose root is below 2^16 and a
-// remainder that is a square outright; two spellings of one radical that the
-// bound leaves apart are brought together where they meet, by
-// `overCommonRadicand`, so every comparison below is exact all the same.
+// `rationalPart + radicalCoefficient·√radicand`, irrational by construction.
+// See "Algebraic numbers" in DEVELOPMENT.md.
 export type AlgebraicType = {
 	[typeKeySymbol]: "Algebraic"
 	rationalPartNumerator: bigint
@@ -39,19 +31,15 @@ export type AlgebraicType = {
 	radicand: bigint
 }
 
-// Lives here rather than in `bigRational.ts` because it builds through
-// `createRational` — the rational core must stay free of value imports from
-// `Rational.ts`.
+// Here rather than in `bigRational.ts`, which must not import `Rational.ts`.
 function rationalValueOf(rational: BigRational): RationalType {
 	return createRational(rational.numerator, rational.denominator)
 }
 
 // #region Construction & normalization
 
-// floor(√value) by Newton's method on bigints. The first estimate is
-// 2^⌈bits/2⌉, which is at least the root, so the iteration only ever descends
-// and stops at the floor. Shared by the normalisation below, by the test two
-// radicands meet under, and by the interval evaluation, `scaledIntervalOf`.
+// floor(√value) by Newton's method. The first estimate, 2^⌈bits/2⌉, is at
+// least the root, so the iteration only descends and stops at the floor.
 export function integerSquareRoot(value: bigint): bigint {
 	if (value < 2n) {
 		return value
@@ -68,26 +56,13 @@ export function integerSquareRoot(value: bigint): bigint {
 	return estimate
 }
 
-// Where trial division stops. Past it the remainder is asked one
-// question — is it a perfect square? — by `integerSquareRoot`, so the root of
-// a large prime costs at most 65,535 divisions and one Newton root rather than
-// a walk up to its own root: `10^16 + 61` measured 2488 ms under unbounded
-// trial division and 1.25 ms here, best of three, and the unbounded growth was
-// √n — `10^12 + 39` measured 27.0 ms there and the same 1.25 ms here, since a
-// bounded cost is the bound. The price is a radicand `p²·q` whose p and q are
-// BOTH above the bound, which stays as written; see `overCommonRadicand` for
-// what that costs.
+// Where trial division stops. See "Radicands past the trial-division bound" in
+// DEVELOPMENT.md.
 const TRIAL_DIVISION_BOUND = 65536n
 
-// Splits a non-negative integer into `square² · squarefree`, so that
-// `√radicand` can be normalised (√12 → 2·√3). Every factor found is divided
-// out wholly, and an odd multiplicity leaves one copy in the squarefree part,
-// so `2·65537²` normalises to `65537·√2` although 65537 is past the bound: what
-// is left after the small factors is exactly the square. A remainder the loop
-// left because its own root was reached is 1 or a prime, and the square test
-// is harmless on both. Zero is the one radicand whose "square" is 0 — 0 = 0²
-// — and the coefficient it scales to zero is what collapses √0 to the
-// rational part in `rebuildAlgebraic`.
+// Splits a non-negative integer into `square² · squarefree`, so √12 becomes
+// 2·√3. Past the bound the remainder is only tested for being a square. Zero's
+// square is 0, which zeroes the coefficient and collapses √0.
 function extractSquarePart(radicand: bigint): {
 	square: bigint
 	squarefree: bigint
@@ -129,10 +104,7 @@ function extractSquarePart(radicand: bigint): {
 	return { square, squarefree: squarefree * remainder }
 }
 
-// The single gateway every NEW radicand funnels through — it normalises
-// the radicand and enforces the invariants, which is what makes an Algebraic
-// provably irrational. An operation that keeps its operand's radicand goes
-// through `rebuildAlgebraic` below instead.
+// The gateway for a new radicand: normalises it and enforces the invariants.
 export function createAlgebraic(
 	rationalPart: BigRational,
 	radicalCoefficient: BigRational,
@@ -154,21 +126,14 @@ export function createAlgebraic(
 	)
 }
 
-// The gateway for a radicand that has already been through
-// `createAlgebraic` — every operation that keeps its operand's radicand, which
-// is all of them but a root and a product across radicals. Normalising again
-// would run the trial division a second time on a radicand that can not have
-// changed: 1,000 additions on √(10^16 + 61) measured 1283 ms through
-// `createAlgebraic` and 0.15 ms through this, best of three. It still collapses
-// a cancelled radical to a Rational, which is the one invariant an operation
-// can break.
+// The gateway for a radicand `createAlgebraic` already normalised. It skips the
+// factoring, and collapses a cancelled radical to a Rational.
 function rebuildAlgebraic(
 	rationalPart: BigRational,
 	coefficient: BigRational,
 	radicand: bigint,
 ): AlgebraicType | RationalType {
 	if (radicand === 1n || coefficient.numerator === 0n) {
-		// The radical collapsed — the value is rational after all.
 		return rationalValueOf(
 			addRationals(
 				rationalPart,
@@ -189,8 +154,7 @@ function rebuildAlgebraic(
 	}
 }
 
-// The two halves of `a + b·√d`, without the radicand — every helper below
-// that works on the parts of ONE radical takes and answers this.
+// The two parts of `a + b·√d`, without the radicand.
 type AlgebraicParts = { rationalPart: BigRational; coefficient: BigRational }
 
 function partsOf(algebraic: AlgebraicType): AlgebraicParts {
@@ -214,10 +178,8 @@ function radicalCoefficientOf(algebraic: AlgebraicType): BigRational {
 	}
 }
 
-// (a + b·√d)(c + e·√d) = (a·c + b·e·d) + (a·e + b·c)·√d, over the parts
-// rather than over two values — the one product formula of the slice, read by
-// the Method and by `raise`, which multiplies without building a value it would
-// take apart again.
+// (a + b·√d)(c + e·√d) = (a·c + b·e·d) + (a·e + b·c)·√d, over the parts so
+// that `raise` need not build a value per step.
 function productParts(
 	first: AlgebraicParts,
 	second: AlgebraicParts,
@@ -240,10 +202,8 @@ function productParts(
 	}
 }
 
-// 1/(a + b·√d) = (a − b·√d)/(a² − b²·d) — the conjugate trick, over the
-// parts for the same reason the product above is. The denominator can not be
-// zero (that would make √d rational), which is exactly the "dividing by an
-// Algebraic never fails" guarantee.
+// 1/(a + b·√d) = (a − b·√d)/(a² − b²·d). The norm is never zero, since that
+// would make √d rational.
 function reciprocalParts(
 	parts: AlgebraicParts,
 	radicand: bigint,
@@ -268,19 +228,9 @@ function reciprocalParts(
 	}
 }
 
-// Two radicands name one radical exactly when their product is a perfect
-// square: √d = (s/e)·√e with s = √(d·e). Two distinct squarefree radicands
-// never do, so this is the seam where a radicand the trial-division bound left
-// as `p²·q` meets its normalised spelling, or another un-normalised one. The
-// larger radicand is rewritten over the smaller, which is the more normalised
-// of the two, and the caller then runs the same-radicand arithmetic it already
-// has — so a sum, a product, an ordering and an equality across the two
-// spellings all answer what they answer for one. `null` says the radicals are
-// genuinely different. One Newton root of `d·e` per meeting of two radicands,
-// which the same-radicand fast path never pays: 100,000 comparisons of √2
-// against √3 measured 76.6 ms here against 68.9 ms without the alignment,
-// best of five, while the same-radicand pairs measured 15.9 and 17.7 ms
-// against 15.2 and 16.6 — the price is a tenth on the one path that pays it.
+// Rewrites the larger radicand over the smaller when the two name one radical,
+// or answers `null`. See "Radicands past the trial-division bound" in
+// DEVELOPMENT.md.
 function overCommonRadicand(
 	first: AlgebraicType,
 	second: AlgebraicType,
@@ -304,8 +254,7 @@ function overCommonRadicand(
 }
 
 // `a + b·√d` as `a + (b·root/e)·√e`, where root = √(d·e). The coefficient
-// stays non-zero and the radicand is one an Algebraic already carries, so the
-// rebuild can not collapse and the cast holds.
+// stays non-zero, so the rebuild can not collapse and the cast holds.
 function rewrittenOver(
 	algebraic: AlgebraicType,
 	radicand: bigint,
@@ -321,9 +270,7 @@ function rewrittenOver(
 	) as AlgebraicType
 }
 
-// The exact square root of a non-negative rational, staying in the
-// quadratic slice: √(p/q) = √(p·q)/q. Returns an Integer-free Rational when
-// the root is exact and an Algebraic otherwise.
+// √(p/q) = √(p·q)/q: a Rational when the root is exact, else an Algebraic.
 export function squareRootOfRational(
 	value: BigRational,
 ): OptionalType<AlgebraicType | RationalType> {
@@ -331,9 +278,7 @@ export function squareRootOfRational(
 		return createEmpty()
 	}
 
-	// √0 is exactly 0 — the one non-negative root that leaves no radical
-	// at all. Said here rather than left to `createAlgebraic` so the answer is
-	// the canonical zero and not `0/q`.
+	// √0 is 0, the one root that leaves no radical.
 	if (value.numerator === 0n) {
 		return createValue(createRational(0n, 1n))
 	}
@@ -351,10 +296,7 @@ export function squareRootOfRational(
 
 // #region Exact sign determination
 
-// The exact sign of `a + b·√d` — decidable because comparing `a²`
-// against `b²·d` settles which side dominates. This, plus normalization, is
-// the entire reason Algebraic keeps every guarantee: no approximation is ever
-// consulted.
+// The exact sign of `a + b·√d`. See "Exact Algebraic signs" in DEVELOPMENT.md.
 export function signOfLinearRadical(
 	rationalPart: BigRational,
 	radicalCoefficient: BigRational,
@@ -375,7 +317,7 @@ export function signOfLinearRadical(
 		return rationalSignValue
 	}
 
-	// Opposite signs — compare |a|² with |b|²·d; the larger term wins.
+	// Opposite signs: compare a² with b²·d, and the larger term wins.
 	const rationalSquared = multiplyRationals(rationalPart, rationalPart)
 	const radicalSquared = multiplyRationals(
 		multiplyRationals(radicalCoefficient, radicalCoefficient),
@@ -384,11 +326,8 @@ export function signOfLinearRadical(
 	const difference = subtractRationals(rationalSquared, radicalSquared)
 	const differenceSign = rationalSign(difference)
 
-	// |a| = |b|·√d with the two signs opposed is exactly `a + b·√d = 0`,
-	// so 0 is the sign — and it is also unreachable: it would make √d rational,
-	// and the gateway never hands out a radicand that is a perfect square.
-	// Answered rather than thrown, so that the routine is total whatever
-	// radicand it is handed.
+	// Zero would make √d rational, so it is unreachable, but answered rather
+	// than thrown so the function is total.
 	if (differenceSign === 0n) {
 		return 0n
 	}
@@ -396,15 +335,8 @@ export function signOfLinearRadical(
 	return differenceSign > 0n ? rationalSignValue : radicalSignValue
 }
 
-// The exact sign of `a + b·√d − c·√e` over two genuinely different
-// radicals — `overCommonRadicand` has already said the two are not one — needed
-// to compare two Algebraics over different radicals. One careful squaring
-// reduces it to the single-radical case, and nothing in it asks the radicands
-// to be squarefree: the squaring is an identity, and the sign it hands to
-// `signOfLinearRadical` is decided by comparing rational squares, which is
-// exact for any radicand that is not a perfect square. No enclosure is
-// consulted, for the reason none could decide the one case that matters:
-// two spellings of one number, which the alignment above answers exactly.
+// The exact sign of `a + b·√d − c·√e` over two different radicals, by one
+// squaring. See "Exact Algebraic signs" in DEVELOPMENT.md.
 function signOfTwoRadicalDifference(
 	rationalPart: BigRational,
 	radicalCoefficient: BigRational,
@@ -431,8 +363,8 @@ function signOfTwoRadicalDifference(
 		return leftSign
 	}
 
-	// Same sign on both sides — compare (a + b·√d)² against (c·√e)²,
-	// which is again of the form A + B·√d versus a rational.
+	// Same sign on both sides: compare (a + b·√d)² with (c·√e)², a form over √d
+	// against a rational.
 	const squaredRationalPart = addRationals(
 		multiplyRationals(rationalPart, rationalPart),
 		multiplyRationals(
@@ -457,8 +389,6 @@ function signOfTwoRadicalDifference(
 	return (leftSign * comparisonSign) as -1n | 0n | 1n
 }
 
-// The exact sign of `first − second` for any mix of the quadratic
-// slice's values.
 export function signOfDifference(
 	first: AlgebraicType,
 	second: AlgebraicType | IntegerType | RationalType,
@@ -513,17 +443,15 @@ function orderingOfSign(sign: -1n | 0n | 1n): OrderingType {
 
 // #region Interval evaluation
 
-// A certified enclosure of the value, scaled by 10^digits — used only
-// when an Algebraic must be compared against a Transcendental, where interval
-// refinement is the terminating procedure.
+// A certified enclosure of the value, scaled by 10^digits. See "Reading digits
+// off an enclosure" in DEVELOPMENT.md.
 export function scaledIntervalOf(
 	algebraic: AlgebraicType,
 	digits: bigint,
 ): { low: bigint; high: bigint } {
 	const scale = 10n ** digits
 
-	// floor(√(radicand · scale²)) and its successor enclose √radicand at
-	// this scale.
+	// floor(√(radicand · scale²)) and its successor enclose √radicand.
 	const radicalLow = integerSquareRoot(algebraic.radicand * scale * scale)
 	const radicalHigh = radicalLow + 1n
 
@@ -551,20 +479,15 @@ export function scaledIntervalOf(
 	return { low, high }
 }
 
-// The five rules of `Rounding`, over an exact value held as the scaled
-// integer `scaled / scale` with a positive scale: the answer is the step of
-// the unit grid the named rule reaches. Written here rather than in either
-// irrational, because rounding an enclosure is one decision whichever kind
-// produced the enclosure, and `Rational::round(toward:)` says the same five
-// things in Essence over its own numerator and denominator.
+// The step of the unit grid each `Rounding` rule reaches for `scaled / scale`,
+// with a positive scale. Shared by both irrationals.
 export function roundScaled(
 	scaled: bigint,
 	scale: bigint,
 	direction: RoundingType,
 ): bigint {
-	// bigint division truncates towards zero, so a negative value takes
-	// one step back to reach its floor. Everything below is written on that
-	// floor and on the part above it, exactly as the Essence body is.
+	// bigint division truncates towards zero, so a negative value steps back
+	// one to reach its floor. The rules are written on the floor.
 	let floored = scaled / scale
 	let remainder = scaled - floored * scale
 
@@ -581,9 +504,7 @@ export function roundScaled(
 			return remainder === 0n ? floored : floored + 1n
 
 		case "Rounding#TowardZero":
-			// Cutting the fractional part off IS the floor, except for a
-			// negative value that is not whole, which takes one step back
-			// towards zero.
+			// The floor, but a negative value that is not whole steps up one.
 			return scaled < 0n && remainder !== 0n ? floored + 1n : floored
 
 		case "Rounding#Nearest":
@@ -591,8 +512,7 @@ export function roundScaled(
 				return remainder * 2n > scale ? floored + 1n : floored
 			}
 
-			// A tie away from zero, which for a negative value is the
-			// floor.
+			// A tie goes away from zero, which for a negative value is the floor.
 			return scaled < 0n ? floored : floored + 1n
 
 		case "Rounding#NearestEven":
@@ -604,33 +524,8 @@ export function roundScaled(
 	}
 }
 
-// The step of the 10^-places grid a certified enclosure decides on. The
-// enclosure is taken at `places + guard` digits, both of its ends are rounded
-// at `places`, and agreement is the answer — a disagreement asks for twice the
-// guard. It terminates because the two ends can only disagree while the value
-// sits inside the enclosure's own width of the one point the rule steps at: an
-// integer multiple of the grid for `#Down`, `#Up` and `#TowardZero`, a half of
-// one for the two nearest rules. A value on such a point is a ratio of
-// Integers, which neither irrational is.
-//
-// `limitDigits` is for the one caller that can not say that outright — a
-// Transcendental over several bases, whose value being rational would settle an
-// open problem. That caller reads a `null` answer as the impasse it is instead
-// of looping forever; every other caller passes `null` for no limit and is
-// answered a step. The limit is ABSOLUTE, on the width of the enclosure rather
-// than on how far past `places` the refinement was pushed, because that width
-// is what `Number.es` documents the cutoff as. So a caller asking for a grid
-// already at the limit is answered `null` before a single enclosure is taken,
-// and what it reports is the width it asked for rather than an impasse it
-// reached.
-//
-// The guard starts at 8 digits and doubles. Eight is what makes the
-// FIRST enclosure decide for every ordinary value, so the common call costs one
-// enclosure: 10,000 approximations of √2 to five places measured 5.9 ms, and
-// 1,000 of π measured 2.0 ms, best of three. Depth is what costs — 1,000
-// places measured 57 µs a call for √2 and 1.8 ms for π, since π's enclosure
-// sums a Machin series to that width — so a doubling that overshoots is paid
-// for once rather than a walk that adds a digit at a time.
+// The step of the 10^-places grid a certified enclosure decides on, or `null`
+// past `limitDigits`. See "Reading digits off an enclosure" in DEVELOPMENT.md.
 export function roundedOnDecimalGrid(
 	enclosureAt: (digits: bigint) => { low: bigint; high: bigint },
 	places: bigint,
@@ -664,15 +559,8 @@ export function roundedOnDecimalGrid(
 	}
 }
 
-// The power of ten at or below the value's distance from zero, read off
-// the same certified enclosure the grid rounding reads. An enclosure taken at
-// `digits` brackets the value scaled by 10^digits, so a digit count both of its
-// ends share names one power-of-ten band and settles the exponent; ends of
-// different lengths, or an interval still holding zero, ask for twice the
-// digits. It terminates for the reason `roundedOnDecimalGrid` does: an
-// irrational is neither zero nor a power of ten, so the interval eventually
-// falls strictly inside one band. `limitDigits` is the same absolute cutoff,
-// for the same caller.
+// The exponent of the largest power of ten not greater than the value's
+// distance from zero, or `null` past `limitDigits`.
 export function decimalExponentOnEnclosure(
 	enclosureAt: (digits: bigint) => { low: bigint; high: bigint },
 	limitDigits: null,
@@ -719,8 +607,7 @@ export function add(
 	algebraic: AlgebraicType,
 	other: IntegerType | RationalType,
 ): AlgebraicType {
-	// Adding a rational moves the rational part and can never collapse
-	// the radical — the result is total.
+	// Adding a rational can not collapse the radical, so the cast holds.
 	return rebuildAlgebraic(
 		addRationals(rationalPartOf(algebraic), bigRationalOf(other)),
 		radicalCoefficientOf(algebraic),
@@ -760,10 +647,7 @@ export function divide(
 	)
 }
 
-// `divide` under the proof its refined entries carry. The divisor is a
-// `NonZeroInteger` or a `NonZeroRational` in the source, so the zero test above
-// it can not fire and the Optional always holds a value. A read of that value
-// rather than a second division: the arithmetic stays in one place.
+// `divide` for a divisor proven not zero, which always holds a value.
 export function divideByNonZero(
 	algebraic: AlgebraicType,
 	other: IntegerType | RationalType,
@@ -771,10 +655,8 @@ export function divideByNonZero(
 	return (divide(algebraic, other) as ValueType<AlgebraicType>).item
 }
 
-// Same-radicand arithmetic stays inside the slice (and may collapse to
-// a Rational — √2·√2 = 2); different radicands generally do not — those come
-// back empty until the general algebraic representation exists. "Same" is
-// decided by `overCommonRadicand`, so two spellings of one radical add.
+// Empty when the two radicals differ, since the sum leaves the slice. See
+// "Arithmetic across radicands" in DEVELOPMENT.md.
 export function addAlgebraic(
 	algebraic: AlgebraicType,
 	other: AlgebraicType,
@@ -827,8 +709,8 @@ export function multiplyWithAlgebraic(
 	const secondRational = rationalPartOf(other)
 	const secondRadical = radicalCoefficientOf(other)
 
-	// Across radicands only pure radicals stay quadratic:
-	// b·√d · b'·√e = bb'·√(d·e).
+	// Across radicands only pure radicals stay quadratic: b·√d · b'·√e =
+	// bb'·√(d·e).
 	if (firstRational.numerator === 0n && secondRational.numerator === 0n) {
 		return createValue(
 			createAlgebraic(
@@ -852,15 +734,12 @@ export function divideByAlgebraic(
 		return multiplyWithAlgebraic(algebraic, reciprocal)
 	}
 
-	// A reciprocal can not itself collapse — the inverse of an
-	// irrational is irrational — so this branch is unreachable; it exists for
-	// the type system.
+	// Unreachable, since the reciprocal of an irrational is irrational.
 	return createEmpty()
 }
 
-// `value ÷ algebraic`, for the commuted overloads on Integer and
-// Rational — total, because an Algebraic is never zero. This is the
-// "dividing by an Irrational can not fail" guarantee, in code.
+// `value ÷ algebraic`, for the commuted entries on Integer and Rational. Total,
+// since an Algebraic is never zero.
 export function dividedInto(
 	algebraic: AlgebraicType,
 	value: IntegerType | RationalType,
@@ -871,20 +750,12 @@ export function dividedInto(
 		return multiply(reciprocal, value)
 	}
 
-	// Unreachable — the reciprocal of an irrational is irrational — but
-	// the type system can not know that.
+	// Unreachable, since the reciprocal of an irrational is irrational.
 	return reciprocal
 }
 
-// The quadratic slice is closed under Integer powers — a product over one
-// radicand stays over it, and the reciprocal of one value in the field is
-// another — so a negative exponent is as exact as a positive one and no entry
-// of this Method answers an Optional. The power can still collapse: `(√2)²` is
-// the Rational 2, which is why the answer is a Union.
-//
-// Square-and-multiply, so an exponent of n costs a logarithm of n
-// products rather than n of them. The parts are reduced at every step by
-// `multiplyRationals`, so what grows is the value and not the spelling.
+// The slice is closed under Integer powers, so a negative exponent is exact
+// too. The power may still collapse: (√2)² is 2. Square-and-multiply.
 export function raise(
 	algebraic: AlgebraicType,
 	exponent: IntegerType,
@@ -931,9 +802,7 @@ export function reciprocalOf(
 	)
 }
 
-// Negation flips both components and touches neither invariant — the
-// radicand is untouched and the coefficient stays non-zero, so the result is
-// an Algebraic without consulting either gateway.
+// Negation keeps both invariants, so it skips the gateways.
 export function negate(algebraic: AlgebraicType): AlgebraicType {
 	return {
 		[typeKeySymbol]: "Algebraic",
@@ -945,12 +814,8 @@ export function negate(algebraic: AlgebraicType): AlgebraicType {
 	}
 }
 
-// The three Methods that hand an Algebraic to a reader as digits. All
-// are written on `scaledIntervalOf` above: the enclosure is refined until the
-// question at the width asked for is decided, and the decided answer is the
-// answer. None ever gives up — an Algebraic is irrational by construction, so
-// it never sits on the point a rounding rule steps at, and it is never a power
-// of ten either.
+// An Algebraic is irrational, so these readings never reach a limit. See
+// "Reading digits off an enclosure" in DEVELOPMENT.md.
 export function round(
 	algebraic: AlgebraicType,
 	direction: RoundingType,
@@ -1038,20 +903,16 @@ export function toString(algebraic: AlgebraicType): StringType {
 
 // #region Overload wrappers
 
-// The Rewriter addresses Overloads by index — these bind the generic
-// implementations to the Namespace's declared Overload order.
+// The Rewriter addresses Overloads by index, so these bind each entry in the
+// Namespace's declared order.
 export const add__overload$1 = add
 export const add__overload$2 = add
 export const add__overload$3 = addAlgebraic
 export const multiply__overload$1 = multiply
 export const multiply__overload$2 = multiply
 export const multiply__overload$3 = multiplyWithAlgebraic
-// The refined entries take the same Integer the plain ones do — a
-// refinement erases before anything runs — and answer the narrower Type the
-// proof affords: scaling `a + b·√d` by a non-zero factor leaves `b` non-zero,
-// so the radical survives and the value can not collapse to a Rational. The
-// product is the very implementation above under a narrower signature, which
-// is what keeps a proven call and an unproven one the same arithmetic.
+// A non-zero factor leaves the coefficient non-zero, so the proven entries
+// answer an Algebraic. The arithmetic is the same.
 export const multiply__overload$5 = multiply as (
 	algebraic: AlgebraicType,
 	other: IntegerType,
@@ -1072,9 +933,7 @@ export const divide__overload$8 = divideByNonZero as (
 	other: RationalType,
 ) => AlgebraicType
 
-// `round` answers an Integer as the first entry of its Overload; the
-// second is written in Essence on `approximate`. `toString` is the first entry
-// of its own, and the two `as:` entries beside it are Essence.
+// The other entries of `round` and `toString` are written in Essence.
 export const round__overload$1 = round
 export const toString__overload$1 = toString
 
