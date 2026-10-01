@@ -527,18 +527,18 @@ describe("what decides that two items are one", () => {
 		).toEqual(['"2"', '"[Start, End]"'])
 	})
 
-	// A List key encodes through its items, so these Lists reach the encoded
-	// path.
+	// An Algebraic has no canonical encoding, so these items take the scan
+	// path under `Number`'s branded witness.
 	it("answers for items of a kind that does not encode", async () => {
 		expect(
 			await run(`implementation {
-				constant nested: List<List<Integer>> = [[1], [2], [1]]
+				constant roots: List<Number> = [2::squareRoot(), 3::squareRoot(), 2::squareRoot()]
 
-				Terminal.inspect(nested::removeDuplicates()::toString())
-				Terminal.inspect(nested::hasDuplicates()::toString())
-				Terminal.inspect(nested::everyItem(alsoIn [[1]])::toString())
+				Terminal.inspect(roots::removeDuplicates()::toString())
+				Terminal.inspect(roots::hasDuplicates()::toString())
+				Terminal.inspect(roots::everyItem(alsoIn [2::squareRoot()])::toString())
 			}`),
-		).toEqual(['"[[1], [2]]"', '"true"', '"[[1], [1]]"'])
+		).toEqual(['"[√2, √3]"', '"true"', '"[√2, √2]"'])
 	})
 
 	// The scan path. This Namespace calls two Strings equal when they differ
