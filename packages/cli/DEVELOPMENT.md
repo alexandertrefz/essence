@@ -43,9 +43,9 @@ on the key emit the same bytes.
 
 `emitterKey` names everything that changes the bytes without changing the graph. That is `EMITTER`, minifying, the
 emit target, the runtime bridge, the compile mode and the source map's shape. A linked map adds the output's base
-name, since the bundle's last line spells it. The same sources built into two directories share one entry. The Compiler's fingerprint
-is in the key because `esc` is what a Compiler developer runs, so an edited Rewriter must never reuse a bundle.
-`EMITTER` stands in for `esc`'s own code.
+name, since the bundle's last line spells it. The same sources built into two directories share one entry. The
+Compiler's fingerprint is in the key because `esc` is what a Compiler developer runs, so an edited Rewriter must never
+reuse a bundle. `EMITTER` stands in for `esc`'s own code.
 
 `compileFile` takes the key from the linked graph and reads the cache before emitting. So the front half always runs:
 every Diagnostic about the source is reported, and `esc watch` still learns which files a build reads. A hit skips the
@@ -64,3 +64,48 @@ bundle, written under a name no entry has.
 A watch session writes an entry per save, so `prune` keeps the newest `KEPT_BUNDLES` by modification time. A
 content-addressed file is never rewritten, so its time is when it was emitted. Pruning runs only after a write, and a
 wrongly evicted entry costs one rebuild.
+
+## Mutation runs
+
+`essence test --mutate` asks whether the tests would catch a bug, where coverage only says a line ran. `runMutation`
+works in three steps:
+
+1. A baseline compile with the coverage counters in, which also asks every Module for its mutation sites. It runs
+   once, and each test records which points it reached.
+2. An attribution join turns "this line ran" into "these tests reach this site", by position.
+3. For each site, one mutant is compiled through the same warm Session and run against only the tests that reach it.
+
+The baseline must compile and pass, since every verdict rests on it. A focused baseline is refused under any filter:
+the silenced tests would leave their sites looking unreached.
+
+The run makes one seed and hands it to the baseline and every mutant. A property test that reaches a site draws the
+same values from a mutant that it drew from the code, so a kill is reproducible. The corpus is read once and replayed
+first, so a mutant that brings back a remembered bug meets the case that caught it.
+
+A mutant ends in one of five verdicts. It is `invalid` when it does not compile, since the tests never saw it. It is
+`hung` when it runs out of time, which counts as caught: a run that never ends is noticed. It is `killed` when a
+covering test fails, or when its bundle will not load, its runner throws or its Worker dies. It is `survived` when every
+covering test passes, and `uncovered` when no test reaches its site.
+
+`--mutation-limit` caps how many mutants are compiled. Uncovered sites cost nothing, so they are all recorded whatever
+the limit. Sites past the limit are neither judged nor dropped. `mutation-end` counts every site, so the unjudged ones
+are the remainder, which the human report states. The run exits 0 unless `--strict` is given and a mutant survived.
+
+Under `--json`, each verdict is streamed as it is reached. The baseline's events are written only on an early exit,
+before a `mutation-end` of zeros. They are not streamed live, because a passing test's event carries its duration, so
+two runs at one seed would write different streams.
+
+### The mutant Worker
+
+`import()` never unloads a bundle, so mutants are loaded into a Worker, `src/mutantWorker.ts`, rather than into the
+command line's own process. The Worker reports itself exhausted after `BUNDLE_LIMIT` bundles, and the driver replaces
+it. The Language Server recycles its test Worker the same way. The Worker never compiles: the compile pool does,
+through the Session that already holds the graph. Only paths cross in and only events cross out, because a value's
+hidden Type key is a Symbol of the runtime instance that built it.
+
+Each mutant is emitted into a fresh directory, for the reason test bundles are staged. The snapshot and corpus stores
+belong to the run, so they cross once per Worker in an `init` message.
+
+The driver waits on each mutant for `mutantTimeout`. It listens for `exit` as well as `error`, since a Worker can
+vanish without an error. Only terminating stops a hung mutant, so a timeout, a dead Worker or an answer
+that could not cross the port all replace the Worker.

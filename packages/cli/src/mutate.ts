@@ -58,28 +58,11 @@ import {
 	tallyMutants,
 } from "./testReport"
 
-// The driver of `essence test --mutate`. Coverage says a line RAN; this
-// says a bug there would be CAUGHT.
-//
-// The shape of a run is three movements. A BASELINE compile with the counters
-// in and every Module asked what lies it admits, run once with each test saying
-// which points IT touched. An ATTRIBUTION join, which turns "this line ran"
-// into "these tests reach this site" by position. And then, per site, one
-// deliberate lie compiled through the same warm Session the baseline was
-// compiled through, run against ONLY the tests that reach it.
-//
-// The run is pinned to ONE seed, made once and handed to the baseline and
-// to every mutant alike. It is what makes the answer reproducible in the one
-// place a mutation run could otherwise be a coin toss: a property test in the
-// covering set draws exactly the values it drew when the baseline was declared
-// green, so a mutant it kills is a mutant it kills every time. The corpus rides
-// with it and is read once — the values a property has failed on before are
-// replayed first, so a mutant that reintroduces a bug the corpus remembers is
-// killed by the very case that caught it the first time.
+// The driver of `essence test --mutate`. Coverage says a line ran; a mutation
+// run says whether a bug there would be caught. See "Mutation runs" in
+// DEVELOPMENT.md.
 
-// What `--mutate` may not be asked alongside, and why each is a
-// contradiction rather than a combination. Refused before anything runs, the
-// way `--contracts` and `--no-contracts` are.
+// The flags `--mutate` refuses, each with the reason it prints.
 const CONTRADICTIONS: Array<[keyof OptionValues, string, string]> = [
 	[
 		"watch",
@@ -113,25 +96,15 @@ function contradiction(
 		}
 	}
 
-	// The same refusal `essence test` makes, made here too, because this
-	// run resolves contracts exactly as that one does and a run that guessed
-	// which of the two was meant would prove either more or less than the
-	// reader asked for.
+	// The same refusal `essence test` makes.
 	if (options.contracts && options.noContracts) {
 		return "--contracts and --no-contracts contradict each other — say one."
 	}
 
-	// Turning the instrumentation pass OFF is the one way to leave a
-	// mutation run compiling, running and reporting while quietly answering
-	// about nothing: no counters means no coverage table, no table means no
-	// test reaches any site, and every site in the project comes back as one no
-	// test reaches. Refused rather than warned about, because the report it
-	// would print is a plausible one.
+	// Without the coverage counters no test reaches any site, and the report
+	// would look plausible. So it is refused, not warned about.
 	if (options.withoutOptimisation.includes(coveragePassName)) {
-		// Named where it was written. The pass is left out by a flag or
-		// by the project's own `build.withoutOptimisations`, and a refusal that
-		// named a flag nobody typed would send its reader looking through a
-		// command line that does not hold it.
+		// Names the setting or the flag, whichever left the pass out.
 		let where = configuration.build.withoutOptimisations.includes(
 			coveragePassName,
 		)
@@ -150,8 +123,8 @@ function contradiction(
 
 // #region The attribution join
 
-// The tests that reach a site, in the order the RUN met them, so that a
-// report names the same killer twice and a Worker is handed the same list.
+// The tests that reach a site, in the order the run met them, so reports and
+// Workers see a stable list.
 function coveringTests(
 	site: MutationSite,
 	attribution: Map<string, ModuleAttribution>,
@@ -189,27 +162,19 @@ type MutantRequest = Omit<
 	"kind" | "id"
 >
 
-// The recycled Worker, from this side. It boots on the first mutant, and
-// it is TERMINATED and replaced whenever it says it has loaded its last bundle
-// — which is the whole reason it exists: every bundle a run loads is a Module
-// that can never be unloaded, and a run compiles hundreds of them.
+// The mutant Worker, from the driver's side. It boots on the first mutant and
+// is replaced whenever it reports its last bundle loaded, since a loaded Module
+// is never unloaded.
 type MutantRunner = {
-	// `timeout` is per mutant, in milliseconds, and it is not optional:
-	// a run that could wait forever is a run that can hang a CI job forever,
-	// which is worse than no mutation report at all. What the number is, is
-	// `mutantTimeout`'s business.
+	// `timeout` is per mutant, in milliseconds, and required so a run can never
+	// hang. See `mutantTimeout`.
 	run: (request: MutantRequest, timeout: number) => Promise<MutantRun>
 	dispose: () => Promise<void>
 }
 
-// How long ONE mutant may run before the driver stops waiting. A mutant
-// is a deliberate lie, and one of the lies this walker tells — a comparison
-// rotated, a literal nudged, an `if` turned inside out — is exactly the shape
-// that turns a terminating loop into a loop with no end. So the wait is bounded
-// by what the same tests took when they were green: ten times that, because a
-// machine under load is slower than a machine that is not and a false HUNG
-// would be a lie about the tests, and never less than five seconds, because ten
-// times a millisecond is not a timeout, it is a coin toss.
+// How long one mutant may run, in milliseconds, since a mutation can make a
+// loop endless. The multiple of the baseline allows for a loaded machine, and
+// the floor for fast tests.
 const MINIMUM_MUTANT_TIMEOUT = 5_000
 const MUTANT_TIMEOUT_FACTOR = 10
 
@@ -220,18 +185,16 @@ export function mutantTimeout(baselineMilliseconds: number): number {
 	)
 }
 
-// Whether the Worker that answered this way is still worth keeping. One
-// that crashed on a bundle caught its own error and is as good as it was; one
-// that was TERMINATED mid-spin, one that died, and one whose port would not
-// carry an answer are each a thread the next mutant may not be handed.
+// Whether a Worker that answered with this phase may run the next mutant. A
+// load or run failure was caught inside it. A timeout, a death or a failed
+// answer was not.
 function keepsWorker(phase: MutantPhase | null): boolean {
 	return phase === null || phase === "load" || phase === "run"
 }
 
 function createMutantRunner(stores: MutantStores): MutantRunner {
-	// Asked of THIS module's own URL, because that is what says whether
-	// the package is running as sources or as what was published — see
-	// `workerFileName`, which the compile pool asks the same question of.
+	// This module's URL says whether the package runs as sources or as
+	// published. See `workerFileName`.
 	let workerURL = new URL(
 		workerFileName(import.meta.url, "mutantWorker"),
 		import.meta.url,
@@ -239,11 +202,8 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 	let worker: Worker | null = null
 	let next = 0
 
-	// The stores cross ONCE per thread rather than once per mutant. They
-	// belong to the run — every mutant of it compares itself against the same
-	// snapshots and replays the same counterexamples — and a Worker recycles
-	// every sixty-four bundles, so a project with a large `__snapshots__` was
-	// paying a structured clone of the whole of it per compile.
+	// The stores belong to the whole run, so they cross once per Worker rather
+	// than once per mutant.
 	let boot = (): Worker => {
 		let fresh = new Worker(workerURL)
 
@@ -284,11 +244,8 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 			let answer = await new Promise<MutantRun>((resolve) => {
 				let timer: ReturnType<typeof setTimeout> | null = null
 				let settled = false
-				// Every way out of the wait goes through here, and it
-				// answers ONCE: a Worker that dies a moment after it was given
-				// up on, or one whose message arrives as the timer fires, must
-				// not resolve a Promise that is already resolved and must not
-				// leave a timer behind that outlives the run.
+				// Every way out of the wait comes here, and only the first one
+				// counts. It also clears the timer and the listeners.
 				let settle = (run: MutantRun): void => {
 					if (settled) {
 						return
@@ -320,19 +277,14 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 						settle(message)
 					}
 				}
-				// A Worker that dies takes its mutant with it, and what
-				// died was the mutant's own run — so it is answered as a
-				// mutant the world noticed rather than as one nothing could be
-				// learnt from. The thread is dropped either way, so the next
-				// mutant boots a fresh one.
+				// A Worker that dies took its mutant's run with it, so the mutant
+				// counts as noticed. The next mutant boots a fresh Worker.
 				let onError = (error: unknown): void => {
 					failed(rendered(error), "worker")
 				}
-				// The listener without which this whole Promise could
-				// never settle. A Worker can go away without ever raising an
-				// `error` — a native crash, a `process.exit` inside a mutated
-				// Module's top level — and the driver was left waiting on a
-				// thread that no longer exists.
+				// A Worker can exit without an `error`, from a native crash or a
+				// `process.exit` in a mutated Module. Without this the wait never
+				// settles.
 				let onExit = (code: number): void => {
 					failed(
 						`the mutant's Worker exited with code ${code} before it answered`,
@@ -356,11 +308,8 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 				} satisfies MutantWorkerRequest)
 			})
 
-			// A hung mutant is still SPINNING, and terminating it is the
-			// only thing that stops it. The same call recycles the Worker for
-			// every other answer that leaves one unfit — see `keepsWorker` —
-			// and for the ordinary case of a Worker that has loaded its last
-			// bundle.
+			// Only terminating stops a hung mutant. It also recycles a Worker
+			// that `keepsWorker` rejects or that loaded its last bundle.
 			if (answer.exhausted) {
 				await discard(running)
 			}
@@ -377,23 +326,9 @@ function createMutantRunner(stores: MutantStores): MutantRunner {
 
 type MutantStatus = MutantRecord["status"]
 
-// Which MODULES a run mutates, which the paths on the command line scope
-// and the tests they select do not: `essence test --mutate src/Standings.es`
-// asks about the lies THAT file admits, and runs whatever tests reach them.
-// Nothing named means every Module the run compiled.
-//
-// A glob is read down to its literal head — `src/*.es` scopes to `src` —
-// rather than expanded a second time. What is being answered is "is this Module
-// one the reader pointed at", and the head is what they pointed at. WHAT counts
-// as a glob character is the resolver's own answer, imported rather than
-// restated: a second spelling that disagreed about `]` or `}` would scope a run
-// to a directory nobody named.
-//
-// CANONICAL, because the other side of the comparison is: a Module names
-// itself by the path the graph resolved, symlinks followed and casing as the
-// filesystem stores it. On a Mac a temporary directory is `/var/…` lexically and
-// `/private/var/…` really, and one un-canonicalised side is enough to scope a
-// whole run down to nothing.
+// The Modules a run mutates, from the paths on the command line; none means
+// every Module. A glob scopes to its literal head, so `src/*.es` scopes to
+// `src`. Paths are canonical, like the Module paths they are compared with.
 export function mutationScope(
 	patterns: Array<string>,
 	workingDirectory: string,
@@ -421,10 +356,8 @@ export function isInScope(module: string, scope: Array<string>): boolean {
 	)
 }
 
-// Every site the run holds, once per Module and in one order — file name,
-// then the walk's own numbering. A Module two entries reach is enumerated under
-// each of them and the two lists are identical, so the second is dropped rather
-// than believed.
+// Every site in scope, once per Module, ordered by file name and then site id.
+// A Module two entries reach yields the same sites twice, so repeats are dropped.
 export function collectSites(
 	outcomes: Array<CompileOutcome>,
 	scope: Array<string>,
@@ -459,11 +392,8 @@ export function collectSites(
 		)
 }
 
-// What a SPEC may reach in and change, and nothing a command line can
-// say. `mutantTimeout` never answers under `MINIMUM_MUTANT_TIMEOUT`, and a
-// spec that proves a hang is caught asks for a shorter wait, so the seam is a
-// parameter of this Function rather than an Option or an environment variable,
-// which are both promises to a user that nobody wants to keep.
+// What a spec may change and a user may not. A spec that proves a hang is
+// caught needs a wait under `MINIMUM_MUTANT_TIMEOUT`.
 export type MutationInternals = {
 	timeoutFor?: (baselineMilliseconds: number) => number
 }
@@ -484,28 +414,17 @@ export async function runMutation(
 		return EXIT_USAGE
 	}
 
-	// BOUND before anything redirects it. The baseline is run with stdout
-	// pointed at stderr — a mutated Module's own top-level output belongs to
-	// nobody and may not land in the middle of the stream — and this is the
-	// reference to the real one.
+	// Bound before stdout is pointed at stderr, so a Module's own output never
+	// lands in the event stream.
 	let writeEvent = process.stdout.write.bind(process.stdout)
 	let emit = (event: TestEvent): void => {
 		if (context.options.json) {
 			writeEvent(`${JSON.stringify(event)}\n`)
 		}
 	}
-	// Every way out that is not the report, answered the same way: the
-	// stream ends with a `mutation-end` whatever happened, so a consumer reading
-	// it is never left waiting for a tally that is not coming. What it carries
-	// where the run learnt nothing is zeros, and the baseline's own events go
-	// out ahead of it — a red baseline under `--json` used to write an empty
-	// stream and exit 1, which told a reader nothing about which test failed.
-	//
-	// The baseline's events are replayed HERE rather than streamed as
-	// they happen, and that is the reproducibility claim keeping its shape: a
-	// `test-pass` carries a duration, and a duration is a fact about a machine.
-	// Two runs at one seed write the same stream, and a run that streamed its
-	// baseline live would not.
+	// Every early exit writes the baseline's events, then a `mutation-end` of
+	// zeros, so a stream always ends with its tally. See "Mutation runs" in
+	// DEVELOPMENT.md.
 	let stopEarly = (code: number, baseline: Array<TestEvent> = []): number => {
 		for (let event of baseline) {
 			emit(event)
@@ -540,21 +459,14 @@ export async function runMutation(
 		return stopEarly(EXIT_SUCCESS)
 	}
 
-	// The baseline compiles with the counters IN, whatever the command
-	// line said about coverage — the attribution join reads them, and a site no
-	// counter stands over is a site no test can be shown to reach. It is not a
-	// coverage report and never prints one; `--coverage` is refused beside
-	// `--mutate` for exactly that reason.
+	// The baseline always compiles with the coverage counters, which the
+	// attribution join reads. It never prints a coverage report.
 	let instrumented: CLIContext = {
 		...context,
 		options: { ...context.options, coverage: true },
 	}
-	// The mode the project's own `essence test` runs in, goals and all —
-	// see `resolveContracts`. A generated goal is a test like any other: it
-	// reaches sites, it kills mutants, and a run that left it out would report a
-	// project that tests its declarations as testing less than it does. The
-	// run's one pinned seed is what keeps the goals answering the same question
-	// of every mutant that they answered of the code.
+	// The mode the project's own `essence test` runs in, so generated goals
+	// count as tests and can kill mutants.
 	let plan = await planCompilation(instrumented, command, inputFileNames, {
 		emit: true,
 		cacheOutput: true,
@@ -563,9 +475,7 @@ export async function runMutation(
 		enumerateMutations: true,
 	})
 	let staging = await createStagingDirectory("essence-mutate-")
-	// Built once the stores it hands its Workers are known, which is after
-	// the baseline compiled — so it is a name declared here and assigned there,
-	// because the `finally` below is what disposes of it however the run ends.
+	// Assigned once the baseline has run, and disposed of by the `finally`.
 	let runner: MutantRunner | null = null
 
 	try {
@@ -576,10 +486,7 @@ export async function runMutation(
 
 		printDiagnostics(context, compilation)
 
-		// The baseline must be GREEN, and a compile that stopped is the
-		// first way it can fail to be. Everything a mutation run says rests on
-		// "these tests pass over this code" — a project where they do not is a
-		// project with a question to answer before this one.
+		// The baseline must compile and pass, since every verdict rests on it.
 		if (
 			hasFailures(compilation) ||
 			compilation.outcomes.some(
@@ -611,10 +518,7 @@ export async function runMutation(
 
 		runner = createMutantRunner({ snapshots: stored, counterexamples })
 
-		// ONE seed for the baseline and for every mutant of the run. See
-		// the note at the top of the file: it is what makes a property test in
-		// the covering set answer the same question of the mutant that it
-		// answered of the code.
+		// One seed for the baseline and every mutant.
 		let seed = context.options.seed ?? randomSeed()
 		let events: Array<TestEvent> = []
 		let restore = redirectStdout()
@@ -637,9 +541,7 @@ export async function runMutation(
 					suites,
 					filters,
 					(event) => events.push(event),
-					// The counters, AND what each test touched of them —
-					// which is the whole of what turns "this line ran" into "these
-					// tests reach this site".
+					// Which points each test reached, for the attribution join.
 					{ byTest: true },
 					{ stored },
 					{ seed, cases: context.options.cases, counterexamples },
@@ -667,15 +569,8 @@ export async function runMutation(
 			return stopEarly(EXIT_FAILURE, events)
 		}
 
-		// A focused baseline is REFUSED, and not for the reason `essence
-		// test` refuses one at the end of a plain run. A focus silences most of
-		// the suite, and this run reads what ran to learn which tests reach
-		// which site — so every site the silenced tests cover comes back as one
-		// no test reaches, and the score is taken over whatever the focus left.
-		// It is a wrong answer rather than a warning, so it is refused before a
-		// single mutant is compiled, and it is refused under any filter: a
-		// filter is a narrowing the reader asked for, and a leftover `focused`
-		// is one nobody did.
+		// A focused baseline is refused under any filter. The silenced tests
+		// would leave their sites looking unreached, and the score would be wrong.
 		if (focused) {
 			if (!context.options.json) {
 				context.terminal.err("")
@@ -694,16 +589,12 @@ export async function runMutation(
 
 		let { attribution, durations } = foldBaseline(baseline, events)
 
-		// And the stream is DROPPED here, which is the last moment
-		// anything needs it: the early exits above replay it, and everything
-		// past this point reads the folds instead. A green suite's baseline is
-		// several events per test, and the loop it is standing in front of
-		// compiles and loads hundreds of Modules.
+		// Nothing reads the baseline's events past the folds, so they are freed
+		// before the mutant loop.
 		events.length = 0
 
-		// The order the RUN met each test, which is what makes a covering
-		// set a list rather than a set: the Worker runs them in it and stops at
-		// the first kill, so the killer a report names is the same one twice.
+		// The order the run met each test. A Worker runs a covering list in this
+		// order and stops at the first kill, so the named killer is stable.
 		let order = new Map<string, number>()
 		let entryOf = new Map<string, string>()
 
@@ -718,28 +609,16 @@ export async function runMutation(
 		let sites = collectSites(compilation.outcomes, scope)
 		let mutants: Array<MutantRecord> = []
 		let compiled = 0
-		// Written as each mutant is judged rather than at the end, so a
-		// consumer watching a long run learns what it learns when it is learnt
-		// — the same discipline the test stream keeps. The list beside it is
-		// what the human report reads, which is written once at the end.
+		// Each verdict is streamed as it is reached. The human report reads
+		// `mutants` once at the end.
 		let record = (mutant: MutantRecord): void => {
 			mutants.push(mutant)
 			emit({ schema: 1, kind: "mutant", ...mutant })
 		}
 
-		// The limit caps what is JUDGED and nothing else. A mutant costs a
-		// compile and a run, which is what a reader narrowing a large project is
-		// buying their way out of; a site no test reaches costs neither, and
-		// leaving those out under a limit would report a project as having fewer
-		// untested lines the harder its run was narrowed. So an uncovered site
-		// is recorded whatever the limit, in the walk's own order, and the limit
-		// is counted against the mutants that were actually built.
-		//
-		// A site past the limit is neither judged nor DROPPED. `sites`
-		// counts every site the walker kept, and the five statuses under it
-		// count what became of the ones that were looked at — so what the limit
-		// left alone is the remainder, which a consumer subtracts and the human
-		// report is told outright.
+		// The limit counts compiled mutants only, so every uncovered site is
+		// recorded whatever the limit. Sites past it are counted as unjudged. See
+		// "Mutation runs" in DEVELOPMENT.md.
 		let unjudged = 0
 
 		for (let site of sites) {
@@ -784,8 +663,7 @@ export async function runMutation(
 
 		emit({ schema: 1, kind: "mutation-end", ...counts })
 
-		// Skipped under `--json` exactly as the test report is: stdout
-		// carries the event stream and nothing else.
+		// Under `--json`, stdout carries only the event stream.
 		if (!context.options.json && !context.options.quiet) {
 			for (let line of renderMutation(
 				mutants,
@@ -797,10 +675,7 @@ export async function runMutation(
 			}
 		}
 
-		// Exit 0 by default, because a mutation score is INFORMATION: a
-		// project learning what its tests would catch has not failed by being
-		// told. `--strict` is what a job holding a project to its score asks
-		// for.
+		// A score is information, so only `--strict` fails a run with survivors.
 		return context.options.strict && counts.survived > 0
 			? EXIT_FAILURE
 			: EXIT_SUCCESS
@@ -811,9 +686,8 @@ export async function runMutation(
 	}
 }
 
-// The baseline read down to what the rest of the run needs from it: which
-// tests reach which point, and how long each test took while the code still
-// told the truth. The caller empties the event stream once this answers.
+// What the run needs from the baseline: which tests reach which point, and how
+// long each test took.
 function foldBaseline(
 	baseline: TestRun,
 	events: Array<TestEvent>,
@@ -823,17 +697,13 @@ function foldBaseline(
 } {
 	return {
 		attribution: attributionOf(events),
-		// Read off the FOLD rather than off the events a second time,
-		// because the fold has already answered it.
 		durations: new Map(
 			baseline.tests.map((test) => [test.id, test.duration]),
 		),
 	}
 }
 
-// A site and what became of it, in the shape the event and the report
-// both read — see `MutantRecord`, which is the one place those fields are
-// spelled.
+// A site and its verdict, as the event and the report read it.
 function recordOf(
 	site: MutationSite,
 	status: MutantStatus,
@@ -851,10 +721,8 @@ function recordOf(
 	}
 }
 
-// One mutant, compiled and asked. Every entry holding a covering test is
-// recompiled with the lie in it — usually one, and more only where two entries
-// both reach the mutated Module and both test it — and each is run against its
-// own share of the covering set.
+// Compiles and runs one mutant. Every entry holding a covering test is
+// recompiled with the mutation and runs its own share of the covering tests.
 async function judge(work: {
 	site: MutationSite
 	covering: Array<string>
@@ -865,14 +733,11 @@ async function judge(work: {
 	index: number
 	runner: MutantRunner
 	seed: string
-	// What each covering test took in the BASELINE, which is what this
-	// mutant's own wait is measured against — see `mutantTimeout`.
+	// Each covering test's baseline duration, which the mutant's wait is
+	// measured against.
 	durations: Map<string, number>
 	timeoutFor: (baselineMilliseconds: number) => number
-	// Whether the goals a Namespace's declarations promise are compiled
-	// into the mutant as well. It has to be the baseline's own answer: a
-	// covering set holding a generated goal is a covering set that names a test
-	// which is not in a bundle compiled without them.
+	// Must match the baseline, whose covering tests may be generated goals.
 	contracts: boolean
 }): Promise<MutantRecord> {
 	let byEntry = new Map<string, Array<string>>()
@@ -901,12 +766,8 @@ async function judge(work: {
 	let step = 0
 
 	for (let [entry, ids] of byEntry) {
-		// A directory per bundle. Bun's resolver remembers what a
-		// directory held the first time it read anything out of it, so a second
-		// bundle written beside the first would be invisible to the `import()`
-		// that runs it — the same trap `stageBundle` exists for, answered here
-		// by emitting where nothing has looked rather than by copying
-		// afterwards.
+		// A fresh directory per mutant, emitted into directly, for the reason
+		// `stageBundle` stages test bundles.
 		let directory = path.join(
 			work.staging,
 			"mutants",
@@ -922,10 +783,7 @@ async function judge(work: {
 			outputFileName: path.join(directory, "mutant.mjs"),
 			minify: false,
 			sourcemap: false,
-			// WITHOUT the counters. The baseline's are what said which
-			// tests reach this site, and the answer is already in hand — a
-			// mutant counts nothing, and instrumenting hundreds of bundles
-			// would pay for a table nobody reads.
+			// Without the coverage counters, which only the baseline needs.
 			optimisation: optimiserOptionsFor(work.context.options),
 			tests: true,
 			contracts: work.contracts,
@@ -935,10 +793,8 @@ async function judge(work: {
 			},
 		})
 
-		// A mutant that would not compile is INVALID rather than killed.
-		// It is the walker's own shortfall — a swap it could not prove sound —
-		// and counting it as a kill would credit the tests for catching
-		// something they never saw.
+		// A mutant that does not compile is invalid, not killed: the tests never
+		// saw it.
 		if (!outcome.ok || outcome.outputFileName === null) {
 			return verdict("invalid")
 		}
@@ -958,15 +814,9 @@ async function judge(work: {
 			),
 		)
 
-		// A mutant that never came back is CAUGHT. A run that does not end
-		// is a failure anybody would notice — the loop that no longer stops is
-		// exactly what a rotated comparison or a nudged bound turns a good one
-		// into — so it counts for the tests rather than against them.
-		//
-		// Every other problem is a KILL. A bundle that would not load, a
-		// runner that threw, a Worker that died: a program that comes apart is a
-		// program the world notices, and `invalid` means one thing only, which
-		// is that the mutant did not COMPILE. There is no killer to name.
+		// A hung mutant counts as caught, since a run that never ends is
+		// noticed. Any other problem, such as a failed load or a dead Worker, is
+		// a kill with no killer to name.
 		if (answer.phase !== null) {
 			return verdict(answer.phase === "timeout" ? "hung" : "killed")
 		}
