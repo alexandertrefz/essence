@@ -522,6 +522,45 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
+			// Two keys through `server` each read `config.server`, in a Lookup of
+			// its own, so a pass rewriting one never rewrites the other.
+			it("should build each Lookup of a shared step from Nodes of its own", () => {
+				let value = lastConstantValue(`implementation {
+					${config}
+					constant both = {
+						config with
+							server.tls.enabled = true,
+							server.port = 1,
+					}
+				}`)
+				let lookups: Array<common.typed.LookupNode> = []
+
+				function collect(entry: unknown) {
+					if (entry === null || typeof entry !== "object") {
+						return
+					}
+
+					let fields = entry as Record<string, unknown>
+
+					if (fields.nodeType === "Lookup") {
+						lookups.push(entry as common.typed.LookupNode)
+					}
+
+					for (let key of Object.keys(fields)) {
+						if (key !== "type") {
+							collect(fields[key])
+						}
+					}
+				}
+
+				collect(value)
+
+				let members = lookups.map((lookup) => lookup.member)
+
+				expect(lookups.length).toBeGreaterThan(1)
+				expect(new Set(members).size).toBe(members.length)
+			})
+
 			// Every level keeps the Alias it was reached under, since an update
 			// writes only members the original declares.
 			it("should answer the Type of the value updated", () => {

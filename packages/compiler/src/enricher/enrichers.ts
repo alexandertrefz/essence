@@ -1617,11 +1617,11 @@ function groupPosition(group: Array<PathKeyEntry>): common.Position {
 function clonePlace(
 	node: common.typed.ExpressionNode,
 ): common.typed.ExpressionNode {
-	if (node.nodeType === "Lookup") {
-		return { ...node, base: clonePlace(node.base) }
+	if (node.nodeType !== "Lookup") {
+		return { ...node }
 	}
 
-	return { ...node }
+	return { ...node, base: clonePlace(node.base), member: { ...node.member } }
 }
 
 // The Scope a Method's Parameter list and body are read in. It holds the
