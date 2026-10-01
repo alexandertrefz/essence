@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { findSimpleChild, type SimpleNode } from "../../visitor/typedSimple"
 import type { OptimiserPass } from "../index"
 import { rewriteNodes } from "../walk"
 
@@ -375,36 +376,22 @@ function appendCall(node: common.typedSimple.ExpressionNode): {
 }
 
 // Whether the name appears anywhere, in every position, a shadowing
-// declaration included. Shared Types are walked once.
-function mentions(root: unknown, name: string): boolean {
-	let seen = new Set<object>()
-	let found = false
+// declaration included.
+function mentions(
+	nodes: ReadonlyArray<common.typedSimple.ImplementationNode>,
+	name: string,
+): boolean {
+	return nodes.some((node) => mentionsName(node, name))
+}
 
-	function visit(node: unknown): void {
-		if (found || node === null || typeof node !== "object") {
-			return
-		}
-
-		if (seen.has(node)) {
-			return
-		}
-
-		seen.add(node)
-
-		let record = node as Record<string, unknown>
-
-		if (record["nodeType"] === "Identifier" && record["name"] === name) {
-			found = true
-
-			return
-		}
-
-		for (let value of Object.values(record)) {
-			visit(value)
-		}
+function mentionsName(node: SimpleNode, name: string): boolean {
+	if (node.nodeType === "Identifier") {
+		return node.name === name
 	}
 
-	visit(root)
+	return findSimpleChild(node, mentionsInChild, name) ?? false
+}
 
-	return found
+function mentionsInChild(child: SimpleNode, name: string): true | undefined {
+	return mentionsName(child, name) || undefined
 }
