@@ -470,14 +470,14 @@ describe("the analysis cache", () => {
 		expect(
 			workspace.documentOf(pathOf("Top.es"), { cancellation }),
 		).toBeNull()
-		// Nothing was written either, so the next uncancelled ask still
-		// produces a complete answer rather than reading a half filled entry.
+		// Nothing was written, so the next uncancelled ask produces a complete
+		// answer.
 		expect(workspace.analysisOf(pathOf("Top.es"))).not.toBeNull()
 		expect(workspace.enrichedOf(pathOf("Top.es"))).not.toBeNull()
 	})
 
 	// A file that writes neither section is a Program of its own everywhere,
-	// even as a dependency, so it has one enrichment and one Choice identity.
+	// even as a dependency. It has one enrichment and one Choice identity.
 	it("should keep a section-less dependency's own enrichment", () => {
 		let { workspace, pathOf } = workspaceOf({
 			"Plain.es": `implementation {\n\tchoice Colour {\n\t\tRed\n\t\tBlue\n\t}\n}\n`,
@@ -518,8 +518,7 @@ describe("the analysis cache", () => {
 		expect(workspace.enrichedOf(pathOf("Plain.es"))).toBe(plain!)
 		expect(compilationCounts.enrichments).toBe(enriched)
 
-		// Its own text moving is the other question, and that still drops
-		// everything this holds for it.
+		// Its own text moving drops everything held for it.
 		open("Plain.es", `${plainSource}\n`, 2)
 
 		expect(workspace.isAnalysed(pathOf("Plain.es"))).toBe(false)
@@ -638,12 +637,9 @@ describe("the analysis cache", () => {
 		expect(compilationCounts.links).toBe(counted + 1)
 	})
 
-	// Which Module of a graph an analysis collects annotations for is
-	// decided once and never again: a root's analysis is cached whole, so asking
-	// it a second time for a Module BENEATH it reads the cache rather than
-	// collecting anything. The Hover that follows then pays for a link of its
-	// own — which is why every path that analyses a root has to pass the focus
-	// the Server is holding, the test session's results included.
+	// A root's analysis is cached whole, so asking again for a Module beneath
+	// it collects nothing. Every path that analyses a root passes the Server's
+	// focus. See "Analysing a graph" in packages/language-server/DEVELOPMENT.md.
 	it("should not collect a Module's annotations for a root it already analysed", () => {
 		let { workspace, pathOf } = workspaceOf(chain)
 
@@ -1633,9 +1629,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// Excluded from the WALK, not from the Server. A reader looking
-	// straight at a file is owed its Diagnostics — what the setting declines is
-	// the panel listing files nobody asked about.
+	// Excluded from the walk, not from the Server. An open file is owed its
+	// Diagnostics.
 	it("should report on an excluded file that is open", async () => {
 		let files = makeSessionWorkspace({
 			"essence.json": excludingCorpus,
@@ -1659,9 +1654,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The project file is watched, so a reader who has just drawn the
-	// boundary somewhere else watches the panel answer rather than being told
-	// to restart the editor.
+	// The project file is watched, so moving the boundary updates the panel
+	// without a restart.
 	it("should report on what the project file stops excluding", async () => {
 		let files = makeSessionWorkspace({
 			"essence.json": excludingCorpus,
@@ -1696,11 +1690,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And the other direction, which is the one a reader reaches for: a
-	// corpus that was being reported on goes quiet the moment the project says
-	// it is not a source. The discovery walk has to be answered again, and the
-	// squiggles it stops owning have to be cleared rather than left standing on
-	// a file nothing will ever analyse again.
+	// A corpus that was reported on goes quiet once the project excludes it.
+	// The walk runs again, and the squiggles it stops owning are cleared.
 	it("should stop reporting on what the project file starts excluding", async () => {
 		let files = makeSessionWorkspace({
 			"essence.json": "{}",
@@ -1732,10 +1723,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A mistake in the project file is a Warning with a span, published on
-	// the project file — the only place a reader would look for it. The setting
-	// falls back to its default and the note says so, which is the point: a
-	// setting that did not read is a setting the author believes is in force.
+	// A mistake in the project file is a Warning with a span on the project
+	// file. The setting falls back to its default, and the note says so.
 	it("should publish what the project file could not be read as", async () => {
 		let files = makeSessionWorkspace({
 			"essence.json": JSON.stringify({ excludes: ["corpus"] }),
@@ -1756,10 +1745,9 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And out of the BUFFER while one is open, because that is the text
-	// the reader is looking at. It is the whole reason the extension forwards
-	// `essence.json` at all: a Diagnostic that waited for a save would arrive
-	// after the mistake had already been obeyed.
+	// Read out of the buffer while one is open, which is why the extension
+	// forwards `essence.json`. See "Project files" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should read an open project file out of its unsaved text", async () => {
 		let files = makeSessionWorkspace({ "essence.json": "{}", ...chain })
 		let session = startSession()
@@ -1781,8 +1769,7 @@ describe("the Server's request loop", () => {
 				"unknown-setting",
 			])
 
-			// And the file on disk answers again once the buffer is gone
-			// — which is what the walk and the run have been obeying all along.
+			// The file on disk answers again once the buffer is gone.
 			await session.close(files.pathOf("essence.json"))
 			await session.settle()
 
@@ -1793,10 +1780,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// An open project file is never treated as Essence. Every request that
-	// reads a buffer goes through one lookup and it refuses this one — otherwise
-	// the Essence Parser would read JSON, and a file that is perfectly well
-	// formed would fill the panel with syntax errors.
+	// An open project file is never treated as Essence. The one lookup every
+	// request reads a buffer through refuses it.
 	it("should answer no Essence request over an open project file", async () => {
 		let files = makeSessionWorkspace({ "essence.json": "{}", ...chain })
 		let session = startSession()
@@ -1825,11 +1810,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The `essence` key of a `package.json` is where these settings used
-	// to live. Nothing is read from one now — the corpus it named is walked and
-	// reported on — and the key is answered with a Diagnostic on itself rather
-	// than with silence, because a setting the author believes is in force is
-	// the failure the report exists to prevent.
+	// Nothing is read from a `package.json`'s `essence` key. The key gets a
+	// Diagnostic, since its author may believe the setting is in force.
 	it("should say that a manifest's essence key has moved", async () => {
 		let files = makeSessionWorkspace({
 			"package.json": JSON.stringify({
@@ -1856,10 +1838,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A manifest changing costs the settings and nothing else: no walk, no
-	// analysis, no test run. All one can say is that its `essence` key has
-	// moved, and answering `bun install` with a project rebuilt from scratch
-	// would make an install cost more than the install.
+	// A manifest changing costs the settings alone: no walk, no analysis, no
+	// test run.
 	it("should republish a manifest's Diagnostic without analysing anything", async () => {
 		let files = makeSessionWorkspace({ ...chain })
 		let session = startSession()
@@ -1886,10 +1866,8 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("package.json"))).toEqual([
 				"moved-setting",
 			])
-			// Not one link, which is what tells the two paths apart: a
-			// PROJECT file changing sets the folders again, and that drops
-			// every cached analysis, so the sweep behind it links the whole
-			// workspace from scratch. A manifest drops the settings alone.
+			// No link. A project file changing sets the folders again and drops
+			// every cached analysis, while a manifest drops the settings alone.
 			expect(session.tallySince(before).links).toBe(0)
 		} finally {
 			await session.dispose()
@@ -1897,9 +1875,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// What a whole workspace costs to report on: one link per ROOT, and
-	// nothing per file beneath one. Two roots here — the chain's Top, whose
-	// graph holds Middle and Base, and a Module nothing imports.
+	// A whole workspace costs one link per root and nothing per file beneath
+	// one. Here the chain's Top and a Module nothing imports are the roots.
 	it("should link once per root at startup", async () => {
 		let files = makeSessionWorkspace({ ...chain, "Solo.es": soloSource })
 		let session = startSession()
@@ -1917,21 +1894,10 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The sweep is a QUEUE, drained one root per callback, and this is what
-	// that buys: a request sent while it is running is answered out of the middle
-	// of it rather than after the last root. Before the chunking, an Editor that
-	// opened a project of two dozen test files asked its first Hover into a Server
-	// that would not speak until two dozen graphs had been linked.
-	//
-	// Deterministic rather than timed, and this is the argument. The sweep hands
-	// the loop back between two roots — `setImmediate`, a macrotask, so a turn of
-	// the loop separates them and the connection's I/O runs in it — and a request
-	// is I/O. Every hop of the round trip is one such turn and therefore costs
-	// ONE root, whatever a root happens to cost: reading the request, the
-	// `yieldToConnection` the handler makes before it compiles, the answer coming
-	// back. That is a handful of roots, and it does not grow with the queue —
-	// which is the whole difference, since the single callback it replaced cost
-	// every root that was left.
+	// The sweep is a queue drained one root per callback, so a request is
+	// answered from its middle. Each hop of the round trip costs one root, since
+	// the sweep yields with `setImmediate`. See "The workspace sweep" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should answer a request sent while the startup sweep is still running", async () => {
 		let roots = [
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -1945,14 +1911,11 @@ describe("the Server's request loop", () => {
 			let counts = session.counts()
 
 			await session.initialize([files.root])
-			// The LAST root of the queue, so that the document the reader
-			// is looking at is the one the sweep would get to last — which is the
-			// case the chunking is for.
+			// The last root of the queue, so the open document is the one the
+			// sweep reaches last.
 			await session.open(files.pathOf("Root23.es"), fanOut["Root23.es"]!)
-			// The tally rather than a publish, because the tally is a
-			// counter in this process and a publish has a pipe between it and
-			// the fact it reports. One link is the sweep having started, read at
-			// the moment it starts.
+			// The tally rather than a publish, since it is a counter in this
+			// process. One link means the sweep has started.
 			await session.waitForLinks(counts, 1)
 
 			let hover = await session.request<Hover | null>(HoverRequest.type, {
@@ -1965,15 +1928,11 @@ describe("the Server's request loop", () => {
 			})
 
 			expect(hover.result).not.toBeNull()
-			// Which is to say the sweep had roots left when the answer
-			// arrived. Unchunked, this is exactly the count of the roots: the
-			// batch was one callback, and nothing was answered until it returned.
+			// The sweep had roots left when the answer arrived.
 			expect(session.tallySince(counts).links).toBeLessThan(roots.length)
 
-			// And it goes on to cover everything it was queued for — being
-			// interruptible is not being abandoned. The last root by path is the
-			// last one analysed, so its Diagnostics arriving is the sweep having
-			// finished.
+			// It then covers everything it was queued for. The last root by path
+			// is analysed last, so its Diagnostics mean the sweep finished.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root23.es"), 0),
 			).toBe(true)
@@ -1993,24 +1952,9 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// A keystroke mid-sweep, which is the interleaving the queue could have
-	// got wrong. `entriesFor` adds every root that has never published, so that a
-	// file PROMOTED to one is found — and mid-sweep every root still queued has
-	// published nothing, so an unguarded scan reads the whole remaining project
-	// as newly promoted and pulls it into the batch the reader is waiting on,
-	// which is the one callback the chunking exists to break up. What the batch
-	// owes is the roots reaching the change; the rest are owed to the queue,
-	// which will reach them.
-	//
-	// Read as the most graphs any ONE turn of the loop linked rather than as a
-	// total at the moment the answer arrives, and this is why. The total is the
-	// drain rate racing the 200 ms window: it is a number about the machine, it
-	// says nothing at all on one that empties the queue inside that window, and
-	// asserting it stays under the count of the roots is asserting that a link
-	// stays expensive. What the batch swallowing the queue looks like is not a
-	// bigger total — the same roots are linked either way, and only the callback
-	// they are linked in differs. So the callback is what is measured, and a
-	// reading of two is a reading of one root per callback whatever a root costs.
+	// A keystroke mid-sweep runs the roots reaching the change, not every
+	// queued root that has never published. It is read as the most graphs one
+	// turn of the loop linked, which does not depend on the machine's speed.
 	it("should link only the roots reaching a keystroke made during a sweep", async () => {
 		let roots = [
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -2027,10 +1971,8 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Root00.es"), fanOut["Root00.es"]!)
 			await session.waitForLinks(counts, 1)
-			// Root00 is the first root of the queue, and its swept
-			// Diagnostics have to be on the client before the mark is taken —
-			// otherwise the mark is behind the sweep's own publish and the wait
-			// below answers to that rather than to the keystroke.
+			// Root00 is first in the queue. Its swept Diagnostics must reach the
+			// client before the mark, so the wait answers to the keystroke.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root00.es"), 0),
 			).toBe(true)
@@ -2038,9 +1980,8 @@ describe("the Server's request loop", () => {
 			let mark = session.publishMark()
 			let bursts = session.watchLinkBursts()
 
-			// A keystroke that MOVES the file's list, so the publish
-			// answering it is one the dedup can not swallow — it is the event the
-			// burst is read at.
+			// A keystroke that moves the file's list, so its publish is not
+			// deduplicated away.
 			await session.change(
 				files.pathOf("Root00.es"),
 				fanOut["Root00.es"]!.replace(
@@ -2052,28 +1993,20 @@ describe("the Server's request loop", () => {
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root00.es"), mark),
 			).toBe(true)
-			// Two: the one root the keystroke reaches, and the sweep's next
-			// entry, which land between the same two polls because a due timer
-			// runs ahead of the check phase the sweep's callback waits in.
-			// Swallowing the queue is not two — it is every root still owed,
-			// linked inside the one callback the reader is waiting on.
+			// The root the keystroke reaches and the sweep's next entry land
+			// between two polls, since a due timer runs before the check phase.
 			expect(bursts.most()).toBeLessThanOrEqual(2)
 
-			// The sweep then finishes the roots it still owed, and the
-			// answer to the keystroke survives it: Root00 was dropped from the
-			// queue by the batch that analysed it, so nothing published it again
-			// out of the text it no longer holds.
+			// The sweep finishes, and the answer to the keystroke survives it,
+			// since the batch dropped Root00 from the queue.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root47.es"), 0),
 			).toBe(true)
 
 			bursts.stop()
 
-			// One link per root and one more for the keystroke, which is
-			// the count whatever order the two of them interleaved in — the
-			// queue drops the root the batch analysed rather than analysing it
-			// twice, and nothing the batch reached is left for the queue to
-			// discover.
+			// One link per root and one for the keystroke, in any interleaving,
+			// since the queue drops the root the batch analysed.
 			expect(session.tallySince(counts).links).toBe(roots.length + 1)
 			expect(session.codesFor(files.pathOf("Root00.es"))).toEqual([
 				"assignment-type-mismatch",
@@ -2095,21 +2028,10 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// A dependency changing HANDS mid-sweep, which is the other thing a
-	// batch firing into a queue can get wrong. A URI is cleared once no entry
-	// still reports on it, and what answers that question is what has PUBLISHED
-	// — mid-queue a fraction of the project. So the keystroke that takes the
-	// Library away from the file the reader is in leaves it owned by a root at
-	// the far end of the queue that has published nothing yet, and clearing it
-	// on that answer is a squiggle going out and coming back a project's worth of
-	// roots later, in a file nobody touched.
-	//
-	// Read off the wire and off nothing else: under the rule the Library's list
-	// never moves, so the dedup sends nothing for it at all, and the flicker is
-	// two messages the log holds whatever order they land in. Sized like the
-	// keystroke test above and for the same reason — the last root has to still
-	// be queued when the window fires — and it fails the way that one does if it
-	// is not, by saying nothing rather than by saying something false.
+	// A dependency changing hands mid-sweep. Its new owner is still queued, so
+	// the orphan is held until the sweep ends. A queue drained first makes this
+	// pass without testing anything. See "Who owns a published list" in
+	// packages/language-server/DEVELOPMENT.md.
 	it("should keep a dependency's Diagnostics a queued root still owes", async () => {
 		let roots = [
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -2126,10 +2048,8 @@ describe("the Server's request loop", () => {
 			await session.initialize([files.root])
 			await session.open(files.pathOf("Root00.es"), fanOut["Root00.es"]!)
 			await session.waitForLinks(counts, 1)
-			// Root00 is the first root of the queue and the Library is in
-			// its graph, so the Library's own Diagnostics are on the client
-			// before the mark — which is what makes every publish after it one
-			// this keystroke caused.
+			// Root00 is first in the queue and reaches the Library, so the
+			// Library's Diagnostics are on the client before the mark.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Library.es"), 0),
 			).toBe(true)
@@ -2139,9 +2059,8 @@ describe("the Server's request loop", () => {
 
 			let mark = session.publishMark()
 
-			// The import taken away, which is the whole event: Root00
-			// stops reporting on the Library, and the only other file importing
-			// it is the root the sweep has not reached.
+			// Root00 stops importing the Library, and the only other importer is
+			// a root the sweep has not reached.
 			await session.change(
 				files.pathOf("Root00.es"),
 				fanOut["Root00.es"]!.replace(
@@ -2156,15 +2075,13 @@ describe("the Server's request loop", () => {
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root00.es"), mark),
 			).toBe(true)
-			// Still on the client — though it is the log below that pins
-			// it. A clear and the publish that undoes it leave the same state
-			// behind, and only the messages tell the two apart.
+			// Still on the client. A clear and the publish undoing it leave the
+			// same state, so the log pins it.
 			expect(session.codesFor(files.pathOf("Library.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
 
-			// And still, once the root that took it over has run and the
-			// sweep has made every decision it was holding.
+			// And still once the new owner has run and the sweep has ended.
 			expect(
 				await session.waitForPublishOf(files.pathOf("Root47.es"), 0),
 			).toBe(true)
@@ -2187,11 +2104,8 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// The other half of the shutdown test above. A sweep is a queue with a
-	// callback armed, so a client that goes away in the middle of one leaves a
-	// project's worth of roots still to analyse and to publish for — into a
-	// connection that is not there, where a throw is the process rather than a
-	// failed request.
+	// A sweep has a callback armed, so a client leaving mid-sweep must stop the
+	// queue, or it publishes into a closed connection.
 	it("should stop a sweep in flight when the client shuts down", async () => {
 		let roots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 		let files = makeSessionWorkspace(heavyFanOut(roots))
@@ -2204,19 +2118,16 @@ describe("the Server's request loop", () => {
 			await session.waitForLinks(counts, 1)
 			await session.client.sendRequest(ShutdownRequest.type)
 
-			// After the shutdown has been ANSWERED, which is what makes the
-			// mark deterministic: the response is written behind every publish
-			// the Server had already sent, so nothing that crossed the pipe
-			// before it is counted as coming after.
+			// After the shutdown is answered, since the response is written
+			// behind every publish already sent.
 			let mark = session.publishMark()
 
-			// A queue the shutdown failed to stop is a queue the settle
-			// waits out, and every root it had left would publish on the way.
+			// A queue the shutdown failed to stop would publish before the settle
+			// answers.
 			await session.settle()
 
 			expect(session.publishesSince(mark)).toEqual([])
-			// And the sweep really was unfinished, or this would assert
-			// that a Server with nothing left to do published nothing.
+			// The sweep was unfinished, or this would prove nothing.
 			expect(session.tallySince(counts).links).toBeLessThan(roots.length)
 		} finally {
 			await session.dispose()
@@ -2224,10 +2135,7 @@ describe("the Server's request loop", () => {
 		}
 	}, 60_000)
 
-	// A keystroke refreshes every root that IMPORTS what changed, and a
-	// root need not be open to be one. Under the open-document model a mistake
-	// pushed into a Module from a file the reader had open simply never appeared
-	// in the file that could not survive it.
+	// A keystroke refreshes every root that imports what changed, open or not.
 	it("should refresh an unopened dependent root when a shared Module changes", async () => {
 		let shared = `implementation {\n\tconstant shared = 1\n}\n\nexport {\n\tshared\n}\n`
 		let reader = `import {\n\tfrom "./Shared.es" { shared }\n}\n\nimplementation {\n\tTerminal.print(shared::toString())\n}\n`
@@ -2261,11 +2169,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The one document no root can ever stand in for: a buffer opened from
-	// outside the workspace folders. No discovery walk finds it, so it is in no
-	// root set, and nothing imports it, so no graph reaches it — it is an entry
-	// of its own, and the only one that has to be scheduled by what it READS
-	// rather than by what reads it.
+	// A buffer outside the workspace folders is in no root set and no graph
+	// reaches it. It is an entry of its own, scheduled by what it reads.
 	it("should refresh an open buffer outside the folders when what it imports changes", async () => {
 		let base = `implementation {\n\tconstant thing = 1\n}\n\nexport {\n\tthing\n}\n`
 		let outside = `import {\n\tfrom "../inside/Base.es" { thing }\n}\n\nimplementation {\n\tconstant seen = thing\n}\n`
@@ -2300,11 +2205,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A closed file's Diagnostics are still true — they are what the file
-	// on disk says, and a buffer going away does not change what is written in
-	// it. Nothing imports this one, so no importer could publish for it either:
-	// under the open-document model closing it cleared its squiggles for the
-	// rest of the session.
+	// A closed file's Diagnostics are what the file on disk says, so they
+	// stay. Nothing imports this one.
 	it("should keep the Diagnostics of a broken file nothing imports when it is closed", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n`
 		let files = makeSessionWorkspace({ "Broken.es": broken })
@@ -2331,9 +2233,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The other half of that. A file that is gone has nothing to say, and
-	// nobody but this Server is going to take its squiggles down — it owned them
-	// itself, since nothing imports it.
+	// A deleted file has nothing to say, and the Server, which owned its
+	// squiggles, takes them down.
 	it("should clear the Diagnostics of a file that was deleted", async () => {
 		let broken = `implementation {\n\tconstant amount: Integer = "two"\n}\n`
 		let files = makeSessionWorkspace({ "Broken.es": broken })
@@ -2362,12 +2263,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The mirror of a file being deleted, and the case a walk of the roots
-	// REACHING a change can not see: a change that drops an import PROMOTES what
-	// it named to a root, which by definition reaches nothing that changed. It
-	// is what stopped being reached. Nothing else will ever schedule it — no
-	// keystroke lands in a file nobody has open — while the analysis of the file
-	// that let it go stops reporting on everything underneath it.
+	// Dropping an import promotes what it named to a root, which reaches nothing
+	// that changed. `entriesFor` also runs a root that has never published.
 	it("should keep reporting on a Module whose only importer stops importing it", async () => {
 		let leaf = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let mid = `import {\n\tfrom "./Leaf.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
@@ -2394,9 +2291,8 @@ describe("the Server's request loop", () => {
 			)
 			await session.settle()
 
-			// The whole subtree under the dropped edge, not only the file
-			// promoted to a root: Mid is what Leaf's Diagnostics reach the
-			// Editor through now.
+			// The whole subtree under the dropped edge. Leaf's Diagnostics reach
+			// the Editor through Mid now.
 			expect(session.codesFor(files.pathOf("Leaf.es"))).toEqual([
 				"assignment-type-mismatch",
 			])
@@ -2409,11 +2305,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The same promotion, made by a deletion rather than by a keystroke.
-	// Here it is retirement that would clear them: the deleted file is retired
-	// and everything it owned is orphaned, and what was beneath it has no other
-	// claimant — so the file that is gone takes a project's squiggles with it
-	// while every one of them is still true on disk.
+	// The same promotion, made by a deletion. The deleted file is retired, and
+	// what it owned must pass to the new root rather than be cleared.
 	it("should keep reporting on a Module whose only importer was deleted", async () => {
 		let leaf = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let mid = `import {\n\tfrom "./Leaf.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n\nexport {\n\there\n}\n`
@@ -2445,8 +2338,7 @@ describe("the Server's request loop", () => {
 			expect(session.codesFor(files.pathOf("Mid.es"))).toEqual([
 				"dependency-has-errors",
 			])
-			// And the file that IS gone is still cleared, which is the
-			// other half of the same batch.
+			// The deleted file itself is cleared.
 			expect(session.diagnosticsFor(files.pathOf("Top.es"))).toEqual([])
 		} finally {
 			await session.dispose()
@@ -2454,11 +2346,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And with the promoted file OPEN, which is the worst of the three: a
-	// buffer the reader is looking at goes quiet while the mistake is on the
-	// screen in front of them. An open document is not an entry of its own here
-	// — a root's graph reaches it — so its Diagnostics belonged to the importer
-	// that has just been deleted.
+	// With the promoted file open. An open document a root reaches is no entry
+	// of its own, so its Diagnostics belonged to the deleted importer.
 	it("should keep the Diagnostics of an open Module whose only importer was deleted", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let main = `import {\n\tfrom "./Library.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
@@ -2492,12 +2381,9 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A file something starts importing stops being a root, and its
-	// Diagnostics become the importing root's to publish. The hand-over has to
-	// be silent: the new owner publishes before the old entry is retired, and
-	// what the two of them say is the same list — a Module's Diagnostics depend
-	// on that Module and on what it reaches and on nothing else — so nothing
-	// goes over the wire for it at all.
+	// A file something starts importing stops being a root. The new owner
+	// publishes the same list before the old entry retires, so nothing goes over
+	// the wire.
 	it("should hand a file over silently when it stops being a root", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let alone = `implementation {\n\tconstant here = 1\n}\n\nexport {\n\there\n}\n`
@@ -2524,8 +2410,8 @@ describe("the Server's request loop", () => {
 			])
 			await session.settle()
 
-			// The importer really did become the only root — it has the
-			// Diagnostic that says it imported something broken.
+			// The importer became the only root, with the Diagnostic that says
+			// it imported something broken.
 			expect(session.codesFor(files.pathOf("Main.es"))).toEqual([
 				"dependency-has-errors",
 			])
@@ -2546,12 +2432,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And the other direction, which is the same requirement read
-	// backwards: a file that BECOMES a root takes its own Diagnostics over, and
-	// the entry that used to lend them stops reporting on it in the same batch.
-	// What each of them says is the same list, so a reader watching the Problems
-	// panel sees nothing happen — the clear is held back until every analysis of
-	// the batch has published, and by then somebody else is answering.
+	// A file that becomes a root takes its own Diagnostics over in the same
+	// batch. The clear waits until every analysis of the batch has published.
 	it("should take a file over silently when it becomes a root", async () => {
 		let library = `implementation {\n\tconstant amount: Integer = "two"\n}\n\nexport {\n\tamount\n}\n`
 		let importing = `import {\n\tfrom "./Library.es" { amount }\n}\n\nimplementation {\n\tconstant here = amount\n}\n`
@@ -2596,10 +2478,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A cycle nobody imports is the one shape with no root in it at all,
-	// and the member reaching the most others is analysed in its place. The
-	// broken file is the OTHER member: it is reported on only because the
-	// entry's graph reached it.
+	// A cycle nobody imports has no root, so the member reaching the most others
+	// is analysed. The broken file is the other member.
 	it("should report on a cycle nobody imports", async () => {
 		let files = makeSessionWorkspace(cycle)
 		let session = startSession()
@@ -2620,10 +2500,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// And a cycle can be MADE by a deletion, which is where "closest to
-	// root" has to be worked out again rather than once at startup: the file
-	// above it was the only root either member had, and losing it leaves two
-	// files importing each other and nothing else.
+	// A deletion can make a cycle nobody imports, so its entry is worked out
+	// again rather than once at startup.
 	it("should analyse a cycle that loses the file above it", async () => {
 		let above = `import {\n\tfrom "./Circle.es" { circled }\n}\n\nimplementation {\n\tconstant seen = circled(1)\n}\n`
 		let files = makeSessionWorkspace({ ...cycle, "Above.es": above })
@@ -2656,11 +2534,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// The coverage fallback — "closest to root we can actually analyse".
-	// A root the Compiler threw on judged nothing beneath it, and every file
-	// under it used to analyse itself because every file under it was open. The
-	// fallback analyses the ones the batch was supposed to cover and did not, so
-	// one unreadable file can not hide a project.
+	// A root the Compiler threw on judged nothing beneath it. The fallback
+	// analyses the files the batch should have covered and did not.
 	it("should report on the files beneath a root that could not be read", async () => {
 		let deep = `${unparseableSource}\nexport {\n\ta\n}\n`
 		let uses = `import {\n\tfrom "./Deep.es" { a }\n}\n\nimplementation {\n\tTerminal.print(a)\n}\n`
@@ -2683,9 +2558,8 @@ describe("the Server's request loop", () => {
 		}
 	})
 
-	// A build drops the `tests { … }` section, so the Editor is the only
-	// thing that reports on one while it is being written. The Server's
-	// Workspace types it for that reason, and this is what says so.
+	// A build drops the `tests { … }` section, so the Server's Workspace types
+	// it.
 	it("should report on a tests section, which no build ever sees", async () => {
 		let source = [
 			"implementation {",
@@ -2721,10 +2595,8 @@ function uriFor(filePath: string): string {
 	return `file://${filePath.split("/").map(encodeURIComponent).join("/")}`
 }
 
-// A Position by what it points AT rather than by a line and column counted
-// out by hand — these sources are tab-indented, and a counted column is a fact
-// about the whitespace rather than about the name. Zero based, which is what the
-// protocol speaks.
+// A Position by what it points at, zero-based as the protocol counts. The
+// sources are tab-indented, so a column counted by hand would be fragile.
 function positionOf(
 	source: string,
 	needle: string,
