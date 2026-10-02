@@ -8273,6 +8273,36 @@ describe("Inline a Constant", () => {
 		expectRefactored(lines, result)
 	})
 
+	// A predicate's Argument must be a literal, so the Constant is refused
+	// there until its value is written in.
+	it("writes the value into a refinement's predicate that reads it", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant limit = 10",
+			"",
+			"\ttype Small = Integer where @::isLessThan(limit)",
+			"",
+			"\tfunction main() -> Integer {",
+			"\t\t<- limit",
+			"\t}",
+			"}",
+		]
+
+		let [action] = inlines(lines, rangeOf(lines, "limit = 10"))
+		let result = applied(lines, action)
+
+		expect(result).toEqual([
+			"implementation {",
+			"\ttype Small = Integer where @::isLessThan(10)",
+			"",
+			"\tfunction main() -> Integer {",
+			"\t\t<- 10",
+			"\t}",
+			"}",
+		])
+		expect(refactoredCodesOf(result)).toEqual([])
+	})
+
 	// A compound value is delimited by its own brackets, so it reads as itself
 	// in front of a `::`.
 	it("writes a compound value in as it stands", () => {

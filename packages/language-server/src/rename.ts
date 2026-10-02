@@ -1097,14 +1097,9 @@ function walkNode(
 
 			return
 		}
-		case "TypeAliasStatement": {
-			declareInScope(scope, "types", node.name, "type", context)
-
-			let aliasScope = scopeWithGenerics(node.generics, scope, context)
-
-			walkTypeDeclaration(node.type, aliasScope, context)
+		case "TypeAliasStatement":
+			walkTypeAlias(node, scope, context)
 			return
-		}
 		case "IfStatement": {
 			walkNode(node.condition, scope, context)
 
@@ -1884,6 +1879,24 @@ function walkNativeSignature(
 	}
 
 	walkTypeDeclaration(signature.returnType, signatureScope, context)
+}
+
+// A refinement's predicate reads names as any Expression does, so the
+// Constant a predicate's Argument names keeps that read.
+function walkTypeAlias(
+	node: parser.TypeAliasStatementNode,
+	scope: Scope,
+	context: WalkContext,
+) {
+	declareInScope(scope, "types", node.name, "type", context)
+
+	let aliasScope = scopeWithGenerics(node.generics, scope, context)
+
+	walkTypeDeclaration(node.type, aliasScope, context)
+
+	if (node.predicate !== null) {
+		walkNode(node.predicate, aliasScope, context)
+	}
 }
 
 // Null where a contextually typed Function literal omitted an annotation.

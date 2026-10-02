@@ -2660,6 +2660,30 @@ describe("Rename of a name a Case payload reads", () => {
 	})
 })
 
+// The Enricher refuses a name as a predicate's Argument, and the read must
+// still be found, or a rename leaves it naming nothing.
+describe("Rename of a name a refinement's predicate reads", () => {
+	it("renames a Constant read by a predicate", () => {
+		let source = [
+			"implementation {",
+			"\tconstant limit = 10",
+			"",
+			"\ttype Small = Integer where @::isLessThan(limit)",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 11 }, "bound")).toBe(
+			[
+				"implementation {",
+				"\tconstant bound = 10",
+				"",
+				"\ttype Small = Integer where @::isLessThan(bound)",
+				"}",
+			].join("\n"),
+		)
+	})
+})
+
 // A Case payload's `= { … }` is written outside every body too.
 describe("Rename of a name a Case payload default reads", () => {
 	it("renames a module Constant read by a payload default", () => {
