@@ -43,6 +43,10 @@ type State = {
 	// Every Protocol in Scope, built once per request, so a conformance clause
 	// reads back as the Protocol it names.
 	protocols: Record<string, common.ProtocolType>
+	// Every Protocol the document declares at any depth, by identity. Built the
+	// first time the cursor stands on a clause.
+	declaredProtocols: Record<string, common.ProtocolType> | null
+	program: common.typed.Program
 	parserProgram: parser.Program | null
 }
 
@@ -64,6 +68,53 @@ function protocolsOf(
 		if (node.nodeType === "ProtocolDeclarationStatement") {
 			protocols[node.name.content] = node.protocolType
 		}
+	}
+
+	return protocols
+}
+
+// The identities of the Protocols a Namespace's clauses resolved to, its `is`
+// clauses' and its `where` conditions'.
+function clauseIdentities(type: common.NamespaceType): Array<string> {
+	return [
+		...(type.conformsTo ?? []),
+		...Object.values(type.conformanceConditions ?? {}).flatMap(
+			(conditions) => conditions.map((condition) => condition.protocol),
+		),
+	]
+}
+
+// The Protocol a clause naming `name` resolved to. Its identity tells a
+// Protocol declared in a body from another of its name, which a table keyed
+// by name can not.
+function resolvedProtocol(
+	name: string,
+	identities: Array<string>,
+	state: State,
+): common.ProtocolType | undefined {
+	state.declaredProtocols ??= declaredProtocolsOf(state.program)
+
+	let declared = state.declaredProtocols
+
+	return identities
+		.map((identity) => declared[identity])
+		.find((protocol) => protocol?.name === name)
+}
+
+function declaredProtocolsOf(
+	program: common.typed.Program,
+): Record<string, common.ProtocolType> {
+	let protocols: Record<string, common.ProtocolType> = {}
+	let collect = (node: TypedNode) => {
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			protocols[node.protocolType.identity] = node.protocolType
+		}
+
+		forEachTypedChild(node, collect)
+	}
+
+	for (let node of typedProgramNodes(program)) {
+		collect(node)
 	}
 
 	return protocols
@@ -101,6 +152,8 @@ function hoverAt(
 		cursor,
 		best: null,
 		protocols: protocolsOf(program),
+		declaredProtocols: null,
+		program,
 		parserProgram,
 	}
 
@@ -593,8 +646,10 @@ function visitNamespace(
 
 	// `is Comparable` reads back as that Protocol, on the Protocol Identifier's
 	// span. A `where` condition names a Generic and a Protocol.
+	let identities = clauseIdentities(node.type)
+
 	for (let clause of node.conformsTo) {
-		visitProtocolReference(clause.name, clause.position, state)
+		visitProtocolReference(clause.name, clause.position, identities, state)
 
 		for (let condition of clause.conditions) {
 			let generic = node.generics.find(
@@ -615,6 +670,7 @@ function visitNamespace(
 			visitProtocolReference(
 				condition.protocol,
 				condition.protocolPosition,
+				identities,
 				state,
 			)
 		}
@@ -1073,11 +1129,17 @@ function visitIdentifier(
 function visitProtocolReference(
 	name: string,
 	position: common.Position,
+	identities: Array<string>,
 	state: State,
 ) {
-	let protocolType = state.protocols[name]
+	if (!wins(state, position)) {
+		return
+	}
 
-	if (protocolType === undefined || !wins(state, position)) {
+	let protocolType =
+		resolvedProtocol(name, identities, state) ?? state.protocols[name]
+
+	if (protocolType === undefined) {
 		return
 	}
 

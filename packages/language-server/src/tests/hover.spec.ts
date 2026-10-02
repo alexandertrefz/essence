@@ -1243,6 +1243,62 @@ describe("Hover of conformance clauses", () => {
 		)
 	})
 
+	// A clause in a body may name a Protocol that body declares, which can
+	// shadow one of the same name outside it.
+	it("should describe a clause naming a Protocol declared in a body", () => {
+		let source = [
+			"implementation {",
+			"\tprotocol Sized {",
+			"\t\tsize() -> Integer",
+			"\t}",
+			"",
+			"\tfunction measure() -> Integer {",
+			"\t\tprotocol Sized {",
+			"\t\t\tbulk() -> Integer",
+			"\t\t}",
+			"",
+			"\t\tnamespace Crates<infer Item> for List<Item>",
+			"\t\t\tis Sized where Item is Sized",
+			"\t\t{",
+			"\t\t\tbulk() -> Integer {",
+			"\t\t\t\t<- @::length()",
+			"\t\t\t}",
+			"\t\t}",
+			"",
+			"\t\t<- 1",
+			"\t}",
+			"}",
+		].join("\n")
+		let bodyProtocol = ["protocol Sized", "bulk() -> Integer"].join("\n")
+
+		expect(hover(source, { line: 12, column: 7 })).toBe(bodyProtocol)
+		expect(hover(source, { line: 12, column: 27 })).toBe(bodyProtocol)
+	})
+
+	it("should describe a clause naming a Protocol only a body declares", () => {
+		let source = [
+			"implementation {",
+			"\tfunction measure() -> Integer {",
+			"\t\tprotocol Weighed {",
+			"\t\t\tweight() -> Integer",
+			"\t\t}",
+			"",
+			"\t\tnamespace Pounds for Integer is Weighed {",
+			"\t\t\tweight() -> Integer {",
+			"\t\t\t\t<- @",
+			"\t\t\t}",
+			"\t\t}",
+			"",
+			"\t\t<- 3::weight()",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 7, column: 35 })).toBe(
+			["protocol Weighed", "weight() -> Integer"].join("\n"),
+		)
+	})
+
 	// The receiver is bound to a `List` Type, since a written List reaches
 	// `namespace NonEmptyList`, whose `sort` has a signature of its own.
 	it("should show a Method's Protocol bound", () => {

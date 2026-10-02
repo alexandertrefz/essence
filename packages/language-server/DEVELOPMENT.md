@@ -469,6 +469,8 @@ A declaration whose name would only repeat itself answers with what the name sta
 - A Protocol, a Choice and a Namespace with conformance clauses read back as their declaration head, with Type
   Parameters, conformance clauses and each Case's payload. A Namespace without clauses answers `Name: Name`. An import
   or export entry naming a Namespace reads back as `namespace Name for Target`.
+- A Protocol named in an `is` clause or a `where` condition reads back as the Protocol the clause resolved to. The
+  typed Namespace records it by identity, which tells a Protocol declared in a body from another of its name.
 - A Record Alias reads back as its members, on its own declaration and on an annotation or entry naming it. A value of
   one answers with the name, since the shape would drown the line. Only the outermost Alias is expanded: a member that
   is an Alias stays named.
