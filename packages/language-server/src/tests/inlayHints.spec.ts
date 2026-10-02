@@ -10,6 +10,8 @@ import type { common } from "@essence-lang/interfaces"
 
 import { analyseDocument } from "../analyse"
 import { findInlayHints, type InlayHint } from "../inlayHints"
+import { toLspInlayHint } from "../server"
+import { applyEdits } from "./textEdits"
 
 function allHintsOf(source: string) {
 	let { program } = parseWithDiagnostics(source)
@@ -28,27 +30,31 @@ function hintsOf(source: string) {
 	}))
 }
 
-// Applied back to front, so that an earlier insertion on a line does not
-// shift the column a later one was measured at.
+// Every Hint accepted at once, each with the label edit it carries.
 function applyHints(source: string): string {
-	let lines = source.split("\n")
-	let edits = allHintsOf(source)
-		.flatMap((hint) => (hint.textEdit === null ? [] : [hint.textEdit]))
-		.sort(
-			(a, b) =>
-				b.position.line - a.position.line ||
-				b.position.column - a.position.column,
-		)
+	return accepted(source, allHintsOf(source))
+}
 
-	for (let edit of edits) {
-		let index = edit.position.line - 1
-		let column = edit.position.column - 1
-		let line = lines[index] ?? ""
-
-		lines[index] = line.slice(0, column) + edit.newText + line.slice(column)
-	}
-
-	return lines.join("\n")
+function accepted(source: string, hints: Array<InlayHint>): string {
+	return applyEdits(
+		source,
+		hints.flatMap((hint) =>
+			hint.textEdit === null
+				? []
+				: [
+						...(hint.textEdit.labelEdit === undefined
+							? []
+							: [hint.textEdit.labelEdit]),
+						{
+							range: {
+								start: hint.textEdit.position,
+								end: hint.textEdit.position,
+							},
+							newText: hint.textEdit.newText,
+						},
+					],
+		),
+	)
 }
 
 describe("Inlay Hints", () => {
@@ -486,7 +492,8 @@ describe("Inlay Hints", () => {
 	})
 
 	// A Hint's label is the annotation the source left out, and the Hint sits
-	// where it belongs, so accepting one is a plain insertion.
+	// where it belongs, so accepting one inserts it. A Function literal's
+	// Parameter also writes its label, which `(item: Integer)` would change.
 	describe("Accepting a Hint", () => {
 		it("should insert its own label at its own position", () => {
 			let source = [
@@ -504,7 +511,7 @@ describe("Inlay Hints", () => {
 			])
 
 			for (let hint of hints) {
-				expect(hint.textEdit).toEqual({
+				expect(hint.textEdit).toMatchObject({
 					position: hint.position,
 					newText: hint.label,
 				})
@@ -521,11 +528,12 @@ describe("Inlay Hints", () => {
 			expect(applyHints(source)).toBe(
 				[
 					"implementation {",
-					"\tconstant kept: List<Integer> = [1]::removeEvery(where (item: Integer) -> Boolean { <- true })",
+					"\tconstant kept: List<Integer> = [1]::removeEvery(where (_ item: Integer) -> Boolean { <- true })",
 					"}",
 				].join("\n"),
 			)
 			expect(hintsOf(applyHints(source))).toEqual([])
+			expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
 		})
 
 		it("should annotate the underscore spelling after the name", () => {
@@ -536,6 +544,163 @@ describe("Inlay Hints", () => {
 			].join("\n")
 
 			expect(applyHints(source)).toContain("(_ item: Integer) -> Boolean")
+		})
+
+		it("should hand an editor the label edit with the annotation", () => {
+			let source = [
+				"implementation {",
+				"\tconstant kept = [1]::removeEvery(where (item) { <- true })",
+				"}",
+			].join("\n")
+			let parameterHint = allHintsOf(source).find(
+				(hint) => hint.label === ": Integer",
+			) as InlayHint
+
+			expect(toLspInlayHint(parameterHint).textEdits).toEqual([
+				{
+					range: {
+						start: { line: 1, character: 41 },
+						end: { line: 1, character: 41 },
+					},
+					newText: "_ ",
+				},
+				{
+					range: {
+						start: { line: 1, character: 45 },
+						end: { line: 1, character: 45 },
+					},
+					newText: ": Integer",
+				},
+			])
+		})
+
+		it("should keep a Method literal's Parameter a name", () => {
+			let source = [
+				"implementation {",
+				'\tconstant loans = ["grace" = 1]',
+				'\tconstant updated = loans::update(at "grace", with (count) { <- count::add(1) })',
+				"}",
+			].join("\n")
+
+			expect(applyHints(source).split("\n")[2]).toBe(
+				'\tconstant updated: Dictionary<String, Integer> = loans::update(at "grace", with (_ count: Integer) -> Integer { <- count::add(1) })',
+			)
+			expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
+		})
+
+		// The signatures each literal in `acceptedLiteral` takes its Types and
+		// labels from.
+		const signatures = [
+			"implementation {",
+			"\tfunction discount(using rule: (on: Integer) -> Integer) -> Integer {",
+			"\t\t<- rule(on 100)",
+			"\t}",
+			"",
+			"\tfunction shaped(using rule: (_: { a: Integer }) -> Integer) -> Integer {",
+			"\t\t<- rule({ a = 1 })",
+			"\t}",
+			"",
+			"\tfunction shapedOn(using rule: (on: { a: Integer }) -> Integer) -> Integer {",
+			"\t\t<- rule(on { a = 1 })",
+			"\t}",
+			"",
+		]
+
+		// The literal on its own line, annotated, and whether the result
+		// compiles.
+		function acceptedLiteral(literal: string) {
+			let source = [
+				...signatures,
+				`\tconstant x: Integer = ${literal}`,
+				"}",
+			].join("\n")
+			let result = applyHints(source)
+
+			return {
+				literal: result
+					.split("\n")
+					[signatures.length]?.slice(
+						"\tconstant x: Integer = ".length,
+					),
+				diagnostics: analyseDocument(result).diagnostics,
+			}
+		}
+
+		it("should write the label the expected signature gives", () => {
+			expect(
+				acceptedLiteral("discount(using (price) { <- price })"),
+			).toEqual({
+				literal:
+					"discount(using (on price: Integer) -> Integer { <- price })",
+				diagnostics: [],
+			})
+			expect(
+				acceptedLiteral("discount(using (_ price) { <- price })"),
+			).toEqual({
+				literal:
+					"discount(using (on price: Integer) -> Integer { <- price })",
+				diagnostics: [],
+			})
+		})
+
+		it("should write no second label where the name is the label", () => {
+			expect(acceptedLiteral("discount(using (on) { <- on })")).toEqual({
+				literal: "discount(using (on: Integer) -> Integer { <- on })",
+				diagnostics: [],
+			})
+		})
+
+		it("should label a Pattern Parameter as the signature does", () => {
+			expect(acceptedLiteral("shaped(using ({ a }) { <- a })")).toEqual({
+				literal:
+					"shaped(using (_ { a }: { a: Integer }) -> Integer { <- a })",
+				diagnostics: [],
+			})
+			expect(acceptedLiteral("shapedOn(using ({ a }) { <- a })")).toEqual(
+				{
+					literal:
+						"shapedOn(using (on { a }: { a: Integer }) -> Integer { <- a })",
+					diagnostics: [],
+				},
+			)
+			expect(
+				acceptedLiteral("shapedOn(using (on { a }) { <- a })"),
+			).toEqual({
+				literal:
+					"shapedOn(using (on { a }: { a: Integer }) -> Integer { <- a })",
+				diagnostics: [],
+			})
+		})
+
+		// A Function literal refuses `_: Integer` and `on _: Integer`, so a
+		// bare `_` keeps its Hint and offers no edit.
+		it("should offer no edit for a bare `_` under a label", () => {
+			let source = [
+				...signatures,
+				"\tconstant x: Integer = discount(using (_) { <- 1 })",
+				"}",
+			].join("\n")
+			let parameterHint = allHintsOf(source).find(
+				(hint) => hint.label === ": Integer",
+			)
+
+			expect(parameterHint?.textEdit).toBeNull()
+		})
+
+		it("should offer no edit for a bare `_` without a label", () => {
+			let source = [
+				"implementation {",
+				"\tconstant ones: List<Integer> = [1]::map((_) { <- 1 })",
+				"}",
+			].join("\n")
+			let hints = allHintsOf(source)
+
+			expect(hints.map((hint) => hint.label)).toEqual([
+				": Integer",
+				" -> Integer",
+			])
+			expect(hints[0]?.textEdit).toBeNull()
+			expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
 		})
 	})
 
@@ -744,28 +909,6 @@ describe("Inlay Hints that write a name", () => {
 		}
 	}
 
-	function applied(source: string, hints: Array<InlayHint>): string {
-		let lines = source.split("\n")
-		let edits = hints
-			.flatMap((hint) => (hint.textEdit === null ? [] : [hint.textEdit]))
-			.sort(
-				(a, b) =>
-					b.position.line - a.position.line ||
-					b.position.column - a.position.column,
-			)
-
-		for (let edit of edits) {
-			let index = edit.position.line - 1
-			let column = edit.position.column - 1
-			let line = lines[index] ?? ""
-
-			lines[index] =
-				line.slice(0, column) + edit.newText + line.slice(column)
-		}
-
-		return lines.join("\n")
-	}
-
 	const shapes = [
 		"implementation {",
 		"\ttype Point = { x: Integer, y: Integer }",
@@ -818,7 +961,7 @@ describe("Inlay Hints that write a name", () => {
 		expect(hints.map((hint) => hint.label)).toEqual([": Point"])
 		expect(hints[0]?.textEdit?.newText).toBe(": { x: Integer, y: Integer }")
 		expect(
-			analyseDocument(applied(main, hints), filePath).diagnostics,
+			analyseDocument(accepted(main, hints), filePath).diagnostics,
 		).toEqual([])
 	})
 
@@ -845,7 +988,7 @@ describe("Inlay Hints that write a name", () => {
 		expect(hints.map((hint) => hint.label)).toEqual([": Reading"])
 		expect(hints[0]?.textEdit?.newText).toBe(": Integer | String")
 		expect(
-			analyseDocument(applied(main, hints), filePath).diagnostics,
+			analyseDocument(accepted(main, hints), filePath).diagnostics,
 		).toEqual([])
 	})
 
@@ -899,7 +1042,7 @@ describe("Inlay Hints that write a name", () => {
 
 		expect(hints[0]?.textEdit?.newText).toBe(": Point")
 		expect(
-			analyseDocument(applied(main, hints), filePath).diagnostics,
+			analyseDocument(accepted(main, hints), filePath).diagnostics,
 		).toEqual([])
 	})
 

@@ -5,6 +5,7 @@ import {
 } from "@essence-lang/compiler/visitor"
 import type { common } from "@essence-lang/interfaces"
 
+import { isAtOrBefore } from "./positions"
 import { typedProgramBodies } from "./sections"
 import { spellTypeAt } from "./spellableTypes"
 
@@ -21,9 +22,16 @@ export type InlayHint = {
 	textEdit: InlayHintEdit | null
 }
 
-// An insertion, so a Cursor: the annotation replaces nothing.
+// An insertion, so a Cursor: the annotation replaces nothing. A contextual
+// Function literal's Parameter also writes its label, via `labelEditOf`.
 type InlayHintEdit = {
 	position: common.Cursor
+	newText: string
+	labelEdit?: LabelEdit
+}
+
+type LabelEdit = {
+	range: common.Position
 	newText: string
 }
 
@@ -38,6 +46,7 @@ function addTypeHint(
 	position: common.Cursor,
 	prefix: string,
 	type: common.Type,
+	labelEdit: LabelEdit | null | "unwritable" = null,
 ) {
 	if (
 		hints.range !== null &&
@@ -57,9 +66,13 @@ function addTypeHint(
 		label: `${prefix}${printType(type)}`,
 		kind: "type",
 		textEdit:
-			written === null
+			written === null || labelEdit === "unwritable"
 				? null
-				: { position, newText: `${prefix}${written}` },
+				: {
+						position,
+						newText: `${prefix}${written}`,
+						...(labelEdit === null ? {} : { labelEdit }),
+					},
 	})
 }
 
@@ -112,8 +125,8 @@ function visitNode(node: TypedNode, hints: Hints) {
 			}
 
 			break
-		case "FunctionDefinition":
-			hintFunctionDefinition(node, hints)
+		case "FunctionValue":
+			hintFunctionDefinition(node.value, node.type, hints)
 			break
 	}
 
@@ -140,9 +153,10 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 // Parameter's name and at the end of the Parameter list.
 function hintFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
+	type: common.FunctionType,
 	hints: Hints,
 ) {
-	for (let parameter of definition.parameters) {
+	for (let [index, parameter] of definition.parameters.entries()) {
 		// INVARIANT: `parameter.position` stops at the Type, before any default. The
 		// applied edit writes at that end, so a wider span would put `: Integer` after
 		// `= 1`.
@@ -155,6 +169,10 @@ function hintFunctionDefinition(
 				parameter.position.end,
 				": ",
 				parameter.inferredType,
+				labelEditOf(
+					parameter,
+					type.parameterTypes[index]?.name ?? null,
+				),
 			)
 		}
 	}
@@ -170,4 +188,34 @@ function hintFunctionDefinition(
 			definition.inferredReturnType,
 		)
 	}
+}
+
+// `(count: Integer)` makes `count` a label, so the annotated form also writes
+// the label the Parameter took from the expected signature, or `_` for none.
+// A bare `_` has no annotated spelling, since a Function literal refuses both
+// `_: Integer` and `on _: Integer`.
+function labelEditOf(
+	parameter: common.typed.ParameterNode,
+	label: string | null,
+): LabelEdit | null | "unwritable" {
+	// `on { width }` writes its label already.
+	if (parameter.externalName !== null) {
+		return null
+	}
+
+	let binder = parameter.internalName
+
+	if (binder === null) {
+		return "unwritable"
+	}
+
+	let range = { start: parameter.position.start, end: binder.position.start }
+	let newText = label === binder.content ? "" : `${label ?? "_"} `
+
+	// An `_` before the binder says there is no label already.
+	if (!isAtOrBefore(binder.position.start, parameter.position.start)) {
+		return label === null ? null : { range, newText }
+	}
+
+	return newText === "" ? null : { range, newText }
 }

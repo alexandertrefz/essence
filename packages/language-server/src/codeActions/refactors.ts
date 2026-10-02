@@ -24,6 +24,7 @@ export function annotationActions(
 			diagnosticPosition: null,
 			isPreferred: false,
 			edits: [
+				...(edit.labelEdit === undefined ? [] : [edit.labelEdit]),
 				{
 					range: { start: edit.position, end: edit.position },
 					newText: edit.newText,

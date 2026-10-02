@@ -2372,8 +2372,9 @@ export function startServer(options: { connection?: Connection } = {}) {
 }
 
 // A Type Hint carries the edit that writes it, an insertion at an empty
-// Range. A value Hint records one run and has nothing to accept, so it is a
-// Parameter Hint, which Editors draw quietly.
+// Range, and before it any label a Function literal's Parameter needs. A value
+// Hint records one run and has nothing to accept, so it is a Parameter Hint,
+// which Editors draw quietly.
 export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
 	let position = {
 		line: hint.position.line - 1,
@@ -2399,6 +2400,14 @@ export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
 		label: hint.label,
 		kind: InlayHintKind.Type,
 		textEdits: [
+			...(hint.textEdit.labelEdit === undefined
+				? []
+				: [
+						{
+							range: toLspRange(hint.textEdit.labelEdit.range),
+							newText: hint.textEdit.labelEdit.newText,
+						},
+					]),
 			{
 				range: { start: insertion, end: insertion },
 				newText: hint.textEdit.newText,

@@ -5805,6 +5805,25 @@ describe("Code Actions", () => {
 			)
 		})
 
+		it("should keep a literal's Parameter a name, not a label", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant loans = ["grace" = 1]',
+				'\tconstant updated = loans::update(at "grace", with (count) { <- count::add(1) })',
+				"}",
+			]
+
+			let refactor = actionsOf(lines).find(
+				(entry) =>
+					entry.title === "Add explicit Type annotation ': Integer'",
+			) as CodeActionEntry
+
+			expect(applied(lines, refactor)[2]).toBe(
+				'\tconstant updated = loans::update(at "grace", with (_ count: Integer) { <- count::add(1) })',
+			)
+			expect(codesOf(applied(lines, refactor))).toEqual([])
+		})
+
 		// The title quotes the Hint's edit, not its label. An Alias the position
 		// cannot resolve is shown by name and written as the shape.
 		it("should quote the annotation it writes where the two differ", () => {
