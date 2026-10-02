@@ -1,3 +1,7 @@
+import {
+	findParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -42,7 +46,11 @@ export function extractConstantActions(
 
 	let expression = findInnermostNodeContaining(program, selection)
 
-	if (expression === null || !isExtractable(expression)) {
+	if (
+		expression === null ||
+		!isExtractable(expression) ||
+		holdsBareCase(expression)
+	) {
 		return []
 	}
 
@@ -142,6 +150,44 @@ function isExtractable(
 		default:
 			return false
 	}
+}
+
+// Whether a bare `#Case` inside the value resolves against the Type its
+// position expects. See "Extracting a Constant" in DEVELOPMENT.md.
+function holdsBareCase(node: ParserNode): boolean {
+	switch (node.nodeType) {
+		case "CaseValue":
+			if (node.choice === null) {
+				return true
+			}
+
+			break
+		// An Argument resolves against its Parameter, and a receiver or a
+		// callee against nothing the position decides.
+		case "MethodInvocation":
+		case "FunctionInvocation":
+			return false
+		case "FunctionValue":
+			if (node.value.returnType !== null) {
+				return false
+			}
+
+			break
+		case "Define":
+			if (node.returnType !== null) {
+				return false
+			}
+
+			break
+		case "Match":
+			return holdsBareCase(node.value)
+	}
+
+	return (
+		findParserChild(node, (child) =>
+			holdsBareCase(child) ? true : undefined,
+		) === true
+	)
 }
 
 // The Expressions a Statement reads every time it is reached. See

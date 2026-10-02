@@ -8392,6 +8392,94 @@ describe("Extract to a Constant", () => {
 		expectRefactored(lines, result)
 	})
 
+	// `#Empty` resolves against the Type its position expects, and a Constant
+	// with no written Type expects none. A Match writes its own.
+	it("offers nothing for a value holding a bare Case", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant held: List<Optional<Integer>> = [#Value(1), #Empty]",
+			"",
+			"\tfunction report(_ url: String) -> { url: String, code: Optional<Integer> } {",
+			"\t\t<- { url, code = #Empty }",
+			"\t}",
+			"",
+			"\tfunction checked(_ code: Integer) -> Optional<Integer> {",
+			"\t\t<- match code -> Optional<Integer> {",
+			"\t\t\tcase 0 { <- #Empty }",
+			"\t\t\tcase _ { <- #Value(code) }",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "[#Value(1), #Empty]")),
+		).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "{ url, code = #Empty }")),
+		).toEqual([])
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "match code", "\t\t}"),
+		)
+
+		expectRefactored(lines, applied(lines, action))
+	})
+
+	// The arrow is the Type `#Empty` resolves against.
+	it("lifts a `define` that writes its answer Type", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction parsed(_ text: String) -> Optional<Integer> {",
+			"\t\t<- define -> Optional<Integer> {",
+			"\t\t\tas #Empty if text::isEmpty()",
+			"\t\t\tas Integer.parse(text) otherwise",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeFrom(lines, "define ->", "\t\t}"),
+		)
+		let result = applied(lines, action)
+
+		expect(result[2]).toBe(
+			"\t\tconstant value = define -> Optional<Integer> {",
+		)
+		expectRefactored(lines, result)
+	})
+
+	// `#Decimal` resolves against `toString`'s Parameter wherever the call
+	// stands.
+	it("lifts a call that passes a bare Case", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction rate(_ wins: Integer) -> String {",
+			'\t\t<- wins::divide(by 1)::toString(as #Decimal, toPlaces 2)::append("%")',
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeOf(
+				lines,
+				"wins::divide(by 1)::toString(as #Decimal, toPlaces 2)",
+			),
+		)
+		let result = applied(lines, action)
+
+		expect(result.slice(2, 4)).toEqual([
+			"\t\tconstant toString = wins::divide(by 1)::toString(as #Decimal, toPlaces 2)",
+			'\t\t<- toString::append("%")',
+		])
+		expectRefactored(lines, result)
+	})
+
 	// A Method taken as a value loses its defaults, and one with Protocol-bound
 	// Type Parameters is refused as a value.
 	it("offers nothing for a callee, but lifts the whole call", () => {

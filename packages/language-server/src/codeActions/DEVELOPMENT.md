@@ -130,9 +130,12 @@ A reader dragging over characters is often off by one, and still means the same 
 
 Only some Expressions are worth naming, and `isExtractable` lists them. A bare Identifier already has a name, and
 a scalar Literal reads as its own value. Others take their meaning from where they are written and would lose it.
-A Function literal and a bare `#Case` take their Type from their position. A member path stands for a Function of
-the Argument it is handed. A Record written with a path key reaches into a value its position supplies: the value a
-`with` updates, or a Parameter's default.
+A Function literal and a bare `#Case` take their Type from their position. So does a value holding a bare `#Case`,
+as `[#Value(1), #Empty]` does, which `holdsBareCase` finds. It does not search a call: an Argument resolves against its
+Parameter, and a receiver or a callee against nothing the position decides. Nor does it search the answers of a Match,
+of a `define` with a `-> Type`, or of a Function literal that writes its return Type, which resolve against that Type.
+A member path stands for a Function of the Argument it is handed. A Record written with a path key reaches into a value
+its position supplies: the value a `with` updates, or a Parameter's default.
 
 `collectEager` collects the Expressions a Statement reads every time it is reached, which are the ones a Constant
 before it may hold. Its walk stops at anything that opens a body of its own, such as a Function literal or a Match
