@@ -183,7 +183,7 @@ function hoverAt(
 // character, a blank line. A space between two tokens belongs to what spans
 // them.
 function isInMargin(text: string, cursor: common.Cursor): boolean {
-	let line = text.split("\n")[cursor.line - 1] ?? ""
+	let line = lineOf(text, cursor.line)
 	let index = cursor.column - 1
 
 	if ((line[index] ?? "").trim() !== "") {
@@ -194,6 +194,28 @@ function isInMargin(text: string, cursor: common.Cursor): boolean {
 		line.slice(0, index).trim() === "" ||
 		line.slice(index + 1).trim() === ""
 	)
+}
+
+// One line of the text, counted from 1, or "" outside it. Hover runs on every
+// pointer move, so the rest of the document is not split.
+function lineOf(text: string, lineNumber: number): string {
+	if (lineNumber < 1) {
+		return ""
+	}
+
+	let start = 0
+
+	for (let line = 1; line < lineNumber; line++) {
+		start = text.indexOf("\n", start) + 1
+
+		if (start === 0) {
+			return ""
+		}
+	}
+
+	let end = text.indexOf("\n", start)
+
+	return text.slice(start, end === -1 ? text.length : end)
 }
 
 // Every resolved annotation with what it resolved to, offered last so a tie

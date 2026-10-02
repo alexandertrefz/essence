@@ -858,6 +858,23 @@ describe("Hover inside a declaration's body", () => {
 		expect(hover(source, { line: 7, column: 2 })).toBeNull()
 		expect(hover(source, { line: 2, column: 3 })).toBe("Thing: Thing")
 	})
+
+	// The margin is read off the cursor's own line, the first and the last
+	// included. Both margins lie inside the List's span, which would answer
+	// without the rule.
+	it("should read the margin of the first and the last line", () => {
+		let source = [
+			"implementation { constant total = [",
+			"\t1,",
+			"\t2 ] }",
+		].join("\n")
+
+		expect(hover(source, { line: 1, column: 35 })).toBe("List<Integer>")
+		expect(hover(source, { line: 1, column: 36 })).toBeNull()
+		expect(hover(source, { line: 3, column: 1 })).toBeNull()
+		expect(hover(source, { line: 3, column: 2 })).toBe("Integer")
+		expect(hover(source, { line: 4, column: 1 })).toBeNull()
+	})
 })
 
 // A literal Matcher's value, a Record Matcher's by-value members and the
