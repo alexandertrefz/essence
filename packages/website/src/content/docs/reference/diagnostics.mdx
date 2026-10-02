@@ -5592,6 +5592,37 @@ Move the constant into a module outside the cycle, or export a function that ret
 
 Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-and-cycles)
 
+### `cyclic-load-time-use`
+
+**Error.** Code that runs while a module loads uses a name from a module of its own import cycle. That code is a constant's value, a static property's value or a top-level statement, and the functions they call. Inside a cycle, the order the modules load in is not stated, so the other module may not have run yet: its namespaces do not exist and its functions may read values it has not set.
+
+<div class="error-output">
+
+```
+[cyclic-load-time-use]
+Error: 'pong' is used while this Module loads, but comes from a Module of its import cycle
+    ╭─┤ Ping.es:10:21 │
+    │
+  2 │     from "./Pong.es" { pong }
+    │                        ──┬─  
+    │                          ╰─── bound from ./Pong.es here
+    │ 
+ 10 │     constant opening = pong()
+    │                        ──┬─  
+    │                          ╰─── this calls it
+    │ 
+    │ Help: Use it inside a Function that runs once the Modules have loaded, or break the cycle.
+    │ 
+    │ Note: ./Pong.es imports this Module back, directly or through further Modules, so it may load after this one.
+────╯
+```
+
+</div>
+
+Make the value a function the program calls once the modules have loaded, such as `function opening() -> String { <- pong() }`, or move one of the two declarations out of the cycle. A function body that uses the other module is fine, as long as nothing calls it while a module of the cycle loads.
+
+Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-and-cycles)
+
 ### `cyclic-side-effects`
 
 **Warning.** A module in a cycle runs a statement at its top level, such as a print. Inside a cycle, the order the modules run in is not stated.
@@ -5603,9 +5634,9 @@ Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-a
 Warning: This Statement runs in an order the cycle does not state
     ╭─┤ Ping.es:10:2 │
     │
- 10 │     Terminal.print(pong())
-    │     ───────────┬──────────  
-    │                ╰──────────── this runs when the Module body runs
+ 10 │     Terminal.print("Ping.es runs")
+    │     ───────────────┬──────────────  
+    │                    ╰──────────────── this runs when the Module body runs
     │ 
     │ Help: Break the cycle, or move the Statement into a Module outside it.
     │ 

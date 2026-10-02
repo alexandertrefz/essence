@@ -458,6 +458,7 @@ export type DiagnosticCode =
 	| "export-of-unknown-name"
 	| "export-of-variable"
 	| "cyclic-constant-import"
+	| "cyclic-load-time-use"
 	| "cyclic-side-effects"
 	| "unused-import"
 	| "dependency-has-errors"

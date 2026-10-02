@@ -45,6 +45,12 @@ After enrichment each Module of a cycle also reports `cyclic-side-effects` on it
 a declaration. A Module body runs on first import, and inside a cycle the entry point decides which body runs
 first.
 
+`moduleSections` marks each typed import entry `cyclic` where its Module is in the importing Module's group. The
+validator refuses code that runs while the Module loads and uses such a name, as `cyclic-load-time-use`. See "Use
+before declaration" in packages/compiler/src/validator/DEVELOPMENT.md. The three rules stand beside each other.
+`cyclic-constant-import` refuses the import of a Constant itself, wherever it is read. `cyclic-side-effects` warns
+about the order of a Module body's own effects, which a use of the other Module need not be part of.
+
 ## Unused imports
 
 `reportUnusedImports` warns about a bound entry whose local name nothing reads. A warning on a name the Module

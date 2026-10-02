@@ -262,6 +262,7 @@ function moduleSections(
 	state: ModuleState,
 	surface: ExportSurface,
 	surfaceFor: (filePath: string) => ExportSurface | null,
+	inCycle: (filePath: string) => boolean,
 ): {
 	imports: common.typed.ImportSectionNode | null
 	exports: common.typed.ExportSectionNode | null
@@ -297,6 +298,7 @@ function moduleSections(
 										surfaceFor(binding.dependencyPath),
 										binding.entry.name.content,
 									),
+									cyclic: inCycle(binding.dependencyPath),
 									type: boundEntryType(
 										state.scope,
 										binding.localName,
@@ -791,7 +793,15 @@ function linkGroup(
 			module: state.module,
 			program: {
 				...enriched[index]!.program,
-				...moduleSections(state, surface, surfaceFor),
+				...moduleSections(
+					state,
+					surface,
+					surfaceFor,
+					(filePath) =>
+						group.length > 1 &&
+						filePath !== state.module.filePath &&
+						states.has(filePath),
+				),
 			},
 			diagnostics: [
 				...state.module.diagnostics,

@@ -127,6 +127,13 @@ Each holds nothing until its own Statement, or its own initialiser, runs. A body
 reported, as `Constant 'k' is read before it has a value` or the same for a Property. A read the Statement makes
 itself is left to the enricher, which reports a Constant named above its line, and to `checkPropertyIsBound`.
 
+A Module of an import cycle may load before the Module it imports from. So code that runs while it loads may not use
+a name bound from another Module of the cycle, which the linker marks `cyclic` on the typed import entry. A unit records
+each such use, and one the Statement reaches is `cyclic-load-time-use`, at once or through the bodies it runs. A Type,
+a Choice and a Protocol bind no runtime name and count for nothing. A provided Method is emitted apart from its
+Protocol's Module, so calling one reaches only the conformer's Methods its body dispatches to. Started work that goes
+on after the Module's last suspension may run while a Module of the cycle loads, so it is held to these names too.
+
 Each unit's closure over the bodies it runs is worked out once, per strongly connected group, as the latest moment
 it needs something to exist. Moments count Statements, and a Namespace's Statement gives one to each Property in
 written order. A Statement whose closure needs nothing later than itself costs no further walk.

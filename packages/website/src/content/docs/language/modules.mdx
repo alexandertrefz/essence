@@ -508,7 +508,7 @@ Corner Shop is open
 
 `Banner.es` and `Storefront.es` both use `shopName` from `Settings.es`. `Settings.es` runs once, before either of them.
 
-Two modules may import each other, directly or through others; that is a cycle. Functions, type aliases, choices, protocols and namespaces are hoisted, which means they exist before any module body runs. A cycle that names only those compiles and runs:
+Two modules may import each other, directly or through others; that is a cycle. Functions, type aliases, choices, protocols and namespaces are hoisted, so either module may name them anywhere. A cycle that names only those compiles and runs:
 
 ```essence
 § file: Totals.es
@@ -581,6 +581,8 @@ Error: Constant 'taxPercent' is imported across a cycle
 ```
 
 </div>
+
+Code that runs while a module loads may not use a name from another module of its cycle. That code is a constant's value, a static property's value and a top-level statement, and the functions they call. The other module may load later, so its namespaces may not exist yet. Suppose `Rounding.es` also imported `withTax` and wrote `constant sample = withTax({ cents = 100 })`. That call runs into `Totals.es` while `Rounding.es` loads, and the compiler refuses it with [`cyclic-load-time-use`](/docs/reference/diagnostics#cyclic-load-time-use). The same call inside a function body is fine, since nothing calls it until the modules have loaded.
 
 A top-level statement in a module inside a cycle, such as a `Terminal.print` in the body of `Rounding.es`, is the Warning [`cyclic-side-effects`](/docs/reference/diagnostics#cyclic-side-effects). The program compiles. Whether that statement runs before or after the other module's body depends on which module the entry file reaches first.
 

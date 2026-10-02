@@ -7,9 +7,10 @@ import { forEachTypedChild, type TypedNode } from "../visitor/index"
 // What code needs while it runs. See "Use before declaration" in
 // DEVELOPMENT.md.
 export type Dependency = {
-	// A Namespace's class, a top-level Constant, or a static Property, whose
-	// `name` is `Namespace.member`.
-	kind: "namespace" | "constant" | "property"
+	// A Namespace's class, a top-level Constant, a static Property, whose
+	// `name` is `Namespace.member`, or a name bound from another Module of the
+	// import cycle.
+	kind: "namespace" | "constant" | "property" | "cycle"
 	name: string
 	position: common.Position
 	label: string
@@ -69,6 +70,8 @@ type Builder = {
 	count: number
 	// The top-level Namespaces, whose classes are bound where they are written.
 	namespaces: ReadonlySet<string>
+	// The names bound from another Module of the import cycle.
+	cycleMates: ReadonlySet<string>
 }
 
 type Walk = {
@@ -94,12 +97,14 @@ type Pending = {
 export function collectUnits(
 	nodes: Array<common.typed.ImplementationNode>,
 	namespaces: ReadonlySet<string>,
+	cycleMates: ReadonlySet<string>,
 ): Units {
 	let build: Builder = {
 		bodies: new Map(),
 		literals: new WeakMap(),
 		count: 0,
 		namespaces,
+		cycleMates,
 	}
 	let top: Scope = { parent: null, names: new Map() }
 	let topWalk = (unit: Unit, home: string | null): Walk => ({
@@ -590,7 +595,11 @@ function namesOtherCode(
 
 // A top-level Constant or Variable, which holds nothing until its Statement
 // runs.
-function readConstant(walk: Walk, node: common.typed.IdentifierNode): void {
+function readConstant(
+	walk: Walk,
+	node: common.typed.IdentifierNode,
+	label: string,
+): void {
 	let binding = resolve(walk.scope, node.content)
 
 	if (binding?.kind === "value" && binding.declared !== undefined) {
@@ -598,7 +607,28 @@ function readConstant(walk: Walk, node: common.typed.IdentifierNode): void {
 			kind: "constant",
 			name: node.content,
 			position: node.position,
-			label: "this reads it",
+			label,
+			home: walk.home,
+		})
+	} else if (binding === undefined) {
+		useCycleMate(walk, node.content, node.position, label)
+	}
+}
+
+// A name another Module of the import cycle binds, whose Module body may not
+// have run yet.
+function useCycleMate(
+	walk: Walk,
+	name: string,
+	position: common.Position,
+	label: string,
+): void {
+	if (walk.build.cycleMates.has(name)) {
+		walk.unit.dependencies.push({
+			kind: "cycle",
+			name,
+			position,
+			label,
 			home: walk.home,
 		})
 	}
@@ -610,10 +640,11 @@ function depend(
 	position: common.Position,
 	label: string,
 ): void {
-	if (
-		resolve(walk.scope, namespace)?.kind !== "namespace" &&
-		walk.build.namespaces.has(namespace)
-	) {
+	if (resolve(walk.scope, namespace)?.kind === "namespace") {
+		return
+	}
+
+	if (walk.build.namespaces.has(namespace)) {
 		walk.unit.dependencies.push({
 			kind: "namespace",
 			name: namespace,
@@ -621,6 +652,8 @@ function depend(
 			label,
 			home: walk.home,
 		})
+	} else {
+		useCycleMate(walk, namespace, position, label)
 	}
 }
 
@@ -740,7 +773,11 @@ function visitExpression(
 				return
 			}
 
-			readConstant(walk, node)
+			readConstant(
+				walk,
+				node,
+				use === "call" ? "this calls it" : "this reads it",
+			)
 
 			if (use === "value") {
 				escape(walk, node)

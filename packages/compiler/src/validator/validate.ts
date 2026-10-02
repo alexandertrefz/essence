@@ -164,7 +164,10 @@ export const validate = (
 	// Fresh state per run. See "Module state" in DEVELOPMENT.md.
 	witnessScopes = []
 	writtenBounds = []
-	declarationOrder = collectDeclarationOrder(program.implementation.nodes)
+	declarationOrder = collectDeclarationOrder(
+		program.implementation.nodes,
+		program.imports,
+	)
 	executingTopLevelIndex = null
 	initialisingProperty = null
 	abandonedLines = new Set(options.recovery?.lines ?? [])

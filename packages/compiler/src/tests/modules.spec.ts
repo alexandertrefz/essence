@@ -5212,6 +5212,422 @@ implementation {
 		})
 	})
 
+	// A Module of a cycle may load before the other, so code that runs while it
+	// loads must not need the other one.
+	describe("Code that runs while a Module of a cycle loads", () => {
+		const board = `import {
+	from "./A.es" { Game }
+}
+
+implementation {
+	type Board = List<Integer>
+
+	namespace Board for Board {
+		static empty: Board = [0, 0]
+	}
+
+	function count(_ game: Game) -> Integer {
+		<- game.board::length()
+	}
+}
+
+export {
+	Board
+	count
+}
+`
+
+		it("refuses a Constant whose value reads a Namespace of the cycle", () => {
+			withProject(
+				{
+					"A.es": `import {
+	from "./B.es" { Board }
+}
+
+implementation {
+	type Game = { board: Board }
+
+	constant empty: Game = { board = Board.empty }
+}
+
+export {
+	Game
+	empty
+}
+`,
+					"B.es": board,
+				},
+				(directory) => {
+					let diagnostics = analysedAt(directory, "A.es", "A.es")
+
+					expect(reportsOf(diagnostics)).toEqual([
+						[
+							"cyclic-load-time-use",
+							"'Board' is used while this Module loads, but comes from a Module of its import cycle",
+						],
+					])
+					expect(diagnostics[0].helps).toEqual([
+						"Use it inside a Function that runs once the Modules have loaded, or break the cycle.",
+					])
+				},
+			)
+		})
+
+		it("refuses a Statement reaching the cycle through a Function of its own", () => {
+			withProject(
+				{
+					"A.es": `import {
+	from "./B.es" { Board }
+}
+
+implementation {
+	type Game = { board: Board }
+
+	function fresh() -> Game {
+		<- { board = Board.empty }
+	}
+
+	constant empty: Game = fresh()
+}
+
+export {
+	Game
+	empty
+}
+`,
+					"B.es": board,
+				},
+				(directory) => {
+					let diagnostics = analysedAt(directory, "A.es", "A.es")
+
+					expect(codesOf(diagnostics)).toEqual([
+						"cyclic-load-time-use",
+					])
+					expect(diagnostics[0].labels[0]?.message).toBe(
+						"this call reaches it",
+					)
+					expect(diagnostics[0].notes[1]).toBe(
+						"This uses 'Board' through 'fresh'.",
+					)
+				},
+			)
+		})
+
+		it("refuses a call into a Module of a cycle of three", () => {
+			withProject(
+				{
+					"A.es": `import {
+	from "./B.es" { viaB }
+}
+
+implementation {
+	function start() -> Integer {
+		<- viaB()
+	}
+}
+
+export {
+	start
+}
+`,
+					"B.es": `import {
+	from "./C.es" { viaC }
+}
+
+implementation {
+	function viaB() -> Integer {
+		<- viaC()
+	}
+}
+
+export {
+	viaB
+}
+`,
+					"C.es": `import {
+	from "./A.es" { start }
+}
+
+implementation {
+	function viaC() -> Integer {
+		<- 3
+	}
+
+	constant early = start()
+}
+
+export {
+	viaC
+	early
+}
+`,
+				},
+				(directory) => {
+					expect(
+						codesOf(analysedAt(directory, "A.es", "C.es")),
+					).toEqual(["cyclic-load-time-use"])
+				},
+			)
+		})
+
+		// B never suspends again, but the work it starts goes on during A's
+		// `complete`, while A has not declared `Doubling` yet.
+		it("refuses work started while a Module loads that later reaches the cycle", () => {
+			withProject(
+				{
+					"A.es": `import {
+	from "./B.es" { noop }
+}
+
+implementation {
+	function wait() -> Future<Integer> {
+		complete Async.sleep(milliseconds 30)
+
+		<- 1
+	}
+
+	constant waited = complete wait()
+
+	function touch() -> Integer {
+		<- noop()
+	}
+
+	namespace Doubling for Integer {
+		doubled() -> Integer { <- @::multiply(with 2) }
+	}
+}
+
+export {
+	Doubling
+	touch
+}
+`,
+					"B.es": `import {
+	from "./A.es" { Doubling }
+}
+
+implementation {
+	function slowly() -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+
+		<- 3::doubled()
+	}
+
+	constant running = start slowly()
+
+	function noop() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	noop
+}
+`,
+				},
+				(directory) => {
+					let diagnostics = analysedAt(directory, "A.es", "B.es")
+
+					expect(codesOf(diagnostics)).toEqual([
+						"cyclic-load-time-use",
+					])
+					expect(diagnostics[0].labels[0]?.message).toBe(
+						"this starts work that later reaches it",
+					)
+				},
+			)
+		})
+
+		// `bump` reads a value its own Module sets while it loads.
+		it("refuses a Function of the cycle called while a Module loads", () => {
+			withProject(
+				{
+					"P.es": `import {
+	from "./Q.es" { readEarly }
+}
+
+implementation {
+	function bump(_ n: Integer) -> Integer {
+		<- n::multiply(with 2)::add(1000)
+	}
+
+	function report() -> String {
+		<- readEarly()
+	}
+}
+
+export {
+	bump
+	report
+}
+`,
+					"Q.es": `import {
+	from "./P.es" { bump }
+}
+
+implementation {
+	constant early: String = "{bump(3)}"
+
+	function readEarly() -> String {
+		<- early
+	}
+}
+
+export {
+	readEarly
+}
+`,
+				},
+				(directory) => {
+					expect(
+						codesOf(analysedAt(directory, "P.es", "Q.es")),
+					).toEqual(["cyclic-load-time-use"])
+				},
+			)
+		})
+
+		// A provided Method's body is emitted apart from its Protocol's Module,
+		// and here dispatches to a Namespace of the calling Module.
+		it("accepts a provided Method of a Protocol of the cycle called while a Module loads", async () => {
+			await withBuiltProject(
+				{
+					"Main.es": `import {
+	from "./P.es" { describeAll }
+	from "./Q.es" { early }
+}
+
+implementation {
+	Terminal.print(describeAll({ count = 5 }))
+	Terminal.print(early)
+}
+`,
+					"P.es": `import {
+	from "./Q.es" {
+		Box
+		Boxes
+	}
+}
+
+implementation {
+	protocol Alpha {
+		size() -> Integer
+
+		twice() -> Integer {
+			<- @::size()::multiply(with 2)::add(1000)
+		}
+
+		label() -> String {
+			<- "size {@::size()} and more"
+		}
+	}
+
+	function describeAll(_ box: Box) -> String {
+		<- box::label()
+	}
+}
+
+export {
+	Alpha
+	describeAll
+}
+`,
+					"Q.es": `import {
+	from "./P.es" { Alpha }
+}
+
+implementation {
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is Alpha {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	constant box: Box = { count = 3 }
+	constant early: String = "{box::twice()} / {box::label()}"
+}
+
+export {
+	Box
+	Boxes
+	box
+	early
+}
+`,
+				},
+				async (directory) => {
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["size 5 and more", "1006 / size 3 and more"])
+				},
+			)
+		})
+
+		// Only Function bodies cross, and they run once both Modules loaded.
+		it("runs a cycle whose load-time code never crosses it, from either entry", async () => {
+			let files = {
+				"A.es": `import {
+	from "./B.es" { Board }
+}
+
+implementation {
+	type Game = { board: Board }
+
+	function empty() -> Game {
+		<- { board = Board.empty }
+	}
+
+	function cells(_ game: Game) -> Integer {
+		<- game.board::length()
+	}
+}
+
+export {
+	Game
+	cells
+	empty
+}
+`,
+				"B.es": board,
+			}
+
+			for (let [first, second] of [
+				["A.es", "B.es"],
+				["B.es", "A.es"],
+			]) {
+				await withBuiltProject(
+					{
+						...files,
+						"Main.es": `import {
+	from "./${first}" { ${first === "A.es" ? "cells empty" : "count"} }
+	from "./${second}" { ${second === "A.es" ? "cells empty" : "count"} }
+}
+
+implementation {
+	Terminal.print(cells(empty()))
+	Terminal.print(count(empty()))
+}
+`,
+					},
+					async (directory) => {
+						expect(
+							await runBundle(
+								generateModules(
+									linkProject(directory, "Main.es"),
+								),
+								directory,
+							),
+						).toEqual(["2", "2"])
+					},
+				)
+			}
+		})
+	})
+
 	// The Namespace has to hoist for the other Module of the cycle to bind it,
 	// though its static Property reads a Constant, which never hoists.
 	it("binds a Namespace across a cycle whose static Property reads a Constant", async () => {

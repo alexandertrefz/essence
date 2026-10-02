@@ -31,6 +31,8 @@ export type DeclarationOrder = {
 	namespaces: TopLevelNamespaces
 	constants: Declarations
 	properties: Declarations
+	// The names bound from another Module of the import cycle, by their entry.
+	cycleMates: Map<string, common.typed.ImportNode>
 	// The last Statement that declares anything code can reach too early.
 	last: number
 	reported: Set<string>
@@ -61,6 +63,9 @@ type Simulation = {
 	escapedClosure: Closure
 	fired: Set<Unit>
 	tails: Map<number, Array<Started>>
+	// Started work that goes on only after the last Statement that may
+	// suspend, which a Module of the cycle may still be loading around.
+	late: Array<Started>
 	scheduled: Set<Unit>
 }
 
@@ -75,6 +80,7 @@ const STEPS = 1 << 20
 
 export function collectDeclarationOrder(
 	nodes: Array<common.typed.ImplementationNode>,
+	imports: common.typed.ImportSectionNode | null = null,
 ): DeclarationOrder {
 	let namespaces: TopLevelNamespaces = new Map()
 	let constants: Declarations = new Map()
@@ -120,6 +126,12 @@ export function collectDeclarationOrder(
 		}
 	}
 
+	let cycleMates = new Map(
+		(imports?.entries ?? [])
+			.filter((entry) => entry.cyclic && entry.runtime)
+			.map((entry) => [entry.alias ?? entry.name, entry] as const),
+	)
+
 	reachWork.visits = 0
 
 	return {
@@ -127,7 +139,9 @@ export function collectDeclarationOrder(
 		namespaces,
 		constants,
 		properties,
-		last,
+		cycleMates,
+		// Every Statement may reach a Module of the cycle.
+		last: cycleMates.size > 0 ? Number.POSITIVE_INFINITY : last,
 		reported: new Set(),
 		run: null,
 	}
@@ -145,13 +159,18 @@ export function reportReachedNamespaces(
 	}
 
 	let simulation = (order.run ??= {
-		units: collectUnits(order.nodes, new Set(order.namespaces.keys())),
+		units: collectUnits(
+			order.nodes,
+			new Set(order.namespaces.keys()),
+			new Set(order.cycleMates.keys()),
+		),
 		order,
 		closures: new Map(),
 		escaped: new Set(),
 		escapedClosure: emptyClosure(),
 		fired: new Set(),
 		tails: new Map(),
+		late: [],
 		scheduled: new Set(),
 	})
 	let node = order.nodes[index]
@@ -168,14 +187,21 @@ export function reportReachedNamespaces(
 		}))
 
 	for (let cursor = 0; ; cursor++) {
-		// Work this Statement starts may go on while it suspends.
+		// Work this Statement starts may go on while it suspends. Work that
+		// goes on after the Module's last suspension is held to its cycle.
 		if (cursor === roots.length) {
-			let released = (simulation.tails.get(index) ?? []).map(
-				(started: Started) => ({
+			let released = [
+				...(simulation.tails.get(index) ?? []).map(
+					(started: Started) => ({
+						...started,
+						moment: index * STEPS + 1,
+					}),
+				),
+				...simulation.late.splice(0).map((started) => ({
 					...started,
-					moment: index * STEPS + 1,
-				}),
-			)
+					moment: (order.nodes.length + 1) * STEPS,
+				})),
+			]
 
 			simulation.tails.delete(index)
 
@@ -221,6 +247,11 @@ function availableFrom(
 	dependency: Dependency,
 	order: DeclarationOrder,
 ): number {
+	// A Module of the cycle may load after this one.
+	if (dependency.kind === "cycle") {
+		return Number.POSITIVE_INFINITY
+	}
+
 	if (dependency.kind !== "namespace") {
 		let declaration = (
 			dependency.kind === "constant" ? order.constants : order.properties
@@ -401,7 +432,7 @@ function fire(simulation: Simulation, root: Unit, index: number): void {
 }
 
 // The part of a started body after its first suspension, which runs once the
-// top level next suspends.
+// top level next suspends, or after the Module's last suspension.
 function schedule(
 	simulation: Simulation,
 	id: string,
@@ -423,6 +454,8 @@ function schedule(
 			...(simulation.tails.get(at) ?? []),
 			{ unit: tail, via },
 		])
+	} else if (simulation.order.cycleMates.size > 0) {
+		simulation.late.push({ unit: tail, via })
 	}
 }
 
@@ -454,6 +487,33 @@ function fireEscaped(
 	}
 }
 
+// One unit the walk from a Statement reached, and how.
+type Step = {
+	unit: Unit
+	parent: Step | null
+	via: { position: common.Position; label: string } | null
+}
+
+// The first run from the Statement towards a Step, and the bodies on the way.
+function pathTo(step: Step): {
+	via: { position: common.Position; label: string } | null
+	path: Array<string>
+} {
+	let path: Array<string> = []
+	let first = step
+
+	for (
+		let current: Step | null = step;
+		current?.parent != null;
+		current = current.parent
+	) {
+		path.unshift(current.unit.name)
+		first = current
+	}
+
+	return { via: first.via, path }
+}
+
 // Walks from a Statement to every Dependency it meets too early, with the
 // path it took, and reports each once.
 function reportFrom(
@@ -464,12 +524,6 @@ function reportFrom(
 	home: string | null,
 	reported: Set<string>,
 ): void {
-	type Step = {
-		unit: Unit
-		parent: Step | null
-		via: { position: common.Position; label: string } | null
-	}
-
 	let index = Math.floor(moment / STEPS)
 	let seen = new Set<Unit>([root.unit])
 	// Started work is walked from where it was started.
@@ -497,7 +551,9 @@ function reportFrom(
 			if (
 				declaration === undefined ||
 				availableFrom(dependency, order) < moment ||
-				(step.parent === null && dependency.kind !== "namespace") ||
+				(step.parent === null &&
+					(dependency.kind === "constant" ||
+						dependency.kind === "property")) ||
 				order.reported.has(`${index} ${dependency.name}`) ||
 				reported.has(key)
 			) {
@@ -506,7 +562,9 @@ function reportFrom(
 
 			reported.add(key)
 
-			if (step.parent === null) {
+			if (dependency.kind === "cycle") {
+				reportCycleUse(order, step, dependency)
+			} else if (step.parent === null) {
 				reportUse(dependency, declaration)
 			} else {
 				reportReach(step, dependency, declaration, home)
@@ -552,28 +610,12 @@ function reportFrom(
 		declaration: { position: common.Position },
 		home: string | null,
 	): void {
-		let path: Array<string> = []
-		let first = step
-
-		for (
-			let current: Step | null = step;
-			current?.parent != null;
-			current = current.parent
-		) {
-			path.unshift(current.unit.name)
-			first = current
-		}
+		let { via, path } = pathTo(step)
 
 		if (dependency.kind === "namespace") {
-			reportReachedDependency(
-				first.via!,
-				path,
-				dependency,
-				declaration,
-				home,
-			)
+			reportReachedDependency(via!, path, dependency, declaration, home)
 		} else {
-			reportReadTooEarly(first.via!, path, dependency, declaration)
+			reportReadTooEarly(via!, path, dependency, declaration)
 		}
 	}
 }
@@ -658,7 +700,57 @@ function declarationOf(
 			return order.constants.get(dependency.name)
 		case "property":
 			return order.properties.get(dependency.name)
+		case "cycle":
+			return order.cycleMates.get(dependency.name)
 	}
+}
+
+// A name another Module of the import cycle binds, used while this Module
+// loads, directly or through a body it runs.
+function reportCycleUse(
+	order: DeclarationOrder,
+	step: Step,
+	dependency: Dependency,
+): void {
+	let entry = order.cycleMates.get(dependency.name)!
+	let { via, path } = pathTo(step)
+	let used = secondary(dependency.position, dependency.label)
+
+	reportError(
+		`'${dependency.name}' is used while this Module loads, but comes from a Module of its import cycle`,
+		via?.position ?? dependency.position,
+		{
+			code: "cyclic-load-time-use",
+			labels:
+				via === null
+					? [
+							primary(dependency.position, dependency.label),
+							secondary(
+								entry.position,
+								`bound from ${entry.source} here`,
+							),
+						]
+					: [
+							primary(via.position, via.label),
+							used,
+							secondary(
+								entry.position,
+								`bound from ${entry.source} here`,
+							),
+						],
+			notes: [
+				`${entry.source} imports this Module back, directly or through further Modules, so it may load after this one.`,
+				...(path.length === 0
+					? []
+					: [
+							`This uses '${dependency.name}' through ${path.join(", then ")}.`,
+						]),
+			],
+			helps: [
+				"Use it inside a Function that runs once the Modules have loaded, or break the cycle.",
+			],
+		},
+	)
 }
 
 // A Constant or a static Property a body the Statement runs reads before it

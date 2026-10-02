@@ -218,6 +218,9 @@ export type ImportNode = {
 	source: string
 	modulePath: string | null
 	runtime: boolean
+	// Whether `modulePath` is in this Module's import cycle, whose Module
+	// bodies run in an order the source does not state.
+	cyclic: boolean
 	// What the entry bound, the member or else the Type, for a Hover.
 	type: Type | null
 	position: Position
