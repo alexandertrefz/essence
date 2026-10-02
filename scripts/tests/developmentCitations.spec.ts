@@ -6,7 +6,7 @@ import {
 	findingsIn,
 	readSource,
 	sourceOf,
-	trackedScripts,
+	repositoryScripts,
 } from "../commentProse"
 import {
 	developmentFiles,
@@ -26,7 +26,7 @@ let citations: Array<Citation> = []
 let developments: Array<string> = []
 
 beforeAll(async () => {
-	citations = (await trackedScripts()).map(readSource).flatMap(citationsIn)
+	citations = (await repositoryScripts()).map(readSource).flatMap(citationsIn)
 	developments = await developmentFiles()
 })
 

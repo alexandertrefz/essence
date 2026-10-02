@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
+import { repositoryFiles } from "@essence-lang/fixtures/repository"
 import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import { REPOSITORY_ROOT } from "../publishing/packages"
@@ -53,18 +54,6 @@ afterAll(() => {
 // Bun's own file names for a test.
 const testFileName = /[._](test|spec)\.[cm]?[jt]sx?$/
 
-async function listedFiles(): Promise<Array<string>> {
-	let listed = await spawnAndWait(["git", "ls-files", "-z"], {
-		cwd: REPOSITORY_ROOT,
-	})
-
-	if (listed.code !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr}`)
-	}
-
-	return listed.stdout.split("\0")
-}
-
 describe("the test budget", () => {
 	for (let mode of [[], ["--isolate"], ["--parallel=2"]]) {
 		it(`should reach every file of a run with ${mode.join(" ") || "no flags"}`, async () => {
@@ -106,7 +95,7 @@ describe("the test budget", () => {
 	it("should reach a run started inside any workspace that holds a spec", async () => {
 		let workspaces = [
 			...new Set(
-				(await listedFiles())
+				(await repositoryFiles(REPOSITORY_ROOT))
 					.filter((file) => specFileName.test(file))
 					.map((file) =>
 						/^(packages|examples)\//.test(file)
@@ -153,7 +142,7 @@ describe("the test budget", () => {
 	})
 
 	it("should find every test file named so that the budget reaches it", async () => {
-		let misnamed = (await listedFiles()).filter(
+		let misnamed = (await repositoryFiles(REPOSITORY_ROOT)).filter(
 			(file) => testFileName.test(file) && !specFileName.test(file),
 		)
 

@@ -8,7 +8,7 @@ import {
 	sentencesOf,
 	wordsOf,
 } from "@essence-lang/fixtures/prose"
-import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+import { repositoryFiles } from "@essence-lang/fixtures/repository"
 import { LanguageVariant, SyntaxKind } from "typescript/unstable/ast"
 import { createScanner, getShebang } from "typescript/unstable/ast/scanner"
 
@@ -114,21 +114,13 @@ const excludedPattern =
 
 const scriptPattern = /\.(ts|js|mjs|cjs)$/
 
-export async function trackedScripts(): Promise<Array<string>> {
-	let listed = await spawnAndWait(["git", "ls-files", "-z"], {
-		cwd: REPOSITORY_ROOT,
-	})
-
-	if (listed.code !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr}`)
-	}
-
-	return listed.stdout
-		.split("\0")
-		.filter(
-			(file) => scriptPattern.test(file) && !excludedPattern.test(file),
-		)
-		.sort()
+// Untracked files count too, so a new file meets the rules before it is added.
+export async function repositoryScripts(
+	root: string = REPOSITORY_ROOT,
+): Promise<Array<string>> {
+	return (await repositoryFiles(root)).filter(
+		(file) => scriptPattern.test(file) && !excludedPattern.test(file),
+	)
 }
 
 type Comment = {
@@ -947,7 +939,7 @@ export function citationsIn(source: Source): Array<Citation> {
 }
 
 export async function repositoryFindings(): Promise<Array<Finding>> {
-	return (await trackedScripts()).flatMap((file) =>
+	return (await repositoryScripts()).flatMap((file) =>
 		findingsIn(readSource(file)),
 	)
 }

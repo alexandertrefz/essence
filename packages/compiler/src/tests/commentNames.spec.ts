@@ -2,12 +2,13 @@ import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+import { repositoryFiles } from "@essence-lang/fixtures/repository"
 
 // A comment that quotes a name nothing declares sends its reader looking for
 // a Function, a Type or a Method label that is not there. A rename leaves
 // such names behind. So every name a comment quotes in backticks is looked for
-// in the code of every tracked TypeScript, JavaScript, Astro and Essence file.
+// in the code of every TypeScript, JavaScript, Astro and Essence file. A file
+// git does not track yet counts, and one it ignores does not.
 //
 // A quoted name is checked when it is written the way code names are: letters
 // only, with both capitals and lowercase. So `describeType` and `List` are
@@ -17,7 +18,7 @@ import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 // `everyItem(where:)` holds each label to the labels a Method of that name is
 // declared or called with.
 //
-// A name counts as present when code, a String or a tracked file's name spells
+// A name counts as present when code, a String or a listed file's name spells
 // it. The specs' Essence programs are Strings.
 //
 // A failure names the file and line of each name the code lacks. Correct the
@@ -517,18 +518,6 @@ const scannedExtensions = /\.(?:[cm]?[jt]sx?|es|astro)$/
 // the ones checked. Its code still counts, since other comments name it.
 const generatedFile = /\.generated\.ts$/
 
-async function trackedFiles(): Promise<Array<string>> {
-	let listed = await spawnAndWait(["git", "ls-files", "-z"], {
-		cwd: REPOSITORY_ROOT,
-	})
-
-	if (listed.code !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr}`)
-	}
-
-	return listed.stdout.split("\0").filter((file) => file !== "")
-}
-
 function scanFile(file: string, source: string): Scanned {
 	if (file.endsWith(".es")) {
 		return scanEssence(file, source)
@@ -558,7 +547,7 @@ async function readRepository(): Promise<Repository> {
 	let runs: Array<CommentRun> = []
 	let codes: Array<string> = []
 	let words = new Set<string>()
-	let files = await trackedFiles()
+	let files = await repositoryFiles(REPOSITORY_ROOT)
 	let fileCount = 0
 
 	for (let file of files) {

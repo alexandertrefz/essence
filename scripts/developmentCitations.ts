@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+import { repositoryFiles } from "@essence-lang/fixtures/repository"
 
 import type { Citation } from "./commentProse"
 import { REPOSITORY_ROOT } from "./publishing/packages"
@@ -121,24 +121,9 @@ export function repeatedHeadingsOf(
 
 // Untracked files count too, so new notes are checked before they are added.
 export async function developmentFiles(): Promise<Array<string>> {
-	let listed = await spawnAndWait(
-		["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-		{ cwd: REPOSITORY_ROOT },
+	return (await repositoryFiles(REPOSITORY_ROOT)).filter(
+		(file) => path.posix.basename(file) === "DEVELOPMENT.md",
 	)
-
-	if (listed.code !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr}`)
-	}
-
-	return [
-		...new Set(
-			listed.stdout
-				.split("\0")
-				.filter(
-					(file) => path.posix.basename(file) === "DEVELOPMENT.md",
-				),
-		),
-	].sort()
 }
 
 export function readDevelopment(file: string): string | null {

@@ -1,5 +1,9 @@
 import { beforeAll, describe, expect, it } from "bun:test"
-import { readFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import * as path from "node:path"
+
+import { spawnAndWait } from "@essence-lang/fixtures/spawn"
 
 import {
 	BASELINE_PATH,
@@ -12,9 +16,9 @@ import {
 	lowerBaseline,
 	readBaseline,
 	readSource,
+	repositoryScripts,
 	type Source,
 	sourceOf,
-	trackedScripts,
 	UPDATE_COMMAND,
 } from "../commentProse"
 
@@ -26,7 +30,7 @@ let sources: Array<Source> = []
 let findings: Array<Finding> = []
 
 beforeAll(async () => {
-	sources = (await trackedScripts()).map(readSource)
+	sources = (await repositoryScripts()).map(readSource)
 	findings = sources.flatMap(findingsIn)
 })
 
@@ -63,7 +67,7 @@ describe("Comment Prose", () => {
 
 		// Every rule passes on a reader that found nothing, so the count is
 		// what shows the reading still reaches the whole repository.
-		it("should read every tracked script", () => {
+		it("should read every script in the repository", () => {
 			expect(sources.length).toBeGreaterThan(400)
 			expect(
 				sources.reduce(
@@ -71,6 +75,49 @@ describe("Comment Prose", () => {
 					0,
 				),
 			).toBeGreaterThan(10_000)
+		})
+
+		// In a repository of its own, so no other spec meets the untracked
+		// file while it exists.
+		it("should read a script git does not track yet, and none it ignores", async () => {
+			let root = mkdtempSync(
+				path.join(tmpdir(), "essence-comment-prose-"),
+			)
+			let git = async (...command: Array<string>) => {
+				let run = await spawnAndWait(["git", ...command], { cwd: root })
+
+				expect(run.stderr).toBe("")
+			}
+
+			try {
+				writeFileSync(path.join(root, ".gitignore"), "ignored.ts\n")
+				writeFileSync(path.join(root, "added.ts"), "let a = 1\n")
+				writeFileSync(
+					path.join(root, "untracked.ts"),
+					"let a = 1\n// NOTE: The walk stops.\n",
+				)
+				writeFileSync(path.join(root, "ignored.ts"), "let a = 1\n")
+				await git("init", "--quiet")
+				await git("add", "added.ts")
+
+				expect(await repositoryScripts(root)).toEqual([
+					"added.ts",
+					"untracked.ts",
+				])
+				expect(
+					findingsIn(
+						sourceOf(
+							"untracked.ts",
+							readFileSync(
+								path.join(root, "untracked.ts"),
+								"utf8",
+							),
+						),
+					).map((finding) => finding.rule),
+				).toEqual(["no-note-prefix"])
+			} finally {
+				rmSync(root, { recursive: true, force: true })
+			}
 		})
 	})
 

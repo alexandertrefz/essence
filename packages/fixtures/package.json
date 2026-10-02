@@ -1,7 +1,7 @@
 {
 	"name": "@essence-lang/fixtures",
 	"version": "0.0.1",
-	"description": "Essence sources the test suite compiles, the paths to reach them, the way it runs a process, and what its prose rules call a sentence.",
+	"description": "Essence sources the test suite compiles, the paths to reach them, the way it runs a process, the files its repository checks read, and what its prose rules call a sentence.",
 	"private": true,
 	"type": "module",
 	"main": "./src/index.ts",
@@ -9,6 +9,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./prose": "./src/prose.ts",
+		"./repository": "./src/repository.ts",
 		"./spawn": "./src/spawn.ts"
 	},
 	"license": "MIT"

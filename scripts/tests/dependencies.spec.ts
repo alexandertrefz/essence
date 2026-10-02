@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { existsSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
-import { spawnAndWait } from "@essence-lang/fixtures/spawn"
+import { repositoryFiles } from "@essence-lang/fixtures/repository"
 
 import {
 	type Manifest,
@@ -13,7 +13,7 @@ import {
 
 // The workspace resolves every `@essence-lang/*` package from the root, declared
 // or not. An installed package finds only what its manifest names, the nearest
-// tracked `package.json` above the file.
+// `package.json` above the file.
 
 type Token = {
 	kind: "word" | "string" | "punctuation"
@@ -309,7 +309,7 @@ function astroScript(source: string): string {
 	return script.join("")
 }
 
-// The script a tracked file holds, or `null` for a file that is not one.
+// The script a listed file holds, or `null` for a file that is not one.
 // A `bin/` command is a script without an extension, known by its shebang.
 function scriptOf(file: string, text: string): string | null {
 	if (/\.[cm]?[jt]sx?$/.test(file)) {
@@ -350,15 +350,7 @@ async function readRepository(): Promise<Repository> {
 		return repository
 	}
 
-	let listed = await spawnAndWait(["git", "ls-files", "-z"], {
-		cwd: REPOSITORY_ROOT,
-	})
-
-	if (listed.code !== 0) {
-		throw new Error(`git ls-files failed: ${listed.stderr}`)
-	}
-
-	let files = listed.stdout.split("\0").filter((file) => file !== "")
+	let files = await repositoryFiles(REPOSITORY_ROOT)
 	let manifests = new Map<string, Manifest>()
 
 	for (let file of files) {
