@@ -330,8 +330,8 @@ Error: Nothing decides the Type Arguments of 'Box#Empty'
    │                      ────┬────  
    │                          ╰────── no Type Arguments here, and nothing around it decides them
    │ 
-   │ Help 1: Annotate the declaration: 'constant left: Box<Value> = Box#Empty'.
-   │ Help 2: Or apply the Type Arguments: 'Box<Value>#Empty'.
+   │ Help 1: Annotate the Declaration this is written into with 'Box<…>', which is what decides them.
+   │ Help 2: Or apply the Type Arguments here — 'Box<…>#Empty', with the Type you mean in place of each '…'.
    │ 
    │ Note 1: 'Box' takes 1 Type Parameter: 'Value'.
    │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.
@@ -340,7 +340,7 @@ Error: Nothing decides the Type Arguments of 'Box#Empty'
 
 </div>
 
-The Help names both ways out, with placeholders. It calls the constant `left`, whatever its name, and writes the type parameter `Value` where a type argument goes. Write the type you mean, as in `Box<String>#Empty`.
+The Help names both ways out, with `…` where a type argument goes. Write the type you mean, as in `Box<String>#Empty`.
 
 The payload decides only in the bare spelling. `Box#Full("a letter")` on a constant with no annotation is `undecided-type-arguments` as well. The block's second Note holds for that spelling with the choice's name: the payload is checked against the type arguments, and it decides nothing. A payload also decides only the type parameters its members mention. In a `choice Either<First, Second>`, a bare `#Left(1)` decides `First`, and the error says that nothing decides `Second`.
 
