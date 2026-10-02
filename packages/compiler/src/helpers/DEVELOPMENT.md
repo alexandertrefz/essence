@@ -178,7 +178,9 @@ nobody to ask: `constant d: NonZeroInteger = 3` is a `NonZeroInteger` because 3 
 decides such predicates while compiling, for a declared Constant, an Argument, a returned value and a Property.
 It reports nothing. A value it does not admit gets the ordinary mismatch where it stands, and `describePredicate`
 names the question it left unanswered. A value whose Type the base does not take is refused before any question,
-so `fitsRefinementBase` has the mismatch name the base instead and offer no check.
+so `fitsRefinementBase` has the mismatch name the base instead and offer no check. Only an Argument's callee's
+own `infer` Type Parameters bind while the base is matched. An enclosing Declaration's `Item` is fixed, so a
+`List<String>` is no `List<Item>`.
 
 Only a written Literal is admitted. Deciding anything else would need an interpreter and a second implementation
 of every native. So the evaluator is an allowlist: a table of predicates over JavaScript scalars, keyed by the

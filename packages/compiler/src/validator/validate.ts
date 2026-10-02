@@ -53,7 +53,7 @@ import {
 	typeContainsUnknown,
 } from "../helpers/types"
 import { type Claim, claimedCaseReport } from "./claimedCases"
-import { refinementEvidence } from "./refinementEvidence"
+import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
@@ -1077,7 +1077,7 @@ function validateFunctionInvocation(
 			if (matchResult.type === "ArgumentMismatch") {
 				for (let i of matchResult.mismatchedArgumentIndices) {
 					reportArgumentMismatch(
-						functionType.parameterTypes,
+						functionType,
 						matchResult.parameterForArgument[i],
 						node.arguments[i],
 					)
@@ -3670,15 +3670,15 @@ function reportUnmergedPayloadPathKey(
 }
 
 function reportArgumentMismatch(
-	parameterTypes: Array<common.Parameter>,
+	callee: common.BaseFunction,
 	index: number,
 	argumentNode: common.typed.ArgumentNode,
 ): void {
-	let parameter = parameterTypes[index]
+	let parameter = callee.parameterTypes[index]
 
 	if (parameter !== undefined && parameter.name !== argumentNode.name) {
 		reportArgumentLabelMismatch(
-			parameterTypes,
+			callee.parameterTypes,
 			parameter,
 			index,
 			argumentNode,
@@ -3722,7 +3722,7 @@ function reportArgumentMismatch(
 		}
 	}
 
-	let evidence = refinementEvidence(parameter?.type, argumentNode.value)
+	let evidence = argumentEvidence(parameter, argumentNode, callee)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
 	// The members the default fills in are not missing from the Argument.
 	let record =
@@ -3851,7 +3851,7 @@ function validateSimpleFunctionInvocation(
 	if (matchResult.type === "ArgumentMismatch") {
 		for (let i of matchResult.mismatchedArgumentIndices) {
 			reportArgumentMismatch(
-				functionType.parameterTypes,
+				functionType,
 				matchResult.parameterForArgument[i],
 				argumentNodes[i],
 			)

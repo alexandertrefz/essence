@@ -3247,6 +3247,89 @@ describe("Validator", () => {
 			])
 		})
 
+		// No check of `isNot(0)` makes a String a `NonZero`, so only the other
+		// half of the Help is offered.
+		it("should not ask an item of another base to check the predicate", () => {
+			let diagnostics = diagnosticsOfBody(
+				`constant words: List<NonZero> = [1, "a"]`,
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
+				["Write an item that already has Type 'NonZero'."],
+			])
+		})
+
+		// A Type Parameter the call binds may still take the value's items, so
+		// the check is offered.
+		it("should ask an Argument a Parameter could bind to check the predicate", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function countOf<infer Item>(_ items: NonEmptyList<Item>) -> Integer {
+					<- items::length()
+				}
+
+				constant words: List<String> = ["a"]
+
+				Terminal.inspect(countOf(words))
+				Terminal.inspect(countOf("a"))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
+				[
+					"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonEmptyList<Item>'.",
+				],
+				[],
+			])
+		})
+
+		// The closure binds no Type Parameter of its own, and the enclosing
+		// `Item` is opaque, so the base refuses the Strings before the check.
+		it("should not ask a closure's Argument to check against an opaque Type Parameter", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Filled<Item> = List<Item> where @::hasItems()
+
+				function countOf<infer Item>(_ items: Filled<Item>) -> Integer {
+					constant counted = (_ xs: Filled<Item>) -> Integer { <- xs::length() }
+					constant words: List<String> = ["a"]
+
+					<- counted(words)
+				}
+
+				Terminal.inspect(countOf([1, 2]))
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.notes[1],
+					diagnostic.helps,
+				]),
+			).toEqual([
+				[
+					"'Filled<Item>' refines List<Item>, so a value has to be a List<Item> before '@::hasItems()' is asked.",
+					[],
+				],
+			])
+		})
+
+		// The value has items already, so the other Argument's `T` is what
+		// it does not fit, and no check would change that.
+		it("should not ask a value that proves the refinement to check it", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Filled<Item> = List<Item> where @::hasItems()
+
+				function pair<infer T>(_ a: Filled<T>, _ b: Filled<T>) -> Integer {
+					<- a::length()::add(b::length())
+				}
+
+				constant words: NonEmptyList<String> = ["a"]
+
+				Terminal.inspect(pair([1], words))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
+				["Pass a value that already has Type 'Filled<T>'."],
+			])
+		})
+
 		it("should name the predicate where a returned value is refused", () => {
 			let diagnostics = diagnosticsOfBody(`
 				function zero() -> NonZero {
@@ -3617,12 +3700,20 @@ describe("Validator", () => {
 					)
 				}
 
+				// No check of the predicate makes the Strings `Item`s, so the
+				// report names the base and offers no check.
 				it("should refuse a written List of Strings", () => {
+					let diagnostics = diagnosticsFor(
+						inCountOf(`constant again: Filled<Item> = ["a"]`),
+					)
+
 					expect(
-						codesFor(
-							inCountOf(`constant again: Filled<Item> = ["a"]`),
-						),
+						diagnostics.map((diagnostic) => diagnostic.code),
 					).toEqual(["assignment-type-mismatch"])
+					expect(diagnostics[0].notes[1]).toBe(
+						"'Filled<Item>' refines List<Item>, so a value has to be a List<Item> before '@::hasItems()' is asked.",
+					)
+					expect(diagnostics[0].helps).toEqual([])
 				})
 
 				it("should refuse a written List of Strings as the standard library's refinement", () => {

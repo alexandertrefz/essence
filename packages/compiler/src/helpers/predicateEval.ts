@@ -216,19 +216,22 @@ function unadmittedWrittenPart(
 	)
 }
 
-// Whether a value's Type is one the refinement's base takes, binding the base's
-// Type Parameters as the value decides them. A value outside the base is
-// refused before its predicate is asked.
+// Whether a value's Type is one the refinement's base takes, binding the
+// `bindable` Type Parameters as the value decides them. Any other is fixed. A
+// value outside the base is refused before its predicate is asked.
 export function fitsRefinementBase(
 	refinement: common.RefinementType,
 	value: common.typed.ExpressionNode,
+	bindable: ReadonlySet<common.GenericName>,
 ): boolean {
-	let parameters = genericNamesMentioned(refinement.base)
+	let parameters = [...genericNamesMentioned(refinement.base)].filter(
+		(name) => bindable.has(name),
+	)
 
-	return parameters.size === 0
+	return parameters.length === 0
 		? fitsWritten(refinement.base, value)
 		: matchesTypeWithBindings(refinement.base, value.type, {
-				bindableNames: parameters,
+				bindableNames: new Set(parameters),
 				bindings: new Map(),
 			})
 }
