@@ -356,6 +356,83 @@ describe("Resolvers", () => {
 			])
 		})
 
+		// Dropping the specifier helps only where another Namespace writes the
+		// Method for the value.
+		it("should say what a specifier's Namespace targets where the value is not one", () => {
+			let source = `implementation {
+				namespace Shout for String {
+					loud() -> String {
+						<- @::append("!")
+					}
+				}
+
+				Terminal.print(5::<Shout>loud())
+			}`
+			let elsewhere = source.replace(
+				"Terminal.print",
+				`namespace Loud for Integer {
+					loud() -> String {
+						<- @::toString()::append("!")
+					}
+				}
+
+				Terminal.print`,
+			)
+
+			expect(
+				[source, elsewhere].map((written) =>
+					diagnosticsFor(written).map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.notes,
+						diagnostic.helps,
+					]),
+				),
+			).toEqual([
+				[
+					[
+						"no-namespace-for-value",
+						[
+							"'Shout' targets String, which a PositiveInteger is not.",
+						],
+						[],
+					],
+				],
+				[
+					[
+						"no-namespace-for-value",
+						[
+							"'Shout' targets String, which a PositiveInteger is not.",
+						],
+						["Drop the Namespace specifier."],
+					],
+				],
+			])
+			expect(
+				codesFor(elsewhere.replace("5::<Shout>loud()", "5::loud()")),
+			).toEqual([])
+		})
+
+		// `Orderable` provides `isBetween`, so the call answers without the
+		// specifier though no Namespace writes it.
+		it("should offer to drop a specifier where a provided Method answers", () => {
+			let source = `implementation {
+				namespace Shout for String {
+					loud() -> String {
+						<- @::append("!")
+					}
+				}
+
+				Terminal.print(5::<Shout>isBetween(1, and 9))
+			}`
+
+			expect(
+				diagnosticsFor(source).map((diagnostic) => diagnostic.helps),
+			).toEqual([["Drop the Namespace specifier."]])
+			expect(
+				codesFor(source.replace("5::<Shout>isBetween", "5::isBetween")),
+			).toEqual([])
+		})
+
 		// The control: a Protocol pick on a bounded receiver reaches the
 		// conformance.
 		it("should keep a Protocol pick on a Type Parameter receiver", () => {

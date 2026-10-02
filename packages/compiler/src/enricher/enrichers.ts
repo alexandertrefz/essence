@@ -186,7 +186,7 @@ import {
 	typeDeclarationCount,
 	unimportedNamespacesOf,
 } from "./scope"
-import { namespaceLookupWording, specifierWasRefused } from "./specifiers"
+import { reportEmptyLookup, specifierWasRefused } from "./specifiers"
 import {
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
@@ -12517,38 +12517,36 @@ function resolveMethodInvocation(
 				baseType.type !== "Error" &&
 				!isUnwrittenTypeParameter(baseType, scope)
 			) {
-				let wording = namespaceLookupWording(node, baseType)
-
-				reportError(
-					`No Namespace provides Methods for this value`,
-					node.base.position,
-					{
-						code: "no-namespace-for-value",
-						labels: [
-							primary(
-								node.base.position,
-								`this is ${withArticle(describeType(baseType))}`,
-							),
-							secondary(
-								node.member.position,
-								`'${node.member.content}' is looked up in its Namespaces`,
-							),
-						],
-						notes: wording.notes,
-						helps: [
-							...wording.helps,
-							...unboundedParameterHelps(
+				reportEmptyLookup(
+					node,
+					baseType,
+					scope,
+					partitionInstanceMethodNamespaces(
+						node.member.content,
+						namespacesDeclaringMethod(
+							node.member.content,
+							resolveMethodLookupNamespacesForReceiverType(
 								baseType,
-								node.member.content,
+								null,
 								scope,
 							),
-							...unimportedNamespaceHelps(
-								node.member.content,
-								baseType,
-								scope,
-							),
-						],
-					},
+							baseType,
+							scope,
+							node.position,
+						),
+					).instanceNamespaces,
+					[
+						...unboundedParameterHelps(
+							baseType,
+							node.member.content,
+							scope,
+						),
+						...unimportedNamespaceHelps(
+							node.member.content,
+							baseType,
+							scope,
+						),
+					],
 				)
 			}
 		} else {

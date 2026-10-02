@@ -15,11 +15,52 @@ export function specifierWasRefused(
 	return identifier != null && refusedSpecifiers.has(identifier)
 }
 
-// What `no-namespace-for-value` says of the lookup. A specifier narrowed it, so
-// other Namespaces may well target the value.
-export function namespaceLookupWording(
+// A call whose lookup found no Namespace for the receiver. `writers` are the
+// Namespaces that answer the Method for a call without the specifier, provided
+// and derived ones included, and `helps` the caller's own.
+export function reportEmptyLookup(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
+	scope: enricher.Scope,
+	writers: Map<string, common.NamespaceType>,
+	helps: Array<string>,
+): void {
+	let methodName = node.member.content
+	let written = [...writers]
+		.filter(([, namespace]) => Object.hasOwn(namespace.methods, methodName))
+		.map(([name]) => name)
+
+	let wording = namespaceLookupWording(node, baseType, scope, written)
+
+	reportError(
+		`No Namespace provides Methods for this value`,
+		node.base.position,
+		{
+			code: "no-namespace-for-value",
+			labels: [
+				primary(
+					node.base.position,
+					`this is ${withArticle(describeType(baseType))}`,
+				),
+				secondary(
+					node.member.position,
+					`'${methodName}' is looked up in its Namespaces`,
+				),
+			],
+			notes: wording.notes,
+			helps: [...wording.helps, ...helps],
+		},
+	)
+}
+
+// What `no-namespace-for-value` says of the lookup. A specifier narrowed it, so
+// other Namespaces may well target the value, and dropping it helps only where
+// one answers the Method.
+function namespaceLookupWording(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	written: Array<string>,
 ): { notes: Array<string>; helps: Array<string> } {
 	let specifier = node.namespaceSpecifier
 
@@ -30,11 +71,25 @@ export function namespaceLookupWording(
 		}
 	}
 
+	let named = nearestEntry(
+		scope,
+		(current) => current.members,
+		specifier.content,
+	)
+	let note = `The specifier limits the lookup to '${specifier.content}', which provides no '${node.member.content}' for ${describeType(baseType)}.`
+
+	// A Type Parameter's Methods come through its Protocol alone, whatever the
+	// Namespace targets.
+	if (named?.type === "Namespace" && baseType.type !== "GenericUse") {
+		note =
+			named.targetType === null
+				? `'${specifier.content}' targets no Type, so no value reaches its Methods.`
+				: `'${specifier.content}' targets ${describeType(named.targetType)}, which ${withArticle(describeType(baseType))} is not.`
+	}
+
 	return {
-		notes: [
-			`The specifier limits the lookup to '${specifier.content}', which provides no '${node.member.content}' for ${describeType(baseType)}.`,
-		],
-		helps: ["Drop the Namespace specifier."],
+		notes: [note],
+		helps: written.length > 0 ? ["Drop the Namespace specifier."] : [],
 	}
 }
 
@@ -148,6 +203,25 @@ function declaresAnywhere(
 	}
 
 	return false
+}
+
+// The nearest Scope's entry of the name, as a named lookup reads it.
+function nearestEntry<Entry>(
+	scope: enricher.Scope,
+	entries: (current: enricher.Scope) => Record<string, Entry>,
+	name: string,
+): Entry | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (Object.hasOwn(entries(current), name)) {
+			return entries(current)[name]
+		}
+	}
+
+	return null
 }
 
 // Each name as its nearest binding holds it, so a Namespace shadowed by a

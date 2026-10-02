@@ -2716,7 +2716,7 @@ Error: No Namespace provides Methods for this value
 
 Bound the type parameter by a protocol that has the method: `show<infer Item is Printable>(_ item: Item)`.
 
-With a [namespace specifier](/docs/reference/diagnostics#not-a-namespace), the lookup is limited to the namespace it names, and the note says so: `"a"::<Clock>padded()` looks only in `Clock`, which targets no string. Dropping the specifier lets every namespace answer. A type parameter's methods come through its protocol alone, so a specifier naming a namespace finds nothing on one.
+With a [namespace specifier](/docs/reference/diagnostics#not-a-namespace), the lookup is limited to the namespace it names, and the note says what that namespace targets. Where `Shout` is declared `for String`, `5::<Shout>loud()` looks only in `Shout`, and the note is `'Shout' targets String, which a PositiveInteger is not.` Dropping the specifier lets every namespace answer, so the help to drop it is offered only where another namespace answers the method for the value. A type parameter's methods come through its protocol alone, so a specifier naming a namespace finds nothing on one.
 
 Taught on: [Generics › A type parameter is opaque](/docs/language/generics#a-type-parameter-is-opaque)
 

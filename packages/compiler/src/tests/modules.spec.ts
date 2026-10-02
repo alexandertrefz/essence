@@ -3134,6 +3134,57 @@ export {
 		)
 	})
 
+	// Nothing else writes `loud`, so dropping the specifier would not help.
+	it("names what an imported Namespace a specifier names targets", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shout.es" { Shout }
+}
+
+implementation {
+	Terminal.print(5::<Shout>loud())
+}
+`,
+				"Shout.es": `implementation {
+	namespace Shout for String {
+		loud() -> String {
+			<- @::append("!")
+		}
+	}
+}
+
+export {
+	Shout
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+
+				expect(
+					main.diagnostics.map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.notes,
+						diagnostic.helps,
+					]),
+				).toEqual([
+					[
+						"no-namespace-for-value",
+						[
+							"'Shout' targets String, which a PositiveInteger is not.",
+						],
+						[],
+					],
+				])
+			},
+		)
+	})
+
 	it("offers the import of a Namespace a specifier names but the Module does not import", () => {
 		withProject(
 			{
