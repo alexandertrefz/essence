@@ -192,10 +192,6 @@
 			"rules": { "complexity": ["error", { "max": 52 }] }
 		},
 		{
-			"files": ["packages/language-server/src/callHierarchy.ts"],
-			"rules": { "complexity": ["error", { "max": 60 }] }
-		},
-		{
 			"files": [
 				"packages/language-server/src/codeActions/implementProtocol.ts"
 			],
@@ -215,10 +211,6 @@
 		{
 			"files": ["packages/language-server/src/foldingRanges.ts"],
 			"rules": { "complexity": ["error", { "max": 65 }] }
-		},
-		{
-			"files": ["packages/language-server/src/inlayHints.ts"],
-			"rules": { "complexity": ["error", { "max": 59 }] }
 		},
 		{
 			"files": ["packages/language-server/src/rename.ts"],
