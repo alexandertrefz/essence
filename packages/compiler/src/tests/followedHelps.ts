@@ -121,6 +121,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"malformed-unicode-escape",
 		"method-called-with-dot",
 		"missing-documentation-separator",
+		"namespace-as-value",
 		"nested-example",
 		"nonconforming-namespace",
 		"operator-not-supported",

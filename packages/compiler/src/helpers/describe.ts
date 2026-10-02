@@ -244,14 +244,10 @@ export function describeType(type: common.Type): string {
 }
 
 // What a report calls a Type that no Type Annotation can spell and nothing
-// stands in for, or null for any other. Those are a Namespace read as a value
-// and an Overload set. A Case has no spelling either, but its Choice has one,
+// stands in for, or null for any other. That is an Overload set, since no
+// Namespace is a value. A Case has no spelling either, but its Choice has one,
 // and callers offer that edit first. A Function Type can be spelled.
 export function unnameableTarget(type: common.Type): string | null {
-	if (type.type === "Namespace") {
-		return describeType(type)
-	}
-
 	return type.type === "OverloadedMethod" ||
 		type.type === "OverloadedStaticMethod"
 		? "an overloaded Function"

@@ -4114,6 +4114,8 @@ function rewriteLookup(node: common.typedSimple.LookupNode): estree.Expression {
 		return namespaceMember(node.namespaceName, node.member.name)
 	}
 
+	// INVARIANT: an Identifier of a Namespace's Type is that Namespace's own
+	// name. No Namespace is a value, so no other name can hold one.
 	if (
 		node.base.nodeType === "Identifier" &&
 		node.base.type.type === "Namespace"

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import {
+	analysedDiagnosticsFor,
 	codesOfSource,
 	compiles,
 	enrichedDiagnosticsFor,
@@ -269,6 +270,121 @@ describe("A Namespace specifier that names something else", () => {
 
 		Terminal.print("hello"::append("!"))
 	}`),
+		).toBe(true)
+	})
+})
+
+describe("A Namespace written as a value", () => {
+	function withClock(body: string): string {
+		return `implementation {
+		namespace Clock for Integer {
+			static noon = 43_200
+
+			static now() -> Integer {
+				<- 7
+			}
+		}
+
+		namespace Boxes<infer Item> for List<Item> {
+			counted() -> Integer {
+				<- @::length()
+			}
+		}
+
+		${body}
+	}`
+	}
+
+	// The Help names a static, which reads as a value off the Namespace.
+	it("reads a static off a Program's own Namespace", () => {
+		let source = withClock("Terminal.inspect(Clock)")
+
+		expect(codesOfSource(source)).toEqual(["namespace-as-value"])
+		expect(helpsOfCode(source, "namespace-as-value")).toEqual([
+			"Read a member off it, as in 'Clock.noon'.",
+		])
+		expect(compiles(withClock("Terminal.inspect(Clock.noon)"))).toBe(true)
+	})
+
+	// An alias would hold a Namespace under another name, so it is refused
+	// where it is declared, and its uses report nothing further.
+	it("refuses a Constant that would alias a Namespace", () => {
+		let source = withClock(`constant clock = Clock
+
+		Terminal.inspect(clock.now())`)
+
+		expect(codesOfSource(source)).toEqual(["namespace-as-value"])
+		expect(
+			compiles(
+				withClock(`constant clock = Clock.now
+
+		Terminal.inspect(clock())`),
+			),
+		).toBe(true)
+	})
+
+	// A generic Namespace's Method reads as a Function of its receiver.
+	it("reads a Method off a generic Namespace", () => {
+		let source = withClock("Terminal.inspect(Boxes)")
+
+		expect(helpsOfCode(source, "namespace-as-value")).toEqual([
+			"Read a member off it, as in 'Boxes.counted'.",
+		])
+		expect(compiles(withClock("Terminal.inspect(Boxes.counted)"))).toBe(
+			true,
+		)
+	})
+
+	// A standard library Namespace starts with Overload sets and Protocol-bound
+	// Methods. Neither is a value, so the Help passes over them.
+	it("reads a member off a builtin that is a value as read", () => {
+		let source = withClock(`Terminal.inspect(List)
+		Terminal.inspect(Terminal)`)
+
+		expect(
+			analysedDiagnosticsFor(source).map(
+				(diagnostic) => diagnostic.helps,
+			),
+		).toEqual([
+			["Read a member off it, as in 'List.isEmpty'."],
+			["Read a member off it, as in 'Terminal.write'."],
+		])
+		expect(
+			compiles(
+				withClock(`Terminal.inspect(List.isEmpty)
+		Terminal.inspect(Terminal.write)`),
+			),
+		).toBe(true)
+	})
+
+	it("names no member a Namespace does not declare", () => {
+		expect(
+			helpsOfCode(
+				`implementation {
+		namespace Bare for Boolean {
+		}
+
+		Terminal.inspect(Bare)
+	}`,
+				"namespace-as-value",
+			),
+		).toEqual([
+			"Name a value in its place, since 'Bare' declares no member to read.",
+		])
+	})
+
+	// A Lookup, a call and a Namespace specifier name the Namespace without
+	// reading it as a value.
+	it("accepts what reads off a Namespace", () => {
+		expect(
+			compiles(
+				withClock(`constant now = Clock.now
+
+		Terminal.inspect(Clock.noon)
+		Terminal.inspect(Clock.now())
+		Terminal.inspect(now())
+		Terminal.inspect([1]::<Boxes>counted())`),
+			),
 		).toBe(true)
 	})
 })

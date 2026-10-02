@@ -85,7 +85,6 @@ import {
 } from "../helpers/types"
 import { printType } from "../printType"
 import { recordAnnotation } from "./annotations"
-import { reportedBuiltinNamespaceValue } from "./namespaceValues"
 import {
 	bodyCanWait,
 	childScope,
@@ -1714,9 +1713,7 @@ export function resolveIdentifierType(
 	} else {
 		reportProvidedMethodOutOfReach(node, scope)
 
-		return reportedBuiltinNamespaceValue(node, result, scope, context)
-			? { type: "Error" }
-			: result
+		return result
 	}
 }
 

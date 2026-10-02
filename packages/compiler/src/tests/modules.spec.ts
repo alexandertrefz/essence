@@ -2815,6 +2815,56 @@ export {
 		)
 	})
 
+	// An imported Namespace is no value either, and the Help reads a member the
+	// declaring Module wrote.
+	it("refuses an imported Namespace used as a value", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Time.es" { Clock }
+}
+
+implementation {
+	constant clock = Clock
+
+	Terminal.inspect(Clock)
+	Terminal.inspect(Clock.now())
+}
+`,
+				"Time.es": `implementation {
+	namespace Clock for Integer {
+		static now() -> Integer {
+			<- 7
+		}
+	}
+}
+
+export {
+	Clock
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(reportsOf(main)).toEqual([
+					[
+						"namespace-as-value",
+						"Namespace 'Clock' can not be used as a value",
+					],
+					[
+						"namespace-as-value",
+						"Namespace 'Clock' can not be used as a value",
+					],
+				])
+				expect(main.flatMap((diagnostic) => diagnostic.helps)).toEqual([
+					"Read a member off it, as in 'Clock.now'.",
+					"Read a member off it, as in 'Clock.now'.",
+				])
+			},
+		)
+	})
+
 	it("refuses an export of a Variable and of a name the Module does not declare", () => {
 		withProject(
 			{

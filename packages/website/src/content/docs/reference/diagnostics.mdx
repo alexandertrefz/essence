@@ -4235,28 +4235,28 @@ Taught on: [Protocols › What a protocol is not](/docs/language/protocols#what-
 
 ### `namespace-as-value`
 
-**Error.** A standard library namespace is used as a value, as in `Terminal.inspect(String)`. It holds methods and statics, and the compiled program has no value for it. A namespace your program declares or imports is compiled to a value, so this does not apply to it.
+**Error.** A namespace is used as a value, as in `Terminal.inspect(Clock)`. It holds methods and statics, and no namespace is a value, whether the standard library, your program or an import declares it.
 
 <div class="error-output">
 
 ```
 [namespace-as-value]
-Error: Namespace 'String' can not be used as a value
-   ╭─┤ Inspect.es:2:19 │
+Error: Namespace 'Clock' can not be used as a value
+   ╭─┤ Clock.es:8:19 │
    │
- 2 │     Terminal.inspect(String)
-   │                      ───┬──  
-   │                         ╰──── this names a standard library Namespace
+ 8 │     Terminal.inspect(Clock)
+   │                      ──┬──  
+   │                        ╰──── this names a Namespace
    │ 
-   │ Help: Read one of its members, as in 'String.…', or name another value in its place.
+   │ Help: Read a member off it, as in 'Clock.now'.
    │ 
-   │ Note: A standard library Namespace holds Methods and statics, and has no value of its own while the Program runs.
+   │ Note: A Namespace holds Methods and statics, and is no value of its own.
 ───╯
 ```
 
 </div>
 
-Read a member off the namespace, as in `String.isEmpty("")`, or pass a value in its place.
+Read a member off the namespace, as in `Clock.now` or `Clock.now()`, or pass a value in its place. The help names a member that reads as a value where the namespace has one: a static property first, then a method with one signature and no protocol bound, a static method before the others.
 
 Taught on: [Namespaces and methods › Statics and the dot](/docs/language/namespaces-and-methods#statics-and-the-dot)
 
@@ -4319,7 +4319,7 @@ differently:
 - **A future.** `This describes work that has not run — add 'complete'.` Making futures `Printable` compiles and prints a description of the work, which is why the report never asks for it.
 - **A choice whose cases carry no payload.** The namespace's body may be empty: declaring `namespace Problems for Problem is Printable {}` is the whole of what such a choice needs.
 - **A type that mentions type parameters.** `Declare a Namespace '<infer T> for (_: T) -> T is Printable'.` The namespace stands outside the function that names `T`, so it declares `T` itself, inferred from the value: `namespace Shown<infer T> for (_: T) -> T is Printable { … }`. Where the type parameter stands in a bounded position of a choice, as `Item` in `Ranked<Item>` of `choice Ranked<Value is Equatable>`, the help adds the bound as a condition: `… is Printable where Item is Equatable`.
-- **A namespace read as a value, or an overloaded function.** No type annotation can spell either, so no namespace is offered, and a note says so: `No Namespace can be declared for an overloaded Function — no Type Annotation can spell it, so no 'for' clause can name it.`
+- **An overloaded function.** No type annotation can spell it, so no namespace is offered, and a note says so: `No Namespace can be declared for an overloaded Function — no Type Annotation can spell it, so no 'for' clause can name it.`
 - **An unbounded type parameter.** `Declare it as '<infer Item is Comparable>'`, with a **Quick Fix** that writes the bound onto a declaration in this file.
 
 A namespace's own type parameters are the exception to the last one: the bound
@@ -6431,7 +6431,7 @@ Error: Colour can not be recorded as a snapshot
 
 Declare the conformance, `namespace Colours for Colour is Printable {}`, or snapshot a string you build yourself.
 
-Two shapes are answered differently, because the conformance cannot be written for either. A **bare case** is not a type a namespace can target — `namespace X for Colour#Red` does not parse — so both edits are named: `Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.` A **namespace read as a value**, or an overloaded function, has no type at all, and gets the one answer that is left: `Snapshot a String you build yourself — no Namespace can be declared for Namespace 'String'.` A function value is not such a shape: `namespace Shown for (_: Integer) -> Integer is Printable { … }` makes one printable, and the help says so.
+Two shapes are answered differently, because the conformance cannot be written for either. A **bare case** is not a type a namespace can target — `namespace X for Colour#Red` does not parse — so both edits are named: `Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.` An **overloaded function** has no type at all, and gets the one answer that is left: `Snapshot a String you build yourself — no Namespace can be declared for an overloaded Function.` A function value is not such a shape: `namespace Shown for (_: Integer) -> Integer is Printable { … }` makes one printable, and the help says so.
 
 Taught on: [Tests › Snapshots](/docs/language/tests#snapshots)
 

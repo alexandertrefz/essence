@@ -99,6 +99,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { valueTypeOf } from "./namespaceValues"
 import { reportUnknownPatternMember } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import {
@@ -3169,11 +3170,7 @@ function enrichIdentifierExpression(
 	let alias = declaringScope?.selfMemberAliases?.[node.content]
 
 	if (declaringScope === null || alias === undefined) {
-		return enrichIdentifier(
-			node,
-			scope,
-			resolveIdentifierType(node, scope, context),
-		)
+		return enrichIdentifier(node, scope, valueTypeOf(node, scope, context))
 	}
 
 	return selfPathLookup(

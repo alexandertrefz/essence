@@ -197,6 +197,31 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
+	// No Namespace is a value, so a Constant can not hold one and has no Type
+	// to show. What it reads off the Namespace does.
+	it("should not annotate a Constant written as a Namespace", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Clock for Integer {",
+			"\t\tstatic now() -> Integer {",
+			"\t\t\t<- 7",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant clock = Clock",
+			"\tconstant now = Clock.now()",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([
+			{
+				position: { line: 9, column: 14 },
+				label: ": Integer",
+				kind: "type",
+			},
+		])
+	})
+
 	// A contextually typed Function literal shows its Parameter and return
 	// Types nowhere in the source, which is what a Hint is for.
 	describe("Contextual Function literals", () => {
