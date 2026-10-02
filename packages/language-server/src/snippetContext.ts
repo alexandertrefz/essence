@@ -300,7 +300,10 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				)
 
 				return
+			// Holds signatures only, as a Namespace's `overload` group does.
 			case "OverloadedFunctionStatement":
+				blocks.push({ position: node.position, context: "overload" })
+
 				for (let signature of nativeSignatures(node.methods)) {
 					blocks.push(
 						...parameterBlocks(

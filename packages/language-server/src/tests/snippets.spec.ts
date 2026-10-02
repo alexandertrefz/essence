@@ -564,6 +564,26 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
+	it("offers nothing between the entries of an overload function", () => {
+		let offered = snippetsAt(
+			[
+				"declarations {",
+				"\toverload function combine {",
+				"\t\t(first value: Integer) -> Integer {",
+				"\t\t\t<- value",
+				"\t\t}",
+				"",
+				"\t\t(first value: String) -> String",
+				"\t}",
+				"}",
+			],
+			{ line: 6, column: 1 },
+			path.join(STDLIB_DIRECTORY, "Scratch.es"),
+		)
+
+		expect(offered).toEqual([])
+	})
+
 	// A Parameter list takes a name, a Type and a default. A default is a value
 	// and keeps the values.
 	it("offers nothing inside a written Parameter list", () => {
