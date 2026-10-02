@@ -298,7 +298,8 @@ export function importActions(
 
 // The import the Diagnostic's `data` names, with the declaring Module, as for
 // an `unsatisfied-bound` on a call. Preferred, since there is no Module to
-// choose. `insertImportEdit` declines an existing entry.
+// choose, unless the Help names a second edit. `insertImportEdit` declines an
+// existing entry.
 export function declarationImportAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	imports: ImportContext | null,
@@ -329,7 +330,7 @@ export function declarationImportAction(
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,
-		isPreferred: true,
+		isPreferred: diagnostic.data.partial !== true,
 		edits: [edit],
 	}
 }

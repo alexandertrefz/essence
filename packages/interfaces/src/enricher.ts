@@ -70,6 +70,10 @@ export type Scope = {
 	// asked when a bound names a Protocol out of sight. Absent for a Program
 	// that is no Module.
 	protocolDeclarations?: (name: string) => Array<ProtocolDeclaration>
+	// The Types a Module of the graph exports, by public name, or null for a
+	// Module the link has no surface for. Asked by a Help that offers an
+	// import. Absent for a Program that is no Module.
+	exportedTypes?: (modulePath: string) => Record<string, common.Type> | null
 	// The Type a `<-` here is expected to produce, which a bare Case such as
 	// `<- #Less` resolves against first. `null` is a barrier. See "Barriers" in
 	// DEVELOPMENT.md.

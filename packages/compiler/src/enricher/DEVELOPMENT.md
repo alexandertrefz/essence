@@ -991,6 +991,13 @@ writes a `cases` of its own replaces the derived listing. Writing `is` or `cases
 `derivedConformanceSource` fills in for it only when it writes none of the Protocol's Methods. A witness names one
 Namespace, so half-written equality can not be half derived.
 
+A derive needs the Choice in scope. `choiceBindingIn` finds it by the identity its Cases carry, under its declared
+name or the name an import gave it, so `Box as Carton` keeps its equality. A Choice no name binds derives nothing.
+`derivesOnceImported` decides where importing it brings the derive, and the refusal then offers the import under
+the name its Module exports it as (`foreignChoiceRemedy`). Where the import brings none, as for printing, which needs
+a Namespace stating `is Printable`, or for `Comparable`, the Help that declares the Namespace leads with the import
+(`withImportOf`), since its `for` clause names the Choice.
+
 ### Derived equality for a generic Choice
 
 For a generic Choice, the derived `is` and `isNot` are conditional. They take the Type Parameters some payload

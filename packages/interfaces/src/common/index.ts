@@ -183,6 +183,9 @@ export type DiagnosticData =
 			kind: "import-declaration"
 			name: string
 			modulePath: string
+			// Set where the import is only the first edit the Help names, so
+			// the fix is offered but not preferred.
+			partial?: true
 	  }
 	// A misplaced Module section and the span of its block, which the Parser
 	// dropped.

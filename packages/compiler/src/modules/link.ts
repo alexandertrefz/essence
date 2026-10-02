@@ -706,6 +706,8 @@ function linkGroup(
 				states,
 				surfaces,
 			)
+		state.scope.exportedTypes = (modulePath) =>
+			surfaceOf(modulePath, states, surfaces, new Set())?.types ?? null
 
 		for (let entry of [...(module.program.imports?.entries ?? [])].sort(
 			compareEntries,

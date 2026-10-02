@@ -9190,3 +9190,350 @@ export {
 		)
 	})
 })
+
+describe("Names a report writes for the reader", () => {
+	let boxModule = `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+
+	namespace BoxShown<infer Item> for Box<Item> is Printable {
+		toString() -> String { <- "box" }
+	}
+}
+
+export {
+	Box
+	BoxShown
+}
+`
+
+	// `Box` is imported, and its Cases carry payloads, so no import of it can
+	// derive printing. The Namespace that declares it can.
+	it("offers no import of a Choice the file imports already", () => {
+		let main = (entries: string) => `import {
+	from "./Box.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function boxed<infer Item>(_ b: Box<Item>) -> Integer {
+		Terminal.print(b)
+		<- 1
+	}
+
+	Terminal.inspect(boxed(Box<Integer>#Full(1)))
+}
+`
+
+		withProject(
+			{ "Main.es": main("Box"), "Box.es": boxModule },
+			(directory) => {
+				let refusal = analysedAt(directory, "Main.es", "Main.es").find(
+					(diagnostic) => diagnostic.code === "unsatisfied-bound",
+				)
+
+				expect(refusal?.helps).toEqual([
+					"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+					"'BoxShown' in ./Box.es makes Box<Item> conform to 'Printable' — import it.",
+				])
+			},
+		)
+
+		withProject(
+			{ "Main.es": main("Box\n\t\tBoxShown"), "Box.es": boxModule },
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([])
+			},
+		)
+	})
+
+	// Printing is derived only where a Namespace states it, so importing the
+	// Choice is not enough. An import names what the Module exports.
+	it("offers each import under its exported name, with what printing needs", () => {
+		let colours = (exports: string) => `implementation {
+	choice Colour { Red, Green }
+	choice Box<Value> { Full { value: Value }, Empty }
+
+	function pick() -> Colour {
+		<- #Red
+	}
+
+	function boxed() -> Box<Integer> {
+		<- #Full(1)
+	}
+}
+
+export {
+	${exports}
+}
+`
+		let main = (entries: string, declared: string) => `import {
+	from "./Colours.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	function same<infer T is Equatable>(_ a: T, _ b: T) -> Boolean {
+		<- a::is(b)
+	}
+
+	Terminal.print(pick())
+	Terminal.inspect(same(pick(), pick()))
+	Terminal.inspect(same(boxed(), boxed()))
+}
+`
+
+		withProject(
+			{
+				"Main.es": main("boxed\n\t\tpick", ""),
+				"Colours.es": colours("Colour as Hue\n\tboxed\n\tpick"),
+			},
+			(directory) => {
+				expect(
+					analysedAt(directory, "Main.es", "Main.es")
+						.filter(
+							(diagnostic) =>
+								diagnostic.code === "unsatisfied-bound",
+						)
+						.map((diagnostic) => diagnostic.helps.at(-1)),
+				).toEqual([
+					"'Colour' is declared in Colours.es, which exports it as 'Hue' — import 'Hue' here, and declare a Namespace 'for Hue is Printable' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.",
+					"'Colour' is declared in Colours.es, which exports it as 'Hue' — import 'Hue' here, so its derived 'Equatable' is in scope.",
+					"'Box' is declared in Colours.es, which does not export it — export it there and import it here, so its derived 'Equatable' is in scope.",
+				])
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main(
+					"Box\n\t\tboxed\n\t\tHue\n\t\tpick",
+					"\n\tnamespace HueShown for Hue is Printable {}\n",
+				),
+				"Colours.es": colours("Box\n\tColour as Hue\n\tboxed\n\tpick"),
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([])
+			},
+		)
+	})
+
+	// A Protocol no import derives still needs the Choice named, so the
+	// Namespace Help leads with the import.
+	it("leads a Namespace Help with the import a Choice needs", () => {
+		let parcels = `implementation {
+	choice Colour { Red, Green }
+	choice Box<Value> { Full { value: Value }, Empty }
+
+	function pick() -> Colour {
+		<- #Red
+	}
+
+	function boxed() -> Box<Integer> {
+		<- #Full(1)
+	}
+}
+
+export {
+	Box
+	Colour
+	boxed
+	pick
+}
+`
+		let main = (entries: string, declared: string) => `import {
+	from "./Parcels.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	function less<infer T is Comparable>(_ a: T, _ b: T) -> Boolean {
+		<- a::isLessThan(b)
+	}
+
+	Terminal.print(boxed())
+	Terminal.inspect(less(pick(), pick()))
+}
+`
+
+		withProject(
+			{ "Main.es": main("boxed\n\t\tpick", ""), "Parcels.es": parcels },
+			(directory) => {
+				expect(
+					analysedAt(directory, "Main.es", "Main.es")
+						.filter(
+							(diagnostic) =>
+								diagnostic.code === "unsatisfied-bound",
+						)
+						.map((diagnostic) => diagnostic.helps.at(-1)),
+				).toEqual([
+					"'Box' is declared in Parcels.es — import it here, and declare a Namespace 'for Box<Integer> is Printable'.",
+					"'Colour' is declared in Parcels.es — import it here, and declare a Namespace 'for Colour is Comparable'.",
+				])
+			},
+		)
+
+		withProject(
+			{
+				"Main.es": main(
+					"Box\n\t\tboxed\n\t\tColour\n\t\tpick",
+					`
+	namespace BoxShown for Box<Integer> is Printable {
+		toString() -> String {
+			<- "box"
+		}
+	}
+
+	namespace ColourOrder for Colour is Comparable {
+		compare(to other: Colour) -> Ordering {
+			<- Ordering#Equal
+		}
+	}
+`,
+				),
+				"Parcels.es": parcels,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([])
+			},
+		)
+	})
+
+	let shelfModule = `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Light { Red, Green }
+
+	namespace LightShown for Light is Printable {}
+
+	protocol Shown {
+		label() -> String
+	}
+
+	choice Tagged<Item is Shown> { Tag { item: Item }, Untagged }
+
+	function make() -> Box<Integer> {
+		<- #Full(1)
+	}
+}
+
+export {
+	Box
+	Light
+	LightShown
+	make
+	Shown
+	Tagged
+}
+`
+
+	let importing = (entries: string, body: string) => `import {
+	from "./Shelf.es" {
+		${entries}
+	}
+}
+
+implementation {
+${body}
+}
+`
+
+	// A Generic Alias under another name is one application of its Choice,
+	// with Type Parameters of its own order, so it binds no Choice.
+	let reorderingModule = `implementation {
+	choice Pair<A, B> { Both { first: A, second: B }, Neither }
+	type Flipped<A, B> = Pair<B, A>
+
+	choice Sorted<Item is Comparable, Tag> { Entry { item: Item, tag: Tag }, None }
+	type Reversed<Tag, Item is Comparable> = Sorted<Item, Tag>
+
+	choice Box<Value> { Full { value: Value }, Empty }
+	type Boxes<A> = Box<List<A>>
+}
+
+export {
+	Boxes
+	Flipped
+	Reversed
+}
+`
+
+	let reordered = (entries: string, body: string) =>
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Reordering.es" {
+		${entries}
+	}
+}
+
+implementation {
+${body}
+}
+`,
+				"Reordering.es": reorderingModule,
+			},
+			(directory) => codesOf(analysedAt(directory, "Main.es", "Main.es")),
+		)
+
+	it("takes no Choice from a generic Alias that reorders its Type Parameters", () => {
+		// The receiver's Choice has no name here, as without the import.
+		expect(
+			reordered(
+				"Flipped",
+				`	constant pair: Flipped<Integer, String> = #Both({ first = "a", second = 1 })
+	Terminal.print(pair::is(pair))`,
+			),
+		).toEqual(["unknown-method"])
+
+		// `Tag` is not the Type Parameter `Sorted` bounds, so nothing proves
+		// it Comparable.
+		expect(
+			reordered(
+				"Reversed",
+				`	namespace ReversedOrder<infer Tag, infer Item> for Reversed<Tag, Item> {
+		tagBefore(_ other: Tag) -> Boolean {
+			<- match @ -> Boolean {
+				case #Entry { <- @.tag::isLessThan(other) }
+				case #None { <- false }
+			}
+		}
+	}`,
+			),
+		).toContain("no-namespace-for-value")
+	})
+
+	it("derives equality and printing for a Choice imported under another name", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": importing(
+					"Box as Carton\n\t\tLight as Lamp\n\t\tLightShown",
+					`	constant box: Carton<Integer> = #Full(1)
+	Terminal.inspect(box::is(box))
+	constant lamp: Lamp = #Red
+	Terminal.inspect(lamp::is(#Green))
+	Terminal.print(lamp)`,
+				),
+				"Shelf.es": shelfModule,
+			},
+			async (directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([])
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["true", "false", "Red"])
+			},
+		)
+	})
+})

@@ -2358,6 +2358,43 @@ describe("Workspace", () => {
 			}).diagnostics.map((diagnostic) => diagnostic.code)
 		}
 
+		// Printing also needs a Namespace stating it, so the import is only the
+		// first of the Help's two edits and the fix is not preferred.
+		it("should not prefer an import that is only half of the Help", () => {
+			let { workspace, pathOf } = makeWorkspace({
+				"Signals.es": [
+					"implementation {",
+					"\tchoice Signal { Go, Stop }",
+					"",
+					"\tfunction signal() -> Signal {",
+					"\t\t<- #Go",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tSignal",
+					"\tsignal",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Signals.es" { signal }',
+					"}",
+					"",
+					"implementation {",
+					"\tTerminal.print(signal())",
+					"}",
+					"",
+				].join("\n"),
+			})
+			let mainPath = pathOf("Main.es")
+			let [fix] = fixesFor(workspace, mainPath, 6, "Terminal.print")
+
+			expect(fix.title).toBe("Import 'Signal' from ./Signals.es")
+			expect(fix.isPreferred).toBe(false)
+		})
+
 		// `Problem` is a Choice another Module declares, and its derived
 		// equality is in reach only where its name is. The fix is an import of the
 		// Module the Type's nominal identity names.

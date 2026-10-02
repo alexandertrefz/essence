@@ -101,6 +101,12 @@ import {
 	reportSpecifierIsNotANamespace,
 	reportSpecifierNamesNoValue,
 } from "./specifiers"
+import {
+	choiceBindingIn,
+	foreignChoiceRemedy,
+	unboundForeignChoice,
+	withImportOf,
+} from "./spelling"
 import { inferringRefused } from "./typeParameters"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
@@ -2101,12 +2107,12 @@ export function scopeWithGenerics(
 }
 
 // The Type Parameters a Choice declares, with their bounds, looked up by its
-// name. Empty for a Choice that is not generic.
+// identity. Empty for a Choice that is not generic.
 function declaredChoiceGenerics(
-	choiceName: string,
+	identity: string,
 	scope: enricher.Scope,
 ): Array<common.GenericDeclaration> {
-	let declared = findTypeInScope(displayChoiceName(choiceName), scope)
+	let declared = choiceBindingIn(identity, scope)?.type
 
 	return declared?.type === "GenericAlias" ? declared.generics : []
 }
@@ -2909,11 +2915,12 @@ function declaredChoiceAliasOf(
 		return null
 	}
 
-	// Looked up by the declared name, the Scope's key, then held to the
-	// identity, so another Module's Choice of the name does not count.
-	let declared = findTypeInScope(displayChoiceName(identity), scope)
+	// Looked up by the identity, under the declared name or an import alias,
+	// so another Module's Choice of the name does not count.
+	let binding = choiceBindingIn(identity, scope)
+	let declared = binding?.type ?? null
 
-	noteReachedName(displayChoiceName(identity))
+	noteReachedName(binding?.name ?? displayChoiceName(identity))
 
 	if (declared === null || declared.type !== "GenericAlias") {
 		return null
@@ -2954,10 +2961,11 @@ function choiceTypeOf(
 
 	// The declared Choice, so `case #Red { @::is(c) }` takes any Colour. A
 	// shadowed Choice answers null, as in `declaredChoiceAliasOf`.
-	let declared = findTypeInScope(displayChoiceName(identity), scope)
+	let binding = choiceBindingIn(identity, scope)
+	let declared = binding?.type ?? null
 
 	// Recorded whatever the lookup answers, for the unused-import check.
-	noteReachedName(displayChoiceName(identity))
+	noteReachedName(binding?.name ?? displayChoiceName(identity))
 
 	if (declared === null) {
 		return null
@@ -6232,10 +6240,18 @@ function conformanceRemedy(
 	let spelling = protocolSpelling(protocolName, scope)
 	let protocol = describeProtocol(protocolName, scope)
 
+	// A Choice no name here binds is imported first. Printing is derived only
+	// where a Namespace states it, so that remedy declares one as well.
+	let printing =
+		protocolName === printableProtocolName && carriesNoPayload(culprit)
+	let unbound = unboundForeignChoice(culprit, scope)
+	let foreign =
+		printing || derivesOnceImported(culprit, protocolName) ? unbound : null
+
 	// No Namespace can target a Case, so the edit is about its Choice. Where
 	// the Choice conforms, it is an annotation. Otherwise it is the Choice's own
 	// remedy, since a Namespace `for Door` answers a `Door#Open` too.
-	if (culprit.type === "Case") {
+	if (culprit.type === "Case" && foreign === null) {
 		let choice = choiceTypeOf(culprit, scope)
 		let conforms =
 			choice !== null &&
@@ -6265,24 +6281,8 @@ function conformanceRemedy(
 		return { ...unwaited, describesWork: true }
 	}
 
-	let foreign = foreignChoiceModule(culprit, scope)
-
 	if (foreign !== null) {
-		return {
-			notes: [
-				`A Choice conforms to '${protocol}' wherever it is in scope, and '${foreign.name}' is not in scope here.`,
-			],
-			helps: [
-				`'${foreign.name}' is declared in ${foreign.fileName} — import it here, so its derived '${protocol}' is in scope.`,
-			],
-			// The import a Quick Fix writes, naming the Module by its canonical
-			// path. The language server works out the specifier.
-			data: {
-				kind: "import-declaration",
-				name: foreign.name,
-				modulePath: foreign.modulePath,
-			},
-		}
+		return foreignChoiceRemedy(foreign, protocol, printing)
 	}
 
 	let unimported = unimportedNamespacesOf(scope).filter((candidate) =>
@@ -6341,10 +6341,13 @@ function conformanceRemedy(
 							),
 						]
 					: [
-							protocolName === printableProtocolName &&
-							choiceCasesArePayloadFree(culprit)
-								? `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-								: `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}'.`,
+							withImportOf(
+								unbound,
+								protocolName === printableProtocolName &&
+									choiceCasesArePayloadFree(culprit)
+									? `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+									: `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}'.`,
+							),
 							...(importing === null
 								? []
 								: [declaredInHelp(importing.name, importing)]),
@@ -6539,31 +6542,25 @@ function preludeProtocolsOf(scope: enricher.Scope): ReadonlySet<string> | null {
 	return null
 }
 
-// The Choice this Type is, where another Module of this graph declared it,
-// read off the identity every Case carries. Its derived conformance is found
-// by name, which needs an import. Null for anything else.
-function foreignChoiceModule(
-	type: common.Type,
-	scope: enricher.Scope,
-): { name: string; modulePath: string; fileName: string } | null {
-	let identity = choiceIdentityOf(type)
-	let separator = identity === null ? -1 : identity.lastIndexOf("#")
+// Whether importing a Choice brings it a derived conformance: equality
+// always, and listing where its Cases carry no payload.
+function derivesOnceImported(
+	culprit: common.Type,
+	protocolName: string,
+): boolean {
+	return (
+		protocolName === equatableProtocolName ||
+		(protocolName === enumerableProtocolName && carriesNoPayload(culprit))
+	)
+}
 
-	if (identity === null || separator < 0) {
-		return null
-	}
+// Whether the Choice a Case or a Union of Cases belongs to carries no
+// payload, read off the flag every such Case carries.
+function carriesNoPayload(culprit: common.Type): boolean {
+	let first =
+		culprit.type === "UnionType" ? flattenUnionMembers(culprit)[0] : culprit
 
-	let modulePath = identity.slice(0, separator)
-
-	if (modulePath === "" || modulePath === modulePathOf(scope)) {
-		return null
-	}
-
-	return {
-		name: identity.slice(separator + 1),
-		modulePath,
-		fileName: modulePath.slice(modulePath.lastIndexOf("/") + 1),
-	}
+	return first?.type === "Case" && first.unitChoice === true
 }
 
 // The Namespace whose own Type Parameters declare this name, or null where a

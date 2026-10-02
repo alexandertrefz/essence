@@ -163,6 +163,87 @@ export function displayedRefinementArguments(
 	return type.typeArguments
 }
 
+// Whether a name binding `bound` binds the declaration `carrier` names under
+// `declared`. A Choice is told by the identity its Cases carry, since two
+// Modules may each declare a `Box`. Any other declaration is told by its name.
+export function bindsDeclaration(
+	bound: common.Type,
+	declared: string,
+	carrier: common.Type,
+): boolean {
+	let identity = choiceCarried(carrier)
+
+	return (
+		isDeclaration(bound) &&
+		(identity === null
+			? declaredNameOf(bound) === declared
+			: choiceCarried(bound) === identity)
+	)
+}
+
+// Whether a Type is a declaration rather than one application of one. A
+// Generic Alias of a Choice under another name is an application, since
+// `type Flipped<A, B> = Pair<B, A>` orders its Type Parameters its own way. An
+// import alias keeps the Choice's own name on the Alias.
+export function isDeclaration(type: common.Type): boolean {
+	switch (type.type) {
+		case "GenericAlias":
+			return declaredNameOf(type) === type.name
+		case "UnionType":
+		case "Record":
+			return type.alias === undefined
+		default:
+			return true
+	}
+}
+
+// The name a Type was declared under, or null for one declared under none.
+export function declaredNameOf(type: common.Type): string | null {
+	let identity = choiceCarried(type)
+
+	if (identity !== null) {
+		return displayChoiceName(identity)
+	}
+
+	switch (type.type) {
+		case "GenericAlias":
+		case "Refinement":
+			return type.name
+		case "Record":
+		case "UnionType":
+			return type.name ?? type.alias?.name ?? null
+		default:
+			return null
+	}
+}
+
+// The identity of the Choice a Type is, or one of its Cases or applications
+// is, or null.
+export function choiceCarried(type: common.Type): string | null {
+	if (type.type === "GenericAlias") {
+		return choiceCarried(type.aliasedType)
+	}
+
+	if (type.type === "Case") {
+		return type.choice
+	}
+
+	if (type.type !== "UnionType") {
+		return null
+	}
+
+	let members = flattenUnionMembers(type)
+	let first = members[0]
+
+	return first?.type === "Case" &&
+		members.every(
+			(member) =>
+				member.type === "Case" && member.choice === first.choice,
+		)
+		? first.choice
+		: null
+}
+
 // A Type on one line, as a Diagnostic names it: the spelling a reader knows
 // from their source. `printType` is the hover's form.
 export function describeType(type: common.Type): string {
