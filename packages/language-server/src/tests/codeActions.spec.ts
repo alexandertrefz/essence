@@ -5333,6 +5333,24 @@ describe("Code Actions", () => {
 			expect(codesOf(lines)).toEqual(["use-before-declaration"])
 			expect(titles(quickFixes(lines))).toEqual([])
 		})
+
+		// `Terminal.inspect(total)` would read `total` above its Declaration.
+		it("should offer nothing where a Statement it would pass reads what it declares", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant total = Maths.zero",
+				"",
+				"\tTerminal.inspect(total)",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
 	})
 
 	// The stubs a Namespace owes, with the Protocol's signatures and empty

@@ -1,4 +1,8 @@
 import { patternBindings } from "@essence-lang/compiler/helpers"
+import {
+	findParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -1996,8 +2000,9 @@ export function moveTestsSectionAction(
 }
 
 // Moves the top-level Statement holding a use after the Namespace it reads.
-// Not preferred: the move can break reads of what the Statement declares. A
-// Property read from another Property gets nothing.
+// Not preferred: the move can change what the Statement sees. Nothing is
+// offered where a Statement it would pass reads a name it declares, or for a
+// Property read from another Property.
 export function moveDeclarationAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -2023,7 +2028,14 @@ export function moveDeclarationAction(
 		containsRange(node.position, diagnostic.position),
 	)
 
-	if (declaration === -1 || use === -1 || use > declaration) {
+	if (
+		declaration === -1 ||
+		use === -1 ||
+		use > declaration ||
+		statements
+			.slice(use + 1, declaration + 1)
+			.some((node) => readsDeclaredName(node, statements[use]!))
+	) {
 		return null
 	}
 
@@ -2043,4 +2055,33 @@ export function moveDeclarationAction(
 		isPreferred: false,
 		edits,
 	}
+}
+
+// Whether a Statement reads a name the other declares. A name read inside a
+// body counts too, which only refuses a move a shadowing local would allow.
+function readsDeclaredName(
+	node: parser.ImplementationNode,
+	declaring: parser.ImplementationNode,
+): boolean {
+	if (
+		declaring.nodeType !== "ConstantDeclarationStatement" &&
+		declaring.nodeType !== "VariableDeclarationStatement"
+	) {
+		return false
+	}
+
+	let names = new Set(
+		declaring.name.nodeType === "Pattern"
+			? patternBindings(declaring.name).map(
+					(binding) => binding.name.content,
+				)
+			: [declaring.name.content],
+	)
+	let reads = (child: ParserNode): true | undefined =>
+		(child.nodeType === "Identifier" && names.has(child.content)) ||
+		findParserChild(child, reads)
+			? true
+			: undefined
+
+	return reads(node) === true
 }
