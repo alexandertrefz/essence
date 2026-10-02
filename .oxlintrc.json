@@ -94,7 +94,7 @@
 			"rules": {
 				"max-lines-per-function": [
 					"error",
-					{ "max": 339, "skipComments": true, "skipBlankLines": true }
+					{ "max": 337, "skipComments": true, "skipBlankLines": true }
 				],
 				"complexity": ["error", { "max": 51 }]
 			}
@@ -105,7 +105,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 13478,
+						"max": 13357,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -118,7 +118,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 8320,
+						"max": 8272,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -130,7 +130,7 @@
 			"rules": {
 				"max-lines-per-function": [
 					"error",
-					{ "max": 381, "skipComments": true, "skipBlankLines": true }
+					{ "max": 374, "skipComments": true, "skipBlankLines": true }
 				]
 			}
 		},
@@ -148,7 +148,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 5965,
+						"max": 5940,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -166,7 +166,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 6364,
+						"max": 6215,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -180,7 +180,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 3153,
+						"max": 3027,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -198,10 +198,6 @@
 			"rules": { "max-params": ["error", { "max": 8 }] }
 		},
 		{
-			"files": ["packages/language-server/src/codeActions/lookups.ts"],
-			"rules": { "complexity": ["error", { "max": 76 }] }
-		},
-		{
 			"files": ["packages/language-server/src/completion.ts"],
 			"rules": {
 				"complexity": ["error", { "max": 94 }],
@@ -209,26 +205,14 @@
 			}
 		},
 		{
-			"files": ["packages/language-server/src/foldingRanges.ts"],
-			"rules": { "complexity": ["error", { "max": 65 }] }
-		},
-		{
 			"files": ["packages/language-server/src/rename.ts"],
 			"rules": {
 				"max-lines-per-function": [
 					"error",
-					{ "max": 366, "skipComments": true, "skipBlankLines": true }
+					{ "max": 363, "skipComments": true, "skipBlankLines": true }
 				],
 				"complexity": ["error", { "max": 88 }]
 			}
-		},
-		{
-			"files": ["packages/language-server/src/selectionRanges.ts"],
-			"rules": { "complexity": ["error", { "max": 74 }] }
-		},
-		{
-			"files": ["packages/language-server/src/semanticTokens.ts"],
-			"rules": { "complexity": ["error", { "max": 62 }] }
 		},
 		{
 			"files": ["packages/language-server/src/server.ts"],
