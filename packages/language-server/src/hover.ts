@@ -44,8 +44,10 @@ type State = {
 	// reads back as the Protocol it names.
 	protocols: Record<string, common.ProtocolType>
 	// Every Protocol the document declares at any depth, by identity. Built the
-	// first time the cursor stands on a clause.
+	// first time the cursor stands on a clause no imported Protocol answers.
 	declaredProtocols: Record<string, common.ProtocolType> | null
+	// The Protocols the import block bound, by the name the document writes.
+	imported: Record<string, common.ProtocolType>
 	program: common.typed.Program
 	parserProgram: parser.Program | null
 }
@@ -86,12 +88,18 @@ function clauseIdentities(type: common.NamespaceType): Array<string> {
 
 // The Protocol a clause naming `name` resolved to. Its identity tells a
 // Protocol declared in a body from another of its name, which a table keyed
-// by name can not.
+// by name can not. An imported one is named by its alias, if it has one.
 function resolvedProtocol(
 	name: string,
 	identities: Array<string>,
 	state: State,
 ): common.ProtocolType | undefined {
+	let imported = state.imported[name]
+
+	if (imported !== undefined && identities.includes(imported.identity)) {
+		return imported
+	}
+
 	state.declaredProtocols ??= declaredProtocolsOf(state.program)
 
 	let declared = state.declaredProtocols
@@ -129,11 +137,11 @@ export function findHover(
 	annotations: Array<common.TypeAnnotation> = [],
 	text: string | null = null,
 	// The Protocols the import block bound, so an aliased Protocol is spelled as
-	// the document spells it.
+	// the document spells it. A clause naming one reads back as it.
 	imported: Record<string, common.ProtocolType> = {},
 ): HoverInfo | null {
 	return withProtocolSpellings(protocolSpellings(program, imported), () =>
-		hoverAt(program, cursor, parserProgram, annotations, text),
+		hoverAt(program, cursor, parserProgram, annotations, text, imported),
 	)
 }
 
@@ -143,6 +151,7 @@ function hoverAt(
 	parserProgram: parser.Program | null,
 	annotations: Array<common.TypeAnnotation>,
 	text: string | null,
+	imported: Record<string, common.ProtocolType>,
 ): HoverInfo | null {
 	if (text !== null && isInMargin(text, cursor)) {
 		return null
@@ -153,6 +162,7 @@ function hoverAt(
 		best: null,
 		protocols: protocolsOf(program),
 		declaredProtocols: null,
+		imported,
 		program,
 		parserProgram,
 	}

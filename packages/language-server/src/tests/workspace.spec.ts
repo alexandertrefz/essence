@@ -538,6 +538,17 @@ describe("Workspace", () => {
 				hoverIn("Main.es", main, 16, "isBig")?.documentation,
 			).toContain("Provided by `Measurable`.")
 		})
+
+		// The clause names the alias, which no Protocol of the file declares.
+		it("should describe a clause naming the Protocol under its alias", () => {
+			expect(hoverIn("Main.es", main, 9, "Measurable")?.content).toBe(
+				[
+					"protocol Measurable",
+					"size() -> Integer",
+					"isBig() -> Boolean",
+				].join("\n"),
+			)
+		})
 	})
 
 	describe("rename", () => {
