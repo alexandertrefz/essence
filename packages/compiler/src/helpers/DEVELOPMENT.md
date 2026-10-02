@@ -556,6 +556,16 @@ spell their Parameter `ItemType`. An open Generic on either side binds through `
 signatures flip sides. An opaque Generic as the expected Type accepts only itself. As the actual Type it falls
 through, so an expected Union can accept it as a member.
 
+An `Error` notes each unbound open Generic on the side it meets, as `ItemType` in `List<ItemType>`
+(`noteGenericsMetByError`). Left unbound, such a Generic would reach what reads the binding, such as a Function
+literal's Parameter or the call's answer, as a Type Parameter nothing decided. Each of those would then report
+`uninferable-return-type` or `uninferable-type-parameter` about a mistake already reported.
+
+A noted Generic binds the `Error` only where nothing else binds it. `settleErrorBindings` runs once a call's
+Arguments are matched, and once a receiver has bound a Namespace's Generics. So in `pair(zz, 1)` the `1` decides
+`T`, in either order, and a mistake about `T` after it is still reported. A callback matched before then is typed
+as if the `Error` had bound what it met (`bindingsWithErrorFallback`), without binding it.
+
 `isOpenBindable` is the occurs check. A Generic stops being open once its binding mentions itself, directly as
 `ItemType := ItemType` or through other bindings as `Key := List<Value>` beside `Value := List<Key>`, which
 `bindingCyclesBackTo` follows. No finite Type satisfies such a binding, so the Parameter then behaves as the

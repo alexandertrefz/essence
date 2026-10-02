@@ -395,6 +395,74 @@ describe("Enricher", () => {
 			expect(diagnostics[0].data).toBeUndefined()
 		})
 
+		// A Case Matcher whose Case was reported, or whose value is an Error,
+		// still binds its names, as holes. The body's reads of them are no
+		// second mistake.
+		it("should bind a Case Matcher's names where its Case is not resolved", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant chosen: Optional<Integer> = #Value(1)
+					constant broken = zz
+
+					constant first = match chosen -> Integer {
+						case #Valu(value) { <- value }
+						case _ { <- 0 }
+					}
+					constant second = match chosen -> Integer {
+						case #Valu({ value }) { <- value }
+						case _ { <- 0 }
+					}
+					constant third = match broken -> Integer {
+						case #Value(value) { <- value }
+						case _ { <- 0 }
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-name", "unknown-case", "unknown-case"])
+		})
+
+		// A subject that only holds the Choice a Case Matcher names is one
+		// mistake about the Match. The first such Case Matcher reports it,
+		// whatever its arm, with its binding or without.
+		it("should report a held Case at the first Case Matcher naming one", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					choice Inner { A { value: Integer }, B }
+					choice Outer { Wrap { inner: Inner }, None }
+
+					constant outer: Outer = #Wrap(#A(5))
+
+					constant first = match outer -> Integer {
+						case #None     { <- 0 }
+						case #A(value) { <- value }
+						case #B        { <- 2 }
+						case _         { <- 1 }
+					}
+					constant second = match outer -> Integer {
+						case #None { <- 0 }
+						case #B    { <- 2 }
+						case _     { <- 1 }
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-case", "unknown-case"])
+		})
+
+		// A prefixed Case the value can not be is reported, though the value
+		// holds an Error elsewhere, since that Error may carry no report.
+		it("should report a prefixed Case a value holding an Error can not be", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant mismatched: Result<Result<Integer, String>, Integer> =
+						#Value(#Value(1))
+					constant flat = mismatched::flatten()
+
+					constant read = match flat -> Integer {
+						case Optional#Value(value) { <- value }
+						case _ { <- 0 }
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-case"])
+		})
+
 		it("should report Method Invocations whose arguments match no overload", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = "value"::prepend()
@@ -2461,8 +2529,8 @@ describe("Enricher", () => {
 			).toContain("Type Parameter 'T' could not be inferred")
 		})
 
-		// An Error Type matches everything but binds no Type Parameter, so the
-		// call must not then report the Type Parameter as uninferable.
+		// An Error Type matches everything, so the call must not then report the
+		// Type Parameter it meets as uninferable.
 		it("should not report uninferable Type Parameters for an Error Argument", () => {
 			// Two generic Namespaces with one target tie, so the Argument is an
 			// Error. The receiver is a bound name, since a written List would
@@ -2480,6 +2548,55 @@ describe("Enricher", () => {
 					Terminal.inspect(numbers::firstItem())
 				}`).map((diagnostic) => diagnostic.code),
 			).toEqual(["ambiguous-namespace"])
+		})
+
+		// The Error meets `List<ItemType>` as a whole, and still binds the Type
+		// Parameter inside it.
+		it("should report nothing past an Error a receiver's Type holds", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant column = zz
+					constant grid = [column]
+
+					Terminal.inspect(grid::transpose())
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-name"])
+		})
+
+		// An Error binds a Type Parameter only where no other Argument does, in
+		// either order, so the call answers what the other Argument decided.
+		it("should let another Argument bind a Type Parameter an Error met", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function pair<infer T>(_ first: T, _ second: T) -> T {
+						<- first
+					}
+
+					Terminal.print(pair(zz, 1)::add("x"))
+					Terminal.print(pair(1, zz)::add("x"))
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual([
+				"unknown-name",
+				"no-matching-overload",
+				"unknown-name",
+				"no-matching-overload",
+			])
+		})
+
+		// A Type Parameter an Error meets binds it. A Function literal's
+		// Parameter typed from it, and an answer read later, are then holes
+		// that report nothing more.
+		it("should report nothing past an Error a Type Parameter binds", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant column = zz
+					constant listed = [column, column]
+					constant mapped = listed::map((c) { <- c::add(1) })
+					constant counted = [1]::map((x) { <- zz })
+
+					Terminal.print(mapped::length()::add(counted::length()))
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-name", "unknown-name"])
 		})
 
 		it("should apply defaults for unbound plain Generics", () => {
@@ -9477,7 +9594,6 @@ describe("Enricher", () => {
 
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 				"unknown-name",
-				"uninferable-type-parameter",
 			])
 
 			let branch = program.implementation.nodes.find(

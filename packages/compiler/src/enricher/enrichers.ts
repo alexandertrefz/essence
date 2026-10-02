@@ -101,7 +101,11 @@ import {
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
-import { isOneShapeMatch, isUnknownMember } from "./patternMembers"
+import {
+	isOneShapeMatch,
+	isUnknownMember,
+	unresolvedCaseBindings,
+} from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import {
 	checkProtocolConformance,
@@ -3309,15 +3313,15 @@ type ResolvedMatcher = {
 }
 
 // `handledMatchers` is what earlier arms retired, which a wildcard stands for.
-// An assertion hands an empty list. `armIndex` lets a Match on a Future report
-// its subject on the first arm only. `oneShape` is `isOneShapeMatch`, which an
-// assertion never is.
+// An assertion hands an empty list. A Match's arms share `held`, so a subject
+// holding the Choice its Cases name is reported once, by the first.
+// `oneShape` is `isOneShapeMatch`, which an assertion never is.
 function resolveMatcher(
 	node: parser.MatcherNode,
 	valueType: common.Type,
 	handledMatchers: Array<common.Type>,
 	scope: enricher.Scope,
-	armIndex = 0,
+	held = { reported: false },
 	oneShape = false,
 ): ResolvedMatcher {
 	if (node.nodeType === "LiteralMatcher") {
@@ -3345,7 +3349,7 @@ function resolveMatcher(
 
 	if (node.nodeType === "CaseMatcher") {
 		let literals: Record<string, common.typed.ExpressionNode> = {}
-		let matcher = resolveCaseMatcherType(node, valueType, scope, armIndex)
+		let matcher = resolveCaseMatcherType(node, valueType, scope, held)
 		// The payload Pattern's requirements stand beside the Matcher, so the
 		// Case stays the arm and only the Handler becomes conditional.
 		let payload = resolvePayloadRequirements(node, matcher, scope, literals)
@@ -3604,11 +3608,12 @@ function enrichMatch(
 	// `refinedSelfType`.
 	let namedValues: Array<common.PredicateConjunct> = []
 	let oneShape = isOneShapeMatch(node, value.type)
+	let held = { reported: false }
 
 	return {
 		nodeType: "Match",
 		value,
-		handlers: node.handlers.map((handler, index) => {
+		handlers: node.handlers.map((handler) => {
 			// A bare Case after a Handler's `<-` resolves against the Match's
 			// return Type. `isMatchHandlerBody` tells a Handler's `@` from a
 			// Method's for `namespaceReach`.
@@ -3623,7 +3628,7 @@ function enrichMatch(
 					value.type,
 					handledMatchers,
 					scope,
-					index,
+					held,
 					oneShape,
 				)
 
@@ -10582,8 +10587,8 @@ function unannotatedLiteralArgument(
 		: null
 }
 
-// Silent when an Argument already typed as Error: its own Diagnostic explains
-// why nothing bound the Type Parameter, since an Error matches without binding.
+// Silent when an Argument already typed as Error, whose own Diagnostic
+// explains the call.
 function reportUnboundGenerics(
 	unboundGenerics: Array<string>,
 	position: common.Position,
@@ -14842,9 +14847,9 @@ function resolveMatcherBindings(
 		return []
 	}
 
-	// An unresolved Case was already reported.
+	// An unresolved Case was already reported, so what it binds is a hole.
 	if (matcher.type !== "Case") {
-		return []
+		return unresolvedCaseBindings(node.binding)
 	}
 
 	if (node.binding.nodeType === "Pattern") {
@@ -15153,7 +15158,7 @@ function resolveCaseMatcherType(
 	node: parser.CaseMatcherNode,
 	valueType: common.Type,
 	scope: enricher.Scope,
-	armIndex: number,
+	heldSubject: { reported: boolean },
 ): common.Type {
 	if (node.choice !== null) {
 		let declaredCase = resolveCaseReference(
@@ -15177,8 +15182,10 @@ function resolveCaseMatcherType(
 
 		// The prefix names a Case the value can not be. Only the name is
 		// underlined, so the Quick Fix replaces just the name, and the near
-		// miss comes from this Choice's Cases in the Union.
-		if (!typeContainsError(valueType)) {
+		// miss comes from this Choice's Cases in the Union. A value holding an
+		// Error elsewhere may carry no report, so only the Error itself is
+		// silent.
+		if (valueType.type !== "Error") {
 			reportError(
 				`The matched value has no Case '${node.choice.content}#${node.caseName.content}'`,
 				node.caseName.position,
@@ -15239,15 +15246,17 @@ function resolveCaseMatcherType(
 		]
 
 		// A subject that holds the Choice, as a Future answering one does, is
-		// one mistake about the whole Match. Only the first arm reports it.
-		let held =
-			armIndex === 0
-				? heldCaseSubject(valueType, node.caseName.content, scope)
-				: null
+		// one mistake about the whole Match. The first Case Matcher naming such
+		// a Case reports it.
+		let held = heldSubject.reported
+			? null
+			: heldCaseSubject(valueType, node.caseName.content, scope)
 
 		if (held === null && holdsCaseNamed(valueType, node.caseName.content)) {
 			return { type: "Error" }
 		}
+
+		heldSubject.reported ||= (held?.notes.length ?? 0) > 0
 
 		let suggestion = caseSuggestion(node.caseName.content, memberCaseNames)
 

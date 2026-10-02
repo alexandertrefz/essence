@@ -770,18 +770,15 @@ describe("a name nothing declares, in a Program that parsed", () => {
 	}, 60_000)
 })
 
-// The undeclared `Seat` is an Error, so `List.of`'s `ItemType` never binds.
-// The key's bound is then checked against the renamed Type Parameter, and the
-// report must still name `ItemType` the same way every time.
+// An empty List leaves `reduce`'s `ItemType` unbound, so the key's bound is
+// checked against the renamed Type Parameter. The report must still name
+// `ItemType` the same way every time.
 describe("a bound checked against a Type Parameter mid-inference", () => {
 	let source = `implementation {
-	constant seats: List<Seat> = List.of(integersFrom 0, through 9)
-		::map((number) { <- { row = number, seat = 1 } })
+	constant seats = []
 
-	constant noSeats: Dictionary<Seat, Integer> = [=]
-
-	constant taken: Dictionary<Seat, Integer> = seats::reduce(
-		startingWith noSeats,
+	constant taken = seats::reduce(
+		startingWith [=],
 		(dictionary, seat) { <- dictionary::set(seat, to 1) },
 	)
 }
@@ -799,5 +796,28 @@ describe("a bound checked against a Type Parameter mid-inference", () => {
 
 	it("says the same thing twice in one process", () => {
 		expect(fingerprints(source)).toEqual(fingerprints(source))
+	})
+
+	// The undeclared `Seat` is an Error, which `List.of`'s `ItemType` binds, so
+	// no bound is checked against it and `Seat` is all that is reported.
+	it("reports an undeclared key Type and no bound beside it", () => {
+		let undeclared = `implementation {
+	constant seats: List<Seat> = List.of(integersFrom 0, through 9)
+		::map((number) { <- { row = number, seat = 1 } })
+
+	constant noSeats: Dictionary<Seat, Integer> = [=]
+
+	constant taken: Dictionary<Seat, Integer> = seats::reduce(
+		startingWith noSeats,
+		(dictionary, seat) { <- dictionary::set(seat, to 1) },
+	)
+}
+`
+
+		expect(
+			analyseSource(undeclared).diagnostics.map(
+				(diagnostic) => diagnostic.code,
+			),
+		).toEqual(["unknown-type", "unknown-type", "unknown-type"])
 	})
 })

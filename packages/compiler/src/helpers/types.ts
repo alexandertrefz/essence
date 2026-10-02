@@ -126,6 +126,8 @@ export type GenericBindings = Map<common.GenericName, common.Type>
 export type GenericInferenceContext = {
 	bindableNames: Set<common.GenericName>
 	bindings: GenericBindings
+	// The unbound Type Parameters an Error met, for `settleErrorBindings`.
+	metError?: Set<common.GenericName>
 }
 
 // An `infer` Generic starts unbound on every call. A plain one is bound to its
@@ -392,6 +394,7 @@ export function bindNamespaceTarget(
 	}
 
 	bindPhantomTypeArguments(renamed.target, subject, context)
+	settleErrorBindings(context)
 
 	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
 }
@@ -2632,6 +2635,51 @@ const OUTERMOST: MatchDepth = "outermost"
 
 const NESTED: MatchDepth = "nested"
 
+// Notes each unbound Type Parameter on the side an Error met, anywhere in it.
+// See "Type Parameters" in DEVELOPMENT.md.
+function noteGenericsMetByError(
+	lhs: common.Type,
+	rhs: common.Type,
+	context: GenericInferenceContext | null,
+): void {
+	if (context === null) {
+		return
+	}
+
+	for (let name of mentionedGenericNames(lhs.type === "Error" ? rhs : lhs)) {
+		if (context.bindableNames.has(name) && !context.bindings.has(name)) {
+			context.metError ??= new Set()
+			context.metError.add(name)
+		}
+	}
+}
+
+// Binds each Type Parameter an Error met and nothing else bound to the Error,
+// once every Argument that could bind it was matched.
+export function settleErrorBindings(context: GenericInferenceContext): void {
+	for (let name of context.metError ?? []) {
+		if (!context.bindings.has(name)) {
+			context.bindings.set(name, { type: "Error" })
+		}
+	}
+}
+
+// The bindings a Function literal Argument is typed under. A Type Parameter an
+// Error met and nothing bound yet reads as the Error.
+function bindingsWithErrorFallback(
+	context: GenericInferenceContext,
+): GenericBindings {
+	let fallback = new Map(context.bindings)
+
+	for (let name of context.metError ?? []) {
+		if (!fallback.has(name)) {
+			fallback.set(name, { type: "Error" })
+		}
+	}
+
+	return fallback
+}
+
 function matchTypes(
 	lhs: common.Type,
 	rhs: common.Type,
@@ -2640,6 +2688,8 @@ function matchTypes(
 ): boolean {
 	// An Error matches anything both ways, so one mistake does not cascade.
 	if (lhs.type === "Error" || rhs.type === "Error") {
+		noteGenericsMetByError(lhs, rhs, context)
+
 		return true
 	}
 
@@ -3279,12 +3329,15 @@ export function matchArguments(
 		let argument = matchableArguments[argumentIndex]
 
 		// Substituting the bindings so far gives a deferred callback its real Types.
+		// A callback is typed as if an Error met only had bound what it met.
 		let expectedType =
 			inferenceContext === null
 				? parameter.type
 				: applyGenericBindings(
 						parameter.type,
-						inferenceContext.bindings,
+						parameter.type.type === "Function"
+							? bindingsWithErrorFallback(inferenceContext)
+							: inferenceContext.bindings,
 					)
 
 		// The label is compared first, so an Argument at the wrong label is never
@@ -3344,6 +3397,10 @@ export function matchArguments(
 			),
 			parameterForArgument: argumentPairingInverse(pairing),
 		}
+	}
+
+	if (inferenceContext !== null) {
+		settleErrorBindings(inferenceContext)
 	}
 
 	return {

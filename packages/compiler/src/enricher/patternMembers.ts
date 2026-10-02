@@ -3,6 +3,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 import { primary, reportError } from "../diagnostics/index"
 import { describeType } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
+import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
 import { flattenUnionMembers, typeContainsError } from "../helpers/types"
 
@@ -96,4 +97,30 @@ function reportUnknownPatternMember(
 
 function armsOf(type: common.Type): Array<common.Type> {
 	return type.type === "UnionType" ? flattenUnionMembers(type) : [type]
+}
+
+// Each name a Case Matcher binds where its Case is not resolved, as the Error
+// Type. The Case was reported, or the value is an Error, so reading one of
+// them in the body is no second mistake.
+export function unresolvedCaseBindings(
+	binder: parser.IdentifierNode | parser.PatternNode,
+): Array<{
+	name: parser.IdentifierNode
+	member: parser.IdentifierNode | null
+	path: Array<string>
+	stepPositions: Array<common.Position>
+	type: common.Type
+}> {
+	let bindings =
+		binder.nodeType === "Pattern"
+			? patternBindings(binder)
+			: [{ name: binder, member: null, path: [], steps: [] }]
+
+	return bindings.map((binding) => ({
+		name: binding.name,
+		member: binding.member,
+		path: binding.path,
+		stepPositions: binding.steps.map((step) => step.name.position),
+		type: { type: "Error" },
+	}))
 }

@@ -349,6 +349,13 @@ Bindings are read at what the arm proved, not at what the Case declared, so `cas
 an Integer as the equivalent Record Matcher does. The shorthand reading's one step was never written, so it stands
 at the binder's position.
 
+A Case Matcher whose Case is not resolved still binds its names, each to the Error Type (`unresolvedCaseBindings`),
+so a read of one in the body is no `unknown-name`. That holds only because every such Case is reported, or the
+matched value is itself an Error. A prefixed Case is reported though the value holds an Error elsewhere, since such
+an Error may carry no report. A subject that only holds the Choice the Cases name is one mistake about the Match.
+The first Case Matcher naming such a Case reports it, whatever its arm, and the arms after it stay silent
+(`heldSubject`).
+
 A Matcher over a Union discriminates by members only some arms carry. A member no arm declares is read by how it
 is written (`resolvePatternMatcherType`). Records are open, so a value may carry members its Type leaves out. A
 member written with its Type or its value is a structural test the value may pass, and its binding has the written
