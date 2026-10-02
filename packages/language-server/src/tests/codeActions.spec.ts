@@ -564,6 +564,64 @@ describe("Code Actions", () => {
 			)
 		})
 
+		// `{ kye }` names a member and binds `kye`, which the body reads. Writing
+		// `{ key }` would leave every read naming nothing.
+		it("should keep the name a Pattern member binds", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant point = { key = 1, other = 2 }",
+				"\tconstant { kye } = point",
+				"\tconstant doubled = kye::multiply(with 2)",
+				"",
+				"\tfunction first({ kye: Integer }: { key: Integer }) -> Integer {",
+				"\t\t<- kye",
+				"\t}",
+				"}",
+			]
+
+			let [declared] = quickFixes(lines, spanOf(lines, 3, "kye"))
+			let declaredResult = applied(lines, declared)
+
+			expect(declared.title).toBe("Change to 'key as kye'")
+			expect(declared.diagnosticCode).toBe("unknown-member")
+			expect(declaredResult[2]).toBe("\tconstant { key as kye } = point")
+
+			// An annotated member takes its binder after the Type.
+			let [parameter] = quickFixes(
+				declaredResult,
+				spanOf(lines, 6, "kye"),
+			)
+			let result = applied(declaredResult, parameter)
+
+			expect(result[5]).toBe(
+				"\tfunction first({ key: Integer as kye }: { key: Integer }) -> Integer {",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// `{ kye, key }` would take `key` apart twice as `{ key as kye, key }`,
+		// and `{ key, key }` would also unbind `kye`. A member with a binder
+		// of its own is only a name, which the spelling fix may change.
+		it("should offer nothing where the Pattern names the suggestion already", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant point = { key = 1, other = 2 }",
+				"\tconstant { kye, key } = point",
+				"\tconstant { kye as k } = point",
+				"\tconstant total = kye::add(key)::add(k)",
+				"}",
+			]
+
+			expect(quickFixes(lines, spanOf(lines, 3, "kye"))).toEqual([])
+
+			let [named] = quickFixes(lines, spanOf(lines, 4, "kye"))
+
+			expect(named.title).toBe("Change to 'key'")
+			expect(applied(lines, named)[3]).toBe(
+				"\tconstant { key as k } = point",
+			)
+		})
+
 		it("should offer the suggested name for an unknown Method", () => {
 			let lines = [
 				"implementation {",

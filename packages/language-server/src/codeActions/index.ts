@@ -102,6 +102,7 @@ import {
 import { matchOnValueActions } from "./matchOnValue"
 import { moveActions } from "./moveModule"
 import { pathActions } from "./paths"
+import { patternMemberSpellingActions } from "./patternFixes"
 import { payloadActions } from "./payloads"
 import { annotationActions, shorthandActions } from "./refactors"
 import {
@@ -595,7 +596,13 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	],
 	// The linker's near miss among the dependency's published names.
 	"unknown-export": spellingFix,
-	"unknown-member": spellingFix,
+	// A Pattern member binding under its own name keeps that binding.
+	"unknown-member": (context) =>
+		patternMemberSpellingActions(
+			context.diagnostic,
+			context.program,
+			context.lines,
+		) ?? spellingFix(context),
 	"unknown-method": (context) => [
 		...namespaceImportActions(context.diagnostic, context.imports),
 		...spellingFix(context),
