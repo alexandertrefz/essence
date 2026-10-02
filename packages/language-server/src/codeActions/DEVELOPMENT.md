@@ -68,6 +68,33 @@ value. It parses and is visibly not an answer, and where a Type is expected it i
 reader can act on. For a missing Record member, a shorthand `{ port }` would parse too, but it means `port = port`
 and would silently pick up a Constant of that name.
 
+## Making a Type Generatable
+
+`makeGeneratableActions` writes a `Generatable` Namespace after a Record Alias or a Choice. Its `generate` draws a
+Record member by member, and a Choice by picking one Case out of every Case built. Each member's Type is drawn by the
+first answer of these:
+
+- A Type a Namespace of this file declares `Generatable` is drawn through that Namespace's `generate`.
+- An Alias or a Choice this file declares is built in place, so a Record holding a Record is drawn whole. A Type
+  being drawn is not drawn again inside itself. The Compiler refuses such a Type, but a buffer may hold one.
+- A Boolean, an Integer, a Rational or a String takes the standard library's draw.
+
+Anything else has no draw, such as a List, an Optional, or a Type another Module declares. A generic or refined Type
+has none either: nothing infers a Type Parameter for `generate`, and a draw cannot satisfy a predicate. A refactoring
+promises code that compiles, so it is not offered where a member has no draw. The Quick Fix for
+`ungeneratable-type` answers a Diagnostic and may leave a hole. It leaves the member out and names it in a `§` line,
+and the value it answers is reported as incomplete.
+
+The Namespace is written as the Formatter would lay it out, so formatting leaves the scaffold as written. A head too
+long for its line breaks as the Formatter breaks it (`headLines`): the conformance moves down first, then the `for`
+clause, and the `{` stands alone. A `generate` signature too long for its line puts its Parameter on a line of its own
+(`signatureLines`).
+
+The value is a `Layout`: text the Formatter never breaks, or a bracketed list. `laidOut` writes a list on one line
+where it fits, and one entry to a line otherwise, at every depth. A call takes its sole Record or List Argument into
+its own brackets, as `source::pick(from [` does, and a List of Cases without payloads is filled, as many to a line as
+fit. A Case whose payload declares no member is written without one, as `Signal#On`, since `Signal#On({})` is refused.
+
 ## Reading a Help
 
 Where the compiler decides which answers a Diagnostic has, a fix reads them off the Diagnostic's Help rather than

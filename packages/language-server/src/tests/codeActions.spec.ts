@@ -5673,28 +5673,95 @@ describe("Code Actions", () => {
 			expect(refusalOf(result)).toBeNull()
 		})
 
-		// A member with no draw is named in a `§` line and left out, and the
-		// other members are written.
-		it("should keep the members it can draw beside the ones it can not", () => {
+		// A value without those members would not fit the Type, and a
+		// refactoring writes no hole. The Quick Fix does.
+		it("should offer no refactoring for a Type with a member it can not draw", () => {
 			let lines = [
 				"implementation {",
 				"\ttype Crate = { items: List<String>, held: Optional<Integer>, count: Integer }",
 				"}",
 			]
 
-			let [refactor] = generatableActions(lines, 2, 8)
+			expect(refactoredCodesOf(lines)).toEqual([])
+			expect(generatableActions(lines, 2, 8)).toEqual([])
+		})
+
+		// A Record or Choice this file declares is built in place, and a Type
+		// that conforms already is drawn through its own Namespace. A value
+		// that does not fit breaks where the Formatter breaks it, at any depth.
+		it("should draw a member whose Type this file declares", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Tls = { enabled: Boolean }",
+				"\tchoice Zone {",
+				"\t\tInside,",
+				"\t\tOutside { distance: Integer, tls: Tls },",
+				"\t}",
+				"",
+				"\ttype Pin = { label: String }",
+				"",
+				"\tnamespace PinGeneratable for Pin is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Pin {",
+				'\t\t\t<- { label = "pin" }',
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Server = {",
+				"\t\ttls: Tls,",
+				"\t\tzone: Zone,",
+				"\t\tpin: Pin,",
+				"\t\tinline: { a: Integer, b: Rational },",
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = generatableActions(lines, 16, 8)
 			let result = applied(lines, refactor)
 
-			expect(result.slice(3, 9)).toEqual([
-				"\tnamespace CrateGeneratable for Crate is Generatable {",
-				"\t\tstatic generate(from source: Randomness) -> Crate {",
-				"\t\t\t§ No draw for 'items' — write one, or the value below is incomplete.",
-				"\t\t\t§ No draw for 'held' — write one, or the value below is incomplete.",
-				"\t\t\t<- { count = source::drawInteger(between 0, and 100) }",
+			expect(result.slice(22, 43)).toEqual([
+				"\tnamespace ServerGeneratable for Server is Generatable {",
+				"\t\tstatic generate(from source: Randomness) -> Server {",
+				"\t\t\t<- {",
+				"\t\t\t\ttls = { enabled = source::drawBoolean() },",
+				"\t\t\t\tzone = source::pick(from [",
+				"\t\t\t\t\tZone#Inside,",
+				"\t\t\t\t\tZone#Outside({",
+				"\t\t\t\t\t\tdistance = source::drawInteger(between 0, and 100),",
+				"\t\t\t\t\t\ttls = { enabled = source::drawBoolean() },",
+				"\t\t\t\t\t}),",
+				"\t\t\t\t]),",
+				"\t\t\t\tpin = PinGeneratable.generate(from source),",
+				"\t\t\t\tinline = {",
+				"\t\t\t\t\ta = source::drawInteger(between 0, and 100),",
+				"\t\t\t\t\tb = source::drawRational(between 0/1, and 1/1),",
+				"\t\t\t\t},",
+				"\t\t\t}",
 				"\t\t}",
+				"\t}",
+				"}",
 			])
 
-			expect(refusalOf(result)).toBeNull()
+			expectRefactored(lines, result)
+			expect(format(result.join("\n")).text).toBe(
+				`${result.join("\n")}\n`,
+			)
+		})
+
+		// The Compiler refuses a Type naming itself, and a buffer being typed
+		// may hold one. Drawing `Tree` inside `Tree` would never end.
+		it("should not draw a Type inside itself", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Pair = { left: Tree }",
+				"\tchoice Tree { Leaf, Node { pair: Pair } }",
+				"}",
+			]
+
+			expect(refactoredCodesOf(lines)).toContain(
+				"recursive-type-declaration",
+			)
+			expect(generatableActions(lines, 2, 8)).toEqual([])
+			expect(generatableActions(lines, 3, 10)).toEqual([])
 		})
 
 		it("should pick a Choice's Case from a written List", () => {
@@ -5738,7 +5805,9 @@ describe("Code Actions", () => {
 				"\t\tstatic generate(from source: Randomness) -> Shape {",
 				"\t\t\t<- source::pick(from [",
 				"\t\t\t\tShape#Blank,",
-				"\t\t\t\tShape#Circle({ radius = source::drawInteger(between 0, and 100) }),",
+				"\t\t\t\tShape#Circle({",
+				"\t\t\t\t\tradius = source::drawInteger(between 0, and 100),",
+				"\t\t\t\t}),",
 				"\t\t\t])",
 				"\t\t}",
 				"\t}",
@@ -5746,7 +5815,100 @@ describe("Code Actions", () => {
 			])
 
 			expect(codesOf(result)).toEqual([])
-			expect(refusalOf(result)).toBeNull()
+			expect(format(result.join("\n")).text).toBe(
+				`${result.join("\n")}\n`,
+			)
+		})
+
+		// The Formatter fills a List of Cases without payloads, as many to a
+		// line as fit, rather than one to a line.
+		it("should fill a broken List of Cases without payloads", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Month {",
+				"\t\tJanuary,",
+				"\t\tFebruary,",
+				"\t\tMarch,",
+				"\t\tApril,",
+				"\t\tMay,",
+				"\t\tJune,",
+				"\t\tJuly,",
+				"\t\tAugust,",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, generatableActions(lines, 2, 9)[0])
+
+			expect(result.slice(14, 19)).toEqual([
+				"\t\t\t<- source::pick(from [",
+				"\t\t\t\tMonth#January, Month#February, Month#March, Month#April,",
+				"\t\t\t\tMonth#May, Month#June, Month#July, Month#August,",
+				"\t\t\t])",
+				"\t\t}",
+			])
+			expect(format(result.join("\n")).text).toBe(
+				`${result.join("\n")}\n`,
+			)
+		})
+
+		// The head and the signature break where the Formatter breaks them.
+		it("should break a head too long for its line", () => {
+			let medium = [
+				"implementation {",
+				"\ttype CustomerPreferences = { name: String }",
+				"}",
+			]
+			let long = [
+				"implementation {",
+				"\ttype CustomerPreferencesForTheAccount = { name: String }",
+				"}",
+			]
+
+			let mediumResult = applied(
+				medium,
+				generatableActions(medium, 2, 8)[0],
+			)
+			let longResult = applied(long, generatableActions(long, 2, 8)[0])
+
+			expect(mediumResult.slice(3, 7)).toEqual([
+				"\tnamespace CustomerPreferencesGeneratable for CustomerPreferences",
+				"\t\tis Generatable",
+				"\t{",
+				"\t\tstatic generate(from source: Randomness) -> CustomerPreferences {",
+			])
+			expect(longResult.slice(3, 10)).toEqual([
+				"\tnamespace CustomerPreferencesForTheAccountGeneratable",
+				"\t\tfor CustomerPreferencesForTheAccount",
+				"\t\tis Generatable",
+				"\t{",
+				"\t\tstatic generate(",
+				"\t\t\tfrom source: Randomness,",
+				"\t\t) -> CustomerPreferencesForTheAccount {",
+			])
+
+			for (let result of [mediumResult, longResult]) {
+				expect(codesOf(result)).toEqual([])
+				expect(format(result.join("\n")).text).toBe(
+					`${result.join("\n")}\n`,
+				)
+			}
+		})
+
+		// `Signal#On({})` is refused as a payload `On {}` does not take.
+		it("should write a Case whose payload declares no member bare", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Signal { Off, On {} }",
+				"}",
+			]
+
+			let result = applied(lines, generatableActions(lines, 2, 10)[0])
+
+			expect(result[5]).toBe(
+				"\t\t\t<- source::pick(from [Signal#Off, Signal#On])",
+			)
+			expectRefactored(lines, result)
 		})
 
 		it("should offer nothing where the Type already conforms", () => {
