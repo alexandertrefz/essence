@@ -1344,6 +1344,13 @@ export function holdsFunctionRefusedAsValue(
 	}
 }
 
+// Whether a value of this Type was reported where it was written. It is the
+// Error Type, or it is or holds a Function refused as a value. A check on such
+// a value stands down.
+export function isReportedValue(type: common.Type): boolean {
+	return type.type === "Error" || holdsFunctionRefusedAsValue(type)
+}
+
 // Whether an Error Type sits anywhere in this one. It was reported where it
 // came from, so a Type holding one must not be reported again.
 export function typeContainsError(type: common.Type): boolean {

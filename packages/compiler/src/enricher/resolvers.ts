@@ -75,6 +75,7 @@ import {
 	flattenUnionMembers,
 	holdsFunctionRefusedAsValue,
 	isPartialOf,
+	isReportedValue,
 	matchesType,
 	NotHoistedYet,
 	refinementWithTypeArguments,
@@ -5113,8 +5114,8 @@ export function solveConformance(
 		}
 	}
 
-	// An Error binding was already reported.
-	if (binding.type === "Error") {
+	// An Error binding, or a Function refused as a value, was already reported.
+	if (isReportedValue(binding)) {
 		return { ok: false, chain: [] }
 	}
 
@@ -6808,8 +6809,7 @@ export function resolveConformances(
 		// reported already. The validator reports a Function refused as a value.
 		if (
 			bound === undefined ||
-			bound.type === "Error" ||
-			holdsFunctionRefusedAsValue(bound) ||
+			isReportedValue(bound) ||
 			unbound.some((name) => typeMentionsGeneric(bound, name))
 		) {
 			continue

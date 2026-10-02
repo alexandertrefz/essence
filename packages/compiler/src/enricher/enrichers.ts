@@ -72,6 +72,7 @@ import {
 	type GenericInferenceContext,
 	impliedConjunctKeys,
 	isPartialOf,
+	isReportedValue,
 	matchArguments,
 	matchesType,
 	matchesTypeWithBindings,
@@ -3437,7 +3438,7 @@ function enrichStart(
 		}
 	}
 
-	if (type.type !== "Error") {
+	if (!isReportedValue(type)) {
 		reportWarning(
 			type.type === "Started"
 				? "This is already in flight"
@@ -3486,7 +3487,7 @@ function enrichComplete(
 			? member.valueType
 			: null,
 	)
-	let notWork = answered === null && type.type !== "Error"
+	let notWork = answered === null && !isReportedValue(type)
 	// A misplaced `complete` before no work is one mistake, reported once.
 	let misplaced = reportMisplacedComplete(node, scope, notWork)
 
@@ -7163,7 +7164,7 @@ function enrichCasePayloadDefault(
 		return value
 	}
 
-	if (!isPartialOf(payloadType, value.type)) {
+	if (!isPartialOf(payloadType, value.type) && !isReportedValue(value.type)) {
 		// A partial, so a member the default leaves out is not missing. Only
 		// what it writes can be wrong.
 		let record = recordMismatchEvidence(payloadType, value.type, value, {
@@ -7305,10 +7306,10 @@ function bakeCaseDefaultValue(
 	}
 }
 
-// Whether the value is already an Error that something reported, such as a
-// Constant named before its declaration.
+// Whether the value was already reported: an Error, such as a Constant named
+// before its declaration, or a Function refused as a value.
 function alreadyReportedAbout(node: common.typed.ExpressionNode): boolean {
-	return typeContainsError(node.type)
+	return typeContainsError(node.type) || isReportedValue(node.type)
 }
 
 // A name in a payload default stands for this Module's Constant whose value is
@@ -8531,8 +8532,8 @@ function enrichParameterDefault(
 	let valueType = value.type
 
 	// A written default is admitted by deciding a refinement's predicate, as a
-	// written Argument is.
-	if (fitsWritten(type, value)) {
+	// written Argument is. One already reported is not measured again.
+	if (fitsWritten(type, value) || isReportedValue(valueType)) {
 		return value
 	}
 
@@ -12435,7 +12436,7 @@ function resolveMethodInvocation(
 		// name: two mistakes, two Diagnostics.
 		if (namespaces.size === 0) {
 			if (
-				baseType.type !== "Error" &&
+				!isReportedValue(baseType) &&
 				!isUnwrittenTypeParameter(baseType, scope)
 			) {
 				reportEmptyLookup(
@@ -13318,7 +13319,7 @@ function resolveFunctionInvocation(
 
 		return failed
 	} else {
-		if (type.type !== "Error") {
+		if (!isReportedValue(type)) {
 			reportError(
 				"This Expression is not a Function",
 				node.name.position,
@@ -15733,8 +15734,8 @@ function endsInAnUnreturnedValue(
 }
 
 // The annotation a literal outside Argument position has to write, spelled from
-// its body where it can be. A nested Function or an Unknown can not be typed
-// back in, so a schematic stands there.
+// its body where it can be. A nested Function, an Unknown or a value already
+// reported can not be typed back in, so a schematic stands there.
 function returnTypeHelp(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
@@ -15742,7 +15743,7 @@ function returnTypeHelp(
 ): string {
 	let inferred = inferReturnTypeFromBody(node, parameterTypes, scope)
 	let spelling =
-		inferred === null || typeContainsError(inferred)
+		inferred === null || isReportedValue(inferred)
 			? null
 			: describeType(inferred)
 

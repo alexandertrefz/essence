@@ -16,10 +16,14 @@ import { validate } from "../validator/index"
 
 // End to end, since the Type logic in `src/helpers` must hold once the
 // Enricher decides a Type and the Validator judges it.
-function errorsFor(source: string) {
+function diagnosticsFor(source: string) {
 	let { program, diagnostics } = enrich(parse(source))
 
-	return [...diagnostics, ...validate(program)].filter(
+	return [...diagnostics, ...validate(program)]
+}
+
+function errorsFor(source: string) {
+	return diagnosticsFor(source).filter(
 		(diagnostic) => diagnostic.severity === "error",
 	)
 }
@@ -601,6 +605,88 @@ describe("Type matching", () => {
 				"protocol-bound-function-value",
 				"overloaded-function-value",
 			])
+		})
+
+		// A default, a String hole, a receiver, a `start` or `complete` operand
+		// and a Case payload default are values too. The refusal is their one
+		// report, and a call of a `define` holding one adds none.
+		it("should refuse a Function value once beside the checks on its position", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function shown<infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				function apply(_ rule: (_: Integer, _: Integer) -> Integer = Integer.add) -> Integer {
+					<- rule(1, 2)
+				}
+
+				function show(_ rule: (_: Integer) -> String = shown) -> String {
+					<- rule(1)
+				}
+
+				choice Holder {
+					Has { rule: (_: Integer, _: Integer) -> Integer } = { rule = Integer.add },
+					Empty,
+				}
+
+				function waits() -> Future<Integer> {
+					constant done = complete Integer.add
+					<- 1
+				}
+
+				constant flag = true
+				constant either = define {
+					as (a: Integer, b: Integer) -> Integer { <- a } if flag
+					as Integer.add otherwise
+				}
+
+				Terminal.print("{Integer.add} {shown}")
+				Terminal.print(Integer.add::toString())
+				Terminal.inspect(start Integer.add)
+				Terminal.print(either(1, 2))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+			])
+		})
+
+		// A callee other than a name or a static path is walked, and a Lookup
+		// callee's base is a value. A refused Function in either is reported.
+		it("should refuse a Function value written inside a callee", () => {
+			let errors = errorsFor(`implementation {
+				Terminal.print({ rule = Integer.add }(1, 2))
+				Terminal.print([Integer.add](1, 2))
+				Terminal.print({ rule = Integer.add }.rule(1, 2))
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+			])
+		})
+
+		// A `start` or `complete` before no work answers its operand, so the
+		// operand is what was written as a value.
+		it("should refuse the operand of a `start`, not the keyword", () => {
+			let source = `implementation {
+				Terminal.inspect(start Integer.add)
+			}`
+			let [refusal] = diagnosticsFor(source)
+
+			expect(refusal.code).toBe("overloaded-function-value")
+			expect(refusal.position?.start.column).toBe(
+				source.split("\n")[1].indexOf("Integer.add") + 1,
+			)
 		})
 	})
 

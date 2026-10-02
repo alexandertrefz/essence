@@ -429,7 +429,7 @@ function validateExpression(
 			return validateCombination(node)
 		case "Start":
 		case "Complete":
-			validateExpression(node.expression)
+			validateValue(node.expression)
 
 			return node
 		case "StringValue":
@@ -505,12 +505,20 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 	}
 }
 
+// An Expression written where a value stands, which a Function refused as a
+// value can not be.
+function validateValue(node: common.typed.ExpressionNode): void {
+	validateExpression(node)
+	validateNoBoundFunctionValue(node)
+}
+
 // A Function with Protocol-bounded Type Parameters can not be a value: its
 // hidden conformance Parameters exist only at a direct call.
 function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
-	// A `define` or a `match` answers with what its arms answer, and each arm's
-	// value is checked where it stands.
-	if (node.nodeType === "Define" || node.nodeType === "Match") {
+	// A `define` or a `match` answers with what its arms answer. A `start` or a
+	// `complete` before no work answers its operand. Each is checked where it
+	// stands.
+	if (["Define", "Match", "Start", "Complete"].includes(node.nodeType)) {
 		return
 	}
 
@@ -792,19 +800,17 @@ function validateMethodInvocation(
 	node: common.typed.MethodInvocationNode,
 ): common.typed.MethodInvocationNode {
 	for (let argumentNode of node.arguments) {
-		validateExpression(argumentNode.value)
-		validateNoBoundFunctionValue(argumentNode.value)
+		validateValue(argumentNode.value)
 	}
 
-	validateExpression(node.base)
+	validateValue(node.base)
 
 	if (node.dispatch !== null) {
 		// Each dispatch branch carries its own compilation of a contextually
 		// typed Argument, which is emitted, so each copy is checked too.
 		for (let dispatchCase of node.dispatch) {
 			for (let { argument } of dispatchCase.contextualArguments) {
-				validateExpression(argument.value)
-				validateNoBoundFunctionValue(argument.value)
+				validateValue(argument.value)
 			}
 		}
 
@@ -957,12 +963,12 @@ function validateFunctionInvocation(
 	const functionType = node.name.type
 
 	for (let argumentNode of node.arguments) {
-		validateExpression(argumentNode.value)
-		validateNoBoundFunctionValue(argumentNode.value)
+		validateValue(argumentNode.value)
 	}
 
-	// The callee is not walked as an Expression, so a static call's Namespace
-	// and the static Property it calls through are checked here.
+	// A name or a static path is the Function called, so it is not walked as an
+	// Expression. A static call's Namespace and Property are checked here. A
+	// Lookup's base is a value read, and any other callee is walked.
 	if (
 		node.name.nodeType === "Lookup" &&
 		node.name.base.nodeType === "Identifier" &&
@@ -974,6 +980,10 @@ function validateFunctionInvocation(
 			"this names it",
 		)
 		checkPropertyIsBound(node.name)
+	} else if (node.name.nodeType === "Lookup") {
+		validateValue(node.name.base)
+	} else if (node.name.nodeType !== "Identifier") {
+		validateExpression(node.name)
 	}
 
 	// Only an Identifier callee has a name to give.
@@ -1127,7 +1137,7 @@ function validateFunctionDefinition(
 		// held to the body's rules, except that it may not wait.
 		insideBody("parameter-default", () => {
 			for (let defaultValue of parameterDefaults(node.parameters)) {
-				validateExpression(defaultValue)
+				validateValue(defaultValue)
 			}
 		})
 
@@ -1171,7 +1181,7 @@ function validateNativeShim(shim: common.typed.NativeShimNode): void {
 
 	try {
 		for (let defaultValue of parameterDefaults(shim.parameters)) {
-			validateExpression(defaultValue)
+			validateValue(defaultValue)
 		}
 	} finally {
 		executingTopLevelIndex = enclosingIndex
@@ -2202,8 +2212,7 @@ function validateCaseValue(
 	node: common.typed.CaseValueNode,
 ): common.typed.CaseValueNode {
 	if (node.value !== null) {
-		validateExpression(node.value)
-		validateNoBoundFunctionValue(node.value)
+		validateValue(node.value)
 	}
 
 	if (node.type.type !== "Case") {
@@ -2447,8 +2456,7 @@ function validateRecordValue(
 	node: common.typed.RecordValueNode,
 ): common.typed.RecordValueNode {
 	for (let member of Object.values(node.members)) {
-		validateExpression(member)
-		validateNoBoundFunctionValue(member)
+		validateValue(member)
 	}
 
 	return node
@@ -2458,8 +2466,7 @@ function validateListValue(
 	node: common.typed.ListValueNode,
 ): common.typed.ListValueNode {
 	for (let value of node.values) {
-		validateExpression(value)
-		validateNoBoundFunctionValue(value)
+		validateValue(value)
 	}
 
 	return node
@@ -2470,23 +2477,21 @@ function validateDictionaryValue(
 	node: common.typed.DictionaryValueNode,
 ): common.typed.DictionaryValueNode {
 	for (let entry of node.entries) {
-		validateExpression(entry.key)
-		validateNoBoundFunctionValue(entry.key)
-		validateExpression(entry.value)
-		validateNoBoundFunctionValue(entry.value)
+		validateValue(entry.key)
+		validateValue(entry.value)
 	}
 
 	return node
 }
 
-// Each hole is walked as an Expression. A Function value in a hole is
-// refused by the enricher as not Printable.
+// Each hole is a value. Any other Function value in a hole is refused by the
+// enricher as not Printable.
 function validateInterpolatedStringValue(
 	node: common.typed.InterpolatedStringValueNode,
 ): common.typed.InterpolatedStringValueNode {
 	for (let segment of node.segments) {
 		if (segment.kind === "expression") {
-			validateExpression(segment.expression)
+			validateValue(segment.expression)
 		}
 	}
 
@@ -2580,8 +2585,7 @@ function validateConstantDeclarationStatement(
 		}
 	}
 
-	validateExpression(node.value)
-	validateNoBoundFunctionValue(node.value)
+	validateValue(node.value)
 
 	return node
 }
@@ -2600,8 +2604,7 @@ function validateVariableDeclarationStatement(
 		}
 	}
 
-	validateExpression(node.value)
-	validateNoBoundFunctionValue(node.value)
+	validateValue(node.value)
 
 	return node
 }
@@ -2731,8 +2734,7 @@ function validateVariableAssignmentStatement(
 		)
 	}
 
-	validateExpression(node.value)
-	validateNoBoundFunctionValue(node.value)
+	validateValue(node.value)
 
 	return node
 }
@@ -2833,8 +2835,7 @@ function validateChoiceDeclarationStatement(
 	node: common.typed.ChoiceDeclarationStatementNode,
 ): common.typed.ChoiceDeclarationStatementNode {
 	for (let defaultValue of caseDefaults(node.cases)) {
-		validateExpression(defaultValue)
-		validateNoBoundFunctionValue(defaultValue)
+		validateValue(defaultValue)
 	}
 
 	return node
@@ -2898,8 +2899,7 @@ function validateNamespaceDefinitionStatement(
 		initialisingProperty = { namespaceName: node.name.content, unbound }
 
 		try {
-			validateExpression(property.value)
-			validateNoBoundFunctionValue(property.value)
+			validateValue(property.value)
 		} finally {
 			initialisingProperty = null
 		}
@@ -3093,8 +3093,7 @@ function validateReturnStatement(
 		)
 	}
 
-	validateExpression(node.expression)
-	validateNoBoundFunctionValue(node.expression)
+	validateValue(node.expression)
 
 	return node
 }

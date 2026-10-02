@@ -175,7 +175,15 @@ A value that is or holds a Function refused as a value fits as well, and an Argu
 `argument-type-mismatch`. Nor is a Case payload holding one a `payload-type-mismatch`, an update writing one a
 `partial-type-mismatch`, or a call whose receiver or Argument holds one a `no-matching-overload` in the enricher.
 `validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
-is not reported itself, since its arms carry the value.
+is not reported itself, since its arms carry the value. Nor is a `start` or a `complete` before no work, which
+answers its operand.
+
+`validateValue` checks a value where it is written: an Argument, a receiver, a default, a String hole, a member of a
+Record, a List or a Dictionary, a Case payload, a declaration's value, a `<-`, a `define` arm, and a `start` or
+`complete` operand. A callee is called rather than written as a value, so a name or a static path is not walked. Any
+other callee is walked as an Expression, and a Lookup callee's base is checked as a value. The enricher's own checks
+on such a value stand down through `isReportedValue`: a default's mismatch, a hole's `Printable` bound, a receiver's
+Namespace lookup, a callee that is no Function, and the Warning on a needless `start` or `complete`.
 
 ## Match
 

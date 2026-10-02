@@ -251,6 +251,27 @@ describe("A Function literal outside Argument position", () => {
 	}`),
 		).toBe(true)
 	})
+
+	// A Function refused as a value has no Type to write, so the Help asks for
+	// the one meant. Written, the refusal is the one report left.
+	it("spells no Type for a body answering with a Function refused as a value", () => {
+		let source = `implementation {
+		constant pick = () { <- Integer.add }
+	}`
+
+		expect(codesOfSource(source)).toEqual([
+			"missing-return-type",
+			"overloaded-function-value",
+		])
+		expect(helpsOfCode(source, "missing-return-type")).toEqual([
+			"Write the return Type after the Parameter list — '-> <Type>', naming what this body's '<-' answers with.",
+		])
+		expect(
+			codesOfSource(`implementation {
+		constant pick = () -> (_: Integer, _: Integer) -> Integer { <- Integer.add }
+	}`),
+		).toEqual(["overloaded-function-value"])
+	})
 })
 
 describe("A Namespace specifier that names something else", () => {
