@@ -168,7 +168,7 @@ function collectInto(
 			return
 		case "IfStatement":
 		case "IfElseStatement":
-			collectInto(node.condition, found)
+			collectCondition(node.condition, found)
 			return
 		// A declaration evaluates nothing where it stands.
 		case "FunctionStatement":
@@ -284,6 +284,77 @@ function collectArguments(
 ) {
 	for (let argument of nodeArguments) {
 		collectInto(argument.value, found)
+	}
+}
+
+// A condition narrows the names it proves something about, and a Constant
+// holding its answer proves nothing. See "Extracting a Constant" in
+// DEVELOPMENT.md.
+function collectCondition(
+	condition: parser.ExpressionNode,
+	found: Set<parser.ImplementationNode>,
+) {
+	if (!mayNarrow(condition)) {
+		collectInto(condition, found)
+	} else if (isConjunction(condition)) {
+		collectCondition(condition.base, found)
+		collectCondition(condition.arguments[0].value, found)
+	} else {
+		collectParts(condition, found)
+	}
+}
+
+// Wider than the Enricher's `conditionEvidence`, which also needs the
+// Method's Namespace and a Constant receiver.
+function mayNarrow(node: parser.ExpressionNode): boolean {
+	if (node.nodeType !== "MethodInvocation") {
+		return false
+	}
+
+	if (
+		isConjunction(node) &&
+		(mayNarrow(node.base) || mayNarrow(node.arguments[0].value))
+	) {
+		return true
+	}
+
+	return (
+		isNarrowable(node.base) &&
+		node.arguments.every((argument) => isPredicateLiteral(argument.value))
+	)
+}
+
+function isConjunction(
+	node: parser.ExpressionNode,
+): node is parser.MethodInvocationNode {
+	return (
+		node.nodeType === "MethodInvocation" &&
+		node.member.content === "and" &&
+		node.arguments.length === 1
+	)
+}
+
+// A name, `@`, or a member read off `@`.
+function isNarrowable(node: parser.ExpressionNode): boolean {
+	return node.nodeType === "Identifier" || readsSelf(node)
+}
+
+function readsSelf(node: parser.ExpressionNode): boolean {
+	return (
+		node.nodeType === "Self" ||
+		(node.nodeType === "Lookup" && readsSelf(node.base))
+	)
+}
+
+function isPredicateLiteral(node: parser.ExpressionNode): boolean {
+	switch (node.nodeType) {
+		case "IntegerValue":
+		case "RationalValue":
+		case "StringValue":
+		case "BooleanValue":
+			return true
+		default:
+			return false
 	}
 }
 

@@ -117,6 +117,13 @@ as a name or a Lookup is entered too: a Method taken as a value loses its defaul
 Parameters is refused as a value. A callee that a call answers, as `adder(1)` in `adder(1)(2)`, is a Function value
 already, and is collected.
 
+An `if` condition narrows the names it proves something about, and a Constant holding its answer proves nothing. So
+`collectCondition` leaves out a condition that may prove something, each `::and` holding such a conjunct, and the
+conjunct itself. `mayNarrow` reads the shape `conditionEvidence` reads: a Method call on a name, `@` or a member of
+`@`, with literal Arguments. It cannot tell a Constant from a Variable, or which Namespace answered, so it leaves a
+condition alone whenever the Enricher might narrow on it. See "Narrowing" in
+packages/compiler/src/enricher/DEVELOPMENT.md.
+
 `readsResolveAbove` checks that every name the Expression reads is in scope where the Constant will stand, since
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match
 with a `case #Value(item)` can be lifted. Every Expression `collectEager` reaches is read where the Statement

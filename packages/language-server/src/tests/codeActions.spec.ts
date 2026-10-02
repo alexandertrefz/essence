@@ -8013,6 +8013,76 @@ describe("Extract to a Constant", () => {
 		)
 	})
 
+	// A branch reads `n` as the refinement its condition proved, and a
+	// Constant holding the condition's answer proves nothing about `n`.
+	it("offers nothing for a condition that narrows, or any of its conjuncts", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction doubled(_ n: NonZeroInteger) -> Integer {",
+			"\t\t<- n::multiply(with 2)",
+			"\t}",
+			"",
+			"\tfunction doubledOrZero(_ n: Integer) -> Integer {",
+			"\t\tif n::isNot(0)::and(n::isLessThan(10)) {",
+			"\t\t\t<- doubled(n)",
+			"\t\t}",
+			"",
+			"\t\t<- 0",
+			"\t}",
+			"",
+			"\tfunction shout(_ text: String) -> String {",
+			"\t\tif text::isEmpty() {",
+			'\t\t\t<- ""',
+			"\t\t} else {",
+			"\t\t\t<- exclaimed(text)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction exclaimed(_ text: NonEmptyString) -> String {",
+			'\t\t<- text::append("!")',
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+
+		for (let condition of [
+			"n::isNot(0)::and(n::isLessThan(10))",
+			"n::isNot(0)",
+			"n::isLessThan(10)",
+			"text::isEmpty()",
+		]) {
+			expect(extractions(lines, rangeOf(lines, condition))).toEqual([])
+		}
+	})
+
+	// `limit` is no literal, so the condition proves nothing.
+	it("lifts a condition that proves nothing", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction capped(_ n: Integer, _ limit: Integer) -> Integer {",
+			"\t\tif n::isGreaterThan(limit) {",
+			"\t\t\t<- limit",
+			"\t\t}",
+			"",
+			"\t\t<- n",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(
+			lines,
+			rangeOf(lines, "n::isGreaterThan(limit)"),
+		)
+		let result = applied(lines, action)
+
+		expect(result.slice(2, 4)).toEqual([
+			"\t\tconstant isGreaterThan = n::isGreaterThan(limit)",
+			"\t\tif isGreaterThan {",
+		])
+		expectRefactored(lines, result)
+	})
+
 	// A Method taken as a value loses its defaults, and one with Protocol-bound
 	// Type Parameters is refused as a value.
 	it("offers nothing for a callee, but lifts the whole call", () => {
