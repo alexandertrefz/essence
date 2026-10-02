@@ -286,6 +286,12 @@ Choice of this file it reaches must be published, like a name.
 A Declaration that shares its name with another of this file, as a `type X` and its `namespace X for X` do, is not
 moved. One export entry publishes both, so an importer would lose whichever half stayed behind.
 
+Another Module names the Declaration by the name this file publishes it under, its `as` where the export entry has
+one. The landing Module publishes it under the same `as`, so every entry keeps the name it writes. A Declaration this
+file publishes under two names is not moved. A destination that imports it under a name other than its own is not
+offered, since its entry goes and its reads of that name would name nothing. Nor is one that already binds or
+publishes the name it is published under, whose importers would then read the destination's own.
+
 The destinations are the other Modules in the same directory, plus a new Module named after the Declaration where
 no such file exists. A Module further away is not offered, since the move a reader means is nearly always into a
 file they can see. A Module that forwards the name is not offered either. Moving the Declaration into it would turn
@@ -314,7 +320,8 @@ The edits follow from who still names the Declaration:
 - The landing Module publishes it whenever anything still names it: another Module, this file's own body or
   export block.
 - An import of it in the landing Module is dropped, since a Module does not import what it declares.
-- This file stops publishing it, and imports it back where its body still reads it.
+- This file stops publishing it, and imports it back where its body still reads it, by the published name with an
+  `as` for its own.
 - The landing Module imports what the Statement read through this file's imports. This file drops an entry that
   nothing outside the Statement uses, by name or by a use the typed tree records. An entry for a Choice stays, since
   the Choice's derived Methods need it where the typed tree records nothing.

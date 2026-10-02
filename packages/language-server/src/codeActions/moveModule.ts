@@ -122,6 +122,8 @@ type Move = {
 	// The edit that stops this Module publishing it, or null where it never
 	// did.
 	unpublish: CodeActionEdit | null
+	// The `as` this Module publishes it under, which the destination keeps.
+	alias: string | null
 	usedHere: boolean
 	namings: Array<Naming>
 	// The Namespaces the move brings into the destination, and the calls the
@@ -243,14 +245,18 @@ function movableAt(
 
 		let name = declared.name.content
 		let exports = program.exports
-		let exportEntry =
-			exports === null
-				? null
-				: (exports.entries.find(
-						(entry) =>
-							entry.source === null &&
-							entry.name.content === name,
-					) ?? null)
+		let exportEntries = (exports?.entries ?? []).filter(
+			(entry) => entry.source === null && entry.name.content === name,
+		)
+
+		// The destination publishes it under one name, which every entry
+		// naming it is pointed at.
+		if (exportEntries.length > 1) {
+			return null
+		}
+
+		let exportEntry = exportEntries[0] ?? null
+		let alias = exportEntry?.alias?.content ?? null
 
 		return {
 			context,
@@ -271,11 +277,13 @@ function movableAt(
 				exports === null || exportEntry === null
 					? null
 					: unpublishEdit(lines, exports, exportEntry),
+			alias,
 			usedHere: usedOutside(index, declared.name.position, {
 				span,
 				exportEntry,
 			}),
-			namings: namingsOf(context, name),
+			// Another Module names it by the name this one publishes it under.
+			namings: namingsOf(context, alias ?? name),
 			...namespacesBrought(
 				context,
 				statement,
@@ -1497,6 +1505,11 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	let otherNamings = move.namings.filter(
 		(naming) => naming.filePath !== target.filePath,
 	)
+
+	if (bindsPublishedName(move, target, landingNamings)) {
+		return null
+	}
+
 	// The destination publishes it while anything still names it: another
 	// Module, this file's body, or this file's export block.
 	let publish =
@@ -1505,6 +1518,7 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 
 	if (
 		imports === null ||
+		readsUnderAnotherName(move, landingNamings) ||
 		importsEachOther(move, target, imports, landingNamings) ||
 		namespacesCollide(move, target, landingNamings)
 	) {
@@ -1532,12 +1546,20 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 			move.imports
 				.filter((read) => !read.keptHere)
 				.map((read) => read.entry),
-			move.usedHere ? [{ name: move.name, alias: null, specifier }] : [],
+			move.usedHere
+				? [
+						{
+							name: move.alias ?? move.name,
+							alias: move.alias === null ? null : move.name,
+							specifier,
+						},
+					]
+				: [],
 		),
 	)
 
 	for (let naming of otherNamings) {
-		edits.push(...retargetEdits(move, naming, target.filePath))
+		edits.push(...retargetEdits(naming, target.filePath))
 	}
 
 	return {
@@ -1551,6 +1573,54 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 		isPreferred: false,
 		edits,
 	}
+}
+
+// Whether the destination already binds or publishes the name the Declaration
+// is published under. Its importers would then read the destination's own.
+function bindsPublishedName(
+	move: Move,
+	target: Target,
+	landingNamings: Array<Naming>,
+): boolean {
+	let program = target.program
+	let published = move.alias ?? move.name
+
+	if (program === null || published === move.name) {
+		return false
+	}
+
+	let dropped = new Set<unknown>(
+		landingNamings.flatMap((naming) =>
+			naming.entries.map((named) => named.entry),
+		),
+	)
+
+	return (
+		topLevelNames(program).has(published) ||
+		(program.imports?.entries ?? []).some(
+			(entry) =>
+				!dropped.has(entry) &&
+				(entry.alias ?? entry.name).content === published,
+		) ||
+		(program.exports?.entries ?? []).some(
+			(entry) => (entry.alias ?? entry.name).content === published,
+		)
+	)
+}
+
+// Whether the destination imports it under a name other than its own. That
+// entry goes, and the reads of the local name would name nothing.
+function readsUnderAnotherName(
+	move: Move,
+	landingNamings: Array<Naming>,
+): boolean {
+	return landingNamings.some((naming) =>
+		naming.entries.some(
+			(named) =>
+				named.section === "imports" &&
+				(named.entry.alias ?? named.entry.name).content !== move.name,
+		),
+	)
 }
 
 // Whether this Module and the destination would import each other. See
@@ -1674,7 +1744,7 @@ function landingEdits(
 	if (publish) {
 		let edit = insertExportEdit(sourceText, program, {
 			name: move.name,
-			alias: null,
+			alias: move.alias,
 			specifier: null,
 		})
 
@@ -1809,7 +1879,12 @@ function moduleText(
 	publish: boolean,
 	imports: Array<ImportEntry>,
 ): string {
-	let exported = publish ? `\nexport {\n\t${move.name}\n}\n` : ""
+	let published = spellName({
+		name: move.name,
+		alias: move.alias,
+		specifier: "",
+	})
+	let exported = publish ? `\nexport {\n\t${published}\n}\n` : ""
 	let imported = imports.length === 0 ? "" : `${importBlock(imports, "")}\n`
 
 	return `${imported}implementation {\n${move.text}\n}\n${exported}`
@@ -1818,7 +1893,6 @@ function moduleText(
 // Points another Module's entries at the destination. A group of only this
 // name gets a new specifier; a shared entry moves to the destination's group.
 function retargetEdits(
-	move: Move,
 	naming: Naming,
 	targetPath: string,
 ): Array<CodeActionEdit> {
@@ -1837,18 +1911,20 @@ function retargetEdits(
 			continue
 		}
 
+		// The entry names the Declaration by the name it is published under.
+		let name = named.entry.name.content
 		let alias = named.entry.alias?.content ?? null
 		let insertion =
 			named.section === "imports"
 				? insertImportEdit(naming.sourceText, naming.program, {
-						name: move.name,
+						name,
 						alias,
 						specifier,
 					})
 				: insertExportEdit(
 						naming.sourceText,
 						naming.program,
-						{ name: move.name, alias, specifier },
+						{ name, alias, specifier },
 						named.entry,
 					)
 

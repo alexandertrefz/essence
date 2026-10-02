@@ -4466,6 +4466,236 @@ describe("Workspace", () => {
 				)
 			})
 
+			// An importer names the Declaration by the name it is published
+			// under, which the landing Module publishes it under too.
+			it("should carry an `as` the Declaration is published under", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring.replace(
+						"\tdouble\n",
+						"\tdouble as twice\n",
+					),
+					"B.es": target,
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { twice }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(twice(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+					"Other.es": [
+						"import {",
+						'\tfrom "./A.es" { twice as doubled }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(doubled(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					["implementation {", "}", ""].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"implementation {",
+						"\tconstant one = 1",
+						"",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble as twice",
+						"\tone",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { twice }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(twice(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Other.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { twice as doubled }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(doubled(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				for (let name of ["B.es", "Main.es", "Other.es"]) {
+					expect(codesAfter(workspace, texts, pathOf(name))).toEqual(
+						[],
+					)
+				}
+			})
+
+			it("should import a Declaration published under an `as` back by that name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction double(_ value: Integer) -> Integer {",
+						"\t\t<- value::multiply(with 2)",
+						"\t}",
+						"",
+						"\tfunction quadruple(_ value: Integer) -> Integer {",
+						"\t\t<- double(double(value))",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tdouble as twice",
+						"\tquadruple",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": target,
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { quadruple twice }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(quadruple(twice(1))::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { twice as double }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction quadruple(_ value: Integer) -> Integer {",
+						"\t\t<- double(double(value))",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tquadruple",
+						"}",
+						"",
+					].join("\n"),
+				)
+				// The shared group loses the entry, which joins a group for the
+				// landing Module under the published name.
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./A.es" { quadruple }',
+						'\tfrom "./B.es" { twice }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(quadruple(twice(1))::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				for (let name of ["A.es", "B.es", "Main.es"]) {
+					expect(codesAfter(workspace, texts, pathOf(name))).toEqual(
+						[],
+					)
+				}
+			})
+
+			// Its entry there goes, and the reads of its local name with it.
+			it("should not move a Declaration into a Module that imports it under another name", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring.replace(
+						"\tdouble\n",
+						"\tdouble as twice\n",
+					),
+					"B.es": [
+						"import {",
+						'\tfrom "./A.es" { twice }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(twice(2)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 2, "double").map(
+						(action) => action.title,
+					),
+				).toEqual(["Move 'double' to a new Module"])
+			})
+
+			// B's own `twice` would answer every importer of A's.
+			it("should not move a Declaration into a Module that already publishes its `as`", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring.replace(
+						"\tdouble\n",
+						"\tdouble as twice\n",
+					),
+					"B.es": [
+						"implementation {",
+						"\tfunction twice(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(1)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\ttwice",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 2, "double").map(
+						(action) => action.title,
+					),
+				).toEqual(["Move 'double' to a new Module"])
+			})
+
 			// A file the action writes, which the Server turns into a resource
 			// operation.
 			it("should offer a Module named after the Declaration", () => {
