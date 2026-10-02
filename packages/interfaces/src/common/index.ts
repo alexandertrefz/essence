@@ -442,6 +442,7 @@ export type DiagnosticCode =
 	| "unknown-documentation-parameter"
 	| "misnamed-documentation-parameter"
 	| "undocumented-parameter"
+	| "nested-example"
 	// Modules: specifiers, the files they name, and the graph.
 	| "invalid-module-specifier"
 	| "module-not-found"

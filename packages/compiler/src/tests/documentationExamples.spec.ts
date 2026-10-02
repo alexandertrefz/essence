@@ -7,6 +7,7 @@ import { hasDocumentationExamples } from "../enricher/examples"
 import { enrich } from "../enricher/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // `@example` blocks, and the tests they become. What is written under the tag
 // is compiled in the file's own scope, at the lines it was written on. So an
@@ -306,5 +307,118 @@ describe("What an @example becomes", () => {
 			"expect-not-boolean",
 		])
 		expect(diagnostics[0]?.position?.start.line).toBe(5)
+	})
+})
+
+describe("Where an @example runs", () => {
+	// The `examples` suite stands inside the tests section, so an example on
+	// the section's own declarations sees its setup.
+	it("runs an example on a declaration of the tests section", () => {
+		expect(
+			namesOf(
+				sectionOf(`implementation {}
+
+				tests {
+					constant base = 1
+
+					§§ @example
+					§§   expect plusBase(1)::is(2)
+					function plusBase(_ value: Integer) -> Integer {
+						<- value::add(base)
+					}
+
+					test "adds the base" {
+						expect plusBase(2)::is(3)
+					}
+				}`),
+			),
+		).toEqual(["adds the base", "plusBase example"])
+	})
+
+	// `inner` reads `n`, and `shifted` reads `offset`, which only their
+	// enclosing body and suite declare.
+	it("reports an example on a nested declaration rather than running it", () => {
+		let source = `implementation {
+			function outer(_ n: Integer) -> Integer {
+				§§ @example
+				§§   expect inner(1)::is(2)
+				function inner(_ m: Integer) -> Integer {
+					<- m::add(n)
+				}
+
+				<- inner(1)
+			}
+		}
+
+		tests {
+			suite "grouped" {
+				constant offset = 3
+
+				§§ @example
+				§§   expect shifted(1)::is(4)
+				function shifted(_ m: Integer) -> Integer {
+					<- m::add(offset)
+				}
+
+				test "shifts" {
+					expect shifted(1)::is(4)
+				}
+			}
+		}`
+		let enriched = enrich(parse(source), { tests: true, source })
+
+		expect(
+			enriched.diagnostics.map((diagnostic) => [
+				diagnostic.code,
+				diagnostic.severity,
+				diagnostic.message,
+				diagnostic.position?.start.line,
+			]),
+		).toEqual([
+			[
+				"nested-example",
+				"warning",
+				"This '@example' of 'inner' never runs",
+				3,
+			],
+			[
+				"nested-example",
+				"warning",
+				"This '@example' of 'shifted' never runs",
+				17,
+			],
+		])
+		expect(
+			enriched.diagnostics.flatMap((diagnostic) => diagnostic.helps),
+		).toEqual([
+			"Show it through an '@example' on the top-level declaration 'inner' is nested in, or remove the '@example' tag to keep these lines as prose.",
+			"Write it as a test where 'shifted' is in scope, or remove the '@example' tag to keep these lines as prose.",
+		])
+		expect(namesOf(enriched.program.tests)).toEqual(["shifts"])
+
+		// Each Help's second half, followed: the lines stay as prose.
+		let followed = source.replaceAll(/\t*§§ @example\n/g, "")
+
+		expect(
+			enrich(parse(followed), { tests: true, source: followed })
+				.diagnostics,
+		).toEqual([])
+		expect(compiles(followed, { tests: true })).toBe(true)
+	})
+
+	it("says nothing about a nested example to a compile without the tests", () => {
+		let source = `implementation {
+			function outer(_ n: Integer) -> Integer {
+				§§ @example
+				§§   expect inner(1)::is(2)
+				function inner(_ m: Integer) -> Integer {
+					<- m::add(n)
+				}
+
+				<- inner(1)
+			}
+		}`
+
+		expect(enrich(parse(source), { source }).diagnostics).toEqual([])
 	})
 })

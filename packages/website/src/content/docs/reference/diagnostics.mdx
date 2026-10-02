@@ -5170,6 +5170,36 @@ Quick Fix: **Add a '@param by' line**.
 
 Taught on: [Documentation comments › `undocumented-parameter`](/docs/language/documentation-comments#undocumented-parameter)
 
+### `nested-example`
+
+**Warning.** An `@example` documents a declaration nested inside a body, a suite or a test. Examples run beside the file's top-level declarations, where a nested one is not in scope, so this one never runs.
+
+<div class="error-output">
+
+```
+[nested-example]
+Warning: This '@example' of 'counted' never runs
+   ╭─┤ Total.es:3:3 │
+   │
+ 2 │     function total(of price: Integer, times quantity: Integer) -> Integer {
+   │              ──┬──  
+   │                ╰──── 'counted' is declared inside this
+ 3 │        §§ @example
+   │        ─────┬─────  
+   │             ╰─────── no test is made from this example
+   │ 
+   │ Help: Show it through an '@example' on the top-level declaration 'counted' is nested in, or remove the '@example' tag to keep these lines as prose.
+   │ 
+   │ Note: An '@example' runs as a test beside the file's top-level declarations, and a nested declaration is in scope only inside what declares it.
+───╯
+```
+
+</div>
+
+Show the behaviour through an example on `total`, or remove the `@example` line so the code stays in the block as prose. Inside a suite or a test, write the example as a test there.
+
+Taught on: [Documentation comments › Examples that run](/docs/language/documentation-comments#examples-that-run)
+
 ## Modules
 
 Importing, exporting, and the graph of files.

@@ -1,9 +1,10 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { report } from "../diagnostics/index"
+import { primary, report, reportWarning, secondary } from "../diagnostics/index"
 import { patternBindings } from "../helpers/patterns"
 import { parseTestBody } from "../parser/descent/parse"
 import { documentationPrefix } from "../parser/documentation"
+import { forEachParserChild, type ParserNode } from "../visitor/index"
 
 // `@example` blocks become tests in a synthetic `examples` suite, compiled in
 // the file's own scope. An example that drifts from its code fails a run.
@@ -31,6 +32,8 @@ export function exampleTestsOf(
 	}
 
 	let found = findExamples(program)
+
+	reportNestedExamples(program, found)
 
 	if (found.length === 0) {
 		return []
@@ -135,9 +138,10 @@ function stripPrefix(line: string): string {
 	return body.startsWith(" ") ? body.slice(1) : body
 }
 
-// Every `@example` a Program's own declarations carry, in written order: a
+// Every `@example` the top-level declarations carry, in written order: a
 // declaration's own block, then each of its Parameters'. A Namespace's or a
-// Protocol's Methods are named `Namespace::member`, static or not.
+// Protocol's Methods are named `Namespace::member`, static or not. The tests
+// section's setup counts, since the `examples` suite stands inside it.
 function findExamples(program: parser.Program): Array<FoundExample> {
 	let found: Array<FoundExample> = []
 
@@ -152,7 +156,7 @@ function findExamples(program: parser.Program): Array<FoundExample> {
 		}
 	}
 
-	for (let node of program.implementation.nodes) {
+	for (let node of topLevelNodes(program)) {
 		switch (node.nodeType) {
 			case "FunctionStatement":
 				add(
@@ -189,6 +193,11 @@ function findExamples(program: parser.Program): Array<FoundExample> {
 	}
 
 	return found
+}
+
+// The implementation's nodes, then the tests section's.
+function topLevelNodes(program: parser.Program): Array<parser.TestsNode> {
+	return [...program.implementation.nodes, ...(program.tests?.nodes ?? [])]
 }
 
 type AddExamples = (
@@ -288,3 +297,91 @@ function protocolExamples(
 		}
 	}
 }
+
+// #region Nested examples
+
+// A declaration nested in a body, a test or a suite may read what its
+// enclosing item declares, which the `examples` suite can not see. Its
+// examples are reported rather than run.
+function reportNestedExamples(
+	program: parser.Program,
+	found: Array<FoundExample>,
+): void {
+	let reachable = new Set(found.map((entry) => entry.example))
+
+	for (let outer of topLevelNodes(program)) {
+		let visit = (node: ParserNode, name: string | null): void => {
+			let own = nestedName(node) ?? name
+
+			for (let example of examplesOn(node)) {
+				if (!reachable.has(example)) {
+					reportNestedExample(
+						example,
+						own ?? "this declaration",
+						outer,
+					)
+				}
+			}
+
+			forEachParserChild(node, (child) => visit(child, own))
+		}
+
+		visit(outer, null)
+	}
+}
+
+function reportNestedExample(
+	example: common.DocumentationExample,
+	name: string,
+	outer: parser.TestsNode,
+): void {
+	let position = example.tag?.position ?? example.position
+	let inTestOrSuite = outer.nodeType === "Test" || outer.nodeType === "Suite"
+	let outerName =
+		"name" in outer && outer.name !== null && "position" in outer.name
+			? outer.name.position
+			: null
+
+	reportWarning(`This '@example' of '${name}' never runs`, position, {
+		code: "nested-example",
+		labels: [
+			primary(position, "no test is made from this example"),
+			...(outerName === null
+				? []
+				: [secondary(outerName, `'${name}' is declared inside this`)]),
+		],
+		notes: [
+			"An '@example' runs as a test beside the file's top-level declarations, and a nested declaration is in scope only inside what declares it.",
+		],
+		helps: [
+			inTestOrSuite
+				? `Write it as a test where '${name}' is in scope, or remove the '@example' tag to keep these lines as prose.`
+				: `Show it through an '@example' on the top-level declaration '${name}' is nested in, or remove the '@example' tag to keep these lines as prose.`,
+		],
+	})
+}
+
+function examplesOn(node: ParserNode): Array<common.DocumentationExample> {
+	return "documentation" in node ? (node.documentation?.examples ?? []) : []
+}
+
+// The name a nested declaration is reported under. A Function's block sits on
+// its definition and its Parameters, which inherit the name.
+function nestedName(node: ParserNode): string | null {
+	switch (node.nodeType) {
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
+		case "ProtocolDeclarationStatement":
+		case "NamespaceDefinitionStatement":
+			return node.name.content
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+			return declaredName(node.name)
+		default:
+			return null
+	}
+}
+
+// #endregion

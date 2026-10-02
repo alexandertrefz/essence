@@ -280,6 +280,8 @@ JSDoc has `@example` too, but nothing runs it. Here each example is a test, and 
 
 An example is the body of a test. It may declare constants, and it checks results with [`expect` and `require`](/docs/language/tests). It runs in the file's own scope, so it can call anything the file declares, whether or not it is [exported](/docs/language/modules). A file needs no `tests` block for its examples to run. Tests covers suites and both assertions.
 
+An example on a declaration of the `tests` block runs too, and reads the block's constants. A declaration nested inside a function, a suite or a test is in scope only there, so its example can not run, and the compiler warns with [`nested-example`](/docs/reference/diagnostics#nested-example).
+
 The lines are usually indented two spaces, which sets them apart from the prose. The compiler reads every line up to the next tag either way.
 
 When an example fails, the report points at the line inside the comment:
