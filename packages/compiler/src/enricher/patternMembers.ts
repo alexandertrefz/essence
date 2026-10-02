@@ -2,12 +2,52 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError } from "../diagnostics/index"
 import { describeType } from "../helpers/describe"
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import { closestMatch } from "../helpers/suggest"
-import { flattenUnionMembers } from "../helpers/types"
+import { flattenUnionMembers, typeContainsError } from "../helpers/types"
+
+// Whether the validator refuses a Match whole, as `match-on-non-union`. Its
+// value is no Union, and it names no values of an Integer or a String.
+export function isOneShapeMatch(
+	node: parser.MatchNode,
+	valueType: common.Type,
+): boolean {
+	let erased = eraseRefinements(valueType)
+	let namesValues =
+		(erased.type === "Integer" || erased.type === "String") &&
+		node.handlers.some(
+			(handler) => handler.matcher.nodeType === "LiteralMatcher",
+		)
+
+	return valueType.type !== "UnionType" && !namesValues
+}
+
+// Whether a Matcher's bare member names nothing an arm of the value carries,
+// as `carried` says. A member written with its Type or its value is a test. It
+// is not reported in a Match `isOneShapeMatch` answers, which is refused whole.
+export function isUnknownMember(
+	member: parser.PatternMemberNode,
+	carried: common.Type,
+	valueType: common.Type,
+	oneShape: boolean,
+): boolean {
+	let unknown =
+		member.kind !== "Value" &&
+		member.type === null &&
+		carried.type === "Unknown" &&
+		valueType.type !== "Unknown" &&
+		!typeContainsError(valueType)
+
+	if (unknown && !oneShape) {
+		reportUnknownPatternMember(member.name, valueType)
+	}
+
+	return unknown
+}
 
 // A Pattern naming a member no arm of the value carries, reported as
 // `reportUnknownMember` reports it for a Lookup.
-export function reportUnknownPatternMember(
+function reportUnknownPatternMember(
 	name: parser.IdentifierNode,
 	valueType: common.Type,
 ): void {

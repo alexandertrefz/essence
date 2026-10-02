@@ -1202,13 +1202,18 @@ function validateIdentifier(
 // runtime Matcher is a hole, and the parser read it whole. See "Holes" in
 // DEVELOPMENT.md.
 function matchIsJudgeable(node: common.typed.MatchNode): boolean {
+	// The runtime Matchers, where a requirement naming an undeclared member
+	// leaves its hole.
+	let holes = node.handlers.map(runtimeMatcherOf).filter(typeContainsError)
+
+	// A Pattern's hole leaves a Match over no Union, and no literal Match, to
+	// its own refusal. A Case Matcher's hole does not.
 	return (
 		!typeContainsError(node.value.type) &&
-		// The runtime Matcher, where a requirement naming an undeclared
-		// member leaves its hole.
-		!node.handlers.some((handler) =>
-			typeContainsError(runtimeMatcherOf(handler)),
-		) &&
+		(holes.length === 0 ||
+			(node.value.type.type !== "UnionType" &&
+				!isLiteralMatch(node) &&
+				holes.some((hole) => hole.type !== "Error"))) &&
 		!partiallyRead(node.position)
 	)
 }
@@ -1476,14 +1481,12 @@ function validateDefine(
 
 	for (let arm of node.arms) {
 		checkDefineAnswer(node, arm.value)
-		validateExpression(arm.value)
 
 		// An arm's Condition must be a Boolean, as an `if`'s must.
 		validateCondition(arm.condition, "A Define Condition")
 	}
 
 	checkDefineAnswer(node, node.otherwise.value)
-	validateExpression(node.otherwise.value)
 
 	return node
 }
@@ -1510,13 +1513,13 @@ function reportCaselessDefine(node: common.typed.DefineNode): void {
 }
 
 // Every arm is held to the `define`'s answer Type, and reported at its value
-// with the code a `<-` gets. An arm is a value, so a Function refused as one
-// is reported here.
+// with the code a `<-` gets. An arm is a value, so it is validated as one
+// here.
 function checkDefineAnswer(
 	node: common.typed.DefineNode,
 	value: common.typed.ExpressionNode,
 ): void {
-	validateNoBoundFunctionValue(value)
+	validateValue(value)
 
 	if (fitsExpectedType(node.type, value)) {
 		return

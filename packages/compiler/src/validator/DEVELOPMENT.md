@@ -162,8 +162,11 @@ An Error Type is a hole the enricher left where it reported a mistake. A check m
 mistake again, in words about the wrong thing. So checks stand down where what they judge contains an Error. A
 Signature holding one measures no call. A hole in a positional Argument shifts every Argument after it, so the whole
 call stands down. A labelled hole shifts nothing, and the rest of the call is still measured. A Match whose value or
-runtime Matchers hold a hole gets no exhaustiveness or reachability verdict. The Handlers' bodies are still walked,
-since a mistake inside one is its own.
+runtime Matchers hold a hole gets no exhaustiveness or reachability verdict. A Match over no Union that is no
+literal Match is still `match-on-non-union` when a Pattern's Matcher holds one, since that refusal reads only the
+value and the enricher left the Pattern's member unreported for it. A Case Matcher's hole stands it down, since
+its `unknown-case` is that Match's report. The Handlers' bodies are still walked, since a mistake inside one is its
+own.
 
 `fitsExpectedType` answers a hole on either side as a fit. Every position that measures a written value against a
 written Type asks it: an annotation, an assignment, a `<-` and a `define` arm. The two sides are asked different

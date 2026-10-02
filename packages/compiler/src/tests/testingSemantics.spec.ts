@@ -862,6 +862,30 @@ describe("Tests Section Semantics", () => {
 			).toEqual([])
 		})
 
+		// An assertion is no Match, so nothing refuses it whole: a member the
+		// value's Type leaves out is the mistake, whatever the value carries.
+		it("should report a member the value's Type leaves out", () => {
+			expect(
+				codesOf(
+					`implementation {
+						constant point = { x = 1, y = 2 }
+						constant full = { x = 1, z = 5 }
+						constant narrowed: { x: Integer } = full
+					}
+
+					tests {
+						test "one" {
+							require { z } = point
+							require { z as kept } = narrowed
+
+							expect z::is(1)
+							expect kept::is(5)
+						}
+					}`,
+				),
+			).toEqual(["unknown-member", "unknown-member"])
+		})
+
 		it("should hold what it asserted under one name", () => {
 			let section = sectionOf(
 				`implementation {

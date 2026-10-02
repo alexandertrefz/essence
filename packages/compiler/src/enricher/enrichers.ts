@@ -101,7 +101,7 @@ import {
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
-import { reportUnknownPatternMember } from "./patternMembers"
+import { isOneShapeMatch, isUnknownMember } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import {
 	checkProtocolConformance,
@@ -3310,13 +3310,15 @@ type ResolvedMatcher = {
 
 // `handledMatchers` is what earlier arms retired, which a wildcard stands for.
 // An assertion hands an empty list. `armIndex` lets a Match on a Future report
-// its subject on the first arm only.
+// its subject on the first arm only. `oneShape` is `isOneShapeMatch`, which an
+// assertion never is.
 function resolveMatcher(
 	node: parser.MatcherNode,
 	valueType: common.Type,
 	handledMatchers: Array<common.Type>,
 	scope: enricher.Scope,
 	armIndex = 0,
+	oneShape = false,
 ): ResolvedMatcher {
 	if (node.nodeType === "LiteralMatcher") {
 		// A literal Matcher types `@` as the literal's Type.
@@ -3364,6 +3366,8 @@ function resolveMatcher(
 			valueType,
 			scope,
 			literals,
+			[],
+			oneShape,
 		)
 
 		return {
@@ -3599,6 +3603,7 @@ function enrichMatch(
 	// `case 0`, every Handler is reached by a value that is not `0`. See
 	// `refinedSelfType`.
 	let namedValues: Array<common.PredicateConjunct> = []
+	let oneShape = isOneShapeMatch(node, value.type)
 
 	return {
 		nodeType: "Match",
@@ -3619,6 +3624,7 @@ function enrichMatch(
 					handledMatchers,
 					scope,
 					index,
+					oneShape,
 				)
 
 			// Only an unconditional Handler retires a Type for a later
@@ -14653,25 +14659,16 @@ function resolvePatternMatcherType(
 	scope: enricher.Scope,
 	literals: Record<string, common.typed.ExpressionNode>,
 	path: Array<string> = [],
+	oneShape = false,
 ): common.Type {
 	let members: Record<string, common.Type> = {}
 
 	for (let [name, member] of Object.entries(pattern.members)) {
 		let memberPath = [...path, name]
 		let carried = memberTypeOf(valueType, name)
-		// Only a bare member, since one written with its Type or its value is a
-		// structural test. Reported before a nested Pattern is walked, which
-		// would otherwise report its own members against `Unknown`.
-		let unknown =
-			member.kind !== "Value" &&
-			member.type === null &&
-			carried.type === "Unknown" &&
-			valueType.type !== "Unknown" &&
-			!typeContainsError(valueType)
-
-		if (unknown) {
-			reportUnknownPatternMember(member.name, valueType)
-		}
+		// Decided before a nested Pattern is walked, which would otherwise report
+		// its own members against `Unknown`.
+		let unknown = isUnknownMember(member, carried, valueType, oneShape)
 
 		if (member.kind === "Value") {
 			let enrichedValue = enrichExpression(member.value, scope)
@@ -14703,6 +14700,7 @@ function resolvePatternMatcherType(
 				scope,
 				literals,
 				memberPath,
+				oneShape,
 			)
 
 			members[name] = provenPatternType(memberType, nested)

@@ -357,6 +357,11 @@ Type. A bare member no arm declares is a misspelling, as it is in every other Pa
 Record, so the validator gives the Match no verdict, and its binding holds the Error Type (`typeAtPath`), so nothing
 the body does with it is reported again.
 
+A Match over a value that is no Union, and that names no values of an Integer or a String, is the mistake itself
+(`isOneShapeMatch`). The validator reports it as `match-on-non-union` whatever holes its Pattern Matchers leave. So a
+Pattern Matcher in such a Match reports no member (`isUnknownMember` with `oneShape`), nested Patterns included. A
+literal Match and an assertion are not refused whole, so their Patterns report the member.
+
 The typed spelling is offered as a second Help only where the member is read against a Record or a Case, since
 nothing else could pass the test. Under a Case payload's Record reading that holds, and a payload may carry members
 its Case leaves out too. `resolvePayloadRequirements` always keeps the requirement for such a member, since nothing

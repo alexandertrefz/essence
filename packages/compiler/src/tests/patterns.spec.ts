@@ -12,6 +12,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { codesOfSource } from "./followedHelps"
 
 // The full pipeline minus bundling, since every stage has a part in a Pattern.
 function generate(source: string): string {
@@ -235,6 +236,77 @@ describe("Patterns", () => {
 					{ line: 12, column: 13 },
 				],
 			])
+		})
+
+		// A Match over a value of one shape is the mistake, so a member its
+		// Matcher names and the value lacks is no second one.
+		it("reports a Match over no Union once, whatever members its Matchers name", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				function first<infer Item>(_ item: Item) -> Integer {
+					<- match item -> Integer {
+						case { x } { <- x }
+						case _     { <- 0 }
+					}
+				}
+
+				constant point = { x = 1, y = 2 }
+
+				Terminal.print(match point -> Integer {
+					case { z }          { <- z }
+					case { x as { w } } { <- w }
+					case _              { <- 0 }
+				})
+				Terminal.print(first(1))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"match-on-non-union",
+				"match-on-non-union",
+			])
+		})
+
+		// A literal Match takes an Integer apart by its values and is not
+		// refused whole, so a member its Pattern names is the mistake.
+		it("reports a member a literal Match's Pattern names once", () => {
+			expect(
+				codesOfSource(`implementation {
+				constant n = 5
+
+				constant first = match n -> Integer {
+					case 1     { <- 10 }
+					case { z } { <- z }
+				}
+				constant second = match n -> Integer {
+					case 1     { <- 10 }
+					case { z } { <- z }
+					case _     { <- 0 }
+				}
+
+				Terminal.print(first::add(second))
+			}`),
+			).toEqual(["unknown-member", "unknown-member"])
+		})
+
+		// A Case Matcher over no Union is refused by its own `unknown-case`,
+		// which stands the Match's verdict down.
+		it("reports a Case Matcher over no Union once", () => {
+			expect(
+				codesOfSource(`implementation {
+				constant n = 5
+				constant point = { x = 1, y = 2 }
+
+				constant first = match n -> Integer {
+					case #Value { <- 1 }
+					case _      { <- 0 }
+				}
+				constant second = match point -> Integer {
+					case #Value { <- 1 }
+					case _      { <- 0 }
+				}
+
+				Terminal.print(first::add(second))
+			}`),
+			).toEqual(["unknown-case", "unknown-case"])
 		})
 
 		it("offers the member a misspelled one meant", () => {
