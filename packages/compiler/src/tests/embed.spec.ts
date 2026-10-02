@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url"
 import { fixturePath } from "@essence-lang/fixtures"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 
+import { bundle } from "../bundler/index"
 import {
 	carriesDictionary,
 	type Descriptor,
@@ -792,10 +793,10 @@ export {
 			})
 		})
 
-		// A provided Method counts into its Module's table from the prelude,
-		// and the Module imports that counter by name. The name must not
-		// depend on where in a graph the Module stood.
-		it("names a shared Module's coverage counter the same however it was reached", async () => {
+		// A provided Method stands in the Module that declares its Protocol and
+		// counts into that Module's own table. The Module must not depend on
+		// where in a graph it stood.
+		it("writes a shared Module's provided Method the same however it was reached", async () => {
 			let sizing = `implementation {
 	protocol Sized {
 		size() -> Integer
@@ -872,8 +873,111 @@ export {
 
 					expect(one.diagnostics).toEqual([])
 					expect(two.diagnostics).toEqual([])
-					expect(sized(one)).toContain("as $cover }")
+					expect(sized(one)).toContain(
+						"function $cover(point, value)",
+					)
+					expect(sized(one)).toContain("function $es_Sized__doubled(")
 					expect(sized(one)).toBe(sized(two))
+				},
+			)
+		})
+
+		// A host keeps one prelude for every entry, whichever compiled last. A
+		// Protocol's provided Methods live in the Module that declares it, so
+		// neither entry's prelude carries the other's.
+		it("writes one prelude for two entries whose Protocols provide Methods", async () => {
+			let providing = (
+				protocol: string,
+				member: string,
+				factor: number,
+			) =>
+				`implementation {
+	protocol ${protocol} {
+		size() -> Integer
+
+		${member}() -> Integer {
+			<- @::size()::multiply(with ${factor})
+		}
+	}
+
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is ${protocol} {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	function run() -> Integer {
+		constant box: Box = { count = 3 }
+
+		<- box::${member}()
+	}
+}
+
+export {
+	run
+}
+`
+
+			await withProject(
+				{
+					"A.es": providing("Alpha", "twice", 2),
+					"B.es": providing("Beta", "thrice", 3),
+				},
+				async (root) => {
+					let options = { emit: { mode: "host", root } as const }
+					let alpha = await emitToMemory(
+						path.join(root, "A.es"),
+						options,
+					)
+					let beta = await emitToMemory(
+						path.join(root, "B.es"),
+						options,
+					)
+					let prelude = (result: MemoryEmitResult): string =>
+						result.sources.sources.get("essence:$prelude")!
+
+					expect(alpha.diagnostics).toEqual([])
+					expect(beta.diagnostics).toEqual([])
+					expect(prelude(alpha)).toBe(prelude(beta))
+					expect(prelude(beta)).not.toContain("$es_Alpha__twice")
+
+					// The host's one module per path, with the last prelude.
+					let served = new Map([
+						...alpha.sources.sources,
+						...beta.sources.sources,
+					])
+					let answers: Array<unknown> = []
+
+					for (let [index, entry] of [
+						alpha.sources.entry,
+						beta.sources.entry,
+					].entries()) {
+						let bundled = await bundle(
+							{ entry, sources: served },
+							{
+								sourceFileName: "Main.es",
+								outputFileName: path.join(root, "out.mjs"),
+							},
+						)
+
+						expect(bundled.diagnostics).toEqual([])
+
+						let { module } = await importBundle(
+							new TextDecoder().decode(
+								bundled.outputs[0]!.contents,
+							),
+							root,
+							`entry${index}.mjs`,
+						)
+
+						let run = module["run"] as () => { value: unknown }
+
+						answers.push(String(run().value))
+					}
+
+					expect(answers).toEqual(["6", "9"])
 				},
 			)
 		})

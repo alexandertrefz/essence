@@ -35,16 +35,18 @@ import {
 	compilerOwnedNames,
 	escapeName,
 	isJavaScriptIdentifierName,
-	mangledNamePrefix,
 	mangleName,
 } from "./names"
 import {
-	graphProtocolNamespaces,
-	type PreludeCounter,
+	graphProvidedMethods,
+	hoistedCoverageCounter,
 	protocolEntryIdentity,
 	protocolPreludeNamespaces,
+	providedMethodDeclarations,
+	providedMethodExports,
 	type ProvidedMemberIdentifiers,
 	providedMemberIdentifiers,
+	providedMethodImports,
 } from "./providedMethods"
 import { runtimeNamespaceNames } from "./runtimeNamespaces"
 import {
@@ -279,14 +281,14 @@ function rewriteModuleGraph(
 				)
 			: null
 
-	// One table for the whole graph, so a Protocol's provided Method is one
-	// const in the shared prelude Module.
-	let { namespaces: protocolMembers, counters } = graphProtocolNamespaces(
+	// A Module declares its own Protocols' provided Methods, so the prelude
+	// holds the standard library alone. See "Provided Methods in a graph" in
+	// DEVELOPMENT.md.
+	let prelude = stdlibPrelude()
+	let { protocols, providedMembers, homes } = graphProvidedMethods(
 		modules,
-		(filePath) => preludeCounterName(spellings.get(filePath)!),
+		prelude,
 	)
-	let prelude = [...stdlibPrelude(), ...protocolMembers]
-	let providedMembers = providedMemberIdentifiers(prelude)
 
 	return withEmission({ spellings, target, providedMembers }, () => {
 		let freeFunctions = stdlibFreeFunctions()
@@ -296,6 +298,11 @@ function rewriteModuleGraph(
 		let bodies = modules.map((module) => {
 			let { value: body, pool } = collectingConstantPool(() =>
 				withSourcePath(module.filePath, () => [
+					...providedMethodDeclarations(
+						protocols.get(module.filePath)!,
+						providedMembers,
+						withoutConstantPool,
+					),
 					...rewriteImplementationSection(
 						module.program.implementation,
 					),
@@ -306,8 +313,19 @@ function rewriteModuleGraph(
 				]),
 			)
 
-			return { module, body, pool: constantPoolBand(pool, body, body) }
+			let band = constantPoolBand(pool, body, body)
+			let imports = providedMethodImports(
+				referencedNames([body, band]),
+				module.filePath,
+				homes,
+			)
+
+			return { module, body, pool: band, imports }
 		})
+		let exported = providedMethodExports(
+			homes,
+			bodies.map(({ imports }) => imports),
+		)
 
 		let { value: essenceMembers, pool: preludePool } =
 			collectingConstantPool(() =>
@@ -323,12 +341,10 @@ function rewriteModuleGraph(
 			)
 
 		let declared = new Set(essenceMembers.keys())
+		// A provided Method is declared by one Module and imported by the rest.
+		let reachable = new Set([...declared, ...homes.keys()])
 		let sources = new Map<string, string>()
-		let preludeProgram = preludeModule(
-			essenceMembers,
-			preludePool,
-			counters,
-		)
+		let preludeProgram = preludeModule(essenceMembers, preludePool)
 
 		checkEssenceMethodsAreDeclared(preludeProgram, declared)
 		sources.set(PRELUDE_SPECIFIER, generateProgram(preludeProgram))
@@ -339,29 +355,27 @@ function rewriteModuleGraph(
 			(module) => module.program.tests !== null,
 		)
 
-		for (let { module, body, pool } of bodies) {
+		for (let { module, body, pool, imports } of bodies) {
+			let provides = exported.get(module.filePath) ?? []
 			let published = [
 				...moduleExports(module.program, spellings),
+				...(provides.length === 0
+					? []
+					: [namedExport(provides.map((name) => [name, name]))]),
 				...(testRegistry && module.filePath === entryPath
 					? [testEntryPointsExport()]
 					: []),
 			]
 			// Built before `referencedNames`, because the coverage head names
 			// `$testing`.
-			let counter = counters.find(
-				(entry) => entry.modulePath === module.filePath,
-			)
 			let head =
-				counter !== undefined
-					? [
-							namedImport(
-								[[counter.name, COVERAGE_COUNTER]],
-								PRELUDE_SPECIFIER,
-							),
-						]
-					: module.program.coverage === null
-						? []
-						: coverageHead(module.program.coverage, module.filePath)
+				module.program.coverage === null
+					? []
+					: coverageHead(
+							module.program.coverage,
+							module.filePath,
+							protocols.get(module.filePath)!.length > 0,
+						)
 			let names = referencedNames([body, pool, published, head])
 			let preludeNames = [...essenceMembers.keys()].filter((name) =>
 				names.has(name),
@@ -381,6 +395,12 @@ function rewriteModuleGraph(
 								),
 							]),
 					...moduleImports(module.program, spellings),
+					...[...imports].map(([home, imported]) =>
+						namedImport(
+							imported.map((name) => [name, name]),
+							moduleSpecifier(spellings.get(home)!),
+						),
+					),
 					// Above everything else, so a top-level Statement's counter
 					// finds its name bound.
 					...head,
@@ -390,7 +410,7 @@ function rewriteModuleGraph(
 				],
 			}
 
-			checkEssenceMethodsAreDeclared(moduleProgram, declared)
+			checkEssenceMethodsAreDeclared(moduleProgram, reachable)
 			sources.set(
 				moduleSpecifier(spellings.get(module.filePath)!),
 				generateProgram(
@@ -415,28 +435,18 @@ function rewriteModuleGraph(
 function preludeModule(
 	members: Map<string, EssenceMember>,
 	pool: Map<string, PooledConstant>,
-	counters: Array<PreludeCounter>,
 ): estree.Program {
 	let bands = essenceMemberBands(members)
 	let constantPool = constantPoolBand(pool, [bands.functions, bands.values])
-	let heads = counters.flatMap((counter) =>
-		coverageHead(counter.section, counter.modulePath, counter.name),
-	)
-	let names = [...members.keys(), ...counters.map((counter) => counter.name)]
+	let names = [...members.keys()]
 
 	return {
 		type: "Program",
 		sourceType: "module",
 		body: [
 			...runtimeImports(
-				referencedNames([
-					heads,
-					bands.functions,
-					constantPool,
-					bands.values,
-				]),
+				referencedNames([bands.functions, constantPool, bands.values]),
 			),
-			...heads,
 			...bands.functions,
 			...constantPool,
 			...bands.values,
@@ -1175,6 +1185,24 @@ type PooledConstant = { marker: string; value: estree.Expression }
 // rewriting.
 let pooledConstants = new Map<string, PooledConstant>()
 
+// Unset while a graph's provided Method is emitted, which may run before its
+// Module does. See "Provided Methods in a graph" in DEVELOPMENT.md.
+let poolingConstants = true
+
+function withoutConstantPool(
+	method: common.typedSimple.Method,
+): estree.FunctionExpression {
+	let outer = poolingConstants
+
+	poolingConstants = false
+
+	try {
+		return rewriteFunctionExpression(method.method.value)
+	} finally {
+		poolingConstants = outer
+	}
+}
+
 // One pool per emitted module, since a name declared in one module is not in
 // scope in another.
 function collectingConstantPool<Value>(emit: () => Value): {
@@ -1200,6 +1228,10 @@ const POOL_NAME_PREFIX = "$pool_"
 function pooledReference(
 	node: common.typedSimple.PooledReferenceNode,
 ): estree.Expression {
+	if (!poolingConstants) {
+		return rewriteExpression(node.value)
+	}
+
 	let known = pooledConstants.get(node.key)
 
 	if (known === undefined) {
@@ -1613,13 +1645,11 @@ export function reachableEssenceMethods(
 						.get(memberName)!,
 					{
 						kind: "function",
-						declaration: countingInto(protocol.counter, () =>
-							rewriteEssenceMember(
-								provided
-									.get(protocolEntryIdentity(protocol))!
-									.get(memberName)!,
-								method,
-							),
+						declaration: rewriteEssenceMember(
+							provided
+								.get(protocolEntryIdentity(protocol))!
+								.get(memberName)!,
+							method,
 						),
 						...essenceMethodReferences(
 							method.method.value,
@@ -7475,72 +7505,44 @@ function testEntryPointsExport(): estree.ExportNamedDeclaration {
 // counts that every counter in the body calls.
 const COVERAGE_COUNTER = "$cover"
 
-// A counter the prelude binds, named after its Module's spelled path, so every
-// entry of a host's build names it alike. Encoded as `mangleName` encodes.
-function preludeCounterName(spelling: string): string {
-	let encoded = mangleName(spelling).slice(mangledNamePrefix.length)
-
-	return `${COVERAGE_COUNTER}_${encoded}`
-}
-
-// The counter the body being emitted calls, which for a provided Method in the
-// prelude is its declaring Module's.
-let currentCoverageCounter = COVERAGE_COUNTER
-
-function countingInto<Value>(
-	counter: string | undefined,
-	emit: () => Value,
-): Value {
-	let outer = currentCoverageCounter
-
-	currentCoverageCounter = counter ?? COVERAGE_COUNTER
-
-	try {
-		return emit()
-	} finally {
-		currentCoverageCounter = outer
-	}
-}
-
 function coverageCounter(): estree.Identifier {
-	return { type: "Identifier", name: currentCoverageCounter }
+	return { type: "Identifier", name: COVERAGE_COUNTER }
 }
 
 // Binds the counter by registering the Module's table of points, which says
-// what each counter means. It stands above every instrumented Statement.
+// what each counter means. It stands above every instrumented Statement. A
+// Module that declares provided Methods hoists it, as they do.
 function coverageHead(
 	section: common.typedSimple.CoverageSectionNode,
 	modulePath: string | null,
-	name: string = COVERAGE_COUNTER,
+	hoisted: boolean = false,
 ): Array<estree.Statement> {
-	return [
+	let counters = testingCall("counters", [
 		{
-			type: "VariableDeclaration",
-			kind: "const",
-			declarations: [
-				{
-					type: "VariableDeclarator",
-					id: { type: "Identifier", name },
-					init: testingCall("counters", [
-						{
-							type: "ObjectExpression",
-							properties: [
-								property("module", literalOrNull(modulePath)),
-								property(
-									"points",
-									coveragePoints(section.points),
-								),
-								property(
-									"choices",
-									coverageChoices(section.choices),
-								),
-							],
-						},
-					]),
-				},
+			type: "ObjectExpression",
+			properties: [
+				property("module", literalOrNull(modulePath)),
+				property("points", coveragePoints(section.points)),
+				property("choices", coverageChoices(section.choices)),
 			],
 		},
-	]
+	])
+
+	return hoisted
+		? hoistedCoverageCounter(COVERAGE_COUNTER, counters)
+		: [
+				{
+					type: "VariableDeclaration",
+					kind: "const",
+					declarations: [
+						{
+							type: "VariableDeclarator",
+							id: coverageCounter(),
+							init: counters,
+						},
+					],
+				},
+			]
 }
 
 function coveragePoints(

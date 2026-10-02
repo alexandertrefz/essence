@@ -115,8 +115,8 @@ reached consts go into the prelude Module, and each Module imports the ones it n
 every const it holds. The bundler shakes away the ones nothing imports, and deciding per Module would mean
 running the fixed point once per Module.
 
-A Program's own Protocol-provided Methods join the prelude through `protocolPreludeNamespaces`, so one const
-answers for every conformer, wherever the Protocol was declared.
+A lone Program's own Protocol-provided Methods join its prelude through `protocolPreludeNamespaces`, so one
+const answers for every conformer. A graph keeps them out of the prelude. See "Provided Methods in a graph".
 
 The user's code is rewritten before reachability runs, so the fixed point reads the finished estree. By then
 every reference to a bodied member is a plain `Identifier`, however it was written: a call, a witness's
@@ -137,16 +137,17 @@ emit through; the Namespace import is what a Method call on a Future reads.
 
 Every emitted module has the same order:
 
-1. The runtime imports, then the prelude import and the imports of other Modules, for a Module of a graph.
-2. The coverage counters, when the compile asked for coverage, so a top-level Statement's counter finds its
-   name bound. A Module whose provided Methods sit in the prelude imports its counter from there instead. See
-   "Counting provided Methods".
+1. The runtime imports, then, for a Module of a graph, the prelude import, the imports of other Modules, and
+   the imports of the provided Methods other Modules declare.
+2. The coverage counter, when the compile asked for coverage, so a top-level Statement's counter finds its
+   name bound. A Module of a graph that declares provided Methods hoists it. See "Provided Methods in a graph".
 3. The Function-valued prelude members, the pooled constants, then the static Property values. A lone
    Program holds all three. In a graph the prelude Module holds the members, and each Module holds its own
    pooled constants. See "Prelude emission order".
-4. The implementation, then the tests, which read the implementation and which nothing reads.
-5. The exports. When any Module of a graph has tests, the entry also exports the test entry points, because
-   a bundle exports what its entry exports.
+4. The implementation, then the tests, which read the implementation and which nothing reads. In a graph the
+   Module's own provided Methods come first.
+5. The exports. A Module of a graph exports its provided Methods. When any Module of a graph has tests, the
+   entry also exports the test entry points, because a bundle exports what its entry exports.
 
 `moduleImports` groups imports per Module, in the order the source states them. An entry whose name erases,
 such as a Type Alias, a Choice or a Protocol, binds nothing. Its Module must still run before this one, so a
@@ -154,15 +155,29 @@ dependency left without any binding gets a bare `import "…"`. A re-export is a
 `moduleExports` forwards a re-export straight from the Module it names, and an erased entry publishes
 nothing.
 
-### Counting provided Methods
+### Provided Methods in a graph
 
-A provided Method's coverage points are numbered in its declaring Module's table. Its const lives in the
-prelude, where that Module's `$cover` is not in scope. So `graphProtocolNamespaces` gives each instrumented
-Module that declares one a counter of its own, `$cover_` and the Module's spelled path as `mangleName` encodes
-it. A host's build then names it alike from every entry. The prelude binds it with the Module's whole
-table and exports it, and the Module imports it as `$cover`. `countingInto` makes the provided Method's body
-call that name. The prelude is evaluated before any Module that imports it, so the counter is bound before any
-point counts. A lone Program needs none of this, since its prelude and its counter share one file.
+A graph's prelude holds the standard library alone, so a host serves one prelude for every entry. A user
+Protocol's provided Methods belong to the Module that declares the Protocol. `providedMethodDeclarations` emits
+them at the top of that Module's body. `graphProvidedMethods` maps each const to its Module, and a Module that
+names one imports it from there. The declaring Module exports only what another Module imports, so a one-Module
+graph exports nothing of its own making.
+
+A provided Method reads nothing its Module declares, since `provided-method-out-of-reach` refuses that, and the
+emission keeps it so. Inside a cycle, another Module may call one while it loads, before the declaring Module has
+run:
+
+- The Method is a hoisted `function`, so it is bound from the start.
+- Its body writes its constants in place rather than reading the Module's pool. `withoutConstantPool` turns the
+  pool off while the body is emitted.
+- Under coverage the declaring Module's `$cover` is a hoisted `function` too, built by `hoistedCoverageCounter`.
+  It registers the Module's table on its first call. The Module calls it once with no point as it loads, so a
+  table nothing counted into is still reported.
+
+The prelude and the runtime wait for no user Module, so they have run by then.
+
+The imports add no cycle. A Module names a provided Method only where a conformance to the Protocol is in scope,
+and the conformance's Module imports the Protocol's, so the Module depends on it already.
 
 ## Source maps
 
@@ -204,11 +219,11 @@ something names it. An unused native import costs nothing, since esbuild drops i
 names the runtime Methods its body reaches. Once a runtime module is in the bundle, its top-level
 initialisers, such as `Number.Pi`, can not be dropped. A Method left out leaves no trace in the output.
 
-The candidates are every bodied Method, every Protocol's provided Method, every static Property with a
-value, every bodied free Function and every native shim. They share one fixed point, because an edge may
-cross between kinds. A Method may call a free Function, and a Property's value may call a Method. The search
-starts from the names `referencedNames` finds in the emitted code and the pooled constants. It then follows
-each reached candidate's `references` until nothing new is reached. Stopping after the first round would
+The candidates are every bodied Method, the provided Methods of every Protocol in the prelude, every static
+Property with a value, every bodied free Function and every native shim. They share one fixed point, because an
+edge may cross between kinds. A Method may call a free Function, and a Property's value may call a Method. The
+search starts from the names `referencedNames` finds in the emitted code and the pooled constants. It then
+follows each reached candidate's `references` until nothing new is reached. Stopping after the first round would
 emit a const that names one never declared. Under `whole`, every candidate is reached from the start, so the
 result depends on the standard library alone.
 
@@ -291,7 +306,7 @@ matches a marker is a reference.
 
 There is one pool per emitted module, since a name declared in one module is not in scope in another. A
 lone Program shares one pool between its prelude and its own code. A graph has a pool per Module, and one
-for the prelude Module.
+for the prelude Module. A graph's provided Method uses none. See "Provided Methods in a graph".
 
 `pooledReference` rewrites a value in three ways:
 

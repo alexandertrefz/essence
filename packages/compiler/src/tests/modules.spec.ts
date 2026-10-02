@@ -17,6 +17,7 @@ import { STDLIB_DIRECTORY } from "@essence-lang/standard-library"
 import { analyseLinkedModules } from "../analysis"
 import { bundle, type ModuleSources } from "../bundler/index"
 import { containsErrors } from "../diagnostics/index"
+import { emitToMemory } from "../embed/index"
 import { loadModuleGraph, type Module } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
 import {
@@ -25,7 +26,7 @@ import {
 	type LinkedModule,
 } from "../modules/link"
 import { canonicalPath, resolveSpecifier } from "../modules/resolve"
-import { optimise } from "../optimiser/index"
+import { defaultOptimiserOptions, optimise } from "../optimiser/index"
 import { rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
@@ -5171,6 +5172,75 @@ async function runBundle(
 	return written === "" ? [] : written.replace(/\n$/, "").split("\n")
 }
 
+// `Q.es` belongs to a cycle with `P.es`, and its Constant calls the Methods
+// `P.es` provides while `Q.es` loads, before `P.es` has run.
+const cyclicProvidedCall: Record<string, string> = {
+	"Main.es": `import {
+	from "./P.es" { describeAll }
+	from "./Q.es" { early }
+}
+
+implementation {
+	Terminal.print(describeAll({ count = 5 }))
+	Terminal.print(early)
+}
+`,
+	"P.es": `import {
+	from "./Q.es" {
+		Box
+		Boxes
+	}
+}
+
+implementation {
+	protocol Alpha {
+		size() -> Integer
+
+		twice() -> Integer {
+			<- @::size()::multiply(with 2)::add(1000)
+		}
+
+		label() -> String {
+			<- "size {@::size()} and more"
+		}
+	}
+
+	function describeAll(_ box: Box) -> String {
+		<- box::label()
+	}
+}
+
+export {
+	Alpha
+	describeAll
+}
+`,
+	"Q.es": `import {
+	from "./P.es" { Alpha }
+}
+
+implementation {
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is Alpha {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	constant box: Box = { count = 3 }
+	constant early: String = "{box::twice()} / {box::label()}"
+}
+
+export {
+	Box
+	Boxes
+	box
+	early
+}
+`,
+}
+
 describe("Module Code Generation", () => {
 	// The fixtures, with a cycle, an aliased Constant, a re-export and a Namespace
 	// reached only through dispatch, compiled into one bundle and run.
@@ -5251,8 +5321,8 @@ export {
 		)
 	})
 
-	// A Protocol's provided Method is one const in the shared prelude for the
-	// whole graph, declared in none of the Modules that reach it.
+	// A Protocol's provided Method is one Function for the whole graph. The
+	// Module that declares the Protocol declares it, and the rest import it.
 	it("emits one const for a provided Method the whole graph shares", async () => {
 		await withBuiltProject(
 			{
@@ -5334,17 +5404,188 @@ export {
 				)
 				let sources = generateModules(linked)
 				let declarations = [...sources.sources.values()].filter(
-					(source) => source.includes("$es_Shape__describe ="),
+					(source) =>
+						source.includes("function $es_Shape__describe("),
 				)
 
 				expect(declarations).toHaveLength(1)
+				expect(sources.sources.get("essence:./Shape.es")).toContain(
+					"function $es_Shape__describe(",
+				)
 				expect(sources.sources.get("essence:./Main.es")).toContain(
-					"$es_Shape__describe",
+					'import { $es_Shape__describe } from "essence:./Shape.es"',
 				)
 				expect(await runBundle(sources, directory)).toEqual([
 					'"area 9"',
 					'"area 4"',
 				])
+			},
+		)
+	})
+
+	// `C.es` runs before `P.es`, and its witness names the provided Method as it
+	// loads. The Method is a hoisted Function, so the witness holds it.
+	it("names a provided Method from a Module of a cycle that runs first", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./P.es" { answer }
+}
+
+implementation {
+	Terminal.inspect(answer())
+}
+`,
+				"P.es": `import {
+	from "./C.es" { run }
+}
+
+implementation {
+	protocol Alpha {
+		size() -> Integer
+
+		twice() -> Integer {
+			<- @::size()::multiply(with 2)
+		}
+	}
+
+	function answer() -> Integer {
+		<- run()
+	}
+}
+
+export {
+	Alpha
+	answer
+}
+`,
+				"C.es": `import {
+	from "./P.es" { Alpha }
+}
+
+implementation {
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is Alpha {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	function doubled<infer Item is Alpha>(_ item: Item) -> Integer {
+		<- item::twice()
+	}
+
+	function run() -> Integer {
+		constant box: Box = { count = 3 }
+
+		<- doubled(box)
+	}
+}
+
+export {
+	run
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(sources.sources.get("essence:./C.es")).toContain(
+					'import { $es_Alpha__twice } from "essence:./P.es"',
+				)
+				expect(await runBundle(sources, directory)).toEqual(["6"])
+			},
+		)
+	})
+	// `Q.es` loads before `P.es` and calls the Methods `P.es` provides while it
+	// loads. A provided Method reads nothing of its Module, so it runs then.
+	it("calls a provided Method while a Module of a cycle loads", async () => {
+		await withBuiltProject(cyclicProvidedCall, async (directory) => {
+			let sources = generateModules(
+				linkModuleGraph(
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+				),
+			)
+
+			expect(await runBundle(sources, directory)).toEqual([
+				"size 5 and more",
+				"1006 / size 3 and more",
+			])
+		})
+	})
+
+	// Under coverage the declaring Module's counter is a hoisted Function, so
+	// the early call counts into a table nothing has registered yet.
+	it("counts a provided Method called while a Module of a cycle loads", async () => {
+		await withBuiltProject(cyclicProvidedCall, async (directory) => {
+			let emitted = await emitToMemory(path.join(directory, "Main.es"), {
+				optimisation: { ...defaultOptimiserOptions, coverage: true },
+			})
+
+			expect(emitted.diagnostics).toEqual([])
+			expect(emitted.sources.sources.get("essence:./P.es")).toContain(
+				"function $cover(point, value)",
+			)
+			expect(await runBundle(emitted.sources, directory)).toEqual([
+				"size 5 and more",
+				"1006 / size 3 and more",
+			])
+		})
+	})
+
+	// A provided Method another Module imports is exported, and one nothing
+	// else imports is not, so a one-Module graph exports only its own names.
+	it("exports a provided Method only to a Module that imports it", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `implementation {
+	protocol Alpha {
+		size() -> Integer
+
+		twice() -> Integer {
+			<- @::size()::multiply(with 2)
+		}
+	}
+
+	type Box = { count: Integer }
+
+	namespace Boxes for Box is Alpha {
+		size() -> Integer {
+			<- @.count
+		}
+	}
+
+	constant box: Box = { count = 3 }
+
+	Terminal.inspect(box::twice())
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+				let main = sources.sources.get("essence:./Main.es")!
+
+				expect(main).toContain("function $es_Alpha__twice(")
+				expect(main).not.toContain("export")
+				expect(await runBundle(sources, directory)).toEqual(["6"])
 			},
 		)
 	})

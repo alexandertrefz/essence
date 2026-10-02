@@ -7261,8 +7261,8 @@ describe("two Protocols of one name", () => {
 				let sources = emitModules(directory, "Main.es")
 				let emitted = [...sources.sources.values()].join("\n")
 
-				expect(emitted).toContain("const $es_Tagged__describe =")
-				expect(emitted).toContain("const $es_Tagged_2__describe =")
+				expect(emitted).toContain("function $es_Tagged__describe(")
+				expect(emitted).toContain("function $es_Tagged_2__describe(")
 				expect(await printedBy(directory, sources)).toBe(
 					"Dog x\nMouse x\n",
 				)
@@ -7296,10 +7296,12 @@ describe("two Protocols of one name", () => {
 			async (directory) => {
 				for (let entry of ["Main.es", "a/Main.es"]) {
 					let sources = emitModules(directory, entry)
-					let prelude = sources.sources.get("essence:$prelude")!
-					let first = prelude.indexOf("const $es_Tagged__describe =")
+					let emitted = [...sources.sources.values()].join("\n")
+					let first = emitted.indexOf(
+						"function $es_Tagged__describe(",
+					)
 
-					expect([entry, prelude.slice(first, first + 200)]).toEqual([
+					expect([entry, emitted.slice(first, first + 200)]).toEqual([
 						entry,
 						expect.stringContaining('"Dog "'),
 					])

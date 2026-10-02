@@ -227,9 +227,8 @@ Optimiser: the passes keep none. `CONTEXTS` in `mutation/index.ts` memoises one 
 Rewriter:
 
 - In `rewriter/rewrite.ts`: `emission`, set by `withEmission`; `currentSourcePath`, set by
-  `withSourcePath`; `currentCoverageCounter`, set by `countingInto`; `pooledConstants`, set by
-  `collectingConstantPool`; `shadowingNamespaceScopes`; `completingDepth` and `contextTaken`, set while a
-  completing body is rewritten.
+  `withSourcePath`; `pooledConstants`, set by `collectingConstantPool`; `shadowingNamespaceScopes`;
+  `completingDepth` and `contextTaken`, set while a completing body is rewritten.
 - In `rewriter/stdlibPrelude.ts`: `currentOptimiserOptions`, set by `withOptimiserOptions`, and the caches
   `derivedFromStdlib` makes. They are keyed by the `Stdlib` object and by `optimiserOptionsKey`, so
   `useStdlib` needs no second reset.

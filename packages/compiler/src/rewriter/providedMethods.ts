@@ -1,52 +1,212 @@
 import type { common } from "@essence-lang/interfaces"
+import type * as estree from "estree"
 
 import {
 	type PreludeNamespace,
 	protocolMemberIdentifier,
 } from "./stdlibPrelude"
 
-// The user's Protocols that join the prelude, and the const name of each
+// The user's Protocols with provided Methods, and the const name of each
 // provided Method. See "Const names" in DEVELOPMENT.md.
 
-// A coverage table the prelude binds, because a provided Method of its Module
-// counts into it from inside the prelude.
-export type PreludeCounter = {
-	name: string
-	modulePath: string
-	section: common.typedSimple.CoverageSectionNode
+// Each Module's own Protocols with provided Methods, every provided Method's
+// const name, and the Module that declares each. See "Provided Methods in a
+// graph" in DEVELOPMENT.md.
+export function graphProvidedMethods(
+	modules: Array<{ filePath: string; program: common.typedSimple.Program }>,
+	prelude: Array<PreludeNamespace>,
+): {
+	protocols: Map<string, Array<PreludeNamespace>>
+	providedMembers: ProvidedMemberIdentifiers
+	homes: Map<string, string>
+} {
+	let protocols = new Map(
+		modules.map((module) => [
+			module.filePath,
+			protocolPreludeNamespaces([module.program]),
+		]),
+	)
+	let providedMembers = providedMemberIdentifiers([
+		...prelude,
+		...[...protocols.values()].flat(),
+	])
+
+	return {
+		protocols,
+		providedMembers,
+		homes: providedMethodHomes(protocols, providedMembers),
+	}
 }
 
-// A graph's Protocols with provided Methods, and the counters the prelude binds
-// for them. See "Counting provided Methods" in DEVELOPMENT.md.
-export function graphProtocolNamespaces(
-	modules: Array<{ filePath: string; program: common.typedSimple.Program }>,
-	// The counter's name, read off the Module's path.
-	counterName: (filePath: string) => string,
-): { namespaces: Array<PreludeNamespace>; counters: Array<PreludeCounter> } {
-	let namespaces: Array<PreludeNamespace> = []
-	let counters: Array<PreludeCounter> = []
+// The provided Methods each Module exports: only those another Module imports,
+// so a lone Module's exports stay its own.
+export function providedMethodExports(
+	homes: ReadonlyMap<string, string>,
+	imports: Array<ReadonlyMap<string, Array<string>>>,
+): Map<string, Array<string>> {
+	let exported = new Map<string, Array<string>>()
+	let imported = new Set(
+		imports.flatMap((byHome) => [...byHome.values()].flat()),
+	)
 
-	for (let module of modules) {
-		let found = protocolPreludeNamespaces([module.program])
-		let section = module.program.coverage
-
-		if (found.length === 0 || section === null) {
-			namespaces.push(...found)
-
-			continue
+	for (let [name, home] of homes) {
+		if (imported.has(name)) {
+			exported.set(home, [...(exported.get(home) ?? []), name])
 		}
-
-		let name = counterName(module.filePath)
-
-		counters.push({ name, modulePath: module.filePath, section })
-		namespaces.push(...found.map((entry) => ({ ...entry, counter: name })))
 	}
 
-	return { namespaces, counters }
+	return exported
 }
 
-// The Programs' Protocols with provided Methods, as prelude entries, so one
-// const answers for every conformer.
+// The Module that declares each of a graph's provided Methods, by const name.
+function providedMethodHomes(
+	protocolsByModule: ReadonlyMap<string, Array<PreludeNamespace>>,
+	provided: ProvidedMemberIdentifiers,
+): Map<string, string> {
+	let homes = new Map<string, string>()
+
+	for (let [filePath, protocols] of protocolsByModule) {
+		for (let protocol of protocols) {
+			for (let name of provided
+				.get(protocolEntryIdentity(protocol))
+				?.values() ?? []) {
+				homes.set(name, filePath)
+			}
+		}
+	}
+
+	return homes
+}
+
+// A Module's own Protocols' provided Methods, as hoisted Functions that read
+// nothing of their Module. A Module of a cycle may call one before this Module
+// runs. See "Provided Methods in a graph" in DEVELOPMENT.md.
+export function providedMethodDeclarations(
+	protocols: Array<PreludeNamespace>,
+	provided: ProvidedMemberIdentifiers,
+	// The Method's body without the Module's constant pool.
+	rewrite: (method: common.typedSimple.Method) => estree.FunctionExpression,
+): Array<estree.FunctionDeclaration> {
+	return protocols.flatMap((protocol) =>
+		Object.entries(protocol.node.methods).map(([memberName, method]) => {
+			let { params, body } = rewrite(method)
+
+			return {
+				type: "FunctionDeclaration",
+				id: {
+					type: "Identifier",
+					name: provided
+						.get(protocolEntryIdentity(protocol))!
+						.get(memberName)!,
+				},
+				params,
+				body,
+			}
+		}),
+	)
+}
+
+// A coverage counter a provided Method may call before its Module runs. It
+// registers the table on its first call. The Module calls it once with no
+// point, so a table nothing counted into is still reported.
+export function hoistedCoverageCounter(
+	name: string,
+	counters: estree.Expression,
+): Array<estree.Statement> {
+	let counter: estree.MemberExpression = {
+		type: "MemberExpression",
+		object: { type: "Identifier", name },
+		property: { type: "Identifier", name: "counter" },
+		computed: false,
+		optional: false,
+	}
+	let point: estree.Identifier = { type: "Identifier", name: "point" }
+	let value: estree.Identifier = { type: "Identifier", name: "value" }
+
+	return [
+		{
+			type: "FunctionDeclaration",
+			id: { type: "Identifier", name },
+			params: [point, value],
+			body: {
+				type: "BlockStatement",
+				body: [
+					{
+						type: "IfStatement",
+						test: {
+							type: "BinaryExpression",
+							operator: "===",
+							left: counter,
+							right: { type: "Identifier", name: "undefined" },
+						},
+						consequent: {
+							type: "ExpressionStatement",
+							expression: {
+								type: "AssignmentExpression",
+								operator: "=",
+								left: counter,
+								right: counters,
+							},
+						},
+						alternate: null,
+					},
+					{
+						type: "ReturnStatement",
+						argument: {
+							type: "ConditionalExpression",
+							test: {
+								type: "BinaryExpression",
+								operator: "===",
+								left: point,
+								right: {
+									type: "Identifier",
+									name: "undefined",
+								},
+							},
+							consequent: value,
+							alternate: {
+								type: "CallExpression",
+								callee: counter,
+								arguments: [point, value],
+								optional: false,
+							},
+						},
+					},
+				],
+			},
+		},
+		{
+			type: "ExpressionStatement",
+			expression: {
+				type: "CallExpression",
+				callee: { type: "Identifier", name },
+				arguments: [],
+				optional: false,
+			},
+		},
+	]
+}
+
+// The provided Methods a Module names and another Module declares, grouped by
+// the declaring Module.
+export function providedMethodImports(
+	names: ReadonlySet<string>,
+	filePath: string,
+	homes: ReadonlyMap<string, string>,
+): Map<string, Array<string>> {
+	let imports = new Map<string, Array<string>>()
+
+	for (let [name, home] of homes) {
+		if (home !== filePath && names.has(name)) {
+			imports.set(home, [...(imports.get(home) ?? []), name])
+		}
+	}
+
+	return imports
+}
+
+// The Programs' Protocols with provided Methods, as prelude entries. One const
+// answers for every conformer.
 export function protocolPreludeNamespaces(
 	programs: Array<common.typedSimple.Program>,
 ): Array<PreludeNamespace> {
