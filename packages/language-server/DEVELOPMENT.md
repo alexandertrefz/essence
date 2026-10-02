@@ -600,6 +600,9 @@ for Completion already, so the reading is a walk, not a compile.
   a Statement body, while the member list around it reads as the Namespace.
 - Some contexts exist only to refuse. A `define` arm list, a Choice's Cases, an `overload` group and a Parameter list
   each take a shape no snippet writes. A Parameter default is a smaller span inside the list and reads as a value.
+- A signature written without a body, a native one or a Protocol requirement, has no Function literal for the walk to
+  reach. Its span starts at its `(`, after any Type Parameters, and ends with its return Type. All of it reads as a
+  Parameter list.
 - `method` is the value position inside an instance Method's body, where `{ @ with … }` means something. It is read
   from every containing block, so a Function literal inside a Method keeps it.
 - Whether the cursor starts a Statement comes from the text, since the text being typed does not parse yet.

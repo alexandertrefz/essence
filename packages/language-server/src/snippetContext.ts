@@ -168,7 +168,8 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				blocks.push({ position: node.position, context: "namespace" })
 
 				// An `overload` group holds signatures only, so it refuses every
-				// snippet. Its entries are Function literals the walk reaches.
+				// snippet. Its entries with bodies are Function literals the walk
+				// reaches.
 				for (let member of Object.values(node.methods)) {
 					if (
 						member.nodeType === "OverloadedMethod" ||
@@ -181,6 +182,17 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 							context: "overload",
 						})
 					}
+				}
+
+				for (let signature of nativeSignatures(
+					Object.values(node.methods),
+				)) {
+					blocks.push(
+						...parameterBlocks(
+							signature.position,
+							signature.parameters,
+						),
+					)
 				}
 
 				// The bodies `@` names the receiver in: an instance Method's, not a static
@@ -209,14 +221,25 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 					}
 				}
 
-				// `walk` reaches a provided Method's body; this says `@` names the receiver
-				// in it.
-				for (let body of providedBodies(node)) {
-					blocks.push({
-						position: body.body.position,
-						context: base,
-						method: body.instance,
-					})
+				for (let { signature, instance } of protocolSignatures(node)) {
+					// A requirement is a signature without a body, read as a
+					// native one is.
+					if (signature.body === null) {
+						blocks.push(
+							...parameterBlocks(
+								signature.position,
+								signature.parameters,
+							),
+						)
+					} else {
+						// `walk` reaches a provided Method's body; this says `@`
+						// names the receiver in it.
+						blocks.push({
+							position: signature.body.position,
+							context: base,
+							method: instance,
+						})
+					}
 				}
 
 				return
@@ -260,11 +283,32 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 			// names, Types and defaults, where no value snippet parses.
 			case "FunctionValue":
 				blocks.push({ position: node.position, context: base })
-				blocks.push(...parameterBlocks(node.value))
+				blocks.push(
+					...parameterBlocks(
+						node.value.parameterListPosition,
+						node.value.parameters,
+					),
+				)
 
 				return
 			case "FunctionStatement":
-				blocks.push(...parameterBlocks(node.value))
+				blocks.push(
+					...parameterBlocks(
+						node.value.parameterListPosition,
+						node.value.parameters,
+					),
+				)
+
+				return
+			case "OverloadedFunctionStatement":
+				for (let signature of nativeSignatures(node.methods)) {
+					blocks.push(
+						...parameterBlocks(
+							signature.position,
+							signature.parameters,
+						),
+					)
+				}
 
 				return
 			default:
@@ -280,16 +324,12 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 // The Parameter list, and the defaults in it, which are values. Each default
 // is a smaller span, so the innermost rule finds it.
 function parameterBlocks(
-	definition: parser.FunctionDefinitionNode,
+	position: common.Position,
+	parameters: Array<parser.ParameterNode>,
 ): Array<Block> {
-	let blocks: Array<Block> = [
-		{
-			position: definition.parameterListPosition,
-			context: "parameters",
-		},
-	]
+	let blocks: Array<Block> = [{ position, context: "parameters" }]
 
-	for (let parameter of definition.parameters) {
+	for (let parameter of parameters) {
 		if (parameter.defaultValue !== null) {
 			blocks.push({
 				position: parameter.defaultValue.position,
@@ -308,13 +348,11 @@ function isEmptySpan(position: common.Position): boolean {
 	)
 }
 
-function providedBodies(
+// Every signature a Protocol writes, and whether it is an instance Method's.
+function protocolSignatures(
 	node: parser.ProtocolDeclarationStatementNode,
-): Array<{ body: parser.FunctionValueNode; instance: boolean }> {
-	let bodies: Array<{ body: parser.FunctionValueNode; instance: boolean }> =
-		[]
-
-	for (let member of Object.values(node.methods)) {
+): Array<{ signature: parser.ProtocolMethodSignatureNode; instance: boolean }> {
+	return Object.values(node.methods).flatMap((member) => {
 		let instance =
 			member.nodeType === "SimpleProtocolMethod" ||
 			member.nodeType === "OverloadedProtocolMethod"
@@ -324,14 +362,35 @@ function providedBodies(
 				? member.signatures
 				: [member.signature]
 
-		for (let signature of signatures) {
-			if (signature.body !== null) {
-				bodies.push({ body: signature.body, instance })
-			}
-		}
-	}
+		return signatures.map((signature) => ({ signature, instance }))
+	})
+}
 
-	return bodies
+// The native signatures among a declarations file's members. A native
+// signature has no body, so the walk reaches no Function literal in it. Its
+// span starts at its `(`, after any Type Parameters, and ends with its return
+// Type. All of it reads as a Parameter list.
+function nativeSignatures(
+	members: Array<
+		| parser.NamespaceMethods[string]
+		| parser.FunctionValueNode
+		| parser.NativeMethodSignatureNode
+	>,
+): Array<parser.NativeMethodSignatureNode> {
+	return members.flatMap((member) => {
+		switch (member.nodeType) {
+			case "NativeMethodSignature":
+				return [member]
+			case "SimpleMethodSignature":
+			case "StaticMethodSignature":
+				return [member.signature]
+			case "OverloadedMethodSignatures":
+			case "OverloadedStaticMethodSignatures":
+				return nativeSignatures(member.methods)
+			default:
+				return []
+		}
+	})
 }
 
 // The Function literals of a Namespace's instance Methods, where `@` names the

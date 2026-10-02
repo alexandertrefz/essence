@@ -616,6 +616,60 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
+	// A native signature has no Function literal for the walk to reach, so
+	// its span is read as a Parameter list. Its defaults keep the values.
+	it("offers nothing inside a native signature's Parameter list", () => {
+		let lines = [
+			"declarations {",
+			"\toverload function combine {",
+			"\t\t(first value: Integer) -> Integer {",
+			"\t\t\t<- value",
+			"\t\t}",
+			"\t\t(first value: String, by step: Integer = 1) -> String",
+			"\t}",
+			"",
+			"\tnamespace Sizes for Integer {",
+			"\t\tgrow(by amount: Integer) -> Integer",
+			"\t\tstatic make(from amount: Integer) -> Integer",
+			"",
+			"\t\toverload shrink {",
+			"\t\t\t(by amount: Integer = 2) -> Integer",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+		let file = path.join(STDLIB_DIRECTORY, "Scratch.es")
+		let offeredAt = (line: number, text: string) =>
+			snippetsAt(
+				lines,
+				{ line, column: (lines[line - 1] as string).indexOf(text) + 1 },
+				file,
+			)
+
+		expect(offeredAt(6, "value")).toEqual([])
+		expect(offeredAt(10, "amount")).toEqual([])
+		expect(offeredAt(11, "amount")).toEqual([])
+		expect(offeredAt(14, "amount")).toEqual([])
+		expect(offeredAt(6, "1)")).toContain("record")
+		expect(offeredAt(14, "2)")).toContain("record")
+	})
+
+	// A requirement is a signature without a body, read as a native one is.
+	it("offers nothing inside a Protocol requirement's Parameter list", () => {
+		let offered = snippetsAt(
+			[
+				"implementation {",
+				"\tprotocol Ranked {",
+				"\t\tisAbove(_ mark: Integer) -> Boolean",
+				"\t}",
+				"}",
+			],
+			{ line: 3, column: 13 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
 	// The bodies reach the Editor as snippet text, or a tab stop would be
 	// literal characters.
 	it("hands the body over as snippet text, and says what it writes", () => {
