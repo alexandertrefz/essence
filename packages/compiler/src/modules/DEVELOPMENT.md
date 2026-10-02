@@ -68,6 +68,10 @@ It reads both trees, since neither holds every use:
 - Where no typed Case stands for a bare Case, every Type declaring a Case of its name counts. That holds for
   one that did not resolve, and for the tests section of a compile without the tests, which nothing types.
   Such a compile also parses each `@example` here, so what an example reads counts.
+- Such a compile cannot see a conformance the tests or the examples reach without writing a name, as comparing
+  two Records asks a member's Choice for its derived `Equatable`. So where a Module has either, every Protocol,
+  Namespace, Choice and refinement in Scope counts, which only quiets the warning. A test compile reads
+  `reachedNames` instead.
 - A Choice printed through the derive needs the Namespace that declared it `is Printable`, though the call
   names neither. Every bound Namespace over that Choice declaring `is Printable` counts.
 - A narrowing establishes only a refinement declared in Scope, so `if n::isTwice()` needs `Even` imported for

@@ -1361,10 +1361,20 @@ function usedNames(
 	}
 
 	if (byName) {
-		for (let example of collectDiagnostics(() =>
+		let examples = collectDiagnostics(() =>
 			exampleTestsOf(module.program, module.sourceText),
-		).result) {
+		).result
+
+		for (let example of examples) {
 			visitParsed(example)
+		}
+
+		// Nothing typed the tests or the examples, so a conformance they reach
+		// without writing a name goes unseen.
+		if (module.program.tests !== null || examples.length > 0) {
+			for (let name of conformanceReachableNames(scope)) {
+				names.add(name)
+			}
 		}
 	}
 
@@ -1427,6 +1437,25 @@ function narrowsInside(node: TypedNode): boolean {
 		default:
 			return false
 	}
+}
+
+// The names in Scope a conformance can be reached through without being
+// written: a Protocol, a Namespace, a Choice and a refinement.
+function conformanceReachableNames(scope: enricher.Scope): Array<string> {
+	let namespaces = Object.entries(scope.members).filter(
+		([, value]) => value.type === "Namespace",
+	)
+	let types = Object.entries(scope.types).filter(([, type]) => {
+		let body = type.type === "GenericAlias" ? type.aliasedType : type
+
+		return casesOf(type).length > 0 || body.type === "Refinement"
+	})
+
+	return [
+		...Object.keys(scope.protocols),
+		...namespaces.map(([name]) => name),
+		...types.map(([name]) => name),
+	]
 }
 
 // The Cases a Type declares: a Choice's, a generic Choice's through its

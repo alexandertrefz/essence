@@ -2288,6 +2288,82 @@ export {
 		)
 	})
 
+	// The test compares two Rows, which asks `Outcome` for its derived
+	// `Equatable` without naming it. A compile that leaves the tests out never
+	// sees that, so it counts every Choice in Scope.
+	it("counts a Choice only a test reaches through a conformance as a use, in a compile without the tests", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Lib.es" {
+		Outcome
+		rowOf
+		unread
+		win
+	}
+}
+
+implementation {}
+
+tests {
+	test "compares two rows" {
+		expect rowOf(win())::is(rowOf(win()))
+	}
+}
+`,
+				"Lib.es": `implementation {
+	choice Outcome {
+		Win,
+		Loss,
+	}
+
+	type Row = { form: List<Outcome> }
+
+	function rowOf(_ outcome: Outcome) -> Row {
+		<- { form = [outcome] }
+	}
+
+	function win() -> Outcome {
+		<- #Win
+	}
+
+	function unread() -> Integer {
+		<- 0
+	}
+}
+
+export {
+	Outcome
+	rowOf
+	unread
+	win
+}
+`,
+			},
+			(directory) => {
+				let graph = () =>
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					)
+				let reports = (linked: {
+					modules: Map<string, LinkedModule>
+				}) =>
+					reportsOf(
+						linkedAt(directory, linked, "Main.es").diagnostics,
+					)
+				let unread = [
+					["unused-import", "'unread' is imported and never used"],
+				]
+
+				expect(reports(linkModuleGraph(graph()))).toEqual(unread)
+				expect(
+					reports(linkModuleGraph(graph(), { tests: true })),
+				).toEqual(unread)
+			},
+		)
+	})
+
 	// A Choice prints through the derive only where a Namespace declared it
 	// `is Printable`, and the call names neither.
 	it("counts the Namespace that lets a Choice print as a use", () => {
