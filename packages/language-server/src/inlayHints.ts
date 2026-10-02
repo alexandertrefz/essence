@@ -30,15 +30,29 @@ type InlayHintEdit = {
 // Each Hint's label is the omitted annotation, placed where it belongs, so
 // accepting it inserts it. A Type that cannot be written gets no edit, and the
 // edit spells only what the position resolves, via `spellTypeAt`.
-function typeHint(
+//
+// A Hint on a line outside the requested range is never made, since spelling
+// its Type is the costly part.
+function addTypeHint(
+	hints: Hints,
 	position: common.Cursor,
 	prefix: string,
 	type: common.Type,
-	program: common.typed.Program,
-): InlayHint {
-	let written = spellTypeAt(type, { program, cursor: position })
+) {
+	if (
+		hints.range !== null &&
+		(position.line < hints.range.start.line ||
+			position.line > hints.range.end.line)
+	) {
+		return
+	}
 
-	return {
+	let written = spellTypeAt(type, {
+		program: hints.program,
+		cursor: position,
+	})
+
+	hints.list.push({
 		position,
 		label: `${prefix}${printType(type)}`,
 		kind: "type",
@@ -46,14 +60,14 @@ function typeHint(
 			written === null
 				? null
 				: { position, newText: `${prefix}${written}` },
-	}
+	})
 }
 
 export function findInlayHints(
 	program: common.typed.Program,
 	range: common.Position | null = null,
 ): Array<InlayHint> {
-	let hints: Hints = { list: [], program }
+	let hints: Hints = { list: [], program, range }
 
 	for (let body of typedProgramBodies(program)) {
 		for (let node of body) {
@@ -69,22 +83,15 @@ export function findInlayHints(
 			a.position.column - b.position.column,
 	)
 
-	if (range === null) {
-		return hints.list
-	}
-
-	return hints.list.filter(
-		(hint) =>
-			hint.position.line >= range.start.line &&
-			hint.position.line <= range.end.line,
-	)
+	return hints.list
 }
 
-// The Hints being collected, and the Program whose Scopes say what an edit may
-// write.
+// The Hints being collected, the Program whose Scopes say what an edit may
+// write, and the lines asked for, or null for the whole file.
 type Hints = {
 	list: Array<InlayHint>
 	program: common.typed.Program
+	range: common.Position | null
 }
 
 function visitNode(node: TypedNode, hints: Hints) {
@@ -101,14 +108,7 @@ function visitNode(node: TypedNode, hints: Hints) {
 				node.type.type !== "Error" &&
 				!writesItsOwnType(node.value)
 			) {
-				hints.list.push(
-					typeHint(
-						node.name.position.end,
-						": ",
-						node.type,
-						hints.program,
-					),
-				)
+				addTypeHint(hints, node.name.position.end, ": ", node.type)
 			}
 
 			break
@@ -150,13 +150,11 @@ function hintFunctionDefinition(
 			parameter.inferredType !== null &&
 			parameter.inferredType.type !== "Error"
 		) {
-			hints.list.push(
-				typeHint(
-					parameter.position.end,
-					": ",
-					parameter.inferredType,
-					hints.program,
-				),
+			addTypeHint(
+				hints,
+				parameter.position.end,
+				": ",
+				parameter.inferredType,
 			)
 		}
 	}
@@ -165,13 +163,11 @@ function hintFunctionDefinition(
 		definition.inferredReturnType !== null &&
 		definition.inferredReturnType.type !== "Error"
 	) {
-		hints.list.push(
-			typeHint(
-				definition.parameterListPosition.end,
-				" -> ",
-				definition.inferredReturnType,
-				hints.program,
-			),
+		addTypeHint(
+			hints,
+			definition.parameterListPosition.end,
+			" -> ",
+			definition.inferredReturnType,
 		)
 	}
 }

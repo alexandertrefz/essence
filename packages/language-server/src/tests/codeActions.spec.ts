@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, spyOn } from "bun:test"
 import * as path from "node:path"
 
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
@@ -44,6 +44,7 @@ import {
 } from "../codeActions/shorthandFixes"
 import { mergeModifierAction } from "../codeActions/testFixes"
 import { typedExpressionAt } from "../codeActions/typedLookups"
+import * as spellableTypes from "../spellableTypes"
 import { applyEdits } from "./textEdits"
 
 // Fixtures are joined line arrays with literal `\t`, so an assertion on an
@@ -5837,6 +5838,49 @@ describe("Code Actions", () => {
 			expect(applied(lines, refactor)[10]).toBe(
 				"\t\tconstant made: { a: Integer } = make()",
 			)
+		})
+
+		// Spelling a Type is the costly part of a Hint, so a request for one
+		// line spells that line's Types and no others.
+		it("should spell only the Types of the lines the request covers", () => {
+			let lines = [
+				"implementation {",
+				...Array.from(
+					{ length: 40 },
+					(_, index) => `\tconstant value${index} = "${index}"`,
+				),
+				"}",
+			]
+			let line = 12
+			let annotations = (entries: Array<CodeActionEntry>) =>
+				entries.filter((entry) =>
+					entry.title.startsWith("Add explicit Type annotation"),
+				)
+			let spelling = spyOn(spellableTypes, "spellTypeAt")
+
+			try {
+				let narrow = annotations(
+					actionsOf(lines, {
+						start: { line, column: 1 },
+						end: { line, column: 1 },
+					}),
+				)
+
+				expect(spelling).toHaveBeenCalledTimes(1)
+				expect(narrow.map((entry) => entry.title)).toEqual([
+					"Add explicit Type annotation ': String'",
+				])
+				expect(
+					applied(lines, narrow[0] as CodeActionEntry)[line - 1],
+				).toBe('\tconstant value10: String = "10"')
+				expect(narrow).toEqual(
+					annotations(actionsOf(lines)).filter(
+						(entry) => entry.edits[0]?.range.start.line === line,
+					),
+				)
+			} finally {
+				spelling.mockRestore()
+			}
 		})
 	})
 

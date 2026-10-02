@@ -9,7 +9,7 @@ import { walk } from "./lookups"
 // is preferred.
 
 // Applies an Inlay Hint's edit as an annotation. Only a hint whose Type can be
-// written carries one; see `typeHint`. The title quotes the edit, not the
+// written carries one; see `addTypeHint`. The title quotes the edit, not the
 // label, which may name an Alias this position cannot resolve.
 export function annotationActions(
 	enrichedProgram: common.typed.Program,
