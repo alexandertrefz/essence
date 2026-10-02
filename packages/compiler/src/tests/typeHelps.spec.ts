@@ -631,6 +631,100 @@ describe("Reports that knew the fix and said nothing", () => {
 		])
 	})
 
+	// A Namespace is never called, and without the `()` it is a Namespace read
+	// as a value. Each Help builds a value of the Namespace's target instead.
+	it("builds the value a call on a Namespace meant", () => {
+		let called = (call: string, annotation = "") => `implementation {
+		namespace Points for { x: Integer, y: Integer } {
+			static atX(_ x: Integer) -> { x: Integer, y: Integer } {
+				<- { x = x, y = 0 }
+			}
+
+			static count(_ x: Integer) -> Integer {
+				<- x
+			}
+		}
+
+		constant count = 3
+		constant built${annotation} = ${call}
+
+		Terminal.inspect(built)
+	}`
+
+		// Each row: the call, the Type it is annotated with, the Help, and the
+		// Help followed.
+		for (let [call, annotation, help, followed] of [
+			[
+				"String(5)",
+				": String",
+				"Convert the value with '::toString()', as '5::toString()'.",
+				"5::toString()",
+			],
+			[
+				"String(count)",
+				"",
+				"Convert the value with '::toString()', as 'count::toString()'.",
+				"count::toString()",
+			],
+			[
+				"Integer(5)",
+				": Integer",
+				"Write '5' alone, since it is a value of Type Integer already.",
+				"5",
+			],
+			// A static that answers the target wrapped is offered only where
+			// the position takes what it answers.
+			[
+				'Integer("5")',
+				"",
+				`Call its static Method with the same Arguments, as 'Integer.parse("5")', which answers an Optional<Integer>.`,
+				'Integer.parse("5")',
+			],
+			[
+				'Integer("5")',
+				": Integer",
+				"Write a value of Type Integer in its place.",
+				"5",
+			],
+			// `count` answers no Point, so only `atX` is offered.
+			[
+				"Points(1)",
+				"",
+				"Call its static Method with the same Arguments, as 'Points.atX(1)'.",
+				"Points.atX(1)",
+			],
+			[
+				"Rational(1)",
+				": Rational",
+				"Convert the value with '::toRational()', as '1::toRational()'.",
+				"1::toRational()",
+			],
+			[
+				"List(1, 2)",
+				": List<Integer>",
+				"Write the items in a List Literal, as '[1, 2]'.",
+				"[1, 2]",
+			],
+			[
+				"Boolean(1)",
+				": Boolean",
+				"Write a value of Type Boolean in its place.",
+				"true",
+			],
+			[
+				"Terminal(1)",
+				"",
+				"Read one of its members, as in 'Terminal.…'.",
+				"Terminal.inspect(1)",
+			],
+		]) {
+			expect(
+				helpsOfCode(called(call, annotation), "not-a-function"),
+			).toEqual([help])
+			expect(compiles(called(followed, annotation))).toBe(true)
+		}
+	})
+
 	it("names both readings of a '<-' at the top level", () => {
 		let source = `implementation {
 		<- 42

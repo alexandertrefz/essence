@@ -2032,7 +2032,7 @@ Error: This Expression is not a Function
 
 </div>
 
-Remove the parentheses, or call a function.
+Remove the parentheses, or call a function. A namespace is never called, and the help builds a value of its type instead: `String(5)` is answered with `5::toString()`, `Integer(5)` with `5` alone, and `List(1, 2)` with the list literal `[1, 2]`. A static method is offered only where it answers that type, or wraps it in a choice such as an optional where the position takes one: `Integer("5")` is answered with `Integer.parse("5")`, which answers an `Optional<Integer>`.
 
 Taught on: [Functions as values › Storing and returning functions](/docs/language/functions-as-values#storing-and-returning-functions)
 

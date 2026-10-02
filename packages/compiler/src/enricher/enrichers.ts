@@ -99,7 +99,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
-import { valueTypeOf } from "./namespaceValues"
+import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
 import { reportUnknownPatternMember } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import {
@@ -9575,9 +9575,9 @@ type ArgumentTyper = {
 	// Writes the Type a finished call decided onto a written container Literal
 	// at that Parameter; see `decideWrittenArguments`.
 	decideArgument: (value: parser.ExpressionNode, decided: common.Type) => void
-	// What the position around the Invocation asks it to be, or null. Read only
-	// by `decidedSeedBindings`, for a Type Parameter the Arguments left open,
-	// such as `List<Unknown>` from `startingWith []`.
+	// What the position around the Invocation asks it to be, or null. Read by
+	// `decidedSeedBindings`, for a Type Parameter the Arguments left open, such
+	// as `List<Unknown>` from `startingWith []`, and by `namespaceCallHelps`.
 	expectedType: common.Type | null
 }
 
@@ -13426,10 +13426,26 @@ function resolveFunctionInvocation(
 					],
 					// The parentheses made this a call, so they are what goes.
 					// A Method is the other reading, reached with `::`.
-					helps: [
-						"Remove the '()' — the name already reads the value.",
-						"Or call a Method on it with '::', which is how a Method is reached.",
-					],
+					helps:
+						type.type === "Namespace"
+							? namespaceCallHelps(
+									node,
+									type,
+									writtenArgumentTypes(node.arguments, typer),
+									(receiver) =>
+										namespacesTargeting(
+											getAllNamespacesInScope(
+												scope,
+												null,
+											),
+											receiver,
+										).values(),
+									typer.expectedType,
+								)
+							: [
+									"Remove the '()' — the name already reads the value.",
+									"Or call a Method on it with '::', which is how a Method is reached.",
+								],
 				},
 			)
 		}
