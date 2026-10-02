@@ -50,6 +50,7 @@ import {
 	mergedRecordType,
 	missingRecordMembers,
 	type MatchableArgument,
+	refusedFunctionsAsHoles,
 	withoutUndeclaredMembers,
 	typeContainsError,
 	typeContainsUnknown,
@@ -1521,13 +1522,15 @@ function checkDefineAnswer(
 ): void {
 	validateValue(value)
 
-	if (fitsExpectedType(node.type, value)) {
+	let measured = measuredValue(value)
+
+	if (fitsExpectedType(node.type, measured)) {
 		return
 	}
 
-	let evidence = refinementEvidence(node.type, value)
-	let undecided = undecidedSlotEvidence(node.type, value.type, null)
-	let record = recordMismatchEvidence(node.type, value.type, value, {
+	let evidence = refinementEvidence(node.type, measured)
+	let undecided = undecidedSlotEvidence(node.type, measured.type, null)
+	let record = recordMismatchEvidence(node.type, measured.type, measured, {
 		subject: "the Type this 'define' has",
 	})
 
@@ -1540,7 +1543,7 @@ function checkDefineAnswer(
 				record.lead ??
 					primary(
 						value.position,
-						`this is ${withArticle(describeType(value.type))}`,
+						`this is ${withArticle(describeType(measured.type))}`,
 					),
 				...record.labels,
 				...evidence.labels,
@@ -1554,7 +1557,7 @@ function checkDefineAnswer(
 			helps: [
 				...asynchronyHelps(
 					node.type,
-					value.type,
+					measured.type,
 					bodyCanWait(),
 					completionBarrier(),
 				),
@@ -1563,7 +1566,7 @@ function checkDefineAnswer(
 				...undecided.helps,
 			],
 			data:
-				asynchronyData(node.type, value.type, bodyCanWait()) ??
+				asynchronyData(node.type, measured.type, bodyCanWait()) ??
 				record.data,
 		},
 	)
@@ -2535,7 +2538,7 @@ function validateConstantDeclarationStatement(
 					? null
 					: node.name.content,
 				node.declaredType,
-				node.value,
+				measuredValue(node.value),
 			)
 		}
 	}
@@ -2555,7 +2558,7 @@ function validateVariableDeclarationStatement(
 				"Variable",
 				node.name.content,
 				node.declaredType,
-				node.value,
+				measuredValue(node.value),
 			)
 		}
 	}
@@ -2620,34 +2623,36 @@ function reportDeclarationMismatch(
 function validateVariableAssignmentStatement(
 	node: common.typed.VariableAssignmentStatementNode,
 ): common.typed.VariableAssignmentStatementNode {
-	if (!fitsExpectedType(node.name.type, node.value)) {
+	let assigned = measuredValue(node.value)
+
+	if (!fitsExpectedType(node.name.type, assigned)) {
 		let declaredType = describeType(node.name.type)
-		let evidence = refinementEvidence(node.name.type, node.value)
+		let evidence = refinementEvidence(node.name.type, assigned)
 		// A Variable declared from an empty Literal can be undecided, as in
 		// `List<Unknown>`, which the report explains.
 		let undecided = undecidedSlotEvidence(
 			node.name.type,
-			node.value.type,
+			assigned.type,
 			node.name.content,
 		)
 
 		let record = recordMismatchEvidence(
 			node.name.type,
-			node.value.type,
-			node.value,
+			assigned.type,
+			assigned,
 			{ subject: `Variable '${node.name.content}'` },
 		)
 
 		reportError(
 			`This value does not fit Variable '${node.name.content}'`,
-			record.lead?.position ?? node.value.position,
+			record.lead?.position ?? assigned.position,
 			{
 				code: "assignment-type-mismatch",
 				labels: [
 					record.lead ??
 						primary(
-							node.value.position,
-							`this is ${withArticle(describeType(node.value.type))}`,
+							assigned.position,
+							`this is ${withArticle(describeType(assigned.type))}`,
 						),
 					...record.labels,
 					// Null for a builtin, which has no Essence source.
@@ -2673,7 +2678,7 @@ function validateVariableAssignmentStatement(
 				helps: [
 					...asynchronyHelps(
 						node.name.type,
-						node.value.type,
+						assigned.type,
 						bodyCanWait(),
 						completionBarrier(),
 					),
@@ -2684,7 +2689,7 @@ function validateVariableAssignmentStatement(
 				data:
 					asynchronyData(
 						node.name.type,
-						node.value.type,
+						assigned.type,
 						bodyCanWait(),
 					) ?? record.data,
 			},
@@ -2850,7 +2855,7 @@ function validateNamespaceDefinitionStatement(
 				"Property",
 				qualifiedName,
 				property.type,
-				property.value,
+				measuredValue(property.value),
 			)
 		}
 
@@ -2989,40 +2994,34 @@ function validateReturnStatement(
 			node.expression,
 		)
 	) {
+		let returned = measuredValue(node.expression)
 		// A completing body's `<-` is held to the inner Type of its declared
 		// `Future<T>`, which the emission wraps.
 		let expected = returnedTypeOf(
 			currentFunctionContext.returnType,
 			currentFunctionContext.completing === true,
 		)
-		let evidence = refinementEvidence(expected, node.expression)
+		let evidence = refinementEvidence(expected, returned)
 		// An inferred return Type can be undecided, as in `List<Unknown>`,
 		// which the report explains.
-		let undecided = undecidedSlotEvidence(
-			expected,
-			node.expression.type,
-			null,
-		)
-		let record = recordMismatchEvidence(
-			expected,
-			node.expression.type,
-			node.expression,
-			{ subject: "the declared return Type" },
-		)
+		let undecided = undecidedSlotEvidence(expected, returned.type, null)
+		let record = recordMismatchEvidence(expected, returned.type, returned, {
+			subject: "the declared return Type",
+		})
 
 		reportError(
 			"This value does not fit the declared return Type",
 			// The refused member of a written Record Literal, or the whole
 			// value.
-			record.lead?.position ?? node.expression.position,
+			record.lead?.position ?? returned.position,
 			{
 				code: "return-type-mismatch",
 				// The declared return Type has no Position, so it is a Note.
 				labels: [
 					record.lead ??
 						primary(
-							node.expression.position,
-							`this is ${withArticle(describeType(node.expression.type))}`,
+							returned.position,
+							`this is ${withArticle(describeType(returned.type))}`,
 						),
 					...record.labels,
 					...evidence.labels,
@@ -3036,7 +3035,7 @@ function validateReturnStatement(
 				helps: [
 					...returnAsynchronyHelps(
 						expected,
-						node.expression.type,
+						returned.type,
 						currentFunctionContext.completing === true,
 					),
 					...record.helps,
@@ -3045,9 +3044,7 @@ function validateReturnStatement(
 				],
 				// Unlike elsewhere, `complete` is offered even where the body
 				// can not wait yet: the fixes that follow converge.
-				data:
-					asynchronyData(expected, node.expression.type) ??
-					record.data,
+				data: asynchronyData(expected, returned.type) ?? record.data,
 			},
 		)
 	}
@@ -3254,21 +3251,33 @@ function validateDefiniteReturn(
 
 // Whether a value fits where it was written. A written literal carries its
 // own evidence for a refinement, so `constant d: NonZeroInteger = 3` fits. A
-// hole fits, and so does a Function refused as a value. See "Holes" in
-// DEVELOPMENT.md.
+// hole fits, and so does a Function refused as a value, which a value holding
+// one is measured around. See "Holes" in DEVELOPMENT.md.
 function fitsExpectedType(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
 ): boolean {
-	if (
-		typeContainsError(expected) ||
-		value.type.type === "Error" ||
-		holdsFunctionRefusedAsValue(value.type)
-	) {
-		return true
-	}
+	let measured = measuredValue(value)
 
-	return fitsWritten(expected, value)
+	return (
+		typeContainsError(expected) ||
+		measured.type.type === "Error" ||
+		fitsWritten(expected, measured)
+	)
+}
+
+// The value as a fit measures it: a Function refused as a value inside it is a
+// hole. A mismatch reported from it names no such Function a second time.
+function measuredValue(
+	value: common.typed.ExpressionNode,
+): common.typed.ExpressionNode {
+	// Holing keeps a Case a Case, so the Node keeps its kind.
+	return holdsFunctionRefusedAsValue(value.type)
+		? ({
+				...value,
+				type: refusedFunctionsAsHoles(value.type),
+			} as common.typed.ExpressionNode)
+		: value
 }
 
 // Arguments are asked exactly what the enricher asked them, literals and

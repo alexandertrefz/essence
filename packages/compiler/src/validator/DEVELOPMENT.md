@@ -175,17 +175,19 @@ the value to. On the value's side only a Type that is an Error counts. An Error 
 a slot nothing bound. `Result::flatten` leaves one in a Program the enricher accepted, and a mismatch around it is
 real.
 
-A value that is or holds a Function refused as a value fits as well, and an Argument holding one is no
-`argument-type-mismatch`. Nor is a Case payload holding one a `payload-type-mismatch`, an update writing one a
-`partial-type-mismatch`, or a call whose receiver or Argument holds one a `no-matching-overload` in the enricher.
+A Function refused as a value fits as well. A value holding one is measured with each such Function as a hole
+(`measuredValue`), so `{ a = bounded }` is still no Integer. It is still measured as written, so `[Integer.add]`
+still proves a `NonEmptyList` has an item, and a mismatch reported about it labels no hole. A Case payload holding
+one is no `payload-type-mismatch`, an Argument holding one no `argument-type-mismatch`, an update writing one no
+`partial-type-mismatch`, and a call whose receiver or Argument holds one no `no-matching-overload` in the enricher.
 `validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
 is not reported itself, since its arms carry the value. Nor is a `start` or a `complete` before no work, which
 answers its operand. Nor is a read of a Constant, a Variable, a Pattern's binding or a static Property whose value
 was refused, or a member read off one: `refusedValues.ts` remembers each by name and the Type of its value, after
 that value is validated. A Parameter holding one is remembered too, since no written Type is a refused Function, so
-it took its Type from a value refused where it was written. A Function's own name is still refused where it is
-read, since that is where it is written as a value. A name imported from another Module is not remembered, and is
-refused at each read.
+it took its Type from a value refused where it was written. A Function's own name is still refused where it is read,
+since that is where it is written as a value. A name imported from another Module is not remembered, and is refused
+at each read.
 
 `validateValue` checks a value where it is written: an Argument, a receiver, a default, a String hole, a member of a
 Record, a List or a Dictionary, a Case payload, a declaration's value, a `<-`, a `define` arm, and a `start` or

@@ -1347,6 +1347,47 @@ export function holdsFunctionRefusedAsValue(
 	}
 }
 
+// The Type with each Function refused as a value inside it read as a hole. The
+// value around such a Function is still measured by its shape.
+export function refusedFunctionsAsHoles(
+	type: common.Type,
+	visited: Set<common.Type> = new Set(),
+): common.Type {
+	if (visited.has(type) || !holdsFunctionRefusedAsValue(type)) {
+		return type
+	}
+
+	visited.add(type)
+
+	let hole = (inner: common.Type) => refusedFunctionsAsHoles(inner, visited)
+
+	switch (type.type) {
+		case "List":
+			return { ...type, itemType: hole(type.itemType) }
+		case "Dictionary":
+			return {
+				...type,
+				keyType: hole(type.keyType),
+				valueType: hole(type.valueType),
+			}
+		case "Record":
+		case "Case":
+			return {
+				...type,
+				members: Object.fromEntries(
+					Object.entries(type.members).map(([name, member]) => [
+						name,
+						hole(member),
+					]),
+				),
+			}
+		case "UnionType":
+			return { ...type, types: type.types.map(hole) }
+		default:
+			return { type: "Error" }
+	}
+}
+
 // Whether a value of this Type was reported where it was written. It is the
 // Error Type, or it is or holds a Function refused as a value. A check on such
 // a value stands down.

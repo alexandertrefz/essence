@@ -768,6 +768,86 @@ describe("Type matching", () => {
 				"protocol-bound-function-value",
 			])
 		})
+
+		// A refused Function inside a value is a hole, which spares checks about
+		// it alone. The shape of the value around it is still measured.
+		it("should measure the value around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				constant bounded = <infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				constant wrong: Integer = { a = bounded }
+				constant right: { a: (_: Integer) -> String } = { a = bounded }
+				variable kept: List<Integer> = [1]
+
+				kept = { a = bounded }
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"protocol-bound-function-value",
+				"assignment-type-mismatch",
+				"assignment-type-mismatch",
+			])
+		})
+
+		// The written List still proves it has an item, though the item is the
+		// hole a refused Function leaves.
+		it("should keep what a written value proves around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				constant rules: NonEmptyList<(_: Integer, _: Integer) -> Integer> = [
+					Integer.add,
+				]
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+			])
+		})
+
+		// A mismatch around a refused Function names only what does not fit, in
+		// a declaration, a `<-` and a List alike.
+		it("should name only the mismatch around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = { count: Integer, rule: (_: Integer, _: Integer) -> Integer }
+
+				function make() -> Rule {
+					<- { count = "3", rule = Integer.add }
+				}
+
+				constant declared: Rule = { count = "3", rule = Integer.add }
+				constant listed: List<Integer> = ["3", Integer.add]
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"return-type-mismatch",
+					["this is a String, and Rule declares an Integer"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"assignment-type-mismatch",
+					["this is a String, and Rule declares an Integer"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				["assignment-type-mismatch", ["this is a List<String | …>"]],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
 	})
 
 	// Two Modules may each declare `choice Outcome`, so a Choice's identity is
