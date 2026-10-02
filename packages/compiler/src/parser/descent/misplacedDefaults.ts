@@ -31,7 +31,7 @@ export function reportMisplacedDefault(
 		})
 	} else if (place === "provided Method") {
 		reportError("A provided Method can not carry a default", position, {
-			code: "default-on-protocol-requirement",
+			code: "default-on-protocol-method",
 			labels: [label],
 			notes: [
 				"A conforming Namespace may replace a provided Method, and a call through a bound then runs the replacement, which a default here would not reach.",
@@ -43,7 +43,7 @@ export function reportMisplacedDefault(
 			"A Protocol requirement can not carry a default",
 			position,
 			{
-				code: "default-on-protocol-requirement",
+				code: "default-on-protocol-method",
 				labels: [label],
 				notes: [
 					"A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.",

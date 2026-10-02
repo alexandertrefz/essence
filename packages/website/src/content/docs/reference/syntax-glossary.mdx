@@ -795,7 +795,7 @@ Taught on [Choices and match](/docs/language/choices-and-match).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A named set of methods a type can conform to. A signature alone is a requirement. A method with a body is provided to every conforming type. `static` marks a requirement called on the namespace, and `protocol Greeter is Named` extends another protocol. `Self` stands for the conforming type. | In any block of statements. A namespace conforms with `is`. | A type, as a TypeScript interface is: a parameter typed as a protocol is [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type). A protocol can not require a property, and a requirement can not carry a default value ([`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement)). |
+| A named set of methods a type can conform to. A signature alone is a requirement. A method with a body is provided to every conforming type. `static` marks a requirement called on the namespace, and `protocol Greeter is Named` extends another protocol. `Self` stands for the conforming type. | In any block of statements. A namespace conforms with `is`. | A type, as a TypeScript interface is: a parameter typed as a protocol is [`protocol-as-type`](/docs/reference/diagnostics#protocol-as-type). A protocol can not require a property, and no protocol method, required or provided, can carry a default value ([`default-on-protocol-method`](/docs/reference/diagnostics#default-on-protocol-method)). |
 
 </div>
 

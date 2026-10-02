@@ -604,7 +604,7 @@ Error: A Function literal can not carry a default
    │ Note 2: A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.
 ───╯
 
-[default-on-protocol-requirement]
+[default-on-protocol-method]
 Error: A Protocol requirement can not carry a default
     ╭─┤ DefaultsSyntax.es:16:27 │
     │

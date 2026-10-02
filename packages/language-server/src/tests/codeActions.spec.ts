@@ -2713,14 +2713,12 @@ describe("Code Actions", () => {
 
 			let [fix] = quickFixes(lines)
 
-			expect(fix.diagnosticCode).toBe("default-on-protocol-requirement")
+			expect(fix.diagnosticCode).toBe("default-on-protocol-method")
 
 			let result = applied(lines, fix)
 
 			expect(result[2]).toBe("\t\ttrim(at side: Integer) -> Self")
-			expect(codesOf(result)).not.toContain(
-				"default-on-protocol-requirement",
-			)
+			expect(codesOf(result)).not.toContain("default-on-protocol-method")
 		})
 
 		// A tab typed at the head of the line since the analysis. The span now

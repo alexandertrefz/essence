@@ -457,7 +457,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"default-type-mismatch": mismatchFixes,
 	"default-on-function-literal": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
-	"default-on-protocol-requirement": ({ diagnostic, lines }) =>
+	"default-on-protocol-method": ({ diagnostic, lines }) =>
 		listed(removeDefaultAction(diagnostic, lines)),
 	"define-without-cases": ({ diagnostic, program, lines }) =>
 		listed(inlineDefineValueAction(diagnostic, program, lines)),

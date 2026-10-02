@@ -2927,7 +2927,7 @@ describe("Parser", () => {
 			)
 
 			expect(diagnostics.map((diagnostic) => diagnostic.code)).toContain(
-				"default-on-protocol-requirement",
+				"default-on-protocol-method",
 			)
 
 			let node = program.implementation.nodes[0]
@@ -2960,7 +2960,7 @@ describe("Parser", () => {
 
 			let [refused] = diagnostics.filter(
 				(diagnostic) =>
-					diagnostic.code === "default-on-protocol-requirement",
+					diagnostic.code === "default-on-protocol-method",
 			)
 
 			expect(refused.message).toBe(

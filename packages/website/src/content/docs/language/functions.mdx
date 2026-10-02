@@ -382,7 +382,7 @@ Every place a default is refused, and what the compiler says:
 | [`indistinguishable-default-parameter`](/docs/reference/diagnostics#indistinguishable-default-parameter) | `_ first: Integer = 1, _ second: String`: a defaulted unlabelled parameter with another unlabelled one after it | This default could not be told apart from the Parameter after it |
 | [`ambiguous-overload-default`](/docs/reference/diagnostics#ambiguous-overload-default) | a default lets two [overload](/docs/reference/syntax-glossary#overload) entries accept the same call | This default makes two Overloads accept the same call |
 | [`default-on-function-literal`](/docs/reference/diagnostics#default-on-function-literal) | a default on a [function literal](/docs/reference/syntax-glossary#function-literal), `(_ count: Integer = 1) -> Integer { … }` | A Function literal can not carry a default |
-| [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement) | a default on a requirement inside a [protocol](/docs/language/protocols) | A Protocol requirement can not carry a default |
+| [`default-on-protocol-method`](/docs/reference/diagnostics#default-on-protocol-method) | a default on a requirement or a provided method inside a [protocol](/docs/language/protocols) | A Protocol requirement can not carry a default, or A provided Method can not carry a default |
 
 A default may also be a record, and a record default fills in the members a written argument leaves out; Records explains that form.
 

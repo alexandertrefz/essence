@@ -415,7 +415,7 @@ export type DiagnosticCode =
 	| "nonconforming-namespace"
 	| "undeclared-conformance"
 	| "conformance-needs-target-type"
-	| "default-on-protocol-requirement"
+	| "default-on-protocol-method"
 	| "protocol-bound-function-value"
 	| "overloaded-function-value"
 	| "protocol-bound-namespace-generic"
