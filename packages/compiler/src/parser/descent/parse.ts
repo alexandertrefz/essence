@@ -23,6 +23,10 @@ import { mixedRationalSpellings } from "../../helpers/mixedRational"
 import { matcherNames } from "../../helpers/patterns"
 import * as generators from "../nodeGenerators"
 import {
+	type MisplacedDefault,
+	reportMisplacedDefault,
+} from "./misplacedDefaults"
+import {
 	describeToken,
 	fail,
 	ParseError,
@@ -3521,7 +3525,7 @@ class DescentParser {
 		)
 		this.refuseDefaultValues(
 			parameterList.parameters,
-			"Protocol requirement",
+			body === null ? "Protocol requirement" : "provided Method",
 		)
 
 		return generators.protocolMethodSignature(
@@ -6996,54 +7000,17 @@ class DescentParser {
 		}
 	}
 
-	// Refuses a default where it could never apply, on a Function literal or
-	// a Protocol requirement, and drops it once reported.
+	// Refuses a default where it could never apply, and drops it once reported.
 	protected refuseDefaultValues(
 		parameters: Array<parser.ParameterNode>,
-		kind: "Function literal" | "Protocol requirement",
+		place: MisplacedDefault,
 	): void {
 		for (let parameter of parameters) {
-			if (parameter.defaultValue === null) {
-				continue
+			if (parameter.defaultValue !== null) {
+				reportMisplacedDefault(parameter.defaultValue.position, place)
+
+				parameter.defaultValue = null
 			}
-
-			let position = parameter.defaultValue.position
-
-			if (kind === "Protocol requirement") {
-				reportError(
-					"A Protocol requirement can not carry a default",
-					position,
-					{
-						code: "default-on-protocol-requirement",
-						labels: [primary(position, "this default")],
-						notes: [
-							"A requirement says which calls a conforming Type must answer; a default is part of how one of them answers, which is each Namespace's own.",
-						],
-						helps: [
-							"Declare the requirement without the default, and write the default on the fulfilling Method.",
-						],
-					},
-				)
-			} else {
-				reportError(
-					"A Function literal can not carry a default",
-					position,
-					{
-						code: "default-on-function-literal",
-						labels: [primary(position, "this default")],
-						notes: [
-							"A Function literal is called through the Function Type it was written for, which fixes how many Arguments every call passes, so a default here could never be reached.",
-							// A Note, since the Declaration the literal is
-							// passed to is often not the reader's.
-							"A default belongs to a named Function or Method, whose Parameter list is part of the Declaration a call is resolved against.",
-						],
-						// The edit the Quick Fix makes.
-						helps: ["Remove the default."],
-					},
-				)
-			}
-
-			parameter.defaultValue = null
 		}
 	}
 

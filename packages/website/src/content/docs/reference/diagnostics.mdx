@@ -4558,7 +4558,7 @@ Taught on: [Protocols › Declaring a protocol](/docs/language/protocols#declari
 
 ### `default-on-protocol-requirement`
 
-**Error.** A parameter of a protocol requirement has a default. A default belongs to each namespace's method, not to the requirement.
+**Error.** A parameter of a protocol method has a default. A default belongs to each namespace's method, not to the protocol.
 
 <div class="error-output">
 
@@ -4580,6 +4580,8 @@ Error: A Protocol requirement can not carry a default
 </div>
 
 Remove the default from the requirement, and write it on the method that fulfils it. That method may carry a default its requirement does not.
+
+A [provided method](/docs/language/protocols#provided-methods), one with a body, is refused the same way, as "A provided Method can not carry a default". A namespace may replace it, and a call through a bound then runs the replacement, which the default would not reach. The Help is to remove the default and pass the argument at each call.
 
 Quick Fix: **Remove the default**.
 

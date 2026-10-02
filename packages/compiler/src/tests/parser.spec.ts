@@ -2945,6 +2945,35 @@ describe("Parser", () => {
 			expect(method.signature.parameters[0].defaultValue).toBeNull()
 		})
 
+		it("should word a default on a provided Method for the Method it is on", () => {
+			let { diagnostics } = parseWithDiagnostics(
+				`implementation {
+					protocol Greeter {
+						name() -> String
+
+						greet(times count: Integer = 1) -> String {
+							<- "{@::name()} x{count}"
+						}
+					}
+				}`,
+			)
+
+			let [refused] = diagnostics.filter(
+				(diagnostic) =>
+					diagnostic.code === "default-on-protocol-requirement",
+			)
+
+			expect(refused.message).toBe(
+				"A provided Method can not carry a default",
+			)
+			expect(refused.notes).toEqual([
+				"A conforming Namespace may replace a provided Method, and a call through a bound then runs the replacement, which a default here would not reach.",
+			])
+			expect(refused.helps).toEqual([
+				"Remove the default, and pass the Argument at each call.",
+			])
+		})
+
 		it("should refuse a default in a Function Type", () => {
 			let { diagnostics } = parseWithDiagnostics(
 				"implementation { constant f: (_ n: Integer = 1) -> Integer = g }",

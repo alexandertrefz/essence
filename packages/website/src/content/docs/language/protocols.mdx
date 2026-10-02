@@ -271,7 +271,7 @@ implementation {
 
 A protocol cannot declare:
 
-- **A default on a parameter.** `greet(_ name: String = "world") -> String` is [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement). Write the default on the conforming method.
+- **A default on a parameter.** `greet(_ name: String = "world") -> String` is [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement). Write the default on the conforming method. A provided method can not carry one either, since a namespace may replace it and a bound call then runs the replacement.
 - **A property.** `size: Integer` in a protocol is a `syntax-error`. A protocol holds methods only. To ask for a member, use a record type: a parameter typed `{ name: String }` accepts any record that has a `name`.
 - **A type parameter.** `protocol Container<Item>` and a requirement `transform<infer Target>(…)` are both syntax errors.
 - **A pattern in a parameter.** `area(of { width, height }: …)` is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). A requirement has no body to bind the names in.
