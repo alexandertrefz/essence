@@ -26,7 +26,6 @@ export {
 	choiceIdentity,
 	countOf,
 	describeArgumentCount,
-	describeMatcher,
 	describeParameter,
 	describeSignature,
 	describeType,
@@ -35,7 +34,9 @@ export {
 	displayGenericName,
 	displayProtocolName,
 	lastRequiredParameterIndex,
+	programSpelling,
 	requiredParameterCount,
+	spellMatcher,
 	withArticle,
 } from "./describe"
 export { mixedRationalSpellings } from "./mixedRational"

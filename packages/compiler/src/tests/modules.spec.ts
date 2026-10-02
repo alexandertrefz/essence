@@ -9445,6 +9445,22 @@ ${body}
 }
 `
 
+	// Each probe reports in `Main.es`, then compiles with its Help followed.
+	let reportedIn = (
+		main: string,
+		code: common.DiagnosticCode,
+	): common.Diagnostic | undefined =>
+		withProject({ "Main.es": main, "Shelf.es": shelfModule }, (directory) =>
+			analysedAt(directory, "Main.es", "Main.es").find(
+				(diagnostic) => diagnostic.code === code,
+			),
+		)
+
+	let codesIn = (main: string): Array<common.DiagnosticCode> =>
+		withProject({ "Main.es": main, "Shelf.es": shelfModule }, (directory) =>
+			codesOf(analysedAt(directory, "Main.es", "Main.es")),
+		)
+
 	// A Generic Alias under another name is one application of its Choice,
 	// with Type Parameters of its own order, so it binds no Choice.
 	let reorderingModule = `implementation {
@@ -9535,5 +9551,396 @@ ${body}
 				).toEqual(["true", "false", "Red"])
 			},
 		)
+	})
+
+	it("names the applications of an ambiguous Case as the imports name them", () => {
+		let refusal = reportedIn(
+			importing(
+				"Box as Carton",
+				'\tconstant box: Carton<Integer> | Carton<String> = #Full("x")',
+			),
+			"ambiguous-case",
+		)
+
+		expect(refusal?.message).toBe(
+			"Case '#Full' fits more than one application of 'Carton'",
+		)
+		expect(refusal?.helps).toEqual([
+			"Write 'Carton<Integer>#Full' to pick 'Carton<Integer>'.",
+			"Write 'Carton<String>#Full' to pick 'Carton<String>'.",
+		])
+		expect(
+			codesIn(
+				importing(
+					"Box as Carton",
+					'\tconstant box: Carton<Integer> | Carton<String> = Carton<String>#Full("x")\n\tTerminal.inspect(box)',
+				),
+			),
+		).toEqual([])
+	})
+
+	it("writes a missing Case under the name an import gave its Choice", () => {
+		let match = (handlers: string) =>
+			importing(
+				"Box as Carton",
+				`	function describe(_ box: Carton<Integer> | Carton<String>) -> String {
+		<- match box -> String {
+			case #Empty { <- "empty" }${handlers}
+		}
+	}
+
+	Terminal.print(describe(Carton<Integer>#Empty))`,
+			)
+		let refusal = reportedIn(match(""), "missing-case")
+
+		expect(refusal?.helps).toEqual([
+			"Add 'case Carton#Full', or a 'case _' that covers the rest.",
+		])
+		expect(refusal?.data).toEqual({
+			kind: "missing-case",
+			unhandled: ["Carton#Full"],
+		})
+		expect(
+			codesIn(match('\n\t\t\tcase Carton#Full { <- "full" }')),
+		).toEqual([])
+	})
+
+	// `Main.es` binds no name for `Box`, so its Case is written bare and
+	// resolves against the matched value.
+	it("writes a missing Case bare where no import names its Choice", () => {
+		let match = (handlers: string) =>
+			importing(
+				"make",
+				`	Terminal.print(match make() -> String {
+		case #Empty { <- "empty" }${handlers}
+	})`,
+			)
+		let refusal = reportedIn(match(""), "missing-case")
+
+		expect(refusal?.helps).toEqual([
+			"Add 'case #Full', or a 'case _' that covers the rest.",
+		])
+		expect(codesIn(match('\n\t\tcase #Full { <- "full" }'))).toEqual([])
+	})
+
+	it("offers the name an import gave a Type written by its declared name", () => {
+		let refusal = reportedIn(
+			importing(
+				"Box as Carton",
+				'\tconstant box: Carton<String> = Box<String>#Full("x")',
+			),
+			"unknown-type",
+		)
+
+		expect(refusal?.helps).toEqual([
+			"Write 'Carton', the name 'Box' goes by in this file.",
+		])
+		expect(refusal?.data).toEqual({
+			kind: "suggestion",
+			suggestion: "Carton",
+		})
+		expect(
+			codesIn(
+				importing(
+					"Box as Carton",
+					'\tconstant box: Carton<String> = Carton<String>#Full("x")\n\tTerminal.inspect(box)',
+				),
+			),
+		).toEqual([])
+	})
+
+	// `Flipped` and `Boxes` each name one application, which no Type Argument
+	// written to `Pair` or `Box` spells.
+	it("offers no generic Alias as the name a Choice goes by", () => {
+		let named = (entry: string, annotation: string, value: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Reordering.es" { ${entry} }
+}
+
+implementation {
+	constant held: ${annotation} = ${value}
+	Terminal.inspect(held)
+}
+`,
+					"Reordering.es": reorderingModule,
+				},
+				(directory) =>
+					analysedAt(directory, "Main.es", "Main.es").find(
+						(diagnostic) => diagnostic.code === "unknown-type",
+					)?.helps,
+			)
+
+		expect(
+			named(
+				"Flipped",
+				"Pair<String, Integer>",
+				'#Both({ first = "a", second = 1 })',
+			),
+		).toEqual([])
+		expect(named("Boxes", "Box<Integer>", "#Full(1)")).toEqual([])
+	})
+
+	it("spells a Namespace's target and condition as the imports name them", () => {
+		let entries = "Shown as Visible\n\t\tTagged as Label"
+		let printed = `	function show<infer Item is Visible>(_ tagged: Label<Item>) -> Integer {
+		Terminal.print(tagged)
+		<- 1
+	}`
+		let refusal = reportedIn(
+			importing(entries, printed),
+			"unsatisfied-bound",
+		)
+
+		expect(refusal?.helps).toEqual([
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+			"Declare a Namespace '<infer Item> for Label<Item> is Printable where Item is Visible'.",
+		])
+		expect(
+			codesIn(
+				importing(
+					entries,
+					`	namespace LabelShown<infer Item> for Label<Item> is Printable where Item is Visible {
+		toString() -> String { <- "label" }
+	}
+
+${printed}`,
+				),
+			),
+		).toEqual([])
+	})
+
+	it("names the Choice a dispatch can not tell applications of as imported", () => {
+		let refusal = reportedIn(
+			importing(
+				"Box as Carton",
+				`	function isEmpty(_ box: Carton<Integer> | Carton<String>) -> Boolean {
+		<- box::is(#Empty)
+	}`,
+			),
+			"erased-case-conflict",
+		)
+
+		expect(refusal?.helps).toEqual([
+			"Write the receiver's Type as one application of 'Carton'.",
+		])
+		expect(
+			codesIn(
+				importing(
+					"Box as Carton",
+					`	function isEmpty(_ box: Carton<Integer>) -> Boolean {
+		<- box::is(#Empty)
+	}
+
+	Terminal.inspect(isEmpty(#Empty))`,
+				),
+			),
+		).toEqual([])
+	})
+
+	let renamingModule = `implementation {
+	choice Pair<A, B> { Both { first: A, second: B }, Neither }
+	choice Either<First, Second> { Left { value: First }, Right { value: Second } }
+
+	type Point = { x: Integer, y: Integer }
+	type Small = Integer where @::isLessThan(10)
+}
+
+export {
+	Either
+	Pair
+	Point
+	Small
+}
+`
+
+	let renamed = (body: string) =>
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Renaming.es" {
+		Either as Fork
+		Pair as Duo
+		Point as Spot
+		Small as Tiny
+	}
+}
+
+implementation {
+${body}
+}
+`,
+				"Renaming.es": renamingModule,
+			},
+			// Each probe uses only some of the entries.
+			(directory) =>
+				analysedAt(directory, "Main.es", "Main.es").filter(
+					(diagnostic) => diagnostic.code !== "unused-import",
+				),
+		)
+
+	it("names an undecided Choice as the imports name it", () => {
+		expect(
+			renamed(
+				"\tconstant none = #Neither\n\tconstant left = #Left(1)",
+			).map((diagnostic) => diagnostic.helps),
+		).toEqual([
+			[
+				"Annotate the Declaration this is written into with 'Duo<…, …>', which is what decides them.",
+				"Or apply the Type Arguments here — 'Duo<…, …>#Neither', with the Type you mean in place of each '…'.",
+			],
+			[
+				"Annotate the Declaration this is written into with 'Fork<Integer, …>', which is what decides them.",
+				"Or apply the Type Arguments here — 'Fork<Integer, …>#Left(…)', with the Type you mean in place of each '…'.",
+			],
+		])
+		expect(
+			codesOf(
+				renamed(`	constant none: Duo<Integer, String> = #Neither
+	constant left = Fork<Integer, String>#Left(1)
+	Terminal.inspect(none)
+	Terminal.inspect(left)`),
+			),
+		).toEqual([])
+	})
+
+	// A refinement is no Matcher, so the arm tests its base.
+	it("writes a missing member as the imports name it, a refinement by its base", () => {
+		let matched = (
+			handlers: string,
+		) => `	function spotted(_ value: Spot | Tiny | String) -> String {
+		<- match value -> String {
+			case String { <- "text" }${handlers}
+		}
+	}
+
+	Terminal.print(spotted("a"))`
+
+		expect(
+			renamed(matched("")).find(
+				(diagnostic) => diagnostic.code === "missing-case",
+			)?.helps,
+		).toEqual([
+			"Add 'case Spot', 'case Integer', or a 'case _' that covers the rest.",
+		])
+		expect(
+			codesOf(
+				renamed(
+					matched(
+						'\n\t\t\tcase Spot { <- "spot" }\n\t\t\tcase Integer { <- "tiny" }',
+					),
+				),
+			),
+		).toEqual([])
+	})
+
+	// Two Choices no import names share `#Full`, so neither can be written
+	// bare, and `case _` takes both.
+	it("leaves the Cases no name here can write to a 'case _'", () => {
+		let matched = (handlers: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Parcels.es" { parcels }
+}
+
+implementation {
+	Terminal.print(match parcels() -> String {
+		case #Bare { <- "bare" }${handlers}
+	})
+}
+`,
+					"Parcels.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Crate { Full { count: Integer }, Bare }
+
+	function parcels() -> Box<Integer> | Crate {
+		<- Crate#Bare
+	}
+}
+
+export {
+	parcels
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let refusal = matched("").find(
+			(diagnostic) => diagnostic.code === "missing-case",
+		)
+
+		expect(refusal?.helps).toEqual([
+			"Add 'case #Empty', and a 'case _' for the Cases this file has no name for.",
+		])
+		expect(refusal?.data).toEqual({
+			kind: "missing-case",
+			unhandled: ["#Empty", "_"],
+		})
+		expect(
+			codesOf(
+				matched(
+					'\n\t\tcase #Empty { <- "empty" }\n\t\tcase _ { <- "full" }',
+				),
+			),
+		).toEqual([])
+	})
+
+	// The Namespace's `for` clause names the Choice as the Help's import
+	// binds it.
+	it("spells a Namespace target by the name its import binds", () => {
+		let printed = (entries: string, declared: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Parcels.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	Terminal.print(boxed())
+}
+`,
+					"Parcels.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+
+	function boxed() -> Box<Integer> {
+		<- #Full(1)
+	}
+}
+
+export {
+	Box as Crate
+	boxed
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			printed("boxed", "").find(
+				(diagnostic) => diagnostic.code === "unsatisfied-bound",
+			)?.helps,
+		).toEqual([
+			"Write 'Terminal.inspect(…)' instead — it renders any value structurally and asks for no conformance.",
+			"'Box' is declared in Parcels.es, which exports it as 'Crate' — import 'Crate' here, and declare a Namespace 'for Crate<Integer> is Printable'.",
+		])
+		expect(
+			codesOf(
+				printed(
+					"boxed\n\t\tCrate",
+					`
+	namespace CrateShown for Crate<Integer> is Printable {
+		toString() -> String {
+			<- "crate"
+		}
+	}
+`,
+				),
+			),
+		).toEqual([])
 	})
 })

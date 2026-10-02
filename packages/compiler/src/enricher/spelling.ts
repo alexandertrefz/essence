@@ -1,11 +1,17 @@
-import type { common, enricher } from "@essence-lang/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
 
+import { primary, reportError } from "../diagnostics/index"
 import {
+	ambiguousCaseWording,
 	bindsDeclaration,
+	caseCandidatePrefixes,
 	choiceCarried,
+	declaredNameOf,
 	displayChoiceName,
 	isDeclaration,
+	type Spelling,
 } from "../helpers/describe"
+import { closestMatch } from "../helpers/suggest"
 import { modulePathOf } from "./scope"
 
 // The name this Scope binds a declaration under. That is its declared name
@@ -36,6 +42,39 @@ export function choiceBindingIn(
 		(bound) => choiceCarried(bound) === identity,
 		scope,
 	)
+}
+
+// The other name this Scope binds a Type declared as `name` under, such as the
+// alias an import gave it, or null.
+export function renamedTypeIn(
+	name: string,
+	scope: enricher.Scope,
+): string | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		for (let bound in current.types) {
+			let candidate = current.types[bound]
+
+			if (
+				bound !== name &&
+				isDeclaration(candidate) &&
+				declaredNameOf(candidate) === name &&
+				typeBoundIn(bound, scope) === candidate
+			) {
+				return bound
+			}
+		}
+	}
+
+	return null
+}
+
+// The name to write for a Choice known by its identity.
+export function choiceNameIn(identity: string, scope: enricher.Scope): string {
+	return choiceBindingIn(identity, scope)?.name ?? displayChoiceName(identity)
 }
 
 // Under another name, only a declaration counts (`isDeclaration`). An Alias
@@ -72,6 +111,11 @@ function bindingIn(
 	}
 
 	return null
+}
+
+// The reader's spelling in this Scope.
+export function spellingIn(scope: enricher.Scope): Spelling {
+	return (declared, carrier) => writtenNameIn(declared, carrier, scope)
 }
 
 // The Choice this Type is, where another Module of this graph declared it and
@@ -215,6 +259,20 @@ function importOf({ name, exportedAs, fileName }: ForeignChoice): string {
 			: `'${name}' is declared in ${fileName}, which exports it as '${exportedAs}' — import '${exportedAs}' here`
 }
 
+// The reader's spelling once the Help's import binds the Choice.
+export function spellingAfterImport(
+	scope: enricher.Scope,
+	foreign: ForeignChoice,
+): Spelling {
+	let spell = spellingIn(scope)
+
+	return (declared, carrier) =>
+		spell(declared, carrier) ??
+		(choiceCarried(carrier) === foreign.identity
+			? (foreign.exportedAs ?? foreign.name)
+			: null)
+}
+
 function typeBoundIn(name: string, scope: enricher.Scope): common.Type | null {
 	for (
 		let current: enricher.Scope | null = scope;
@@ -227,4 +285,114 @@ function typeBoundIn(name: string, scope: enricher.Scope): common.Type | null {
 	}
 
 	return null
+}
+
+// Shows the qualified spelling for each candidate. A declared generic Choice
+// also needs its Type Arguments, written as `<…>`, since its Type Parameter
+// names are not in scope at the call. Each Choice is named as this Scope binds
+// it. See `caseCandidatePrefixes`.
+export function reportAmbiguousCase(
+	caseName: parser.IdentifierNode,
+	candidates: Array<common.CaseType>,
+	where: string,
+	scope: enricher.Scope,
+	applied: boolean = false,
+): void {
+	let spell = spellingIn(scope)
+	let prefixes = caseCandidatePrefixes(candidates, applied, spell)
+	let choiceNames = prefixes.map((prefix) => prefix.name)
+	let wording = ambiguousCaseWording(
+		caseName.content,
+		candidates,
+		where,
+		choiceNames.length,
+		spell,
+	)
+
+	reportError(wording.message, caseName.position, {
+		code: "ambiguous-case",
+		labels: [primary(caseName.position, wording.label)],
+		notes: wording.notes,
+		// One Help per prefix, since which was meant is what this can not
+		// decide. The builtin `Optional`'s `#Empty` and `#Value` collide
+		// with names a Program likely declares.
+		helps: prefixes.map(({ name, generic }) =>
+			generic
+				? `Write '${name}<…>#${caseName.content}' with its Type Arguments to pick '${name}'.`
+				: `Write '${name}#${caseName.content}' to pick '${name}'.`,
+		),
+		// The names alone, one action each in the same order. A fix writes
+		// the prefix, and `undecided-type-arguments` then asks for the Type
+		// Arguments of a declared generic Choice.
+		data: { kind: "choice-candidates", names: choiceNames },
+	})
+}
+
+// Every name of one kind visible from `scope`, innermost first, which a
+// near miss is drawn from.
+function namesInScope(
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): Array<string> {
+	let names: Array<string> = []
+	let searchScope: enricher.Scope | null = scope
+
+	while (searchScope !== null) {
+		names.push(...Object.keys(searchScope[kind]))
+		searchScope = searchScope.parent
+	}
+
+	return names
+}
+
+export function suggestionInScope(
+	name: string,
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): string | null {
+	let suggestion = closestMatch(name, namesInScope(scope, kind))
+
+	return suggestion === null || suggestion === name ? null : suggestion
+}
+
+// What `unknown-type` offers: the name an import gave the Type, else a near
+// miss. The Quick Fix writes either.
+export function unknownTypeRemedy(
+	name: string,
+	scope: enricher.Scope,
+): { helps: Array<string>; data?: common.DiagnosticData } {
+	let renamed = renamedTypeIn(name, scope)
+
+	return renamed === null
+		? {
+				helps: suggestionHelps(name, scope, "types"),
+				...suggestionData(suggestionInScope(name, scope, "types")),
+			}
+		: {
+				helps: [
+					`Write '${renamed}', the name '${name}' goes by in this file.`,
+				],
+				...suggestionData(renamed),
+			}
+}
+
+// A near miss is a Help rather than part of the message, since it is a guess.
+export function suggestionHelps(
+	name: string,
+	scope: enricher.Scope,
+	kind: "members" | "types" | "protocols",
+): Array<string> {
+	let suggestion = suggestionInScope(name, scope, kind)
+
+	return suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
+}
+
+// The near miss for the Quick Fix, spread so that no suggestion means no
+// `data` key.
+export function suggestionData(suggestion: string | null): {
+	data?: common.DiagnosticData
+} {
+	return suggestion === null
+		? {}
+		: { data: { kind: "suggestion", suggestion } }
 }

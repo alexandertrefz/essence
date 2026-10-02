@@ -163,6 +163,31 @@ export function displayedRefinementArguments(
 	return type.typeArguments
 }
 
+// The name the reading file writes a declaration under, given its declared
+// name and a Type carrying it. Null where the file binds it under no name. See
+// "Spelling a name for the reader" in DEVELOPMENT.md.
+export type Spelling = (declared: string, type: common.Type) => string | null
+
+export const declaredSpelling: Spelling = (declared) => declared
+
+// The name to write for a Case's Choice, the declared one where the reader
+// binds none.
+export function spellChoiceName(
+	type: common.CaseType,
+	spell: Spelling,
+): string {
+	return written(spell, displayChoiceName(type.choice), type)
+}
+
+// The name to write, the declared one where the reader binds none.
+function written(
+	spell: Spelling,
+	declared: string,
+	carrier: common.Type,
+): string {
+	return spell(declared, carrier) ?? declared
+}
+
 // Whether a name binding `bound` binds the declaration `carrier` names under
 // `declared`. A Choice is told by the identity its Cases carry, since two
 // Modules may each declare a `Box`. Any other declaration is told by its name.
@@ -244,66 +269,119 @@ export function choiceCarried(type: common.Type): string | null {
 		: null
 }
 
+// The reader's spelling from a typed Program alone, as after enrichment: the
+// names its import entries and top-level Choices bind. A name the Program
+// declares itself is its own, since only a Choice's identity tells two
+// Modules' declarations apart. A Choice of another Module that nothing here
+// binds answers null.
+export function programSpelling(program: common.typed.Program): Spelling {
+	let imported = (program.imports?.entries ?? []).flatMap((entry) =>
+		entry.type === null
+			? []
+			: [{ name: entry.alias ?? entry.name, type: entry.type }],
+	)
+	let choices = program.implementation.nodes.flatMap((node) =>
+		node.nodeType === "ChoiceDeclarationStatement"
+			? [{ name: node.name.content, type: node.type }]
+			: [],
+	)
+	let declaredHere = new Set(
+		program.implementation.nodes.flatMap((node) =>
+			node.nodeType === "TypeAliasStatement" ? [node.name.content] : [],
+		),
+	)
+
+	return (declared, carrier) => {
+		let identity = choiceCarried(carrier)
+
+		if (identity === null) {
+			return declaredHere.has(declared)
+				? declared
+				: (imported.find((binding) =>
+						bindsDeclaration(binding.type, declared, carrier),
+					)?.name ?? declared)
+		}
+
+		if (!identity.includes("#")) {
+			return declared
+		}
+
+		return (
+			[...imported, ...choices].find((binding) =>
+				bindsDeclaration(binding.type, declared, carrier),
+			)?.name ?? null
+		)
+	}
+}
+
 // A Type on one line, as a Diagnostic names it: the spelling a reader knows
 // from their source. `printType` is the hover's form.
 export function describeType(type: common.Type): string {
+	return spellType(type, declaredSpelling)
+}
+
+// `describeType`, with every declared name as `spell` writes it.
+export function spellType(type: common.Type, spell: Spelling): string {
+	let described = (inner: common.Type) => spellType(inner, spell)
+
 	switch (type.type) {
 		case "UnionType":
 			if (type.name !== undefined) {
-				return type.name
+				return written(spell, type.name, type)
 			}
 
 			if (type.alias !== undefined) {
-				return `${type.alias.name}<${type.alias.typeArguments
-					.map(describeType)
+				return `${written(spell, type.alias.name, type)}<${type.alias.typeArguments
+					.map(described)
 					.join(", ")}>`
 			}
 
-			return type.types.map(describeType).join(" | ")
+			return type.types.map(described).join(" | ")
 		case "Case":
-			return `${describeCaseChoice(type)}#${type.name}`
+			return `${spellCaseChoice(type, spell)}#${type.name}`
 		// A refinement is named, not spelled out, and an applied one with all
 		// its Arguments, even Type Parameters. A bare `NonEmptyList` is not a
 		// Type a reader can write.
 		case "Refinement":
 			return type.typeArguments === undefined
-				? type.name
-				: `${type.name}<${type.typeArguments
-						.map(describeType)
+				? written(spell, type.name, type)
+				: `${written(spell, type.name, type)}<${type.typeArguments
+						.map(described)
 						.join(", ")}>`
 		case "List":
-			return `List<${describeType(type.itemType)}>`
+			return `List<${described(type.itemType)}>`
 		case "GenericList":
 			return "List"
 		case "Future":
-			return `Future<${describeType(type.valueType)}>`
+			return `Future<${described(type.valueType)}>`
 		case "Started":
-			return `Started<${describeType(type.valueType)}>`
+			return `Started<${described(type.valueType)}>`
 		case "Dictionary":
-			return `Dictionary<${describeType(type.keyType)}, ${describeType(
+			return `Dictionary<${described(type.keyType)}, ${described(
 				type.valueType,
 			)}>`
 		case "GenericDictionary":
 			return "Dictionary"
 		// A Record reached through an Alias is named, as a Union is, and
 		// `describeRecordShape` spells out members where a mismatch needs them.
-		// The name is the declaring file's, even where an import renamed it.
+		// `describeType` gives the declaring file's name, even where an import
+		// renamed it.
 		case "Record":
 			if (type.name !== undefined) {
-				return type.name
+				return written(spell, type.name, type)
 			}
 
 			if (type.alias !== undefined) {
-				return `${type.alias.name}<${type.alias.typeArguments
-					.map(describeType)
+				return `${written(spell, type.alias.name, type)}<${type.alias.typeArguments
+					.map(described)
 					.join(", ")}>`
 			}
 
-			return describeRecordShape(type)
+			return spellRecordShape(type, spell)
 		case "Function":
 		case "SimpleMethod":
 		case "StaticMethod":
-			return describeFunctionSignature(type)
+			return spellFunctionSignature(type, spell)
 		// An Overload set has no one signature. A Diagnostic that holds one
 		// names the Overloads in notes of their own.
 		case "OverloadedMethod":
@@ -347,11 +425,15 @@ export function unnameableTargetNote(type: common.Type): string | null {
 // A Namespace's head for the Type, written after `name`, as a Help spells it. A
 // Type Parameter the Type mentions is not in scope where the Namespace stands,
 // so the head declares it: `<infer T> for (_: T) -> T`.
-export function namespaceHead(type: common.Type, name: string = ""): string {
+export function namespaceHead(
+	type: common.Type,
+	name: string = "",
+	spell: Spelling = declaredSpelling,
+): string {
 	let parameters = [...genericNamesMentioned(type)].map(
 		(parameter) => `infer ${displayGenericName(parameter)}`,
 	)
-	let target = `for ${describeType(type)}`
+	let target = `for ${spellType(type, spell)}`
 
 	if (parameters.length > 0) {
 		return `${name}<${parameters.join(", ")}> ${target}`
@@ -366,6 +448,8 @@ export function namespaceHead(type: common.Type, name: string = ""): string {
 export function namespaceWhere(
 	type: common.Type,
 	parametersOf: (choice: string) => Array<common.GenericDeclaration>,
+	// The name the reader's file binds a bound's Protocol under.
+	spellBound: (identity: string) => string = displayProtocolName,
 ): string {
 	let conditions = [
 		...choiceArgumentBounds(
@@ -375,48 +459,59 @@ export function namespaceWhere(
 		),
 	].map(
 		([name, bound]) =>
-			`${displayGenericName(name)} is ${displayProtocolName(bound)}`,
+			`${displayGenericName(name)} is ${spellBound(bound)}`,
 	)
 
 	return conditions.length === 0 ? "" : ` where ${conditions.join(", ")}`
 }
 
-// A Union member as a Diagnostic names it. A Case Matcher takes no Type
-// Arguments and covers every application of its Case, so a Case is spelled
-// without them.
-function describeMember(type: common.Type): string {
-	return type.type === "Case"
-		? `${displayChoiceName(type.choice)}#${type.name}`
-		: describeType(type)
-}
-
-// A member Type as a `case` writes it. A Matcher can not test a refinement's
-// predicate, so a refinement is spelled as its base, as
-// `refinement-as-matcher` asks.
-export function describeMatcher(type: common.Type): string {
-	return describeMember(eraseRefinements(type))
-}
-
-// What a Match leaves unhandled, as `missing-case` reports it. The Note lists
-// the members as the Union writes them, and the Help the `case` each needs.
-export function describeUnhandled(types: Array<common.Type>): {
-	members: Array<string>
-	matchers: Array<string>
-} {
-	return {
-		members: [...new Set(types.map(describeMember))],
-		matchers: [...new Set(types.map(describeMatcher))],
+// A member Type as a `case` writes it. A Case Matcher takes no Type Arguments
+// and covers every application of its Case, so a Case is spelled without them.
+// A Case of a Choice the reader has no name for is written bare, since a bare
+// Case resolves against the matched value. Where another of `members` shares
+// its name, nothing can be written, and the answer is null. A refinement is no
+// Matcher, so its base is written.
+export function spellMatcher(
+	type: common.Type,
+	spell: Spelling,
+	members: ReadonlyArray<common.Type> = [],
+): string | null {
+	if (type.type !== "Case") {
+		return spellType(eraseRefinements(type), spell)
 	}
+
+	let name = spell(displayChoiceName(type.choice), type)
+	let shared = members.some(
+		(member) =>
+			member.type === "Case" &&
+			member.name === type.name &&
+			member.choice !== type.choice,
+	)
+
+	if (name !== null) {
+		return `${name}#${type.name}`
+	}
+
+	return shared ? null : `#${type.name}`
 }
 
 // The Choice a Case belongs to, applied as `Box<Integer>` where the Case carries
 // the Type Arguments an application bound.
 export function describeCaseChoice(type: common.CaseType): string {
-	let choiceName = displayChoiceName(type.choice)
+	return spellCaseChoice(type, declaredSpelling)
+}
+
+export function spellCaseChoice(
+	type: common.CaseType,
+	spell: Spelling,
+): string {
+	let choiceName = spellChoiceName(type, spell)
 
 	return type.typeArguments === undefined
 		? choiceName
-		: `${choiceName}<${type.typeArguments.map(describeType).join(", ")}>`
+		: `${choiceName}<${type.typeArguments
+				.map((typeArgument) => spellType(typeArgument, spell))
+				.join(", ")}>`
 }
 
 // The prefixes that pick among the Cases a bare `#Case` could mean, and whether
@@ -427,6 +522,7 @@ export function describeCaseChoice(type: common.CaseType): string {
 export function caseCandidatePrefixes(
 	candidates: Array<common.CaseType>,
 	applied: boolean,
+	spell: Spelling = declaredSpelling,
 ): Array<{ name: string; generic: boolean }> {
 	return candidates.flatMap((candidate) => {
 		let sameChoice = candidates.filter(
@@ -441,8 +537,8 @@ export function caseCandidatePrefixes(
 			{
 				name:
 					applied && sameChoice.length > 1
-						? describeCaseChoice(candidate)
-						: displayChoiceName(candidate.choice),
+						? spellCaseChoice(candidate, spell)
+						: spellChoiceName(candidate, spell),
 				generic: candidate.choiceGenerics !== undefined,
 			},
 		]
@@ -457,10 +553,13 @@ export function ambiguousCaseWording(
 	candidates: Array<common.CaseType>,
 	where: string,
 	prefixes: number,
+	spell: Spelling = declaredSpelling,
 ): { message: string; label: string; notes: Array<string> } {
 	let declaring = [
-		...new Set(candidates.map((candidate) => candidate.choice)),
-	].map(displayChoiceName)
+		...new Map(
+			candidates.map((candidate) => [candidate.choice, candidate]),
+		).values(),
+	].map((candidate) => spellChoiceName(candidate, spell))
 	let notes = declaring.map(
 		(choiceName) => `'${choiceName}' declares '#${caseName}'.`,
 	)
@@ -486,6 +585,7 @@ export function ambiguousCaseWording(
 export function erasedDispatchEvidence(
 	earlier: common.Type,
 	later: common.Type,
+	spell: Spelling = declaredSpelling,
 ): { note: string; help: string } {
 	if (
 		earlier.type === "Case" &&
@@ -493,8 +593,8 @@ export function erasedDispatchEvidence(
 		earlier.choice === later.choice
 	) {
 		return {
-			note: `${describeType(earlier)} and ${describeType(later)} differ only in their Type Arguments, which do not survive to runtime.`,
-			help: `Write the receiver's Type as one application of '${displayChoiceName(earlier.choice)}'.`,
+			note: `${spellType(earlier, spell)} and ${spellType(later, spell)} differ only in their Type Arguments, which do not survive to runtime.`,
+			help: `Write the receiver's Type as one application of '${spellChoiceName(earlier, spell)}'.`,
 		}
 	}
 
@@ -507,23 +607,30 @@ export function erasedDispatchEvidence(
 // A function Type as a Type Annotation spells it, `(_: Integer) -> Integer`,
 // with labels but no internal names. A Method named rather than called shows
 // its receiver as the first Parameter.
-function describeFunctionSignature(functionType: common.BaseFunction): string {
+function spellFunctionSignature(
+	functionType: common.BaseFunction,
+	spell: Spelling,
+): string {
 	let parameters = functionType.parameterTypes
 		.map(
 			(parameter) =>
-				`${parameter.name ?? "_"}: ${describeType(parameter.type)}`,
+				`${parameter.name ?? "_"}: ${spellType(parameter.type, spell)}`,
 		)
 		.join(", ")
 
-	return `(${parameters}) -> ${describeType(functionType.returnType)}`
+	return `(${parameters}) -> ${spellType(functionType.returnType, spell)}`
 }
 
 // A Record with its members spelled out, whatever it is called, for a
 // mismatch about members. An empty Record is `{}`.
 export function describeRecordShape(type: common.RecordType): string {
+	return spellRecordShape(type, declaredSpelling)
+}
+
+function spellRecordShape(type: common.RecordType, spell: Spelling): string {
 	let members = Object.entries(type.members).map(
 		([memberName, memberType]) =>
-			`${memberName}: ${describeType(memberType)}`,
+			`${memberName}: ${spellType(memberType, spell)}`,
 	)
 
 	return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`

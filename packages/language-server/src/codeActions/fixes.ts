@@ -55,7 +55,7 @@ import {
 // Quick Fixes for Diagnostic codes. `fixesByCode` in `index.ts` maps codes to
 // them.
 
-// Whether a member spelled by `describeMatcher` can be written as a Matcher. An
+// Whether a member spelled by `spellMatcher` can be written as a Matcher. An
 // Overload set prints as `Function` and cannot, so a `case _` covers it. The
 // Match scaffold shares this rule.
 export function isWritableMatcher(spelling: string): boolean {
@@ -65,7 +65,7 @@ export function isWritableMatcher(spelling: string): boolean {
 
 	return (
 		/^[A-Z][A-Za-z0-9]*(<.+>)?$/.test(spelling) ||
-		/^[A-Z][A-Za-z0-9]*#[A-Z][A-Za-z0-9]*$/.test(spelling)
+		/^([A-Z][A-Za-z0-9]*)?#[A-Z][A-Za-z0-9]*$/.test(spelling)
 	)
 }
 

@@ -14,14 +14,17 @@ import {
 	asynchronyHelps,
 	booleanQuestionFor,
 	countOf,
+	declaredSpelling,
 	describeParameter,
 	describeSignature,
 	describeType,
-	describeUnhandled,
 	displayProtocolName,
 	erasedDispatchEvidence,
+	programSpelling,
 	recordMismatchEvidence,
 	returnAsynchronyHelps,
+	type Spelling,
+	spellType,
 	undecidedSlotEvidence,
 	undispatchableHelps,
 	withArticle,
@@ -53,6 +56,7 @@ import {
 	typeContainsUnknown,
 } from "../helpers/types"
 import { type Claim, claimedCaseReport } from "./claimedCases"
+import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -140,6 +144,9 @@ let topLevelStatementFloor = 0
 // DEVELOPMENT.md.
 let alreadyReported = false
 
+// How a report writes a declared name for this Program's reader.
+let readerSpelling: Spelling = declaredSpelling
+
 export type ValidateOptions = {
 	// What the parser abandoned on its way to this Program. The typed Program
 	// does not carry it.
@@ -162,6 +169,7 @@ export const validate = (
 	abandonedHeadLines = new Set(options.recovery?.headLines ?? [])
 	topLevelStatementFloor = 0
 	alreadyReported = options.reported === true
+	readerSpelling = programSpelling(program)
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let [index, node] of program.implementation.nodes.entries()) {
@@ -881,7 +889,11 @@ function validateDispatchCases(
 			let laterType = dispatchCases[later].memberType
 
 			if (acceptsAllAtRuntime(earlierType, laterType)) {
-				let erased = erasedDispatchEvidence(earlierType, laterType)
+				let erased = erasedDispatchEvidence(
+					earlierType,
+					laterType,
+					readerSpelling,
+				)
 
 				reportError(
 					`The branch for ${describeType(laterType)} can never run`,
@@ -1281,32 +1293,12 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				),
 		)
 
-		// One Diagnostic for every unhandled member, which share a cause and
-		// a fix. One Matcher answers for every application of a Case.
 		if (unhandledTypes.length > 0) {
-			let { members, matchers } = describeUnhandled(unhandledTypes)
-
-			reportError(
-				`This Match Expression does not handle every Case`,
-				node.position,
-				{
-					code: "missing-case",
-					labels: [
-						primary(
-							node.value.position,
-							`this is ${withArticle(describeType(node.value.type))}`,
-						),
-					],
-					notes: [
-						`Unhandled: ${members.map((member) => `'${member}'`).join(", ")}.`,
-					],
-					helps: [
-						`Add ${matchers.map((matcher) => `'case ${matcher}'`).join(", ")}, or a 'case _' that covers the rest.`,
-					],
-					// The Help's spellings, for the Quick Fix that writes the
-					// Handlers.
-					data: { kind: "missing-case", unhandled: matchers },
-				},
+			reportMissingCases(
+				node,
+				memberTypes,
+				unhandledTypes,
+				readerSpelling,
 			)
 		}
 
@@ -1408,7 +1400,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 									writtenBoundOf,
 								)
 							: [
-									`Write this Case above 'case ${describeType(claimer.matcher)}', which can only ever be the last one.`,
+									`Write this Case above 'case ${spellType(claimer.matcher, readerSpelling)}', which can only ever be the last one.`,
 								],
 				)
 

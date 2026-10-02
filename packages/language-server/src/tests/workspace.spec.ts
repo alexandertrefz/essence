@@ -2395,6 +2395,145 @@ describe("Workspace", () => {
 			expect(fix.isPreferred).toBe(false)
 		})
 
+		// `Main.es` names neither Choice. A Case is written bare where that
+		// resolves against the matched value, and `case _` takes the rest.
+		describe("a Match over Choices no import names", () => {
+			let files = {
+				"Parcels.es": [
+					"implementation {",
+					"\tchoice Box<Value> { Full { value: Value }, Empty }",
+					"\tchoice Crate { Full { count: Integer }, Bare }",
+					"",
+					"\tfunction boxes() -> Box<Integer> | Box<String> {",
+					"\t\t<- Box<Integer>#Full(1)",
+					"\t}",
+					"",
+					"\tfunction parcels() -> Box<Integer> | Crate {",
+					"\t\t<- Crate#Bare",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tboxes",
+					"\tparcels",
+					"}",
+					"",
+				].join("\n"),
+				"Main.es": [
+					"import {",
+					'\tfrom "./Parcels.es" {',
+					"\t\tboxes",
+					"\t\tparcels",
+					"\t}",
+					"}",
+					"",
+					"implementation {",
+					"\tconstant boxed = boxes()",
+					"\tconstant parcel = parcels()",
+					"",
+					"\tTerminal.print(match boxed -> String {",
+					'\t\tcase #Empty { <- "empty" }',
+					"\t})",
+					"\tTerminal.print(match parcel -> String {",
+					'\t\tcase #Bare { <- "bare" }',
+					"\t})",
+					"}",
+					"",
+				].join("\n"),
+			}
+
+			it("should write the missing arms the file can name", () => {
+				let { workspace, pathOf } = makeWorkspace(files)
+				let mainPath = pathOf("Main.es")
+				let source = workspace.sourceOf(mainPath) ?? ""
+				let [boxedFix] = fixesFor(
+					workspace,
+					mainPath,
+					12,
+					"match boxed",
+				)
+				let [parcelFix] = fixesFor(
+					workspace,
+					mainPath,
+					15,
+					"match parcel",
+				)
+
+				expect(boxedFix.title).toBe("Add missing Cases")
+				expect(
+					applyEdits(source, boxedFix.edits)
+						.split("\n")
+						.slice(11, 15),
+				).toEqual([
+					"\tTerminal.print(match boxed -> String {",
+					'\t\tcase #Empty { <- "empty" }',
+					"\t\tcase #Full {}",
+					"\t})",
+				])
+				expect(
+					applyEdits(source, parcelFix.edits)
+						.split("\n")
+						.slice(14, 19),
+				).toEqual([
+					"\tTerminal.print(match parcel -> String {",
+					'\t\tcase #Bare { <- "bare" }',
+					"\t\tcase #Empty {}",
+					"\t\tcase _ {}",
+					"\t})",
+				])
+
+				let codes = codesAfter(
+					workspace,
+					mainPath,
+					applyEdits(source, [...boxedFix.edits, ...parcelFix.edits]),
+				)
+
+				expect(codes).not.toContain("missing-case")
+				expect(codes).not.toContain("unknown-type")
+			})
+
+			it("should scaffold a Match the file can write", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					...files,
+					"Main.es": [
+						"import {",
+						'\tfrom "./Parcels.es" { parcels }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction shown() -> String {",
+						"\t\t<- parcels()",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				})
+				let mainPath = pathOf("Main.es")
+				let source = workspace.sourceOf(mainPath) ?? ""
+				let [scaffold] = findCodeActions(
+					source,
+					spanOf(source, 7, "parcels()"),
+					mainPath,
+					workspace,
+				).filter((action) => action.title.startsWith("Match on"))
+				let result = applyEdits(source, scaffold.edits)
+
+				expect(result.split("\n").slice(5, 13)).toEqual([
+					"\tfunction shown() -> String {",
+					"\t\t<- match parcels() -> String {",
+					"\t\t\tcase #Empty {}",
+					"\t\t\tcase #Bare {}",
+					"\t\t\tcase _ {}",
+					"\t\t}",
+					"\t}",
+					"}",
+				])
+				expect(codesAfter(workspace, mainPath, result)).not.toContain(
+					"unknown-type",
+				)
+			})
+		})
+
 		// `Problem` is a Choice another Module declares, and its derived
 		// equality is in reach only where its name is. The fix is an import of the
 		// Module the Type's nominal identity names.

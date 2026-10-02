@@ -37,6 +37,7 @@ import {
 	displayChoiceName,
 	namespaceHead,
 	namespaceWhere,
+	spellChoiceName,
 	unnameableTargetNote,
 	displayGenericName,
 	displayProtocolName,
@@ -103,8 +104,15 @@ import {
 } from "./specifiers"
 import {
 	choiceBindingIn,
+	choiceNameIn,
 	foreignChoiceRemedy,
+	spellingAfterImport,
+	spellingIn,
+	suggestionData,
+	suggestionHelps,
+	suggestionInScope,
 	unboundForeignChoice,
+	unknownTypeRemedy,
 	withImportOf,
 } from "./spelling"
 import { inferringRefused } from "./typeParameters"
@@ -4708,7 +4716,7 @@ function narrowedBodyReport(
 	let at = describeType(binding)
 	let elsewhere =
 		binding.type === "Case"
-			? `or annotate the value at '${displayChoiceName(binding.choice)}', since a bare Case binds the Case, not the Choice.`
+			? `or annotate the value at '${spellChoiceName(binding, spellingIn(scope))}', since a bare Case binds the Case, not the Choice.`
 			: `or declare a Namespace for ${at} that conforms to '${describeProtocol(askedFor, scope)}'.`
 
 	// The first Parameter is `Self`, the receiver, which both take.
@@ -5497,7 +5505,7 @@ function solveCandidateConditions(
 		// `Tag<Integer>#A` and `Tag<String>#B`, leave the Type Parameter open.
 		if (differing !== null) {
 			let names = differing.typeArguments.map(describeType)
-			let application = `${displayChoiceName(differing.choice)}<${Array.from({ length: differing.arity }, () => "…").join(", ")}>`
+			let application = `${choiceNameIn(differing.choice, scope)}<${Array.from({ length: differing.arity }, () => "…").join(", ")}>`
 
 			return {
 				ok: false,
@@ -6042,7 +6050,7 @@ function unansweredReadReport(
 			? []
 			: [
 					binding.type === "Case"
-						? `Annotate the value at '${displayChoiceName(binding.choice)}', since a bare Case binds the Case, not the Choice.`
+						? `Annotate the value at '${spellChoiceName(binding, spellingIn(scope))}', since a bare Case binds the Case, not the Choice.`
 						: `Declare a Namespace for ${at} that conforms to '${describeProtocol(asked, scope)}'.`,
 				]
 
@@ -6263,7 +6271,7 @@ function conformanceRemedy(
 			return {
 				notes: [],
 				helps: [
-					`Annotate the value at '${displayChoiceName(culprit.choice)}': a bare Case binds the Case, not the Choice.`,
+					`Annotate the value at '${spellChoiceName(culprit, spellingIn(scope))}': a bare Case binds the Case, not the Choice.`,
 				],
 			}
 		}
@@ -6322,8 +6330,18 @@ function conformanceRemedy(
 			: null)
 	let declaring = written ?? protocol
 	let unnameable = unnameableTargetNote(culprit)
-	let where = namespaceWhere(culprit, (choice) =>
-		declaredChoiceGenerics(choice, scope),
+	let where = namespaceWhere(
+		culprit,
+		(choice) => declaredChoiceGenerics(choice, scope),
+		(bound) => describeProtocol(bound, scope),
+	)
+	// A Choice no name binds is written as the Help's import will bind it.
+	let head = namespaceHead(
+		culprit,
+		"",
+		unbound === null
+			? spellingIn(scope)
+			: spellingAfterImport(scope, unbound),
 	)
 
 	return {
@@ -6337,7 +6355,7 @@ function conformanceRemedy(
 								importing.name,
 								importing,
 								true,
-								`write that name in a Namespace '${namespaceHead(culprit)} is …${where}'`,
+								`write that name in a Namespace '${head} is …${where}'`,
 							),
 						]
 					: [
@@ -6345,8 +6363,8 @@ function conformanceRemedy(
 								unbound,
 								protocolName === printableProtocolName &&
 									choiceCasesArePayloadFree(culprit)
-									? `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
-									: `Declare a Namespace '${namespaceHead(culprit)} is ${declaring}${where}'.`,
+									? `Declare a Namespace '${head} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`
+									: `Declare a Namespace '${head} is ${declaring}${where}'.`,
 							),
 							...(importing === null
 								? []
@@ -8065,8 +8083,7 @@ function resolveIdentifierTypeDeclarationType(
 			reportError(`Type '${name}' is not declared`, node.position, {
 				code: "unknown-type",
 				labels: [primary(node.position, "no such Type")],
-				helps: suggestionHelps(name, scope, "types"),
-				...suggestionData(suggestionInScope(name, scope, "types")),
+				...unknownTypeRemedy(name, scope),
 			})
 		}
 
@@ -8162,10 +8179,7 @@ export function resolveGenericTypeDeclarationType(
 						labels: [
 							primary(node.baseType.position, "no such Type"),
 						],
-						helps: suggestionHelps(name, scope, "types"),
-						...suggestionData(
-							suggestionInScope(name, scope, "types"),
-						),
+						...unknownTypeRemedy(name, scope),
 					},
 				)
 			}
@@ -8439,54 +8453,6 @@ function reportMemberOperator(
 	)
 
 	return true
-}
-
-// Every name of one kind visible from `scope`, innermost first, which a
-// near miss is drawn from.
-function namesInScope(
-	scope: enricher.Scope,
-	kind: "members" | "types" | "protocols",
-): Array<string> {
-	let names: Array<string> = []
-	let searchScope: enricher.Scope | null = scope
-
-	while (searchScope !== null) {
-		names.push(...Object.keys(searchScope[kind]))
-		searchScope = searchScope.parent
-	}
-
-	return names
-}
-
-export function suggestionInScope(
-	name: string,
-	scope: enricher.Scope,
-	kind: "members" | "types" | "protocols",
-): string | null {
-	let suggestion = closestMatch(name, namesInScope(scope, kind))
-
-	return suggestion === null || suggestion === name ? null : suggestion
-}
-
-// A near miss is a Help rather than part of the message, since it is a guess.
-export function suggestionHelps(
-	name: string,
-	scope: enricher.Scope,
-	kind: "members" | "types" | "protocols",
-): Array<string> {
-	let suggestion = suggestionInScope(name, scope, kind)
-
-	return suggestion === null ? [] : [`Did you mean '${suggestion}'?`]
-}
-
-// The near miss for the Quick Fix, spread so that no suggestion means no
-// `data` key.
-export function suggestionData(suggestion: string | null): {
-	data?: common.DiagnosticData
-} {
-	return suggestion === null
-		? {}
-		: { data: { kind: "suggestion", suggestion } }
 }
 
 export function findTypeInScope(

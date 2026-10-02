@@ -494,6 +494,30 @@ embedding boundary prints both. `withoutRecordNamesInSignature` serves `printSig
 It keeps identity where nothing changed, and answers a back-edge unstripped. The Enricher refuses a Type that
 names itself, so the guard only keeps the language server from hanging.
 
+## Spelling a name for the reader
+
+`describeType` names a Type as its declaring file does, which is right for a label that says what a value is. A
+Help that asks the reader to write a Type must spell it as the reading file does: an import may bind `Box` as
+`Carton`, and `Box` then means nothing there. `spellType`, `spellMatcher`, `spellChoiceName`, `namespaceHead` and
+`caseCandidatePrefixes` take a `Spelling` for that. It maps a declared name and the Type carrying it to the name the
+reader binds it under, or to null where the reader binds none.
+
+`bindsDeclaration` decides whether a binding names a declaration. A Choice is told by the identity its Cases carry,
+since two Modules may each declare a `Box`. Any other Type is told by its declared name. Under another name only a
+declaration counts (`isDeclaration`). `type Pair = Box<Integer>` names one application, and neither `Pair<…>` nor
+`Pair#Full` can be written. A Generic Alias such as `type Flipped<A, B> = Pair<B, A>` is one too, since its Type
+Parameters are in an order of its own. An import keeps the declared name on the Alias it binds, so `Box as Carton`
+still counts.
+
+There are two Spellings. The enricher's (`spellingIn` in `enricher/spelling.ts`) reads the Scope, so a nested
+declaration counts. After enrichment no Scope is left, so `programSpelling` reads the typed Program's import entries
+and top-level Choices. The validator and the language server's Match scaffold use it. Only a Choice carries the
+identity of its Module, so any other name the Program declares itself is its own, and one it imports under another
+name is spelled by that name. A Choice of another Module that no entry binds has no name there. Its Case is written
+bare, as `#Full`, which resolves against the matched value, unless another member of the Union has a Case of that
+name. Then no Matcher can be written, `spellMatcher` answers null, and the Help leaves the Case to a `case _`.
+`spellMatcher` writes a refinement by its base, since a refinement is no Matcher.
+
 ## Matching Types
 
 `matchTypes(lhs, rhs, context, depth)` asks whether a value of `rhs` may stand where `lhs` is expected, binding

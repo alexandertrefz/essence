@@ -1,6 +1,7 @@
 import {
-	describeMatcher,
 	flattenUnionMembers,
+	programSpelling,
+	spellMatcher,
 } from "@essence-lang/compiler/helpers"
 import {
 	forEachTypedChild,
@@ -16,7 +17,7 @@ import type { CodeActionEntry } from "./index"
 
 // Scaffolds a Match over the value under the cursor, one empty arm per Union
 // member in declaration order. It shares `isWritableMatcher` and
-// `describeMatcher` with the `missing-case` fix, so the two write the same arms.
+// `spellMatcher` with the `missing-case` fix, so the two write the same arms.
 
 // The value to match on, and the Type its position asks for, which the
 // scaffolded Match declares as its answer Type.
@@ -67,10 +68,12 @@ function scaffoldFor(
 ): Array<CodeActionEntry> {
 	let { value, answers } = scaffold
 	// One Matcher answers for every application of a Case.
+	let members = flattenUnionMembers(value.type as common.UnionType)
+	let spell = programSpelling(program)
 	let matchers = [
 		...new Set(
-			flattenUnionMembers(value.type as common.UnionType).map(
-				describeMatcher,
+			members.map(
+				(member) => spellMatcher(member, spell, members) ?? "_",
 			),
 		),
 	]

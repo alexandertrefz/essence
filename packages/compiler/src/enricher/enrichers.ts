@@ -16,9 +16,7 @@ import {
 	asynchronyData,
 	asynchronyHelps,
 	booleanQuestionFor,
-	caseCandidatePrefixes,
 	asynchronyState,
-	ambiguousCaseWording,
 	barredCompletion,
 	choiceIdentity,
 	countOf,
@@ -30,6 +28,8 @@ import {
 	displayProtocolName,
 	namespaceHead,
 	specifierTo,
+	spellChoiceName,
+	spellType,
 	undispatchableHelps,
 	unnameableTarget,
 	recordMismatchEvidence,
@@ -169,9 +169,6 @@ import {
 	silentCheckedConformances,
 	solveConformance,
 	typeParameterBoundReport,
-	suggestionData,
-	suggestionHelps,
-	suggestionInScope,
 } from "./resolvers"
 import {
 	bodyCanWait,
@@ -189,6 +186,12 @@ import {
 	unimportedNamespacesOf,
 } from "./scope"
 import { reportEmptyLookup, specifierWasRefused } from "./specifiers"
+import {
+	reportAmbiguousCase,
+	spellingIn,
+	suggestionData,
+	unknownTypeRemedy,
+} from "./spelling"
 import {
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
@@ -508,6 +511,7 @@ function enrichCaseValue(
 			type,
 			context,
 			expectedType === null,
+			scope,
 		)
 	}
 
@@ -536,6 +540,7 @@ function enrichCaseValue(
 				node,
 				type,
 				choiceGenerics,
+				scope,
 			)
 		}
 	}
@@ -575,6 +580,7 @@ function reportUncarriedTypeArgumentDisagreement(
 	written: common.CaseType | common.ErrorType,
 	expectedType: common.Type,
 	inArgumentPosition: boolean,
+	scope: enricher.Scope,
 ): void {
 	if (node.typeArguments === null || written.type !== "Case") {
 		return
@@ -622,8 +628,9 @@ function reportUncarriedTypeArgumentDisagreement(
 	// Where the value's own Type does not match, the position reports the
 	// mismatch itself.
 	if (offered.some((candidate) => matchesType(candidate, written))) {
+		let reader = spellingIn(scope)
 		let spell = (typeArguments: Array<common.Type>) =>
-			`${displayChoiceName(written.choice)}<${typeArguments.map(describeType).join(", ")}>`
+			`${spellChoiceName(written, reader)}<${typeArguments.map((typeArgument) => spellType(typeArgument, reader)).join(", ")}>`
 
 		reportError(
 			"These Type Arguments are not the ones this position decided",
@@ -896,6 +903,7 @@ function reportUndecidedPayloadTypeArguments(
 	node: parser.CaseValueNode,
 	caseType: common.CaseType,
 	choiceGenerics: Array<common.GenericDeclaration>,
+	scope: enricher.Scope,
 ): common.CaseType | common.ErrorType {
 	if (inferReturnTypeFromBodyDepth > 0) {
 		return caseType
@@ -916,7 +924,7 @@ function reportUndecidedPayloadTypeArguments(
 
 	return reportUndecidedTypeArguments(
 		`#${node.caseName.content}(…)`,
-		displayChoiceName(caseType.choice),
+		spellChoiceName(caseType, spellingIn(scope)),
 		node.caseName.content,
 		choiceGenerics,
 		node.position,
@@ -5260,11 +5268,11 @@ function enrichSnapshotValue(
 							]
 						: expression.type.type === "Case"
 							? [
-									`Declare a 'Printable' conformance for '${displayChoiceName(expression.type.choice)}' and annotate the value at it — a bare Case binds the Case, not the Choice.`,
+									`Declare a 'Printable' conformance for '${spellChoiceName(expression.type, spellingIn(scope))}' and annotate the value at it — a bare Case binds the Case, not the Choice.`,
 									"Or snapshot a String you build yourself.",
 								]
 							: [
-									`Declare a 'Printable' conformance for it — '${namespaceHead(expression.type, "namespace …")} is Printable { … }'.`,
+									`Declare a 'Printable' conformance for it — '${namespaceHead(expression.type, "namespace …", spellingIn(scope))} is Printable { … }'.`,
 									"Or snapshot a String you build yourself.",
 								],
 			},
@@ -13958,10 +13966,7 @@ function resolveCaseReference(
 			{
 				code: "unknown-type",
 				labels: [primary(choice.position, "no such Type")],
-				helps: suggestionHelps(choice.content, scope, "types"),
-				...suggestionData(
-					suggestionInScope(choice.content, scope, "types"),
-				),
+				...unknownTypeRemedy(choice.content, scope),
 			},
 		)
 
@@ -14155,7 +14160,7 @@ function resolveBareCaseReference(
 	if (candidates.length === 0) {
 		reportUnknownBareCase(caseName, casesInScope)
 	} else if (!refusedPosition) {
-		reportAmbiguousCase(caseName, candidates, "in scope")
+		reportAmbiguousCase(caseName, candidates, "in scope", scope)
 	}
 
 	return { type: "Error" }
@@ -14246,6 +14251,7 @@ function reportUnknownBareCase(
 function resolveCaseInExpectedType(
 	caseName: parser.IdentifierNode,
 	expectedType: common.Type,
+	scope: enricher.Scope,
 ): common.CaseType | common.ErrorType | null {
 	let members =
 		expectedType.type === "UnionType"
@@ -14262,7 +14268,13 @@ function resolveCaseInExpectedType(
 	}
 
 	if (candidates.length > 1) {
-		reportAmbiguousCase(caseName, candidates, "in the expected Type", true)
+		reportAmbiguousCase(
+			caseName,
+			candidates,
+			"in the expected Type",
+			scope,
+			true,
+		)
 
 		return { type: "Error" }
 	}
@@ -14287,6 +14299,7 @@ function resolveCaseValueType(
 			let contextual = resolveCaseInExpectedType(
 				node.caseName,
 				expectedType,
+				scope,
 			)
 
 			if (contextual !== null) {
@@ -14315,7 +14328,7 @@ function resolveCaseValueType(
 
 			return reportUndecidedTypeArguments(
 				`#${node.caseName.content}`,
-				displayChoiceName(bareCase.choice),
+				spellChoiceName(bareCase, spellingIn(scope)),
 				node.caseName.content,
 				bareCase.choiceGenerics,
 				node.position,
@@ -15344,7 +15357,12 @@ function resolveCaseMatcherType(
 			},
 		)
 	} else {
-		reportAmbiguousCase(node.caseName, candidates, "in the matched Union")
+		reportAmbiguousCase(
+			node.caseName,
+			candidates,
+			"in the matched Union",
+			scope,
+		)
 	}
 
 	return { type: "Error" }
@@ -17481,43 +17499,6 @@ export function settleConformanceClauses(
 	Object.assign(conditions, settled.conformanceConditions)
 
 	return true
-}
-
-// Shows the qualified spelling for each candidate. A declared generic Choice
-// also needs its Type Arguments, written as `<…>`, since its Type Parameter
-// names are not in scope at the call. See `caseCandidatePrefixes`.
-function reportAmbiguousCase(
-	caseName: parser.IdentifierNode,
-	candidates: Array<common.CaseType>,
-	where: string,
-	applied: boolean = false,
-): void {
-	let prefixes = caseCandidatePrefixes(candidates, applied)
-	let choiceNames = prefixes.map((prefix) => prefix.name)
-	let wording = ambiguousCaseWording(
-		caseName.content,
-		candidates,
-		where,
-		choiceNames.length,
-	)
-
-	reportError(wording.message, caseName.position, {
-		code: "ambiguous-case",
-		labels: [primary(caseName.position, wording.label)],
-		notes: wording.notes,
-		// One Help per prefix, since which was meant is what this can not
-		// decide. The builtin `Optional`'s `#Empty` and `#Value` collide
-		// with names a Program likely declares.
-		helps: prefixes.map(({ name, generic }) =>
-			generic
-				? `Write '${name}<…>#${caseName.content}' with its Type Arguments to pick '${name}'.`
-				: `Write '${name}#${caseName.content}' to pick '${name}'.`,
-		),
-		// The names alone, one action each in the same order. A fix writes
-		// the prefix, and `undecided-type-arguments` then asks for the Type
-		// Arguments of a declared generic Choice.
-		data: { kind: "choice-candidates", names: choiceNames },
-	})
 }
 
 // The near miss for an unknown Case, computed once for every reporting site, so
