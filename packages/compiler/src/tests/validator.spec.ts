@@ -4,6 +4,7 @@ import type { common } from "@essence-lang/interfaces"
 
 import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
+import { reachWork } from "../validator/declarationOrder"
 import { validate } from "../validator/index"
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
@@ -2515,6 +2516,638 @@ describe("Validator", () => {
 						Terminal.inspect(2::doubled())
 					}`),
 				).toEqual([])
+			})
+		})
+
+		// A body runs where it is called, so a Statement calling it above a
+		// Namespace the body uses runs ahead of that Namespace too.
+		describe("through what the Statement runs", () => {
+			const parity = `namespace Parity for Integer {
+					isEvenly() -> Boolean { <- @::remainder(dividingBy 2)::is(0) }
+				}`
+
+			it("reports a call to a Function whose body uses a Namespace declared below", () => {
+				let source = `implementation {
+					function run() -> Boolean {
+						<- 4::isEvenly()
+					}
+
+					Terminal.inspect(run())
+
+					${parity}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("use-before-declaration")
+				expect(diagnostics[0].message).toBe(
+					"Namespace 'Parity' is used before it is declared",
+				)
+				expect(
+					diagnostics[0].labels.map((label) => [
+						label.kind,
+						label.message,
+						underlinedBy(source, label),
+					]),
+				).toEqual([
+					["primary", "this call reaches it", "run"],
+					["secondary", "declared here, below the use", "Parity"],
+					["secondary", "this Method comes from it", "isEvenly"],
+				])
+				expect(diagnostics[0].notes).toEqual([
+					"A Namespace comes into being where it is written, so nothing that runs above it can reach it.",
+					"This reaches 'Parity' through 'run'.",
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Move the Declaration of 'Parity' above this Statement, or this Statement below it.",
+				])
+			})
+
+			it("names every Function a call runs through", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function outer() -> Boolean {
+						<- inner(4)
+					}
+
+					function inner(_ n: Integer) -> Boolean {
+						<- n::isEvenly()
+					}
+
+					Terminal.inspect(outer())
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'outer', then 'inner'.",
+				)
+			})
+
+			it("reports a Method of another Namespace whose body uses one declared below", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					namespace Checks for Integer {
+						isFine() -> Boolean { <- @::isEvenly() }
+					}
+
+					Terminal.inspect(4::isFine())
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(
+					"Namespace 'Parity' is used before it is declared",
+				)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'Checks::isFine'.",
+				)
+			})
+
+			it("reports a Function literal bound to a Constant and called above the Namespace", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					constant check = () -> Boolean { <- 4::isEvenly() }
+
+					Terminal.inspect(check())
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'check'.",
+				)
+			})
+
+			it("accepts a Function literal bound to a Constant and called below the Namespace", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant check = () -> Boolean { <- 4::isEvenly() }
+
+						${parity}
+
+						Terminal.inspect(check())
+					}`),
+				).toEqual([])
+			})
+
+			// The library runs the literal it is handed, at once.
+			it("reports a Function literal handed to the library in the Statement", () => {
+				let source = `implementation {
+					Terminal.inspect([1, 2]::map((_ item: Integer) -> Boolean { <- item::isEvenly() }))
+
+					${parity}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(
+					diagnostics[0].labels.map((label) => [
+						label.message,
+						underlinedBy(source, label),
+					]),
+				).toEqual([
+					["this call may run a Function that reaches it", "map"],
+					["declared here, below the use", "Parity"],
+					["this Method comes from it", "isEvenly"],
+				])
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through the Function on line 2.",
+				)
+			})
+
+			it("reports a Constant initialiser calling a Function that uses a Namespace declared below", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function run() -> Boolean {
+						<- 4::isEvenly()
+					}
+
+					constant answer = run()
+
+					${parity}
+
+					Terminal.inspect(answer)
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].position?.start.line).toBe(6)
+			})
+
+			it("reports a conformance witness whose Method uses a Namespace declared below", () => {
+				let source = `implementation {
+					namespace Thing for { value: Integer } is Comparable {
+						compare(to other: { value: Integer }) -> Ordering {
+							<- @.value::scaled()::compare(to other.value)
+						}
+					}
+
+					Terminal.inspect([{ value = 3 }, { value = 1 }]::sort())
+
+					namespace Scaling for Integer {
+						scaled() -> Integer { <- @::multiply(with 2) }
+					}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(
+					"Namespace 'Scaling' is used before it is declared",
+				)
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"this call's Comparable conformance reaches it",
+				)
+				expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+					"sort",
+				)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Scaling' through 'Thing::compare'.",
+				)
+			})
+
+			// `"{thing}"` emits `Shown.toString(thing)`.
+			it("reports a String hole whose Printable conformance comes from a Namespace declared below", () => {
+				let source = `implementation {
+					constant thing = { value = 3 }
+
+					Terminal.inspect("{thing}")
+
+					namespace Shown for { value: Integer } is Printable {
+						toString() -> String { <- @.value::toString() }
+					}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(
+					"Namespace 'Shown' is used before it is declared",
+				)
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"this value's Printable conformance comes from it",
+				)
+				expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+					"thing",
+				)
+			})
+
+			it("reports one Namespace once for a Statement", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function run() -> Boolean {
+						<- 4::isEvenly()
+					}
+
+					Terminal.inspect(run()::and(4::isEvenly())::and(run()))
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"this Method comes from it",
+				)
+			})
+
+			it("accepts a call below the Namespace its Function uses", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function run() -> Boolean {
+							<- 4::isEvenly()
+						}
+
+						${parity}
+
+						Terminal.inspect(run())
+					}`),
+				).toEqual([])
+			})
+
+			// A Function outside the class names it through the binding that is
+			// only set once the class is declared.
+			it("reports a static Property reaching its own Namespace through a Function", () => {
+				let source = `implementation {
+					function run() -> Integer {
+						<- 4::doubled()
+					}
+
+					namespace Doubling for Integer {
+						static four = run()
+
+						doubled() -> Integer { <- @::multiply(with 2) }
+					}
+
+					Terminal.inspect(Doubling.four)
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(
+					"Namespace 'Doubling' is used before it is declared",
+				)
+				expect(
+					diagnostics[0].labels.map((label) => [
+						label.message,
+						underlinedBy(source, label),
+					]),
+				).toEqual([
+					["this call reaches it", "run"],
+					["this Method comes from it", "doubled"],
+					["still being declared when this runs", "Doubling"],
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Work the value out in a Method of 'Doubling' instead.",
+				])
+			})
+
+			it("accepts a static Property reaching its own Namespace through its own Method", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Doubling for Integer {
+							static four = Doubling.computed()
+
+							static computed() -> Integer { <- 2::doubled() }
+
+							doubled() -> Integer { <- @::multiply(with 2) }
+						}
+
+						Terminal.inspect(Doubling.four)
+					}`),
+				).toEqual([])
+			})
+
+			// A name is followed to what it binds where it is read.
+			it("follows a Parameter, not the top-level Function of its name", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function apply(_ step: (_: Integer) -> Integer, to n: Integer) -> Integer {
+							<- step(n)
+						}
+
+						Terminal.inspect(apply((_ x: Integer) -> Integer { <- x::add(1) }, to 3))
+
+						${parity}
+
+						function step(_ x: Integer) -> Boolean { <- x::isEvenly() }
+
+						Terminal.inspect(step(1))
+					}`),
+				).toEqual([])
+			})
+
+			it("follows a Method of a Namespace written below the Function calling it", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function run() -> Boolean {
+						<- 4::isFine()
+					}
+
+					namespace Checks for Integer {
+						isFine() -> Boolean { <- @::isEvenly() }
+					}
+
+					Terminal.inspect(run())
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'run', then 'Checks::isFine'.",
+				)
+			})
+
+			it("follows a local Constant, not the top-level Function of its name", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function twice() -> Integer {
+							constant step = (_ x: Integer) -> Integer { <- x::add(1) }
+
+							<- step(step(1))
+						}
+
+						Terminal.inspect(twice())
+
+						${parity}
+
+						function step(_ x: Integer) -> Boolean { <- x::isEvenly() }
+
+						Terminal.inspect(step(1))
+					}`),
+				).toEqual([])
+			})
+
+			// Making, naming or storing a Function runs nothing. A call through
+			// a value nothing names may run any Function that escaped by then.
+			it.each([
+				[
+					"a Function a call answers",
+					`function makeCheck() -> () -> Boolean {
+						<- () -> Boolean { <- 4::isEvenly() }
+					}
+
+					constant check = makeCheck()`,
+					"check()",
+				],
+				[
+					"a Function stored in a Record",
+					"constant handlers = { onCheck = () -> Boolean { <- 4::isEvenly() } }",
+					"handlers.onCheck()",
+				],
+				[
+					"a Function named by a Constant",
+					`function check() -> Boolean { <- 4::isEvenly() }
+
+					constant named = check`,
+					"named()",
+				],
+				[
+					"a Function stored in a List",
+					"constant checks = [() -> Boolean { <- 4::isEvenly() }]",
+					"checks::map((_ f: () -> Boolean) -> Boolean { <- f() })",
+				],
+			])(
+				"accepts %s that runs below the Namespace",
+				(_, above, below) => {
+					expect(
+						diagnosticsFor(`implementation {
+						${above}
+
+						${parity}
+
+						Terminal.inspect(${below})
+					}`),
+					).toEqual([])
+				},
+			)
+
+			it("reports a Function stored above the Namespace and run through a value above it", () => {
+				let source = `implementation {
+					constant handlers = { onCheck = () -> Boolean { <- 4::isEvenly() } }
+
+					Terminal.inspect(handlers.onCheck())
+
+					${parity}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"this call may run a Function that reaches it",
+				)
+				expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+					"handlers.onCheck",
+				)
+			})
+
+			it("reports a Parameter's default that runs above the Namespace", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function scaled(_ n: Integer, by even: Boolean = 3::isEvenly()) -> Boolean {
+						<- even
+					}
+
+					Terminal.inspect(scaled(2))
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'scaled'.",
+				)
+			})
+
+			// A completing body runs once started, and the part after its first
+			// sure suspension waits for the top level to suspend.
+			it("accepts work that uses the Namespace only after suspending", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function slowly(_ value: Integer) -> Future<Boolean> {
+							complete Async.sleep(milliseconds 1)
+
+							<- value::isEvenly()
+						}
+
+						constant running = start slowly(4)
+
+						${parity}
+
+						Terminal.inspect(complete running)
+					}`),
+				).toEqual([])
+			})
+
+			it("accepts work that is never started above the Namespace", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function slowly(_ value: Integer) -> Future<Boolean> {
+							constant even = value::isEvenly()
+
+							complete Async.sleep(milliseconds 1)
+
+							<- even
+						}
+
+						constant later = slowly(4)
+
+						${parity}
+
+						Terminal.inspect(complete later)
+					}`),
+				).toEqual([])
+			})
+
+			it("reports work started above the Namespace that uses it before suspending", () => {
+				let source = `implementation {
+					function slowly(_ value: Integer) -> Future<Boolean> {
+						constant even = value::isEvenly()
+
+						complete Async.sleep(milliseconds 1)
+
+						<- even
+					}
+
+					constant running = start slowly(4)
+
+					${parity}
+
+					Terminal.inspect(complete running)
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"this starts work that reaches it",
+				)
+				expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+					"start slowly(4)",
+				)
+			})
+
+			// The Statement that starts the work suspends too, so the part after
+			// the sleep runs while it waits.
+			it.each([
+				["completed", "complete slowly()"],
+				[
+					"completed with others",
+					"complete [slowly(), slowly()]::all()",
+				],
+			])(
+				"reports work %s above the Namespace that uses it after suspending",
+				(_, written) => {
+					let diagnostics = diagnosticsFor(`implementation {
+					function slowly() -> Future<Boolean> {
+						complete Async.sleep(milliseconds 1)
+
+						<- 4::isEvenly()
+					}
+
+					Terminal.inspect(${written})
+
+					${parity}
+				}`)
+
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.message),
+					).toEqual([
+						"Namespace 'Parity' is used before it is declared",
+					])
+				},
+			)
+
+			// A completing Function's call builds its Future and runs the
+			// default then, before anything starts it.
+			it("reports a completing Function's default that runs where its Future is built", () => {
+				let source = `implementation {
+					function slowly(_ even: Boolean = 4::isEvenly()) -> Future<Boolean> {
+						complete Async.sleep(milliseconds 1)
+
+						<- even
+					}
+
+					constant later = slowly()
+
+					${parity}
+
+					Terminal.inspect(complete later)
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(underlinedBy(source, diagnostics[0].labels[0])).toBe(
+					"slowly",
+				)
+			})
+
+			// A Record default is merged where the body starts, which here is
+			// below the Namespace.
+			it("accepts a completing Function's Record default that runs once started", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						function slowly(_ options: { even: Boolean } = { even = 4::isEvenly() }) -> Future<Boolean> {
+							complete Async.sleep(milliseconds 1)
+
+							<- options.even
+						}
+
+						constant later = slowly({})
+
+						${parity}
+
+						Terminal.inspect(complete later)
+					}`),
+				).toEqual([])
+			})
+
+			it("reports a Namespace declared inside a body that uses one declared below", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					function run() -> Boolean {
+						namespace Helper for Integer {
+							isFine() -> Boolean { <- @::isEvenly() }
+						}
+
+						<- 2::isFine()
+					}
+
+					Terminal.inspect(run())
+
+					${parity}
+				}`)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reaches 'Parity' through 'run', then 'Helper::isFine'.",
+				)
+			})
+
+			// Each body's closure is worked out once, so a chain of N Functions
+			// called from N Statements costs work in proportion to N.
+			it("walks a chain of Functions in work linear in its length", () => {
+				let visitsFor = (length: number): number => {
+					let functions = Array.from(
+						{ length },
+						(_, index) =>
+							`function f${index}(_ n: Integer) -> Integer { <- ${index === length - 1 ? "n" : `f${index + 1}(n)`} }`,
+					)
+					let constants = Array.from(
+						{ length },
+						(_, index) =>
+							`constant c${index} = f${index}(${index})`,
+					)
+
+					expect(
+						diagnosticsFor(`implementation {
+							${functions.join("\n")}
+							${constants.join("\n")}
+							${parity}
+							Terminal.inspect(c0)
+						}`),
+					).toEqual([])
+
+					return reachWork.visits
+				}
+
+				let short = visitsFor(100)
+				let long = visitsFor(200)
+
+				expect(long).toBeGreaterThan(short)
+				expect(long).toBeLessThanOrEqual(short * 2.2)
 			})
 		})
 	})

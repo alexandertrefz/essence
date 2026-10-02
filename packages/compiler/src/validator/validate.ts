@@ -56,6 +56,11 @@ import {
 	typeContainsUnknown,
 } from "../helpers/types"
 import { type Claim, claimedCaseReport } from "./claimedCases"
+import {
+	collectDeclarationOrder,
+	type DeclarationOrder,
+	reportReachedNamespaces,
+} from "./declarationOrder"
 import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 
@@ -106,13 +111,10 @@ function insideBody(
 	}
 }
 
-// Each top-level Namespace's index in the Statement list and its name's
-// Position. A Namespace is emitted as a `class`, so a use that runs before its
-// Declaration fails. See "Use before declaration" in DEVELOPMENT.md.
-let topLevelNamespaces: Map<
-	string,
-	{ index: number; position: common.Position }
-> = new Map()
+// Where each top-level Namespace is declared. A Namespace is emitted as a
+// `class`, so a use that runs before its Declaration fails. See "Use before
+// declaration" in DEVELOPMENT.md.
+let declarationOrder: DeclarationOrder = collectDeclarationOrder([])
 
 // The index of the top-level Statement being validated, or null inside a
 // Function body, which runs when called. A static Property's initialiser keeps
@@ -162,7 +164,7 @@ export const validate = (
 	// Fresh state per run. See "Module state" in DEVELOPMENT.md.
 	witnessScopes = []
 	writtenBounds = []
-	topLevelNamespaces = collectTopLevelNamespaces(program.implementation.nodes)
+	declarationOrder = collectDeclarationOrder(program.implementation.nodes)
 	executingTopLevelIndex = null
 	initialisingProperty = null
 	abandonedLines = new Set(options.recovery?.lines ?? [])
@@ -179,6 +181,7 @@ export const validate = (
 			// rest of the Program is still validated.
 			try {
 				validateImplementationNode(node, null)
+				reportReachedNamespaces(declarationOrder, index)
 			} catch (error) {
 				reportInternalError(error, node.position)
 			}
@@ -335,31 +338,6 @@ function validateGenerator(generator: common.typed.TestGenerator): void {
 		default:
 			return
 	}
-}
-
-function collectTopLevelNamespaces(
-	nodes: Array<common.typed.ImplementationNode>,
-): Map<string, { index: number; position: common.Position }> {
-	let namespaces = new Map<
-		string,
-		{ index: number; position: common.Position }
-	>()
-
-	for (let [index, node] of nodes.entries()) {
-		// The first Declaration of a name is recorded. The enricher reports
-		// the second.
-		if (
-			node.nodeType === "NamespaceDefinitionStatement" &&
-			!namespaces.has(node.name.content)
-		) {
-			namespaces.set(node.name.content, {
-				index,
-				position: node.name.position,
-			})
-		}
-	}
-
-	return namespaces
 }
 
 function validateImplementationNode(
@@ -3141,7 +3119,7 @@ function checkNamespaceIsDeclared(
 		return
 	}
 
-	let declaration = topLevelNamespaces.get(namespaceName)
+	let declaration = declarationOrder.namespaces.get(namespaceName)
 
 	if (
 		declaration === undefined ||
@@ -3150,6 +3128,7 @@ function checkNamespaceIsDeclared(
 		return
 	}
 
+	declarationOrder.reported.add(`${executingTopLevelIndex} ${namespaceName}`)
 	reportError(
 		`Namespace '${namespaceName}' is used before it is declared`,
 		position,

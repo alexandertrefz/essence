@@ -5278,6 +5278,61 @@ describe("Code Actions", () => {
 			expect(codesOf(lines)).toEqual(["use-before-declaration"])
 			expect(titles(quickFixes(lines))).toEqual([])
 		})
+
+		it("should move a Statement whose call reaches the Namespace through a Function", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction total() -> Integer {",
+				"\t\t<- Maths.zero",
+				"\t}",
+				"",
+				"\tconstant sum = total()",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Move this Statement below 'Maths'")
+			expect(result).toEqual([
+				"implementation {",
+				"\tfunction total() -> Integer {",
+				"\t\t<- Maths.zero",
+				"\t}",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\tconstant sum = total()",
+				"}",
+			])
+
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// Moving the Namespace below itself would change nothing.
+		it("should offer nothing for a Property reaching its own Namespace through a Function", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction total() -> Integer {",
+				"\t\t<- Maths.zero",
+				"\t}",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t\tstatic sum: Integer = total()",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
 	})
 
 	// The stubs a Namespace owes, with the Protocol's signatures and empty

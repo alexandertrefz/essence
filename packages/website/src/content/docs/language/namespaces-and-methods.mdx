@@ -650,7 +650,7 @@ Error: Namespace 'Doubling' is used before it is declared
 
 </div>
 
-A statement can use a namespace only below its declaration, the same as a JavaScript `class` declaration.
+A statement can use a namespace only below its declaration, the same as a JavaScript `class` declaration. That covers what the statement runs: `Terminal.print(quadrupled(3))` above `Doubling` is `use-before-declaration` at the call, because the call runs the body there.
 
 A namespace may be declared inside a function body. Its methods then exist only inside that body:
 

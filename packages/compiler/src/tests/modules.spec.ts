@@ -5107,6 +5107,111 @@ export {
 		)
 	})
 
+	// A Module runs after the Modules it imports, so only its own Namespaces
+	// can be reached before their Declarations.
+	describe("Use before declaration", () => {
+		const lib = `implementation {
+	function run() -> Boolean {
+		<- 4::isEvenly()
+	}
+
+	function apply(_ check: () -> Boolean) -> Boolean {
+		<- check()
+	}
+
+	namespace Parity for Integer {
+		isEvenly() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+	}
+}
+
+export {
+	run
+	apply
+}
+`
+
+		it("reports a Function handed to an imported one that reaches a Namespace declared below", () => {
+			withProject(
+				{
+					"Lib.es": lib,
+					"Main.es": `import {
+	from "./Lib.es" {
+		apply
+		run
+	}
+}
+
+implementation {
+	function check() -> Boolean {
+		<- 3::isOddly()
+	}
+
+	Terminal.print(run())
+	Terminal.print(apply(check))
+
+	namespace Oddness for Integer {
+		isOddly() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(1)
+		}
+	}
+}
+`,
+				},
+				(directory) => {
+					let main = analysedAt(directory, "Main.es", "Main.es")
+
+					expect(analysedAt(directory, "Main.es", "Lib.es")).toEqual(
+						[],
+					)
+					expect(reportsOf(main)).toEqual([
+						[
+							"use-before-declaration",
+							"Namespace 'Oddness' is used before it is declared",
+						],
+					])
+					expect(main[0].labels[0]?.message).toBe(
+						"this call may run a Function that reaches it",
+					)
+					expect(main[0].labels[0]?.position.start.line).toBe(14)
+					expect(main[0].notes[1]).toBe(
+						"This reaches 'Oddness' through 'check'.",
+					)
+				},
+			)
+		})
+
+		it("reports an imported Module's own call that reaches its Namespace below", () => {
+			withProject(
+				{
+					"Lib.es": lib.replace(
+						"\tnamespace Parity",
+						"\tconstant even = run()\n\n\tnamespace Parity",
+					),
+					"Main.es": `import {
+	from "./Lib.es" { run }
+}
+
+implementation {
+	Terminal.print(run())
+}
+`,
+				},
+				(directory) => {
+					expect(
+						reportsOf(analysedAt(directory, "Main.es", "Lib.es")),
+					).toEqual([
+						[
+							"use-before-declaration",
+							"Namespace 'Parity' is used before it is declared",
+						],
+					])
+				},
+			)
+		})
+	})
+
 	// The Module fixtures, with a cycle among them, linked end to end with every
 	// Diagnostic stage run. They are meant to be clean.
 	it("links the Module fixtures without a single Diagnostic", () => {

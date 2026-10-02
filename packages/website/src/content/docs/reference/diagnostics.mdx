@@ -1313,7 +1313,7 @@ Error: Namespace 'Loud' is used before it is declared
 
 </div>
 
-Move the statement below the namespace. A function or method body may name a namespace declared below it, because a body runs only when it is called.
+Move the statement below the namespace. A function or method body may name a namespace declared below it, because a body runs only when it is called. A statement that calls such a body above the namespace is refused at the call. So is one that hands a function to code that may call it at once, such as `map`, or calls a function value it may have reached, such as a parameter or a record member. Holding a function, or storing it in a record or a list, runs nothing and is not refused.
 
 Quick Fix: **Move this Statement below 'Loud'**.
 

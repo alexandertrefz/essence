@@ -91,15 +91,50 @@ before a top-level Namespace's Declaration and names it compiles clean and then 
 reports it as `use-before-declaration`. It covers a Method's home, a dispatch branch's target, a static member's
 base, a bare reference, and a `namespace` witness a call spells in.
 
-`topLevelNamespaces` records each top-level Namespace's index in the Statement list and its name's Position. It is
-read off the typed Statements, because a hoisted Namespace never enters the enricher's declarations and its Type
-carries no Position. The first Declaration of a name is recorded. A nested Namespace and every builtin are absent,
-so the check stays silent for them.
+`collectDeclarationOrder` in `declarationOrder.ts` records each top-level Namespace's index in the Statement list and
+its name's Position. It is read off the typed Statements, because a hoisted Namespace never enters the enricher's
+declarations and its Type carries no Position. The first Declaration of a name is recorded. A nested Namespace and
+every builtin are absent, so the check stays silent for them.
 
 `executingTopLevelIndex` is the index of the top-level Statement whose execution is being validated. A Function or
 Method body runs when it is called, not where it is written. While one is walked the index is null, and nothing in
 it is a top-level use. A Parameter's default runs in the body's frame and is held to the same rules. A refinement's
 predicate is asked of a value and never runs where it is written, so it is walked with the index null too.
+
+A Statement also runs the bodies it calls. `reportReachedNamespaces` follows them once `validate` has walked the
+Statement, and it follows only what runs. `collectUnits` in `reachUnits.ts` splits the code into units that run at
+once: a Statement, a static Property's value, and each body. A unit records the Namespaces it uses, the bodies it runs,
+the Function values that escape it, and whether it calls a Function value nothing names. The uses are the forms
+`checkNamespaceIsDeclared` covers, every witness the code builds, such as a String hole's, and a static member read
+through a Type's name.
+
+Names are read through the Scope they stand in, so a Parameter or a local Constant hides a top-level Function of its
+name. A call runs a body that a name binds: a Function, a Method, a Constant bound to a Function value, or the
+Methods in a witness's map. Making, naming or storing a Function value runs nothing. The value escapes where it is
+stored, handed on or answered. A call through a value nothing names may run any value that has escaped by then, and
+so may a call into the library or another Module that is handed a Function. A Parameter's default runs with its
+body.
+
+A completing body runs only when something starts or completes its Future. Its call builds the Future, which runs the
+Parameters' defaults but a Record default, which is merged at the body's entry. Its part before its first sure
+suspension runs once started. The rest waits for the top level to suspend, so it runs at the first top-level
+Statement at or after the start that holds a `complete`, or after the last one. Work released at the Statement being
+walked is walked with it, until nothing new is released. A suspension inside a branch, a Handler or a `define` is not
+sure.
+
+Each unit's closure over the bodies it runs is worked out once, per strongly connected group, as the latest moment
+it needs something to exist. A Statement whose closure needs nothing later than itself costs no further walk.
+Otherwise a walk with parent links finds each Namespace it reaches too early, and reports it once per Statement at
+what reaches it, unless `checkNamespaceIsDeclared` reported it for that Statement already. `reachWork` counts the
+walk for a spec that holds it linear.
+
+What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
+whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its
+first sure suspension may run at the next top-level `complete`, even where the work it waits for takes longer.
+
+A Namespace's static Properties run while it is declared. Its own Methods name the class through the class's own
+binding, which is bound by then. A body written outside it names the top-level binding, which is not. So a Property
+that reaches its own Namespace through such a body is reported too.
 
 Static Properties are the same fault one level in. They are emitted as static fields, initialised in written order.
 An initialiser that reads a Property of its own Namespace written at or after itself reads `undefined`.
