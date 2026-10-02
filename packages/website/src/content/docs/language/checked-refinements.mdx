@@ -249,6 +249,8 @@ Error: This Argument does not fit Parameter 2
 
 The Help names both ways in: check the predicate on the value in an `if` or a `match`, or pass a value that already has the type. A written value already has it.
 
+A value of another type entirely gets no such Help, since no check would make it fit. `0` passed where a `Rational where @::isLessThan(1/2)` is expected is an `Integer`, and the Note says the refinement takes a `Rational` before the predicate is asked.
+
 ### A written value is its own proof
 
 ```essence

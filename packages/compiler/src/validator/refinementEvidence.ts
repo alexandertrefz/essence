@@ -4,6 +4,7 @@ import { secondary } from "../diagnostics/index"
 import { describeType, withArticle } from "../helpers/describe"
 import {
 	describePredicate,
+	fitsRefinementBase,
 	unadmittedWrittenItem,
 } from "../helpers/predicateEval"
 
@@ -48,6 +49,20 @@ export function refinementEvidence(
 
 	let predicate = describePredicate(expected)
 	let spelling = describeType(expected)
+
+	// Checking the predicate would not make the value fit, so no Help asks for
+	// it.
+	if (value !== undefined && !fitsRefinementBase(expected, value)) {
+		let base = describeType(expected.base)
+
+		return {
+			labels: [],
+			notes: [
+				`'${spelling}' refines ${base}, so a value has to be ${withArticle(base)} before '${predicate}' is asked.`,
+			],
+			helps: [],
+		}
+	}
 
 	return {
 		labels: [],

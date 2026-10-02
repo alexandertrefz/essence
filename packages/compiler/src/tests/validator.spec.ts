@@ -3111,6 +3111,73 @@ describe("Validator", () => {
 			])
 		})
 
+		// An Integer is no Rational, so no check of the predicate would let one
+		// through.
+		it("should name the base where a value is not of the refined Type", () => {
+			let diagnostics = diagnosticsOfBody(`
+				type Small = Rational where @::isLessThan(1/2)
+
+				function halved(_ x: Small) -> Rational {
+					<- x::divide(by 2)
+				}
+
+				Terminal.inspect(halved(0))
+			`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("argument-type-mismatch")
+			expect(diagnostics[0].notes).toEqual([
+				"Parameter 1 is Small.",
+				"'Small' refines Rational, so a value has to be a Rational before '@::isLessThan(1/2)' is asked.",
+			])
+			expect(diagnostics[0].helps).toEqual([])
+		})
+
+		it("should name the base where a declared value is not of the refined Type", () => {
+			let diagnostics = diagnosticsOfBody(`constant d: NonZero = "zero"`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("assignment-type-mismatch")
+			expect(diagnostics[0].notes).toEqual([
+				"'d' is declared as NonZero.",
+				"'NonZero' refines Integer, so a value has to be an Integer before '@::isNot(0)' is asked.",
+			])
+			expect(diagnostics[0].helps).toEqual([])
+		})
+
+		// The base names the Type Parameter, which the value binds: a List of
+		// any item fits it, and only the predicate is left to ask.
+		it("should bind a generic base before judging the value against it", () => {
+			let diagnostics = diagnosticsOfBody(`
+				function first<infer Item>(_ items: NonEmptyList<Item>) -> Item {
+					<- items::firstItem()
+				}
+
+				constant numbers: List<Integer> = [1]
+
+				Terminal.inspect(first(numbers))
+				Terminal.inspect(first("a"))
+			`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.notes[1],
+					diagnostic.helps,
+				]),
+			).toEqual([
+				[
+					"Every value of 'NonEmptyList<Item>' has been proven to answer '@::hasItems()'.",
+					[
+						"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonEmptyList<Item>'.",
+					],
+				],
+				[
+					"'NonEmptyList<Item>' refines List<Item>, so a value has to be a List<Item> before '@::hasItems()' is asked.",
+					[],
+				],
+			])
+		})
+
 		// Conjuncts are resolved to their leaves and sorted, and spelled back in
 		// that order. `isOdd` sorts under `isEven`, the leaf it negates, but
 		// prints under its own name.
