@@ -192,6 +192,7 @@ import {
 	suggestionData,
 	unknownTypeRemedy,
 } from "./spelling"
+import { reportStaticMethodOnValue } from "./staticMethods"
 import {
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
@@ -11464,110 +11465,6 @@ function undeclaredProtocolHelps(
 	return [...missing.keys()].sort().map((name) => missing.get(name)!)
 }
 
-// The Method exists but is static, so the fix rewrites the call, not the name.
-// `memberType` is set only for one member of a Union receiver's dispatch.
-function reportStaticMethodOnValue(
-	node: parser.MethodInvocationNode,
-	baseType: common.Type,
-	memberType: common.Type | null,
-	staticNamespaces: Map<string, common.NamespaceType>,
-): void {
-	let namespaceNames = [...staticNamespaces.keys()]
-	let accepted = staticCallArities(
-		staticNamespaces.get(namespaceNames[0])?.methods[node.member.content],
-		node.arguments.length,
-	)
-
-	reportError(
-		memberType === null
-			? `'${node.member.content}' is a static Method`
-			: `'${node.member.content}' is a static Method for ${describeType(memberType)}`,
-		node.member.position,
-		{
-			code: "static-method-on-value",
-			labels: [
-				primary(
-					node.member.position,
-					"a static Method is called on its Namespace, not on a value",
-				),
-				secondary(
-					node.base.position,
-					`this is ${withArticle(describeType(baseType))}`,
-				),
-			],
-			notes: namespaceNames.map(
-				(name) =>
-					`'${name}' declares '${node.member.content}' as static.`,
-			),
-			// A static takes no receiver, so the arity decides whether the
-			// value belongs among the Arguments. The Help and both Quick Fixes
-			// share this answer.
-			helps: [
-				staticCallHelp(
-					namespaceNames[0],
-					node.member.content,
-					accepted,
-				),
-			],
-			// The first Namespace, the one the Help names, since only a
-			// declaring Namespace reaches the static.
-			data: {
-				kind: "static-owner",
-				namespace: namespaceNames[0],
-				...accepted,
-			},
-		},
-	)
-}
-
-// Which rewrite the static's signatures accept: `Namespace.make(value, 1)` or
-// `Namespace.make(1)`. Every Overload is asked. A Method that can not be read
-// answers yes to both.
-function staticCallArities(
-	method: common.Type | undefined,
-	writtenArguments: number,
-): { acceptsValue: boolean; acceptsWithoutValue: boolean } {
-	let signatures = method === undefined ? null : signaturesOf(method)
-
-	if (signatures === null || signatures.length === 0) {
-		return { acceptsValue: true, acceptsWithoutValue: true }
-	}
-
-	let accepts = (count: number) =>
-		signatures.some(
-			(signature) =>
-				count <= signature.parameterTypes.length &&
-				count >=
-					signature.parameterTypes.filter(
-						(parameter) => !parameter.hasDefault,
-					).length,
-		)
-
-	return {
-		acceptsValue: accepts(writtenArguments + 1),
-		acceptsWithoutValue: accepts(writtenArguments),
-	}
-}
-
-// The Help built from that answer. Where both or neither fit, it hedges.
-function staticCallHelp(
-	namespace: string,
-	methodName: string,
-	accepted: { acceptsValue: boolean; acceptsWithoutValue: boolean },
-): string {
-	let call = `${namespace}.${methodName}`
-
-	if (accepted.acceptsValue && !accepted.acceptsWithoutValue) {
-		return `Write '${call}(…)', passing the value as its first Argument.`
-	}
-
-	if (accepted.acceptsWithoutValue && !accepted.acceptsValue) {
-		return `Write '${call}(…)' without the value — the signature takes no receiver.`
-	}
-
-	return `Write '${call}(…)', passing the value as an Argument if it needs one.`
-}
-
 // One entry a refused call was measured against. `receiverParameters` is how
 // many leading Parameters the call wrote left of the parentheses, so the report
 // leaves them out and counts `Parameter 1` after them.
@@ -12521,7 +12418,13 @@ function resolveMethodInvocation(
 		// The name resolves, but only to a static Method, which neither "no
 		// such Method" report would say.
 		if (staticNamespaces.size > 0) {
-			reportStaticMethodOnValue(node, baseType, null, staticNamespaces)
+			reportStaticMethodOnValue(
+				node,
+				baseType,
+				null,
+				staticNamespaces,
+				scope,
+			)
 
 			return resolveFailedMethodInvocation()
 		}
@@ -12805,6 +12708,7 @@ function resolveUnionMethodDispatch(
 					unionType,
 					memberType,
 					staticNamespaces,
+					scope,
 				)
 
 				return resolveFailedMethodInvocation()
@@ -16054,7 +15958,12 @@ function scopeWithRefinedSelf(
 	base: common.Type,
 	scope: enricher.Scope,
 ): enricher.Scope {
-	return declareVariableInScope("@", base, childScope(scope), true)
+	return declareVariableInScope(
+		"@",
+		base,
+		childScope(scope, { isRefinementPredicate: true }),
+		true,
+	)
 }
 
 // The refusals that need no predicate. Each reports before it answers false.

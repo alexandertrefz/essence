@@ -12,6 +12,7 @@ import {
 import { computeConformanceMethodMap } from "../helpers/conformance"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
+import { compiles } from "./followedHelps"
 
 function enrichSource(source: string): {
 	program: common.typed.Program
@@ -6034,6 +6035,36 @@ describe("Enricher", () => {
 				acceptsValue: true,
 				acceptsWithoutValue: false,
 			})
+		})
+
+		// A predicate calls nothing but a Method of `@`, so rewriting the call
+		// to `Sizes.isSmall()` would be refused again. The declaration is the
+		// edit, and a standard library static has none to offer.
+		it("should offer only the declaration's edit inside a predicate", () => {
+			let refined = (keyword: string) => `implementation {
+				namespace Sizes for Integer {
+					${keyword}isSmall() -> Boolean {
+						<- true
+					}
+				}
+
+				type Small = Integer where @::isSmall()
+			}`
+			let [refusal] = diagnosticsFor(refined("static "))
+
+			expect(refusal.code).toBe("static-method-on-value")
+			expect(refusal.helps).toEqual([
+				"Declare 'isSmall' in 'Sizes' without 'static' — a predicate asks a Method of '@', and a static Method has no receiver.",
+			])
+			expect(refusal.data).toBeUndefined()
+			expect(compiles(refined(""))).toBe(true)
+
+			let [builtin] = diagnosticsFor(`implementation {
+				type Parsed = Integer where @::parse("5")
+			}`)
+
+			expect(builtin.code).toBe("static-method-on-value")
+			expect(builtin.helps).toEqual([])
 		})
 
 		// A builtin static called on a value is refused, or the Simplifier

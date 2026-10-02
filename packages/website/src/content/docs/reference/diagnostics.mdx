@@ -2857,7 +2857,7 @@ Error: 'origin' is a static Method
 
 </div>
 
-Call it on its namespace with `.`: `Points.origin()`.
+Call it on its namespace with `.`: `Points.origin()`. Inside a refinement's `where` predicate, which asks only methods of `@`, the help asks for the method to be declared without `static` instead, and no Quick Fix is offered.
 
 Quick Fix: **Write 'Points.origin(…)' without the value**. A static takes no receiver, so the value the call was written on either belongs among the arguments or does not belong at all, and the signature's arity decides which — only the shape it accepts is offered, and where both shapes fit the help keeps its hedge and neither fix is preferred.
 

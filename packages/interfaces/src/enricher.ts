@@ -99,6 +99,9 @@ export type Scope = {
 	// than a receiver. A report about an unknown name reads it to say which `@`
 	// stands here.
 	isMatchHandlerBody?: boolean
+	// Set on the Scope a refinement's predicate is read in, where every call
+	// asks a Method of `@`. A report reads it to offer only edits that fit.
+	isRefinementPredicate?: true
 	// The identity of the Protocol whose provided Method this Scope is the
 	// body of. The body is emitted once, outside every Program that reaches it,
 	// so the name walk reports a name of the Program read from inside it.

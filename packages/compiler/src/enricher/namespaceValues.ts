@@ -85,6 +85,23 @@ function memberToRead(namespace: common.NamespaceType): string | null {
 	return ranked[0] ?? null
 }
 
+// Whether the nearest binding of `name` is the prelude's. A Program's
+// declaration of the name shadows it, and the standard library's own load has
+// no prelude at all.
+export function isPreludeName(name: string, scope: enricher.Scope): boolean {
+	for (
+		let searchScope: enricher.Scope | null = scope;
+		searchScope !== null;
+		searchScope = searchScope.parent
+	) {
+		if (Object.hasOwn(searchScope.members, name)) {
+			return searchScope.preludeNames?.has(name) === true
+		}
+	}
+
+	return false
+}
+
 // What `not-a-function` offers for a call on a Namespace, as in `String(5)`.
 // Dropping the `()` would leave a Namespace read as a value. What works builds
 // a value of the target: a static Method that answers one, the Argument's own
