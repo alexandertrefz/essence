@@ -52,6 +52,7 @@ import {
 	typeContainsError,
 	typeContainsUnknown,
 } from "../helpers/types"
+import { type Claim, claimedCaseReport } from "./claimedCases"
 import { refinementEvidence } from "./refinementEvidence"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
@@ -1371,94 +1372,45 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				continue
 			}
 
-			let claimingHandlerIndices: Array<number> = []
+			let claims: Array<Claim> = []
 
 			for (let memberIndex of matchedMemberIndices) {
 				let claimingHandlerIndex = claimedBy[memberIndex]
 
 				if (claimingHandlerIndex !== null) {
-					claimingHandlerIndices.push(claimingHandlerIndex)
+					claims.push({
+						index: claimingHandlerIndex,
+						handler: node.handlers[claimingHandlerIndex],
+						matcher: runtimeMatchers[claimingHandlerIndex],
+						member: memberTypes[memberIndex],
+					})
 				}
 			}
 
 			// Every Type this Handler could match is claimed, so it never runs.
-			if (claimingHandlerIndices.length === matchedMemberIndices.length) {
-				let claimingHandlerIndex = Math.min(...claimingHandlerIndices)
-				let claimingHandler = node.handlers[claimingHandlerIndex]
-				let claimingMatcher = runtimeMatchers[claimingHandlerIndex]
-
-				// Why the earlier Case covers this one decides the Notes. See
-				// "Runtime overlap" in DEVELOPMENT.md.
-				let notes = [
-					"Cases are tried in order, and the first one that fits wins.",
-				]
-				// Reordering helps only where this Matcher is narrower than the
-				// one covering it.
-				let helps = [
-					matchesType(runtimeMatcher, claimingMatcher)
-						? "Remove this Case — the Case above answers for every value it would take, in whichever order the two are written."
-						: "Remove this Case, or write it above the one that covers it.",
-				]
+			if (claims.length === matchedMemberIndices.length) {
 				// Covered through erasure, the Program answers with the wrong
 				// value, so the report is an Error.
-				let erased = false
-
-				if (claimingHandler.matcher.type === "GenericUse") {
-					erased = true
-
-					notes.push(
-						`Types erase before a Match runs, so the Generic Case '${describeType(claimingHandler.matcher)}' narrows nothing and accepts every value that reaches it.`,
-					)
-
-					// Two Generic Cases accept the same values in either order,
-					// so the Help addresses the signature, as `undispatchable-method`
+				let { erased, labels, notes, helps } = claimedCaseReport(
+					handler,
+					runtimeMatcher,
+					claims,
+					// Two Generic Cases accept the same values in either order, so
+					// the Help addresses the signature, as `undispatchable-method`
 					// does.
-					helps =
+					(claimer) =>
 						handler.matcher.type === "GenericUse"
 							? undispatchableHelps(
-									[claimingHandler.matcher, handler.matcher],
+									[claimer.matcher, handler.matcher],
 									node.value.nodeType === "Identifier"
 										? node.value.content
 										: null,
 									writtenBoundOf,
 								)
 							: [
-									`Write this Case above 'case ${describeType(claimingHandler.matcher)}', which can only ever be the last one.`,
-								]
-				} else if (!matchesType(claimingMatcher, runtimeMatcher)) {
-					// Claimed through erasure: a refinement's, where the bases
-					// reconcile the two, and otherwise a Function's Signature.
-					erased = true
-
-					notes.push(
-						matchesType(
-							eraseRefinements(claimingMatcher),
-							eraseRefinements(runtimeMatcher),
-						)
-							? "A refinement's predicate erases before a Match runs, so a refined Type is only ever checked as its base — which makes these two Matchers ask the same question."
-							: "A Function's Signature erases before a Match runs, so a Function-typed member is only ever checked for being callable — which makes these two Matchers ask the same question.",
-					)
-
-					// A Guard helps on neither Case. Two Matchers asking one
-					// erased question admit no exhaustive Match.
-					helps = [
-						"Tell the two Cases apart by a member that survives to runtime — a member whose Type is not a Function.",
-					]
-				}
-
-				let labels: [
-					common.DiagnosticLabel,
-					...Array<common.DiagnosticLabel>,
-				] = [
-					primary(
-						handler.matcherPosition,
-						"an earlier Case already answers for every Type this one matches",
-					),
-					secondary(
-						claimingHandler.matcherPosition,
-						"this Case runs first",
-					),
-				]
+									`Write this Case above 'case ${describeType(claimer.matcher)}', which can only ever be the last one.`,
+								],
+				)
 
 				if (erased) {
 					reportError(

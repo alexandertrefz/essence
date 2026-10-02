@@ -914,6 +914,100 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
+		// Each earlier Case claims its own member by Type, and no member Type
+		// holds a Function, so nothing erased covers the dead Cases.
+		it("should warn about Cases that earlier Cases cover together", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Click = { x: Integer, y: Integer }
+				type KeyPress = { key: String }
+
+				constant input: Click | KeyPress = { x = 0, y = 7 }
+
+				Terminal.print(match input -> String {
+					case { x, y } { <- "at {x}, {y}" }
+					case { key } { <- "pressed {key}" }
+					case { x } { <- "x {x}" }
+					case _ { <- "something else" }
+				})
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unreachable-case", 10],
+				["unreachable-case", 11],
+			])
+			expect(diagnostics[0].notes).toEqual([
+				"Cases are tried in order, and the first one that fits wins.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Remove this Case — the Case above answers for every value it would take, in whichever order the two are written.",
+			])
+			expect(diagnostics[1].notes).toEqual([
+				"Cases are tried in order, and the first one that fits wins.",
+			])
+			expect(diagnostics[1].helps).toEqual([
+				"Remove this Case — the Cases above answer for every value it would take.",
+			])
+			expect(
+				diagnostics[1].labels.map((label) => [
+					label.message,
+					label.position.start.line,
+				]),
+			).toEqual([
+				[
+					"earlier Cases already answer for every Type this one matches",
+					11,
+				],
+				["this Case runs first", 8],
+				["this Case runs first", 9],
+			])
+		})
+
+		it("should warn about a wildcard after every Case of a Choice", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Light { Red, Green }
+
+				constant light: Light = #Red
+
+				Terminal.print(match light -> String {
+					case #Red { <- "red" }
+					case #Green { <- "green" }
+					case _ { <- "other" }
+				})
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].notes).toEqual([
+				"Cases are tried in order, and the first one that fits wins.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Remove this Case — the Cases above answer for every value it would take.",
+			])
+		})
+
+		it("should warn about a wildcard after a Case naming every member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant either: Integer | String = 5
+				constant a = match either -> Integer {
+					case Integer | String { <- 1 }
+					case _ { <- 0 }
+				}
+
+				Terminal.inspect(a)
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].notes).toEqual([
+				"Cases are tried in order, and the first one that fits wins.",
+			])
+		})
+
 		// Types erase, so a Generic Matcher's check is always true and every
 		// later Case is dead. It is an Error rather than a dead-code Warning,
 		// since the Program would answer with the wrong value.
@@ -948,6 +1042,76 @@ describe("Validator", () => {
 			expect(diagnostics[0].helps).toEqual([
 				"Write this Case above 'case Value', which can only ever be the last one.",
 			])
+		})
+
+		// `case Item` claims only the `Item` member, which it names, so nothing
+		// erased covers the wildcard.
+		it("should warn about a wildcard after a Generic Case that claims its own member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function d<infer Item is Printable>(_ value: Item | Integer) -> String {
+					<- match value -> String {
+						case Integer { <- "number" }
+						case Item { <- "item" }
+						case _ { <- "other" }
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].position?.start.line).toBe(6)
+			expect(diagnostics[0].helps).toEqual([
+				"Remove this Case — the Cases above answer for every value it would take.",
+			])
+		})
+
+		it("should warn about a Generic Case after a wildcard that claims its member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function d<infer Item is Printable>(_ value: Item | Integer) -> String {
+					<- match value -> String {
+						case Integer { <- "number" }
+						case _ { <- "other" }
+						case Item { <- "item" }
+					}
+				}
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("unreachable-case")
+			expect(diagnostics[0].position?.start.line).toBe(6)
+		})
+
+		// The Type Parameter inside the Union Matcher accepts every value, so
+		// the Union Matcher does too.
+		it("should reject a Case shadowed by a Union Matcher naming a Type Parameter", () => {
+			let source = `implementation {
+				function q<infer Item is Printable>(_ v: Item | Integer | Boolean) -> String {
+					<- match v -> String {
+						case Item | Boolean { <- "item" }
+						case Integer { <- "int" }
+					}
+				}
+			}`
+			let diagnostics = diagnosticsFor(source)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].code).toBe("erased-case-conflict")
+			expect(diagnostics[0].notes[1]).toBe(
+				"Types erase before a Match runs, so the Generic Case 'Item | Boolean' narrows nothing and accepts every value that reaches it.",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Write this Case above 'case Item | Boolean', which can only ever be the last one.",
+			])
+			expect(
+				diagnosticsFor(
+					source.replace(
+						`case Item | Boolean { <- "item" }
+						case Integer { <- "int" }`,
+						`case Integer { <- "int" }
+						case Item | Boolean { <- "item" }`,
+					),
+				),
+			).toEqual([])
 		})
 
 		it("should not warn about a Generic Case written below the Cases it would swallow", () => {

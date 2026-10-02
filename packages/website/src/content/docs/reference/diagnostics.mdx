@@ -3464,6 +3464,11 @@ matchers that ask the same question swallow each other in whichever order they
 are written, so reordering is not offered for them. Where the covered case is
 **narrower**, the Help is `Remove this Case, or write it above the one that covers it.`
 
+Several cases can cover one together: a `case _` after `case #Red` and `case #Green`
+of a `choice Light { Red, Green }` is reached by no value. Every case that claims a
+member is labelled, and the Help is `Remove this Case — the Cases above answer for every
+value it would take.` Moving it above them would swallow them instead.
+
 A case that overlaps no member at all reports under the same code, with its own Help:
 
 <div class="error-output">

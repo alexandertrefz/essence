@@ -151,12 +151,19 @@ decline afterwards. Payload requirements are part of the test: `runtimeMatcherOf
 `case #Apply({ fn: IntFn })` claims as its Record spelling does. A literal, a member literal or a Guard decides
 after the test and claims nothing (`claimsWhatItsTestAccepts`).
 
-Where the earlier Handler covers this one through erasure rather than assignability, the dead Case is an Error,
+Where an earlier Handler covers this one through erasure rather than assignability, the dead Case is an Error,
 `erased-case-conflict`, not a Warning. The Program would answer with the wrong value: `case Value` above `case
 String` returns the String where the Signature promised a `Value`. The Notes name the erasure, since the two Types
 look unrelated without it. Reordering is offered only where the covered Matcher is narrower than the one covering
 it. Two Matchers asking the same question swallow each other in either order, and the only edit is to make them ask
 two.
+
+`claimedCaseReport` judges each claim against the member it claims, not against the dead Matcher. Several Handlers
+often cover a Case together, as `case #Red` and `case #Green` cover a trailing `case _`, and none of them covers it
+alone. A claim is erased only where its Handler does not match its member as a Type. A Generic Case, or a Union
+Matcher naming a Type Parameter, claims its own member as a Type and any other by erasure. A Case covered
+together is labelled at every claiming Handler, and only removal is offered. Removing it leaves every value to the
+Case that answers it now, while moving it above them would hand it members they answer for.
 
 ### Runtime overlap
 
