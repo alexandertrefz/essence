@@ -2875,6 +2875,12 @@ function walkTypedNode(
 		case "FunctionValue":
 			walkTypedBody(node.value.body, context)
 			return
+		case "CaseValue":
+			if (node.value !== null) {
+				walkTypedNode(node.value, context)
+			}
+
+			return
 		case "ChoiceDeclarationStatement":
 			walkTypedCaseDefaults(node.cases, context)
 			return

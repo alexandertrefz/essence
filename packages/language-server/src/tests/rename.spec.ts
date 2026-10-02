@@ -2591,6 +2591,75 @@ describe("Rename of a name a default reads", () => {
 	})
 })
 
+// A Method or a Record member resolves only in the typed pass, which has to
+// look inside a Case value's payload.
+describe("Rename of a name a Case payload reads", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Tank {",
+		"\t\tFull { level: Integer },",
+		"\t\tEmpty,",
+		"\t}",
+		"",
+		"\tnamespace Gauge for Integer {",
+		"\t\tdoubled() -> Integer {",
+		"\t\t\t<- @::multiply(with 2)",
+		"\t\t}",
+		"\t}",
+		"",
+		"\tconstant reading = { amount = 3 }",
+		"\tconstant first: Tank = #Full(reading.amount::doubled())",
+		"\tconstant second: Tank = #Full({ level = 3::doubled() })",
+		"}",
+	].join("\n")
+
+	it("renames a Method called inside a payload", () => {
+		expect(rename(source, { line: 8, column: 3 }, "twice")).toBe(
+			[
+				"implementation {",
+				"\tchoice Tank {",
+				"\t\tFull { level: Integer },",
+				"\t\tEmpty,",
+				"\t}",
+				"",
+				"\tnamespace Gauge for Integer {",
+				"\t\ttwice() -> Integer {",
+				"\t\t\t<- @::multiply(with 2)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant reading = { amount = 3 }",
+				"\tconstant first: Tank = #Full(reading.amount::twice())",
+				"\tconstant second: Tank = #Full({ level = 3::twice() })",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("renames a Record member read inside a payload", () => {
+		expect(rename(source, { line: 13, column: 23 }, "volume")).toBe(
+			[
+				"implementation {",
+				"\tchoice Tank {",
+				"\t\tFull { level: Integer },",
+				"\t\tEmpty,",
+				"\t}",
+				"",
+				"\tnamespace Gauge for Integer {",
+				"\t\tdoubled() -> Integer {",
+				"\t\t\t<- @::multiply(with 2)",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tconstant reading = { volume = 3 }",
+				"\tconstant first: Tank = #Full(reading.volume::doubled())",
+				"\tconstant second: Tank = #Full({ level = 3::doubled() })",
+				"}",
+			].join("\n"),
+		)
+	})
+})
+
 // A Case payload's `= { … }` is written outside every body too.
 describe("Rename of a name a Case payload default reads", () => {
 	it("renames a module Constant read by a payload default", () => {
