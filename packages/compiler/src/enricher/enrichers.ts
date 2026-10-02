@@ -39,7 +39,7 @@ import {
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
-import { parameterInternalName } from "../helpers/names"
+import { parameterInternalName, synthesizedName } from "../helpers/names"
 import {
 	patternBindings,
 	refutablePatternMembers,
@@ -14791,13 +14791,6 @@ function resolvePatternMatcherType(
 	}
 
 	return { type: "Record", members }
-}
-
-// A name no source can write, derived from a Position. `_` is a Symbol to the
-// Lexer and `$` keeps it apart from `_self`. A Position rather than a counter,
-// so the body read twice for return inference mints the same name.
-function synthesizedName(kind: string, position: common.Position): string {
-	return `$${kind}_${position.start.line}_${position.start.column}`
 }
 
 // A Pattern member constrained by value can decline, and only a Matcher has a

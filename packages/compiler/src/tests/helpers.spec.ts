@@ -36,6 +36,7 @@ import {
 	withArticle,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
+import { isSynthesizedName, synthesizedName } from "../helpers/names"
 import { stripPosition, stripPositionFromArray } from "../helpers/nodes"
 import { closestMatch } from "../helpers/suggest"
 import {
@@ -4187,6 +4188,38 @@ describe("closestMatch", () => {
 	it("should offer nothing when there is nothing to offer", () => {
 		expect(closestMatch("undeclaredMethod", [])).toBeNull()
 		expect(closestMatch("", ["length"])).toBeNull()
+	})
+})
+
+// Hover and the debug adapter hide every name the Enricher mints, whatever it
+// names.
+describe("isSynthesizedName", () => {
+	it("should know every kind of name the Enricher mints", () => {
+		let position = {
+			start: { line: 11, column: 28 },
+			end: { line: 11, column: 33 },
+		}
+
+		for (let kind of [
+			"assertion",
+			"pattern",
+			"parameter",
+			"row",
+			"any",
+			"candidate",
+			"source",
+			"drawn",
+		]) {
+			expect(isSynthesizedName(synthesizedName(kind, position))).toBe(
+				true,
+			)
+		}
+	})
+
+	it("should leave the names an author or the Rewriter writes", () => {
+		for (let name of ["standing", "_self", "$es_List_sorted", "$loop_3"]) {
+			expect(isSynthesizedName(name)).toBe(false)
+		}
 	})
 })
 

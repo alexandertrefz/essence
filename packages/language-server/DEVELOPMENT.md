@@ -455,8 +455,9 @@ parts. Each parsed Program's declarations are indexed once, the first time the c
 - An import or export entry pairs its typed entry, which holds the bound Type, with the parsed entry by the entry's
   span. An entry the linking refused stays silent; its Diagnostic is already on it.
 
-Names the Compiler made up answer nothing. That covers the Constant a Pattern stores its value in, a Pattern
-Parameter's internal name, and a member path's `_0` Parameter. The Pattern's own bindings answer for their spans.
+Names the Compiler made up answer nothing. That covers the Constant a Pattern or a `require` stores its value in, a
+Pattern Parameter's internal name, a table test's row taken apart by a Pattern, and a member path's `_0` Parameter.
+The Pattern's own bindings answer for their spans, and a `require` subject answers as written.
 
 ### How a declaration reads back
 

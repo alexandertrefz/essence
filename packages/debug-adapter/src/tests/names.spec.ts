@@ -129,4 +129,22 @@ describe("isCompilerBinding", () => {
 		expect(isCompilerBinding("greet")).toBe(false)
 		expect(isCompilerBinding("_self")).toBe(false)
 	})
+
+	// A `require` subject's Constant is the only binding holding that value,
+	// so the Variables view keeps it. The other names the Enricher mints go.
+	it("keeps a require subject and leaves out the other names the Enricher mints", () => {
+		expect(isCompilerBinding("$assertion_11_20")).toBe(false)
+
+		for (let name of [
+			"$pattern_6_12",
+			"$parameter_4_18",
+			"$row_14_4",
+			"$any_3_9",
+			"$candidate_3_9",
+			"$source_3_9",
+			"$drawn_3_9",
+		]) {
+			expect(isCompilerBinding(name)).toBe(true)
+		}
+	})
 })

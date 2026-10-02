@@ -445,8 +445,9 @@ function visitNode(node: TypedNode, state: State): void {
 
 			break
 		case "Identifier":
-			// A Pattern's bindings read off a Constant with a made-up name at the
-			// Pattern's span, so it is skipped. Each binder answers for its own.
+			// A Pattern's bindings and a `require` read off a Constant with a
+			// made-up name at the span written, so it is skipped. What was
+			// written there answers for its own.
 			if (!isSynthesizedName(node.content)) {
 				visitIdentifier(node, state)
 			}

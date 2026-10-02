@@ -28,6 +28,20 @@ function hoverDocumentation(
 	return hoverInfo(source, cursor)?.documentation ?? null
 }
 
+// The same, with the `tests` block enriched.
+function testsHover(source: string, cursor: common.Cursor): string | null {
+	let { program } = parseWithDiagnostics(source)
+	let { program: enrichedProgram, annotations } = enrich(program, {
+		annotations: true,
+		tests: true,
+	})
+
+	return (
+		findHover(enrichedProgram, cursor, program, annotations, source)
+			?.content ?? null
+	)
+}
+
 describe("Hover", () => {
 	// A step a dotted key reaches through answers as the member it names, since
 	// the synthesized Lookup's member stands where the step was written.
@@ -886,19 +900,6 @@ describe("Hover inside a Match Handler", () => {
 
 // A `require` Matcher's by-value members answer as a Match Handler's do.
 describe("Hover inside a require Matcher", () => {
-	function testsHover(source: string, cursor: common.Cursor) {
-		let { program } = parseWithDiagnostics(source)
-		let { program: enrichedProgram, annotations } = enrich(program, {
-			annotations: true,
-			tests: true,
-		})
-
-		return (
-			findHover(enrichedProgram, cursor, program, annotations, source)
-				?.content ?? null
-		)
-	}
-
 	it("should describe a Record Matcher's member literal", () => {
 		let source = [
 			"implementation {",
@@ -915,6 +916,41 @@ describe("Hover inside a require Matcher", () => {
 		].join("\n")
 
 		expect(testsHover(source, { line: 9, column: 36 })).toBe("Integer")
+	})
+})
+
+// A `require` reads its subject through a Constant the Compiler named at the
+// subject's span. A table test's row Pattern takes apart a row the Compiler
+// named at the Pattern's span. Neither name answers.
+describe("Hover over a value the Compiler named in a test", () => {
+	let source = [
+		"implementation {",
+		"\ttype Standing = { team: String, points: Integer }",
+		"}",
+		"",
+		"tests {",
+		'\ttest "a team is found" {',
+		'\t\tconstant found: Optional<Standing> = #Value({ team = "Lions", points = 0 })',
+		"",
+		"\t\trequire #Value(standing) = found",
+		"\t}",
+		"",
+		'\ttest "{team} starts at {points}" across [',
+		'\t\t{ team = "Lions", points = 0 },',
+		"\t] ({ team, points }: Standing) {",
+		"\t\texpect points::is(0)",
+		"\t}",
+		"}",
+	].join("\n")
+
+	it("answers for a require subject with the subject", () => {
+		expect(testsHover(source, { line: 9, column: 30 })).toBe(
+			"found: Optional<Standing>",
+		)
+	})
+
+	it("says nothing over the braces of a table test's row Pattern", () => {
+		expect(testsHover(source, { line: 14, column: 5 })).toBeNull()
 	})
 })
 

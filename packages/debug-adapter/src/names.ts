@@ -16,6 +16,8 @@ import {
 } from "@essence-lang/compiler/rewriter/names"
 
 const stdlibMethodPrefix = "$es_"
+// The Constant a `require` holds its subject in, as the Enricher names it.
+const requireSubjectPrefix = "$assertion_"
 const overloadSuffix = /__overload\$\d+$/
 const providedMethod = /^([^_]+)(?:_\d+)?__(.+)$/
 
@@ -78,10 +80,11 @@ export function isCompilerBinding(name: string): boolean {
 		name === "$type" ||
 		name === "$helpers" ||
 		name === "$_" ||
-		// The binding a Pattern reads its members off, such as
-		// `$pattern_6_12`. The names the Pattern binds are the author's and
-		// stay.
-		isSynthesizedName(name) ||
+		// A binding the Enricher named, such as the one a Pattern reads its
+		// members off, `$pattern_6_12`. The names the Pattern binds are the
+		// author's and stay. A `require` subject stays too, since no other
+		// binding holds that value.
+		(isSynthesizedName(name) && !name.startsWith(requireSubjectPrefix)) ||
 		name.startsWith(stdlibMethodPrefix) ||
 		name.endsWith("__conformance")
 	)
