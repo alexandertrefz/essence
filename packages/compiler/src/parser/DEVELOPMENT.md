@@ -341,7 +341,10 @@ Where the rest of the Statement is complete and correct, the parser reports the 
 Statement. A thrown refusal would drop the Statement, and a dropped `const price = 12` leaves `price` undeclared at
 every line that reads it. So `parseForeignDeclarationStatement` reads `const` as `constant`. `swallowForeignTail`
 steps over a trailing `;` or Comment. `refuseIndexBrackets` reads `primes[0]` into a `RefusedValue`, which the
-enricher types as `Error`.
+enricher types as `Error`. `openParameterList` drops a receiver written as a first Parameter, as in
+`double(self)`, so the head keeps its other Parameters. The Tokens before the name say whose list it is: an instance
+Method is told its receiver is `@`, and a Function or a static Method that it has none. A Function literal whose
+Parameters may go unannotated reads `(self)` as a Parameter of that name.
 
 Where the habit is not read past, the parser throws a coded `ParseError`, which survives speculation. A habit is
 read past only where it is the whole of what is left. That is a `;` Token, a `//` with the rest of its line, or a

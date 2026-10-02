@@ -6671,7 +6671,7 @@ class DescentParser {
 		parameters: Array<parser.ParameterNode>
 		position: common.Position
 	} {
-		let leftParen = this.tokens.expect(TokenType.SymbolLeftParen)
+		let leftParen = this.tokens.openParameterList(allowsInferredTypes)
 
 		let parameters: Array<parser.ParameterNode> = []
 

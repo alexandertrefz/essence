@@ -2020,4 +2020,99 @@ describe("Foreign syntax", () => {
 			).toEqual([])
 		})
 	})
+
+	// `double(self)`: Python's and Rust's receiver Parameter. Essence's
+	// receiver is `@`, so the word is dropped and the Method reads on.
+	describe("a receiver written as a Parameter", () => {
+		let doubling = (head: string) =>
+			program(
+				"namespace Doubling for Integer {",
+				`\t${head} -> Integer {`,
+				"\t\t<- @::add(@)",
+				"\t}",
+				"}",
+				"Terminal.print(3::double())",
+			)
+
+		it("names the receiver '@' and drops the word", () => {
+			let source = doubling("double(self)")
+			let refusal = onlyDiagnostic(source)
+
+			expect(refusal.code).toBe("foreign-syntax")
+			expect(refusal.message).toBe("A Method takes no 'self' Parameter")
+			expect(refusal.helps).toEqual([
+				"Remove 'self' from the Parameters, and read the receiver as '@' in the body.",
+			])
+			expect(refusedSpan(source)).toBe("self")
+			expect(compiles(doubling("double()"))).toBe(true)
+		})
+
+		it("removes the comma after the word with it", () => {
+			let source = program(
+				"namespace Scaling for Integer {",
+				"\tscaled(this, by factor: Integer) -> Integer {",
+				"\t\t<- @::multiply(with factor)",
+				"\t}",
+				"}",
+				"Terminal.print(3::scaled(by 2))",
+			)
+			let { data } = onlyDiagnostic(source)
+
+			if (data?.kind !== "essence-spelling") {
+				throw new Error(
+					"Diagnostic carries no essence-spelling payload.",
+				)
+			}
+
+			expect(data.spelling).toBe("")
+			expect(spanOf(source, data.position)).toBe("this, ")
+			expect(
+				compiles(source.replace("scaled(this, by", "scaled(by")),
+			).toBe(true)
+		})
+
+		// Only an instance Method has a receiver. In a Function or a static
+		// Method the word names nothing, and `@` is refused there too.
+		it("names no receiver in a Function or a static Method", () => {
+			let heads = (functionHead: string, staticHead: string) =>
+				program(
+					`function ${functionHead} -> Integer {`,
+					"\t<- 2",
+					"}",
+					"namespace Origins for Integer {",
+					`\tstatic ${staticHead} -> Integer {`,
+					"\t\t<- 0",
+					"\t}",
+					"}",
+					"Terminal.print(double())",
+					"Terminal.print(Origins.origin())",
+				)
+			let source = heads("double<infer Item>(self)", "origin(self)")
+
+			expect(messagesOf(source)).toEqual([
+				"A Function has no receiver for 'self' to name",
+				"A static Method has no receiver for 'self' to name",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Remove 'self', or give it a Type, as 'self: …', where it is a Parameter of its own.",
+				"Remove 'self', or give it a Type, as 'self: …', where it is a Parameter of its own.",
+			])
+			expect(compiles(heads("double()", "origin()"))).toBe(true)
+		})
+
+		// A Function literal's Parameter may be named `self` and take its
+		// Type from the expected signature.
+		it("leaves a Parameter named 'self' alone", () => {
+			expect(
+				codesOf(
+					program(
+						"function twice(_ self: Integer) -> Integer {",
+						"\t<- self::multiply(with 2)",
+						"}",
+						"Terminal.print([1, 2]::map((self) { <- twice(self) }))",
+					),
+				),
+			).toEqual([])
+		})
+	})
 })

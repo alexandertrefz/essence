@@ -247,6 +247,47 @@ export const semicolonAccount: ForeignAccount = {
 	helps: ["Remove the ';'."],
 }
 
+// The words another language names the receiver with, Python's and Rust's
+// `self` and JavaScript's `this`, written bare as a first Parameter.
+export const receiverWords: ReadonlySet<string> = new Set(["self", "this"])
+
+// Whose Parameter list a receiver word was written in. Only an instance
+// Method has a receiver.
+export type ParameterListOwner = "Method" | "static Method" | "Function"
+
+// `double(self)`: a receiver written as a first Parameter. In an instance
+// Method the receiver is `@`. A static Method or a Function has none.
+export function writtenReceiverAccount(
+	word: string,
+	owner: ParameterListOwner,
+): ForeignAccount {
+	if (owner !== "Method") {
+		return {
+			code: "foreign-syntax",
+			message: `A ${owner} has no receiver for '${word}' to name`,
+			label: "there is no receiver here",
+			notes: [
+				`Only an instance Method has a receiver, which it reads as '@'. A ${owner} takes only the Arguments its call writes.`,
+			],
+			helps: [
+				`Remove '${word}', or give it a Type, as '${word}: …', where it is a Parameter of its own.`,
+			],
+		}
+	}
+
+	return {
+		code: "foreign-syntax",
+		message: `A Method takes no '${word}' Parameter`,
+		label: "Essence's receiver is '@'",
+		notes: [
+			"A Method reads its receiver as '@', which no Parameter declares. A call passes it before the '::'.",
+		],
+		helps: [
+			`Remove '${word}' from the Parameters, and read the receiver as '@' in the body.`,
+		],
+	}
+}
+
 // What a habit written as a word is answered with. `spelling` is the word a
 // Quick Fix writes in its place, or null where the answer is a shape. Nothing
 // replaces `throw`: a Result is returned instead.

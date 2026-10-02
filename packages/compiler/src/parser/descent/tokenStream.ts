@@ -6,6 +6,11 @@ import {
 	reportWarning,
 	secondary,
 } from "../../diagnostics/index"
+import {
+	type ParameterListOwner,
+	receiverWords,
+	writtenReceiverAccount,
+} from "../../helpers/foreign"
 import { holeHoldsAnEscape } from "../../helpers/stringHoles"
 import {
 	escapeSetSentence,
@@ -649,6 +654,84 @@ export class TokenStream {
 		}
 
 		return this.next()
+	}
+
+	// The `(` of a Parameter list, read past a receiver written as its first
+	// Parameter, as in `double(self)`. The receiver is reported and dropped, so
+	// the Method keeps its other Parameters. A Function literal's inferred
+	// Parameter may be named `self`, so there the word is read as written.
+	openParameterList(allowsInferredTypes: boolean): Token {
+		let leftParen = this.expect(TokenType.SymbolLeftParen)
+		let word = this.peek()
+		let after = this.peek(1)?.type
+
+		if (
+			allowsInferredTypes ||
+			word?.type !== TokenType.Identifier ||
+			!receiverWords.has(word.value) ||
+			(after !== TokenType.SymbolRightParen &&
+				after !== TokenType.SymbolComma)
+		) {
+			return leftParen
+		}
+
+		this.next()
+
+		// A following `,` and the space after it go with the word.
+		let end =
+			after === TokenType.SymbolComma
+				? (this.next(),
+					this.peek()?.position.start ?? word.position.end)
+				: word.position.end
+		let removed = { start: word.position.start, end }
+		let account = writtenReceiverAccount(
+			word.value,
+			this.parameterListOwner(this.tokens.indexOf(leftParen)),
+		)
+
+		reportError(account.message, word.position, {
+			code: account.code,
+			labels: [primary(word.position, account.label)],
+			notes: account.notes,
+			helps: account.helps,
+			data: { kind: "essence-spelling", position: removed, spelling: "" },
+		})
+
+		return leftParen
+	}
+
+	// Whose Parameter list opens at `index`. The Token before its name and any
+	// Type Parameters says: `function` or `static`, else an instance Method's or
+	// a Protocol requirement's head.
+	private parameterListOwner(index: number): ParameterListOwner {
+		let at = index - 1
+
+		if (this.tokens[at]?.type === TokenType.SymbolRightAngle) {
+			for (let depth = 0; at >= 0; at--) {
+				let type = this.tokens[at].type
+
+				depth +=
+					type === TokenType.SymbolRightAngle
+						? 1
+						: type === TokenType.SymbolLeftAngle
+							? -1
+							: 0
+
+				if (depth === 0) {
+					break
+				}
+			}
+
+			at--
+		}
+
+		let keyword = this.tokens[at - 1]?.type
+
+		return keyword === TokenType.KeywordFunction
+			? "Function"
+			: keyword === TokenType.KeywordStatic
+				? "static Method"
+				: "Method"
 	}
 
 	// The Token that closes a bracketed construction. Unlike `expect`, a
