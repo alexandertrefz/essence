@@ -23,9 +23,9 @@ implementation {
 		case _                 { <- 0 }
 	}
 
-	§ pattern-without-body — a Protocol Method says what a call looks like and
-	§ nothing about how it is carried out, so a Pattern there would name parts
-	§ for nobody to read.
+	§ pattern-without-body — a Protocol requirement says what a call looks like
+	§ and nothing about how it is carried out, so a Pattern there would name
+	§ parts for nobody to read.
 	protocol Measurable {
 		area(of { width, height }: { width: Integer, height: Integer }) -> Integer
 	}

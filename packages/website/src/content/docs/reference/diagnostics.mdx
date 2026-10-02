@@ -3991,13 +3991,13 @@ Taught on: [Patterns › In a match arm](/docs/language/patterns#in-a-match-arm)
 
 ### `pattern-without-body`
 
-**Error.** A pattern is written in a protocol method's signature. A signature has no body to bind the names in.
+**Error.** A pattern is written in a protocol requirement's signature. A requirement has no body to bind the names in.
 
 <div class="error-output">
 
 ```
 [pattern-without-body]
-Error: A Protocol Method can not take a Parameter apart
+Error: A Protocol requirement can not take a Parameter apart
    ╭─┤ Measurable.es:3:11 │
    │
  3 │        area(of { width, height }: { width: Integer, height: Integer }) -> Integer
@@ -4006,13 +4006,13 @@ Error: A Protocol Method can not take a Parameter apart
    │ 
    │ Help: Write one name, and take it apart where it is used.
    │ 
-   │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
+   │ Note: A Protocol requirement declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
 ───╯
 ```
 
 </div>
 
-Write one parameter name in the signature, and take it apart in the method that fulfils it.
+Write one parameter name in the signature, and take it apart in the method that fulfils it. A [provided method](/docs/language/protocols#provided-methods), one with a body, may take a parameter apart as any method does.
 
 Taught on: [Protocols › What a requirement can be](/docs/language/protocols#what-a-requirement-can-be)
 

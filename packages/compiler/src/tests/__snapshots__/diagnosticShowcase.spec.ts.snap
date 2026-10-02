@@ -3112,7 +3112,7 @@ Error: A Matcher's Pattern can not name the whole value
 ────╯
 
 [pattern-without-body]
-Error: A Protocol Method can not take a Parameter apart
+Error: A Protocol requirement can not take a Parameter apart
     ╭─┤ Syntax.es:30:11 │
     │
  30 │        area(of { width, height }: { width: Integer, height: Integer }) -> Integer
@@ -3121,7 +3121,7 @@ Error: A Protocol Method can not take a Parameter apart
     │ 
     │ Help: Write one name, and take it apart where it is used.
     │ 
-    │ Note: A Protocol Method declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
+    │ Note: A Protocol requirement declares what a call looks like and nothing about how it is carried out, so a Pattern here would name parts for nobody to read.
 ────╯
 
 [comment-in-hole]

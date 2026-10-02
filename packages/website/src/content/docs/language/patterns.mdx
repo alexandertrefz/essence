@@ -476,7 +476,7 @@ Three places look like a pattern and are not one.
 
 - **The key list after `with`.** After `with`, a bare name is a record to merge, so `{ base with x }` merges the record `x` into `base`. It is not shorthand for `x = x`. That shorthand lives in a record literal, `{ x, y }`, which builds a record from names the way a pattern takes one apart into names.
 - **A property test's [`for any`](/docs/reference/syntax-glossary#for-any) parameter.** A property test runs its body on generated values, and names them after `for any`. That parameter is a name and a type, never a pattern. `for any ({ team, points }: Standing)` is [`property-parameters`](/docs/reference/diagnostics#property-parameters), whose Help says to name the whole value and take it apart in the body.
-- **A protocol requirement.** A requirement is a signature a protocol asks each conforming type to fill in, with no body of its own. It has nowhere to bind names, so a pattern in its signature is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). [Protocols](/docs/language/protocols) covers requirements.
+- **A protocol requirement.** A requirement is a signature a protocol asks each conforming type to fill in, with no body of its own. It has nowhere to bind names, so a pattern in its signature is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). [Protocols](/docs/language/protocols) covers requirements. A provided method is written with a body, so its parameters take patterns as any method's do.
 
 Several forms from other languages do not exist, and each is a `syntax-error`. The one a JavaScript habit meets first is the array pattern:
 

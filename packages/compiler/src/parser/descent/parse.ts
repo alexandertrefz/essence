@@ -3519,10 +3519,14 @@ class DescentParser {
 			)
 		}
 
-		this.refusePatternParameters(
-			parameterList.parameters,
-			"Protocol Method",
-		)
+		// A provided body binds a Pattern's names as any Method body does.
+		if (body === null) {
+			this.refusePatternParameters(
+				parameterList.parameters,
+				"Protocol requirement",
+			)
+		}
+
 		this.refuseDefaultValues(
 			parameterList.parameters,
 			body === null ? "Protocol requirement" : "provided Method",

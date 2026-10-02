@@ -3460,6 +3460,65 @@ implementation {
 		)
 	})
 
+	// The body is emitted once, where the Protocol is declared, and binds the
+	// Pattern there.
+	it("runs a provided Method that takes its Parameter apart from another Module", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Measured.es" {
+		Measured
+	}
+}
+
+implementation {
+	type Plan = { factor: Integer }
+
+	namespace Plans for Plan is Measured {
+		scale() -> Integer {
+			<- @.factor
+		}
+	}
+
+	function measured <infer Item is Measured>(_ item: Item) -> Integer {
+		<- item::area(of { width = 4, height = 1 })
+	}
+
+	constant plan: Plan = { factor = 10 }
+
+	Terminal.inspect(plan::area(of { width = 2, height = 3 }))
+	Terminal.inspect(measured(plan))
+}
+`,
+				"Measured.es": `implementation {
+	type Size = { width: Integer, height: Integer }
+
+	protocol Measured {
+		scale() -> Integer
+
+		area(of { width, height }: Size) -> Integer {
+			<- width::multiply(with height)::multiply(with @::scale())
+		}
+	}
+}
+
+export {
+	Measured
+	Size
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["60", "40"])
+			},
+		)
+	})
+
 	it("calls a Function bounded by a Protocol its Module keeps private", async () => {
 		await withBuiltProject(
 			{

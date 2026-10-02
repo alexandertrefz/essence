@@ -274,7 +274,7 @@ A protocol cannot declare:
 - **A default on a parameter.** `greet(_ name: String = "world") -> String` is [`default-on-protocol-requirement`](/docs/reference/diagnostics#default-on-protocol-requirement). Write the default on the conforming method. A provided method can not carry one either, since a namespace may replace it and a bound call then runs the replacement.
 - **A property.** `size: Integer` in a protocol is a `syntax-error`. A protocol holds methods only. To ask for a member, use a record type: a parameter typed `{ name: String }` accepts any record that has a `name`.
 - **A type parameter.** `protocol Container<Item>` and a requirement `transform<infer Target>(…)` are both syntax errors.
-- **A pattern in a parameter.** `area(of { width, height }: …)` is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). A requirement has no body to bind the names in.
+- **A pattern in a requirement's parameter.** `area(of { width, height }: …)` with no body is [`pattern-without-body`](/docs/reference/diagnostics#pattern-without-body). A requirement has no body to bind the names in. A provided method has one, so it may take a parameter apart.
 
 ## Provided methods
 
@@ -321,7 +321,7 @@ implementation {
 }
 ```
 
-A method written with a body inside a protocol is provided. Every conforming type has it without writing anything: `Rectangles` writes `area` only, and `line::isEmpty()` runs the protocol's body. A provided body is written on [`@`](/docs/reference/syntax-glossary#at), the conforming value.
+A method written with a body inside a protocol is provided. Every conforming type has it without writing anything: `Rectangles` writes `area` only, and `line::isEmpty()` runs the protocol's body. A provided body is written on [`@`](/docs/reference/syntax-glossary#at), the conforming value. Its parameters may be [patterns](/docs/language/patterns), as any method's may: `scaled(by { width, height }: Size) -> Integer { … }` binds `width` and `height` in the body, and a namespace that replaces it may name the parameter whole.
 
 A namespace that writes a method with the provided method's name replaces it, whole. `Squares` writes its own `isEmpty`, and that is what runs, at a direct call and through a bound alike. `isBlank(speck)` returns `true` although `speck`'s area is 1. The replacement cannot call the provided body, and it is held to the provided signature, as a requirement is.
 

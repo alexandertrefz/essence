@@ -6185,6 +6185,103 @@ describe("Protocol-provided Methods", () => {
 		})
 	})
 
+	// A provided Method has a body, which binds a Pattern's names as any
+	// Method body does. A requirement has none, so it still refuses one.
+	describe("a Pattern Parameter", () => {
+		let measured = (replacement: string) => `implementation {
+			type Size = { width: Integer, height: Integer }
+
+			protocol Measured {
+				scale() -> Integer
+
+				area(of { width, height }: Size) -> Integer {
+					<- width::multiply(with height)::multiply(with @::scale())
+				}
+			}
+
+			type Plan = { factor: Integer }
+			type Map = { zoom: Integer }
+
+			namespace Plans for Plan is Measured {
+				scale() -> Integer {
+					<- @.factor
+				}
+			}
+
+			namespace Maps for Map is Measured {
+				scale() -> Integer {
+					<- @.zoom
+				}
+				${replacement}
+			}
+
+			function measured<infer Item is Measured>(_ item: Item) -> Integer {
+				<- item::area(of { width = 2, height = 3 })
+			}
+
+			constant plan: Plan = { factor = 10 }
+			constant map: Map = { zoom = 5 }
+
+			Terminal.inspect(plan::area(of { width = 2, height = 3 }))
+			Terminal.inspect(measured(plan))
+			Terminal.inspect(plan::<Measured>area(of { width = 1, height = 1 }))
+			Terminal.inspect(Plans.area(plan, of { width = 1, height = 2 }))
+			Terminal.inspect(map::area(of { width = 2, height = 3 }))
+			Terminal.inspect(measured(map))
+		}`
+
+		it("should run a provided Method that takes its Parameter apart", async () => {
+			expect(await run(measured(""))).toEqual([
+				"60",
+				"60",
+				"10",
+				"20",
+				"30",
+				"30",
+			])
+		})
+
+		it("should run a replacement that names the Parameter whole", async () => {
+			expect(
+				await run(
+					measured(`
+				area(of size: Size) -> Integer {
+					<- size.width::add(size.height)
+				}`),
+				),
+			).toEqual(["60", "60", "10", "20", "5", "5"])
+		})
+
+		it("should run a replacement that takes the Parameter apart too", async () => {
+			expect(
+				await run(
+					measured(`
+				area(of { width, height }: Size) -> Integer {
+					<- width::subtract(height)
+				}`),
+				),
+			).toEqual(["60", "60", "10", "20", "-1", "-1"])
+		})
+
+		it("should still refuse a Pattern in a requirement", () => {
+			expect(
+				refusalsOf(`implementation {
+					type Size = { width: Integer, height: Integer }
+
+					protocol Measured {
+						area(of { width, height }: Size) -> Integer
+					}
+				}`),
+			).toEqual([
+				[
+					"pattern-without-body",
+					"A Protocol requirement can not take a Parameter apart",
+					["no body to bind these in"],
+				],
+			])
+		})
+	})
+
 	describe("emission", () => {
 		it("should emit one const per provided Method, whatever conforms", () => {
 			let javaScript = generate(
