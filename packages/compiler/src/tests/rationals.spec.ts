@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, spyOn } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -721,44 +721,47 @@ describe("Rationals", () => {
 			).toEqual(['"6,172,839/5,000"', '"1.235e6"', '"123 456 700%"'])
 		})
 
-		// Grouping must cost about what plain formatting costs, held as a ratio
-		// so a slow machine moves both figures. Both run once before timing, so
-		// neither pays for warm-up. They are timed interleaved, so a stall falls
-		// on both. Each is judged on its fastest of fifteen attempts, since the
-		// fastest of three can cross the ceiling under load.
+		// Grouping reads each group of three digits once: one slice and one push
+		// per group, and no unshift, which would copy every group already
+		// written. Counted rather than timed, so machine load changes nothing.
 		it("writes the separator in one pass over the groups", () => {
-			let value = rational.createRational(BigInt("9".repeat(100_000)), 1n)
 			let comma = createString(",")
-			let runs = [
-				() =>
-					rational.toString__overload$4(value, decimal, comma).value,
-				() => rational.toString__overload$2(value, decimal).value,
-			]
-			let fastest = runs.map(() => Number.POSITIVE_INFINITY)
+			let work = (groups: number) => {
+				let value = rational.createRational(
+					BigInt("9".repeat(groups * 3)),
+					1n,
+				)
+				let slices = spyOn(String.prototype, "slice")
+				let pushes = spyOn(Array.prototype, "push")
+				let unshifts = spyOn(Array.prototype, "unshift")
 
-			for (let run of runs) {
-				run()
-			}
+				try {
+					let text = rational.toString__overload$4(
+						value,
+						decimal,
+						comma,
+					).value
 
-			for (let attempt = 0; attempt < 15; attempt++) {
-				for (let [index, run] of runs.entries()) {
-					let start = performance.now()
-					let answer = run()
-
-					fastest[index] = Math.min(
-						fastest[index] as number,
-						performance.now() - start,
-					)
-
-					// Reading the answer keeps an engine from dropping the call,
-					// and keeps an empty answer from being the fastest.
-					expect(answer.length).toBeGreaterThanOrEqual(100_000)
+					return {
+						text,
+						slices: slices.mock.calls.length,
+						pushes: pushes.mock.calls.length,
+						unshifts: unshifts.mock.calls.length,
+					}
+				} finally {
+					slices.mockRestore()
+					pushes.mockRestore()
+					unshifts.mockRestore()
 				}
 			}
 
-			let [grouped, plain] = fastest as [number, number]
+			let thousand = work(1000)
+			let twoThousand = work(2000)
 
-			expect(grouped).toBeLessThan(plain * 3)
+			expect(thousand.text).toHaveLength(1000 * 4 - 1)
+			expect(twoThousand.slices - thousand.slices).toBe(1000)
+			expect(twoThousand.pushes - thousand.pushes).toBe(1000)
+			expect(twoThousand.unshifts).toBe(0)
 		})
 
 		it("reaches a Scalar receiver through both rungs", async () => {
