@@ -60,6 +60,7 @@ import {
 	registerProtocol,
 	scopeMap,
 } from "./scope"
+import { hoistStalls } from "./staticProperties"
 import {
 	mergedModifiers,
 	nameTemplate,
@@ -1546,11 +1547,10 @@ function hoistDeclarationsInner(
 			}
 		}
 
-		if (
-			remainingNodes.length === pendingNodes.length &&
-			!seeded &&
-			!filled
-		) {
+		let stuck =
+			remainingNodes.length === pendingNodes.length && !seeded && !filled
+
+		if (hoistStalls(units, stuck)) {
 			break
 		}
 

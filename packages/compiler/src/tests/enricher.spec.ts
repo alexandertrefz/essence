@@ -1320,6 +1320,115 @@ describe("Enricher", () => {
 			)
 		})
 
+		// A Constant never hoists, so the value can not be read while hoisting.
+		// The annotation stands in for it.
+		it("should hoist a Namespace whose annotated static Property reads a Constant", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant size = 4
+
+					function doubledSize() -> Integer {
+						<- size::doubled()::add(Sized.base)
+					}
+
+					namespace Sized for Integer {
+						static base: Integer = size
+
+						doubled() -> Integer { <- @::multiply(with 2) }
+					}
+
+					Terminal.inspect(doubledSize())
+				}`),
+			).toEqual([])
+		})
+
+		it("should type such a Property by its value below its Namespace", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant size = 4
+
+				function early() -> Integer | String {
+					<- Sized.base
+				}
+
+				namespace Sized {
+					static base: Integer | String = size
+				}
+
+				constant late = Sized.base
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let late = program.implementation.nodes.at(-1)
+
+			expect(late?.nodeType).toBe("ConstantDeclarationStatement")
+			expect(
+				late?.nodeType === "ConstantDeclarationStatement"
+					? printType(late.type)
+					: null,
+			).toBe("Integer")
+		})
+
+		// `B.z` read `A.x` while hoisting, as the annotation's Union.
+		it("should type a Property that read such a Property by its value too", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant base = 4
+
+					namespace A for Integer {
+						static x: Integer | String = base
+					}
+
+					namespace B for Integer {
+						static z = A.x
+					}
+
+					Terminal.inspect(B.z::add(1))
+				}`),
+			).toEqual([])
+		})
+
+		// The Method a call above the Namespace answers with no longer depends
+		// on whether a static Property of the Namespace reads a Constant.
+		it("should answer a refinement's Method from a Namespace whose static Property reads a Constant", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type NonZero = Integer where @::isNot(0)
+
+				constant base = 10
+
+				namespace Wide for Integer {
+					label() -> String { <- "wide" }
+				}
+
+				function describe(_ n: NonZero) -> String {
+					<- n::label()
+				}
+
+				namespace Narrow for NonZero {
+					static scale: Integer = base
+
+					label() -> String { <- "narrow" }
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let describe = program.implementation.nodes.find(
+				(node) => node.nodeType === "FunctionStatement",
+			)
+			let answer =
+				describe?.nodeType === "FunctionStatement"
+					? describe.value.body[0]
+					: undefined
+
+			expect(
+				answer?.nodeType === "ReturnStatement" &&
+					answer.expression.nodeType === "MethodInvocation"
+					? answer.expression.namespace.name
+					: null,
+			).toBe("Narrow")
+		})
+
 		it("should still report duplicate hoisted declarations", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Name = String

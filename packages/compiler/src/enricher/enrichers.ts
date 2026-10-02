@@ -193,6 +193,7 @@ import {
 	unknownTypeRemedy,
 } from "./spelling"
 import { reportStaticMethodOnValue } from "./staticMethods"
+import { settleProperty, typeBodiedProperties } from "./staticProperties"
 import {
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
@@ -6026,6 +6027,7 @@ function enrichNamespaceDefinitionStatement(
 			}
 
 			boundProperties[propertyKey] = type
+			settleProperty(namespaceType.properties, propertyKey, value.type)
 		}
 
 		return result
@@ -17276,20 +17278,14 @@ export function resolveNamespaceDefinitionStatementType(
 		)
 	}
 
-	let selfScope = scopeWithNamespaceSelf(node, resultType, scope)
-
-	for (let [memberKey, memberValue] of Object.entries(node.properties)) {
-		if (memberValue.value === null) {
-			continue
-		}
-
-		// A Property's Type is its value's. Enriching an Expression declares
-		// nothing, so this is safe while hoisting.
-		properties[memberKey] = enrichExpression(
-			memberValue.value,
-			selfScope,
-		).type
-	}
+	// A Property's Type is its value's.
+	typeBodiedProperties(
+		node,
+		properties,
+		scopeWithNamespaceSelf(node, resultType, scope),
+		scope,
+		options.deferOnPendingConformance !== undefined,
+	)
 
 	if (options.deferOnPendingConformance !== undefined) {
 		weaveMethodBounds(

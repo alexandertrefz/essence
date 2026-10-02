@@ -903,9 +903,10 @@ block, from its own position on.
 
 `hoistDeclarations` resolves the hoistable declarations in rounds. A round tries every declaration still pending, each
 inside a collection of its own. A resolution without an Error enters Scope, unless the name is taken already. One with
-an Error, or one that throws `NotHoistedYet`, waits for a later round, by when what it names may have hoisted. The
-rounds stop when one makes no progress: nothing hoisted, no import was seeded and no predicate filled. A declaration
-that never hoists is left to the in-order enrichment, which reports it.
+an Error, or one that throws `NotHoistedYet`, waits for a later round, by when what it names may have hoisted. A round
+that makes no progress, where nothing hoisted, no import was seeded and no predicate filled, is followed by one that
+settles (see "Static Properties while hoisting"). The rounds stop when that one makes no progress either. A
+declaration that never hoists is left to the in-order enrichment, which reports it.
 
 Only an Error keeps a declaration back. A Warning, such as one about its documentation, says nothing about
 whether the Type resolved. The Warnings of a kept resolution are reported then, since a hoisted Type is reused
@@ -934,6 +935,25 @@ reach Scope with its conditional bounds woven in, or a use site before it would 
 `settleConformanceClauses` reads every hoisted Namespace's clauses again after the final seeding, so a clause is
 dropped only where its Protocol never arrives. The Namespace memos of every Scope are then dropped, since the
 rounds solved against the unsettled clauses.
+
+### Static Properties while hoisting
+
+A Namespace's Type holds the Types of its static Properties, and a bodied Property's Type is its value's. So the
+value is enriched while the Namespace resolves (`typeBodiedProperties` in `staticProperties.ts`). A value that reads a
+Constant never resolves there, since a Constant does not hoist. Left alone, such a Namespace stays out of Scope
+until the in-order enrichment reaches it. A body written above it can not call its Methods then, and another Module
+of a cycle never binds it.
+
+`hoistStalls` gives the hoist one more round once a round makes no progress. In that settling round an annotated
+Property whose value does not resolve takes its annotation, and its Namespace hoists. An unannotated one still waits.
+Only a stuck hoist settles, so a value that waits for something still to hoist keeps its own Type. Once the
+in-order enrichment reaches the value, `settleProperty` gives the Property the value's Type. Code below the
+Namespace reads the Type it would read from a Namespace resolved in order. A Property of another Namespace whose
+value read a settled one while hoisting holds the annotation's Type too, so it is settled with it and given its
+value's Type the same way.
+
+A Namespace that hoists this way answers calls above it that it would otherwise miss. A Method call on a refinement
+above it may then resolve to it rather than to a Namespace for the refinement's base.
 
 ### Pending predicates during the hoist
 

@@ -5212,6 +5212,88 @@ implementation {
 		})
 	})
 
+	// The Namespace has to hoist for the other Module of the cycle to bind it,
+	// though its static Property reads a Constant, which never hoists.
+	it("binds a Namespace across a cycle whose static Property reads a Constant", async () => {
+		await withBuiltProject(
+			{
+				"Board.es": `import {
+	from "./Game.es" {
+		Game
+	}
+}
+
+implementation {
+	type Board = List<Integer>
+
+	constant size = 2
+
+	namespace Board for Board {
+		static empty: Board = List.repeat(0, times size)
+
+		filled() -> Integer {
+			<- @::length()
+		}
+	}
+
+	function cells(_ game: Game) -> Integer {
+		<- game.board::filled()
+	}
+}
+
+export {
+	Board
+	cells
+}
+`,
+				"Game.es": `import {
+	from "./Board.es" {
+		Board
+		cells
+	}
+}
+
+implementation {
+	type Game = { board: Board }
+
+	function start() -> Game {
+		<- { board = Board.empty }
+	}
+
+	function count() -> Integer {
+		<- cells(start())
+	}
+}
+
+export {
+	Game
+	count
+	start
+}
+`,
+				"Main.es": `import {
+	from "./Game.es" {
+		count
+	}
+}
+
+implementation {
+	Terminal.inspect(count())
+}
+`,
+			},
+			async (directory) => {
+				expect(analysedAt(directory, "Main.es", "Game.es")).toEqual([])
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["2"])
+			},
+		)
+	})
+
 	// The Module fixtures, with a cycle among them, linked end to end with every
 	// Diagnostic stage run. They are meant to be clean.
 	it("links the Module fixtures without a single Diagnostic", () => {
