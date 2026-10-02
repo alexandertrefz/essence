@@ -6284,7 +6284,7 @@ Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
 
 ### `table-parameters`
 
-**Error.** A table test names its row with more than one parameter. Each row is one value.
+**Error.** A table test names its row with more than one parameter, or gives the row parameter a default. Each row is one value, written whole.
 
 <div class="error-output">
 
@@ -6307,7 +6307,7 @@ Error: A table test takes one row at a time
 
 </div>
 
-Take the row apart in one parameter: `({ a, b }: { a: Integer, b: Integer })`.
+Take the row apart in one parameter: `({ a, b }: { a: Integer, b: Integer })`. A default such as `(n: Integer = 5)` is never read, since no row leaves its value out. Remove it.
 
 Taught on: [Tests › Table tests](/docs/language/tests#table-tests)
 

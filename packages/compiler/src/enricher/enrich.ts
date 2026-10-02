@@ -66,6 +66,7 @@ import {
 	noModifiers,
 	refuseDuplicateNames,
 	refuseReservedSuite,
+	refuseTableDefaults,
 	resolveTestModifiers,
 	type TestModifiers,
 } from "./tests"
@@ -1842,6 +1843,10 @@ const enrichTest = (
 					modifiers.skipped !== null,
 					nameReadsTheRow(node.name, node.table),
 				)
+
+	if (node.table !== null) {
+		refuseTableDefaults(node.table)
+	}
 	// Never together with a table.
 	let properties =
 		node.properties === null

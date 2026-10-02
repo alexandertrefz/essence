@@ -1169,6 +1169,38 @@ describe("Tests Section Semantics", () => {
 			).toEqual(["table-parameters"])
 		})
 
+		// Every row is written whole, so nothing is left for a default to fill.
+		it("should refuse a default on the row Parameter", () => {
+			let source = `implementation {
+				type Row = { a: Integer, b: Integer }
+			}
+
+			tests {
+				test "numbers" across [1, 2] (n: Integer = 5) {
+					expect n::isGreaterThan(0)
+				}
+
+				test "records" across [{ a = 1, b = 2 }] (row: Row = { b = 9 }) {
+					expect row.a::is(1)
+				}
+			}`
+
+			expect(codesOf(source)).toEqual([
+				"table-parameters",
+				"table-parameters",
+			])
+			expect(helpsOf(source)).toEqual([
+				"Remove the default, and write every value a row needs in the row itself.",
+				"Remove the default, and write every value a row needs in the row itself.",
+			])
+			expect(
+				compiles(
+					source.replace(" = 5)", ")").replace(" = { b = 9 })", ")"),
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
 		// A table naming two Parameters has no row Type, so the rows are not
 		// measured and the bindings carry Error.
 		it("should say nothing about the rows a refused list can not type", () => {

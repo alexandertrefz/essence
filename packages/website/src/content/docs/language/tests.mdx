@@ -516,6 +516,7 @@ A table test runs its body once per row. It is written `across [rows] (row: Type
 | `across rows (row: Integer)`, with `rows` a constant | [`table-not-written`](/docs/reference/diagnostics#table-not-written) |
 | `across [] (n: Integer)` | [`table-without-rows`](/docs/reference/diagnostics#table-without-rows) |
 | `across [1, 2] (a: Integer, b: Integer)` | [`table-parameters`](/docs/reference/diagnostics#table-parameters) |
+| `across [1, 2] (n: Integer = 5)` | [`table-parameters`](/docs/reference/diagnostics#table-parameters) |
 | `across ["one"] (n: Integer)` | [`table-row-type-mismatch`](/docs/reference/diagnostics#table-row-type-mismatch) |
 | `across [1, 2] (n: Integer) for any (m: Integer)` | [`contradictory-test-forms`](/docs/reference/diagnostics#contradictory-test-forms) |
 | an unnamed `matches snapshot` in a table test | [`inline-snapshot-in-table`](/docs/reference/diagnostics#inline-snapshot-in-table) |

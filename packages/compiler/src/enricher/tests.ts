@@ -490,6 +490,40 @@ export function refuseReservedSuite(
 	return taken
 }
 
+// Every row is written whole in the table, so a default on the row Parameter
+// would never be read.
+export function refuseTableDefaults(node: parser.TestTableNode): void {
+	for (let parameter of node.parameters) {
+		if (parameter.defaultValue === null) {
+			continue
+		}
+
+		reportError(
+			"A table Parameter takes no default",
+			parameter.defaultValue.position,
+			{
+				code: "table-parameters",
+				labels: [
+					primary(
+						parameter.defaultValue.position,
+						"this value is never used",
+					),
+					secondary(
+						node.keywordPosition,
+						"every row is written here",
+					),
+				],
+				notes: [
+					"Each item of the List is one whole row, so no row leaves its value out for a default to fill in.",
+				],
+				helps: [
+					"Remove the default, and write every value a row needs in the row itself.",
+				],
+			},
+		)
+	}
+}
+
 // Two tests of one name in one suite share an identity, and with it every
 // stored snapshot and baseline. A test and a suite of one name never collide,
 // because a suite is a step of the path rather than its end.
