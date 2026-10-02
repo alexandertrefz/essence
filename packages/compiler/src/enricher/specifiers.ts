@@ -206,7 +206,7 @@ function declaresAnywhere(
 }
 
 // The nearest Scope's entry of the name, as a named lookup reads it.
-function nearestEntry<Entry>(
+export function nearestEntry<Entry>(
 	scope: enricher.Scope,
 	entries: (current: enricher.Scope) => Record<string, Entry>,
 	name: string,
@@ -226,7 +226,7 @@ function nearestEntry<Entry>(
 
 // Each name as its nearest binding holds it, so a Namespace shadowed by a
 // Constant is not offered.
-function namespaceNamesIn(scope: enricher.Scope): Array<string> {
+export function namespaceNamesIn(scope: enricher.Scope): Array<string> {
 	let seen = new Set<string>()
 	let names: Array<string> = []
 

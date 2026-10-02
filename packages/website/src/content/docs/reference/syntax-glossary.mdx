@@ -209,7 +209,7 @@ Taught on [Namespaces and methods](/docs/language/namespaces-and-methods).
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A call to a method a protocol provides, made through the protocol's name. The library's protocols provide methods too, as [`Equatable`](/docs/library/protocols#Equatable) does in `5::<Equatable>isNot(3)`. | For a provided method, one that has a body in the protocol. | A way to reach a requirement. A namespace writes the requirement, so `shelf::<Sized>size()` is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value); name the namespace instead. |
+| A call to a method a protocol provides, made through the protocol's name. The library's protocols provide methods too, as [`Equatable`](/docs/library/protocols#Equatable) does in `5::<Equatable>isNot(3)`. | For a provided method, one that has a body in the protocol. On a value of a type parameter bounded by the protocol, for every method it declares, since the bound passes the conformance in. | A way to reach a requirement on a value of a known type. A namespace writes the requirement, so `shelf::<Sized>size()` is [`picked-requirement`](/docs/reference/diagnostics#picked-requirement); name the namespace instead. |
 
 </div>
 

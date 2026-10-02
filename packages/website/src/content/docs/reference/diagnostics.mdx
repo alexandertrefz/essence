@@ -2716,7 +2716,7 @@ Error: No Namespace provides Methods for this value
 
 Bound the type parameter by a protocol that has the method: `show<infer Item is Printable>(_ item: Item)`.
 
-With a [namespace specifier](/docs/reference/diagnostics#not-a-namespace), the lookup is limited to the namespace it names, and the note says what that namespace targets. Where `Shout` is declared `for String`, `5::<Shout>loud()` looks only in `Shout`, and the note is `'Shout' targets String, which a PositiveInteger is not.` Dropping the specifier lets every namespace answer, so the help to drop it is offered only where another namespace answers the method for the value. A type parameter's methods come through its protocol alone, so a specifier naming a namespace finds nothing on one.
+With a [namespace specifier](/docs/reference/diagnostics#not-a-namespace), the lookup is limited to the namespace it names, and the note says what that namespace targets. Where `Shout` is declared `for String`, `5::<Shout>loud()` looks only in `Shout`, and the note is `'Shout' targets String, which a PositiveInteger is not.` Dropping the specifier lets every namespace answer, so the help to drop it is offered only where another namespace answers the method for the value. A type parameter's methods come through its protocol alone, so a specifier naming a namespace finds nothing on one. A [protocol pick](/docs/reference/syntax-glossary#protocol-pick) of a method the protocol has no body for is [`picked-requirement`](#picked-requirement).
 
 Taught on: [Generics › A type parameter is opaque](/docs/language/generics#a-type-parameter-is-opaque)
 
@@ -2750,6 +2750,35 @@ Error: 'total' is not a Namespace
 Drop the specifier, as in `"hello"::append("!")`, or name a namespace there. Where a constant shadows the namespace you meant, rename the constant.
 
 A specifier that names a type lands here too, labelled `this names a Type`: a type holds no methods of its own, so the help is to drop the specifier. A protocol's name is a [protocol pick](/docs/reference/syntax-glossary#protocol-pick) instead, and a name nothing declares is [`unknown-name`](/docs/reference/diagnostics#unknown-name).
+
+### `picked-requirement`
+
+**Error.** A [protocol pick](/docs/reference/syntax-glossary#protocol-pick), the `Protocol` of `value::<Protocol>method()`, names a method the protocol declares without a body. A pick calls the body the protocol provides, and a requirement has none: each conforming namespace writes its own.
+
+<div class="error-output">
+
+```
+[picked-requirement]
+Error: 'Equatable' has no body for 'is'
+   ╭─┤ Fruit.es:2:26 │
+   │
+ 2 │     Terminal.print("pear"::<Equatable>is("plum"))
+   │                             ────┬──── ─┐  
+   │                                 ╰──────│── this picks 'Equatable'
+   │                                        │  
+   │                                        ╰── 'Equatable' declares this without a body
+   │ 
+   │ Help: Drop the pick, or pick the Namespace that writes 'is': '::<String>is(…)'.
+   │ 
+   │ Note: A pick through a Protocol calls a body the Protocol provides, and 'Equatable' declares 'is' without one: each conforming Namespace writes its own.
+───╯
+```
+
+</div>
+
+Drop the pick, as in `"pear"::is("plum")`, or name the namespace that writes the method: `"pear"::<String>is("plum")`. Where only a derived conformance answers, as on a choice, or each member of a union does, the help is to drop the pick. Where no namespace in scope answers it for the value, the help asks for a value whose namespace does, and a namespace another module exports is offered as an import. The protocol is named as the pick spells it, and a requirement it takes from a protocol it extends is put down to that one: `5::<Orderable>compare(to 3)` says `Comparable` declares `compare`. A pick of a method the protocol provides, such as `"pear"::<Equatable>isNot("plum")`, is what a pick is for, and on a type parameter bounded by the protocol a pick reaches its requirements too.
+
+Taught on: [Protocols › Calling a provided method](/docs/language/protocols#calling-a-provided-method)
 
 ### `undispatchable-method`
 

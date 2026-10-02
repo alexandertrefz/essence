@@ -3185,6 +3185,106 @@ export {
 		)
 	})
 
+	it("reports a pick of an imported Protocol's requirement", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Sized.es" {
+		Shelf
+		Shelves
+		Sized
+	}
+}
+
+implementation {
+	constant shelf: Shelf = { books = 0 }
+
+	Terminal.print(shelf::<Sized>size())
+}
+`,
+				"Aliased.es": `import {
+	from "./Sized.es" {
+		Shelf
+		Shelves
+		Sized as Measure
+	}
+}
+
+implementation {
+	constant shelf: Shelf = { books = 0 }
+
+	Terminal.print(shelf::<Measure>size())
+}
+`,
+				"Sized.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+
+		isEmpty() -> Boolean {
+			<- @::size()::is(0)
+		}
+	}
+
+	type Shelf = { books: Integer }
+
+	namespace Shelves for Shelf is Sized {
+		size() -> Integer {
+			<- @.books
+		}
+	}
+}
+
+export {
+	Shelf
+	Shelves
+	Sized
+}
+`,
+			},
+			(directory) => {
+				let main = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"Main.es",
+				)
+				let picked = main.diagnostics.filter(
+					(diagnostic) => diagnostic.code === "picked-requirement",
+				)
+
+				expect(picked.map((diagnostic) => diagnostic.message)).toEqual([
+					"'Sized' has no body for 'size'",
+				])
+				expect(picked[0]?.helps).toEqual([
+					"Drop the pick, or pick the Namespace that writes 'size': '::<Shelves>size()'.",
+				])
+
+				// The pick is named as this Module spells it.
+				let aliased = linkedAt(
+					directory,
+					linkProject(directory, "Aliased.es"),
+					"Aliased.es",
+				).diagnostics.filter(
+					(diagnostic) => diagnostic.code === "picked-requirement",
+				)
+
+				expect(
+					aliased.map((diagnostic) => [
+						diagnostic.message,
+						diagnostic.labels.map((label) => label.message),
+					]),
+				).toEqual([
+					[
+						"'Measure' has no body for 'size'",
+						[
+							"this picks 'Measure'",
+							"'Measure' declares this without a body",
+						],
+					],
+				])
+			},
+		)
+	})
+
 	it("offers the import of a Namespace a specifier names but the Module does not import", () => {
 		withProject(
 			{

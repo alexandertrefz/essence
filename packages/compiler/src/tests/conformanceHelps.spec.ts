@@ -1011,3 +1011,192 @@ describe("A Protocol restating a Method it extends", () => {
 		).toBe(true)
 	})
 })
+
+// A pick runs a body the Protocol provides, and a requirement has none. The
+// Namespace that writes it is what the Help names.
+describe("A Protocol pick of a requirement", () => {
+	let picked = `implementation {
+		Terminal.print(5::<Equatable>is(5))
+		Terminal.print(5::<Printable>toString())
+	}`
+
+	it("should label the pick and say the requirement has no body", () => {
+		let reported = firstOf(picked, "picked-requirement")
+
+		expect(reported.message).toBe("'Equatable' has no body for 'is'")
+		expect(
+			reported.labels.map((label) => [
+				label.message,
+				label.position.start.column,
+			]),
+		).toEqual([
+			["this picks 'Equatable'", 22],
+			["'Equatable' declares this without a body", 32],
+		])
+		expect(reported.notes).toEqual([
+			"A pick through a Protocol calls a body the Protocol provides, and 'Equatable' declares 'is' without one: each conforming Namespace writes its own.",
+		])
+		expect(reported.helps).toEqual([
+			"Drop the pick, or pick the Namespace that writes 'is': '::<Integer>is(…)'.",
+		])
+	})
+
+	it("should report a pick of the printing requirement the same way", () => {
+		let reported = enrich(parse(picked)).diagnostics.map((diagnostic) => [
+			diagnostic.code,
+			diagnostic.message,
+		])
+
+		expect(reported).toEqual([
+			["picked-requirement", "'Equatable' has no body for 'is'"],
+			["picked-requirement", "'Printable' has no body for 'toString'"],
+		])
+	})
+
+	it("should compile with the pick dropped or naming the Namespace", () => {
+		expect(
+			compiles(`implementation {
+				Terminal.print(5::is(5))
+				Terminal.print(5::<Integer>is(5))
+				Terminal.print(5::toString())
+				Terminal.print(5::<Integer>toString())
+			}`),
+		).toBe(true)
+	})
+
+	let shelves = (call: string) => `implementation {
+		protocol Sized {
+			size() -> Integer
+
+			isEmpty() -> Boolean {
+				<- @::size()::is(0)
+			}
+		}
+
+		type Shelf = { books: Integer }
+
+		namespace Shelves for Shelf is Sized {
+			size() -> Integer {
+				<- @.books
+			}
+		}
+
+		constant shelf: Shelf = { books = 0 }
+
+		Terminal.print(${call})
+	}`
+
+	it("should name the Namespace that writes a Program's requirement", () => {
+		expect(
+			firstOf(shelves("shelf::<Sized>size()"), "picked-requirement")
+				.helps,
+		).toEqual([
+			"Drop the pick, or pick the Namespace that writes 'size': '::<Shelves>size()'.",
+		])
+		expect(compiles(shelves("shelf::size()"))).toBe(true)
+		expect(compiles(shelves("shelf::<Shelves>size()"))).toBe(true)
+	})
+
+	it("should name no Namespace where none writes it for the value", () => {
+		expect(
+			firstOf(shelves("5::<Sized>size()"), "picked-requirement").helps,
+		).toEqual([
+			"Drop the pick, and call 'size' on a value whose Namespace writes it.",
+		])
+	})
+
+	// The control: a provided Method is what a pick reaches.
+	it("should keep a pick of a provided Method", () => {
+		expect(compiles(shelves("shelf::<Sized>isEmpty()"))).toBe(true)
+	})
+
+	// A bound passes the conformance in, and the pick reaches its requirement
+	// through it. Without a bound there is nothing to pick from, which the
+	// bound's Help answers.
+	it("should leave a pick on a Type Parameter to its bound", () => {
+		let generic = (bound: string) => `implementation {
+			protocol Shape {
+				area() -> Integer
+			}
+
+			namespace Square for Integer is Shape {
+				area() -> Integer {
+					<- @::multiply(with @)
+				}
+			}
+
+			function measured<infer T${bound}>(_ x: T) -> Integer {
+				<- x::<Shape>area()
+			}
+
+			Terminal.print(measured(5))
+		}`
+
+		expect(compiles(generic(" is Shape"))).toBe(true)
+
+		let unbounded = enrich(parse(generic(""))).diagnostics
+
+		expect(unbounded.map((diagnostic) => diagnostic.code)).toContain(
+			"no-namespace-for-value",
+		)
+		expect(
+			unbounded.some(
+				(diagnostic) => diagnostic.code === "picked-requirement",
+			),
+		).toBe(false)
+	})
+
+	// A Union has no covering Namespace for 'is', but each member answers
+	// it, and a Choice's derived conformance does.
+	it("should report a pick on a Union or a Choice receiver as a pick", () => {
+		let source = `implementation {
+			choice Light {
+				Red, Green
+			}
+
+			function same(_ x: Integer | String) -> Boolean {
+				<- x::<Equatable>is(x)
+			}
+
+			constant light: Light = #Red
+
+			Terminal.print(light::<Equatable>is(#Red))
+		}`
+		let reported = enrich(parse(source)).diagnostics
+
+		expect(
+			reported.map((diagnostic) => [diagnostic.code, diagnostic.helps]),
+		).toEqual([
+			["picked-requirement", ["Drop the pick."]],
+			["picked-requirement", ["Drop the pick."]],
+		])
+		expect(
+			compiles(`implementation {
+				choice Light {
+					Red, Green
+				}
+
+				constant light: Light = #Red
+
+				Terminal.print(light::is(#Red))
+			}`),
+		).toBe(true)
+	})
+
+	it("should name the Protocol that declares an inherited requirement", () => {
+		let reported = firstOf(
+			`implementation {
+				Terminal.print(5::<Orderable>compare(to 3))
+			}`,
+			"picked-requirement",
+		)
+
+		expect(reported.message).toBe("'Orderable' has no body for 'compare'")
+		expect(reported.labels[1]?.message).toBe(
+			"'Comparable' declares this without a body",
+		)
+		expect(reported.notes).toEqual([
+			"A pick through a Protocol calls a body the Protocol provides, and 'Comparable' declares 'compare' without one: each conforming Namespace writes its own.",
+		])
+	})
+})

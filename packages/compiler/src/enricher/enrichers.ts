@@ -100,6 +100,7 @@ import {
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
 import { reportUnknownPatternMember } from "./patternMembers"
+import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -12498,6 +12499,16 @@ function resolveMethodInvocation(
 	// Namespace resolves the Method. A covering one, such as `Ordering`, takes
 	// precedence.
 	if (matchingNamespaces.size === 0) {
+		let helps = () => [
+			...unboundedParameterHelps(baseType, node.member.content, scope),
+			...unimportedNamespaceHelps(node.member.content, baseType, scope),
+		]
+
+		// A pick of a requirement is refused before a Union dispatches it.
+		if (reportPickedRequirement(node, baseType, scope, helps)) {
+			return resolveFailedMethodInvocation()
+		}
+
 		if (baseType.type === "UnionType") {
 			return resolveUnionMethodDispatch(node, baseType, scope, typer)
 		}
@@ -12521,32 +12532,13 @@ function resolveMethodInvocation(
 					node,
 					baseType,
 					scope,
-					partitionInstanceMethodNamespaces(
+					answeringNamespaces(
 						node.member.content,
-						namespacesDeclaringMethod(
-							node.member.content,
-							resolveMethodLookupNamespacesForReceiverType(
-								baseType,
-								null,
-								scope,
-							),
-							baseType,
-							scope,
-							node.position,
-						),
-					).instanceNamespaces,
-					[
-						...unboundedParameterHelps(
-							baseType,
-							node.member.content,
-							scope,
-						),
-						...unimportedNamespaceHelps(
-							node.member.content,
-							baseType,
-							scope,
-						),
-					],
+						baseType,
+						scope,
+						node.position,
+					),
+					helps(),
 				)
 			}
 		} else {

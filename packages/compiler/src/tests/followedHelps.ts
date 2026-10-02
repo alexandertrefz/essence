@@ -124,6 +124,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"nested-example",
 		"nonconforming-namespace",
 		"operator-not-supported",
+		"picked-requirement",
 		"redundant-pattern-binder",
 		"surrogate-unicode-escape",
 		"unbraced-unicode-escape",

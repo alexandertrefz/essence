@@ -357,6 +357,7 @@ export type DiagnosticCode =
 	| "unknown-method"
 	| "no-namespace-for-value"
 	| "not-a-namespace"
+	| "picked-requirement"
 	| "undispatchable-method"
 	| "untyped-namespace-method"
 	| "static-method-on-value"
