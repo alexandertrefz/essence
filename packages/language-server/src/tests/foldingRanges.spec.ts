@@ -1,9 +1,11 @@
 import { describe, expect, it } from "bun:test"
+import { readFileSync } from "node:fs"
 
 import {
 	type ParserOptions,
 	parseWithDiagnostics,
 } from "@essence-lang/compiler/parser"
+import { fixturePath } from "@essence-lang/fixtures"
 
 import { findFoldingRanges } from "../foldingRanges"
 
@@ -382,5 +384,66 @@ describe("Folding Ranges inside a refinement predicate", () => {
 			startLine: 3,
 			endLine: 4,
 		})
+	})
+})
+
+// Every Node over the same lines as an earlier one adds no fold, so each
+// fixture's folds are distinct, and their number is pinned.
+describe("Folding Ranges across the fixtures", () => {
+	const foldCounts: Record<string, number> = {
+		"Choice.es": 15,
+		"ConditionalConformance.es": 3,
+		"DecimalLiterals.es": 1,
+		"Define.es": 11,
+		"Dictionary.es": 24,
+		"DictionaryBenchmarks.es": 74,
+		"Documentation.es": 11,
+		"Event.es": 10,
+		"Everyday.es": 1,
+		"Future.es": 9,
+		"FutureCombinators.es": 15,
+		"GenericChoice.es": 15,
+		"Generics.es": 6,
+		"HelloWorld.es": 4,
+		"Inference.es": 18,
+		"Interpolation.es": 1,
+		"Irrational.es": 4,
+		"List.es": 12,
+		"Loops.es": 16,
+		"Match.es": 7,
+		"Maybe.es": 16,
+		"Namespace.es": 11,
+		"NestedRecords.es": 15,
+		"Number.es": 2,
+		"Patterns.es": 25,
+		"Protocols.es": 18,
+		"Refinements.es": 41,
+		"Result.es": 7,
+		"StdlibExhaustive.es": 1320,
+		"String.es": 2,
+		"Tests.es": 44,
+		"Tree.es": 10,
+		"modules/A.es": 5,
+		"modules/B.es": 6,
+		"modules/Geometry.es": 8,
+		"modules/Main.es": 8,
+		"modules/math/Math.es": 3,
+	}
+
+	it("should fold each span of lines once, as many times as before", () => {
+		for (let [name, count] of Object.entries(foldCounts)) {
+			let ranges = foldingRangesOf(
+				readFileSync(fixturePath(name), "utf-8"),
+			)
+			let spans = new Set(
+				ranges.map((range) => `${range.startLine}:${range.endLine}`),
+			)
+
+			expect({ name, folds: ranges.length, spans: spans.size }).toEqual({
+				name,
+				folds: count,
+				spans: count,
+			})
+		}
 	})
 })

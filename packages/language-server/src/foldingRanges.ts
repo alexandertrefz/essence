@@ -15,45 +15,52 @@ type FoldingRange = {
 	endLine: number
 }
 
+// The ranges in the order they were found, and the lines of each as a key, so
+// a repeat is found without a scan.
+type Folds = {
+	ranges: Array<FoldingRange>
+	seen: Set<string>
+}
+
 export function findFoldingRanges(
 	program: parser.Program,
 ): Array<FoldingRange> {
-	let ranges: Array<FoldingRange> = []
+	let folds: Folds = { ranges: [], seen: new Set() }
 
 	// The `implementation` block folds, and so do the Module sections around it.
 	if (program.imports !== null) {
-		addRange(ranges, program.imports.position)
-		collectGroups(program.imports.groups, ranges)
+		addRange(folds, program.imports.position)
+		collectGroups(program.imports.groups, folds)
 	}
 
 	// Every Section folds as the block it is written as, down to each `test`.
 	for (let section of programSections(program)) {
-		addRange(ranges, section.position)
+		addRange(folds, section.position)
 
 		for (let node of [...section.head, ...section.nodes]) {
-			collectFromNode(node, ranges)
+			collectFromNode(node, folds)
 		}
 	}
 
 	if (program.exports !== null) {
-		addRange(ranges, program.exports.position)
-		collectGroups(program.exports.groups, ranges)
+		addRange(folds, program.exports.position)
+		collectGroups(program.exports.groups, folds)
 	}
 
-	return ranges
+	return folds.ranges
 }
 
 // A group written over several lines folds; a flat one has nothing to fold.
 function collectGroups(
 	groups: Array<parser.ImportGroupNode | parser.ExportGroupNode>,
-	ranges: Array<FoldingRange>,
+	folds: Folds,
 ) {
 	for (let group of groups) {
-		addRange(ranges, group.position)
+		addRange(folds, group.position)
 	}
 }
 
-function addRange(ranges: Array<FoldingRange>, position: common.Position) {
+function addRange(folds: Folds, position: common.Position) {
 	if (position.end.line <= position.start.line) {
 		return
 	}
@@ -62,27 +69,23 @@ function addRange(ranges: Array<FoldingRange>, position: common.Position) {
 		startLine: position.start.line,
 		endLine: position.end.line - 1,
 	}
+	let key = `${range.startLine}:${range.endLine}`
 
 	// Two ranges over the same lines are one fold. A file of only tests has an
 	// empty implementation spanning its `tests` block.
-	if (
-		ranges.some(
-			(existing) =>
-				existing.startLine === range.startLine &&
-				existing.endLine === range.endLine,
-		)
-	) {
+	if (folds.seen.has(key)) {
 		return
 	}
 
-	ranges.push(range)
+	folds.seen.add(key)
+	folds.ranges.push(range)
 }
 
 // A construct written over several lines folds, and so does each one inside
 // it. An `if … else` folds as one range, since the Parser keeps no Position
 // for `else`. A `define` arm has no closing brace to leave visible, and a
 // `start` or `complete` stands on its operand's first line, so neither folds.
-function collectFromNode(node: ParserNode, ranges: Array<FoldingRange>) {
+function collectFromNode(node: ParserNode, folds: Folds) {
 	switch (node.nodeType) {
 		case "FunctionStatement":
 		case "OverloadedFunctionStatement":
@@ -101,9 +104,9 @@ function collectFromNode(node: ParserNode, ranges: Array<FoldingRange>) {
 		case "CaseValue":
 		case "MethodInvocation":
 		case "FunctionInvocation":
-			addRange(ranges, node.position)
+			addRange(folds, node.position)
 			break
 	}
 
-	forEachParserChild(node, collectFromNode, ranges)
+	forEachParserChild(node, collectFromNode, folds)
 }
