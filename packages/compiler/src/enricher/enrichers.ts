@@ -8524,7 +8524,7 @@ function enrichParameterDefault(
 
 	// A written default is admitted by deciding a refinement's predicate, as a
 	// written Argument is.
-	if (admittedTypeOf(type, value) !== null) {
+	if (fitsWritten(type, value)) {
 		return value
 	}
 

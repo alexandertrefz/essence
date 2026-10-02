@@ -2772,6 +2772,49 @@ export {
 		)
 	})
 
+	// An imported generic refinement asks a written List about the `Item` it
+	// decides. Inside the Function `Item` is opaque, so `["a"]` proves nothing.
+	it("refuses a written List an imported refinement can not prove over an opaque Type Parameter", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Filled.es" { Filled }
+}
+
+implementation {
+	function countOf<infer Item>(_ items: Filled<Item>) -> Integer {
+		constant first: Item = items::firstItem()
+		constant own: Filled<Item> = [first]
+		constant strings: Filled<Item> = ["a"]
+
+		<- own::length()::add(strings::length())
+	}
+
+	Terminal.print(countOf([1, 2]))
+}
+`,
+				"Filled.es": `implementation {
+	type Filled<Item> = List<Item> where @::hasItems()
+}
+
+export {
+	Filled
+}
+`,
+			},
+			(directory) => {
+				let main = analysedAt(directory, "Main.es", "Main.es")
+
+				expect(reportsOf(main)).toEqual([
+					[
+						"assignment-type-mismatch",
+						"This value does not fit the declared Type of Constant 'strings'",
+					],
+				])
+			},
+		)
+	})
+
 	it("refuses an export of a Variable and of a name the Module does not declare", () => {
 		withProject(
 			{

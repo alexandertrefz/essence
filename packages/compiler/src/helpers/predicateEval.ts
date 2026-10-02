@@ -26,9 +26,12 @@ function admittedByEvaluation(
 export function admittedTypeOf(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
+	// Whether the position binds the Type Parameters it names, as an
+	// Argument's does. See "Generic refinements" in DEVELOPMENT.md.
+	binds: boolean = true,
 ): common.Type | null {
 	if (expected.type === "Refinement") {
-		let asked = refinementDecidedBy(expected, value.type)
+		let asked = binds ? refinementDecidedBy(expected, value.type) : expected
 
 		return asked !== null && admittedByEvaluation(asked, value)
 			? asked
@@ -39,7 +42,7 @@ export function admittedTypeOf(
 		expected.type === "Dictionary" &&
 		value.nodeType === "DictionaryValue"
 	) {
-		return admittedDictionaryTypeOf(expected, value)
+		return admittedDictionaryTypeOf(expected, value, binds)
 	}
 
 	if (
@@ -53,7 +56,7 @@ export function admittedTypeOf(
 	let itemTypes: Array<common.Type> = []
 
 	for (let item of value.values) {
-		let decided = admittedTypeOf(expected.itemType, item)
+		let decided = admittedTypeOf(expected.itemType, item, binds)
 
 		if (decided === null && !matchesType(expected.itemType, item.type)) {
 			return null
@@ -72,6 +75,7 @@ export function admittedTypeOf(
 function admittedDictionaryTypeOf(
 	expected: common.DictionaryType,
 	value: common.typed.DictionaryValueNode,
+	binds: boolean,
 ): common.Type | null {
 	if (
 		value.entries.length === 0 ||
@@ -87,8 +91,8 @@ function admittedDictionaryTypeOf(
 	let valueTypes: Array<common.Type> = []
 
 	for (let entry of value.entries) {
-		let key = admittedTypeOf(expected.keyType, entry.key)
-		let held = admittedTypeOf(expected.valueType, entry.value)
+		let key = admittedTypeOf(expected.keyType, entry.key, binds)
+		let held = admittedTypeOf(expected.valueType, entry.value, binds)
 
 		if (
 			(key === null && !matchesType(expected.keyType, entry.key.type)) ||
@@ -110,14 +114,16 @@ function admittedDictionaryTypeOf(
 }
 
 // Whether a written value fits where it stands: assignable, or admitted. A
-// position measuring a value against a Type it did not resolve asks this.
+// position measuring a value against a Type it did not resolve asks this, and
+// binds no Type Parameter unless told to.
 export function fitsWritten(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
+	binds: boolean = false,
 ): boolean {
 	return (
 		matchesType(expected, value.type) ||
-		admittedTypeOf(expected, value) !== null
+		admittedTypeOf(expected, value, binds) !== null
 	)
 }
 
@@ -142,7 +148,8 @@ type UnadmittedWrittenPart = {
 }
 
 // The first written part that did not answer its position's question, or null
-// where the refusal is about the container itself.
+// where the refusal is about the container itself. Each part is asked as an
+// Argument's would be, so a part an inferred `Item` could take is passed over.
 export function unadmittedWrittenItem(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -155,7 +162,7 @@ export function unadmittedWrittenItem(
 		value.nodeType === "DictionaryValue"
 	) {
 		for (let entry of value.entries) {
-			if (!fitsWritten(container.keyType, entry.key)) {
+			if (!fitsWritten(container.keyType, entry.key, true)) {
 				return unadmittedWrittenPart(
 					container.keyType,
 					entry.key,
@@ -163,7 +170,7 @@ export function unadmittedWrittenItem(
 				)
 			}
 
-			if (!fitsWritten(container.valueType, entry.value)) {
+			if (!fitsWritten(container.valueType, entry.value, true)) {
 				return unadmittedWrittenPart(
 					container.valueType,
 					entry.value,
@@ -184,7 +191,7 @@ export function unadmittedWrittenItem(
 	}
 
 	for (let item of value.values) {
-		if (fitsWritten(container.itemType, item)) {
+		if (fitsWritten(container.itemType, item, true)) {
 			continue
 		}
 

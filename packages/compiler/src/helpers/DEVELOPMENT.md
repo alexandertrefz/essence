@@ -224,6 +224,16 @@ The answer is what the value is asked about, not the Type it may answer with. `m
 instantiation against the Parameter as declared. It binds an `infer` Parameter through the base and refuses an
 opaque one, so a written value proves nothing about the enclosing Declaration's own Parameter.
 
+Only an Argument binds the Type Parameters its Type names, so only an Argument asks `admittedTypeOf` with
+`binds` set. Everywhere else, such as a declared Constant or a Parameter's default, `fitsWritten` asks the
+refinement as written. Its Type Parameters are the enclosing Declaration's, fixed, so nothing is decided. Inside
+`countOf<infer Item>`, `["a"]` is then asked about a `List<Item>`, which it is not, and `[first]` with
+`first: Item` is admitted. `Both<Item, String> = ["a"]` is admitted too, since its base `List<Item | String>`
+takes a String without saying what `Item` is.
+
+`unadmittedWrittenItem` names the part a Diagnostic points at. It asks each part with `binds` set, as an
+Argument's would be, so it passes over a part an inferred `Item` could take.
+
 ### The literal table
 
 `literalValueOf` reads a written value as the scalars the runtime holds. An Integer is a bigint. A Rational is a

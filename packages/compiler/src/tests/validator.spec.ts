@@ -3593,6 +3593,133 @@ describe("Validator", () => {
 				})
 			})
 
+			// Inside the Declaration, `Item` is opaque. A written List decides its
+			// own `Item`, and that answer must still fit the declared Type.
+			describe("against the Declaration's own Type Parameter", () => {
+				function inCountOf(declaration: string): string {
+					return `implementation {
+						type Filled<Item> = List<Item> where @::hasItems()
+
+						function countOf<infer Item>(_ items: Filled<Item>) -> Integer {
+							constant first: Item = items::firstItem()
+							${declaration}
+
+							<- again::length()
+						}
+
+						Terminal.inspect(countOf([1, 2]))
+					}`
+				}
+
+				function codesFor(source: string): Array<string | undefined> {
+					return diagnosticsFor(source).map(
+						(diagnostic) => diagnostic.code,
+					)
+				}
+
+				it("should refuse a written List of Strings", () => {
+					expect(
+						codesFor(
+							inCountOf(`constant again: Filled<Item> = ["a"]`),
+						),
+					).toEqual(["assignment-type-mismatch"])
+				})
+
+				it("should refuse a written List of Strings as the standard library's refinement", () => {
+					expect(
+						codesFor(
+							inCountOf(
+								`constant again: NonEmptyList<Item> = ["a"]`,
+							),
+						),
+					).toEqual(["assignment-type-mismatch"])
+				})
+
+				it("should admit a written List of the Parameter's own items", () => {
+					expect(
+						codesFor(
+							inCountOf("constant again: Filled<Item> = [first]"),
+						),
+					).toEqual([])
+					expect(
+						codesFor(
+							inCountOf(
+								"constant again: NonEmptyList<Item> = [first, first]",
+							),
+						),
+					).toEqual([])
+					expect(
+						codesFor(
+							inCountOf("constant again: Filled<Item> = items"),
+						),
+					).toEqual([])
+				})
+
+				// A default is checked while the signature is enriched.
+				it("should refuse a written List of Strings as a Parameter's default", () => {
+					let { diagnostics } = enrich(
+						parse(`implementation {
+							type Filled<Item> = List<Item> where @::hasItems()
+
+							function countOf<infer Item>(_ items: Filled<Item> = ["a"]) -> Integer {
+								<- items::length()
+							}
+						}`),
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.code),
+					).toEqual(["default-type-mismatch"])
+				})
+
+				// The Declaration's `Item` is fixed, so the base is asked as
+				// written. A String fits `Item | String` without deciding `Item`.
+				it("should admit a written List the base takes without deciding the Parameter", () => {
+					expect(
+						codesFor(`implementation {
+							type Both<A, B> = List<A | B> where @::hasItems()
+							type Filled<Item> = List<Item> where @::hasItems()
+
+							function countOf<infer Item>(_ items: Filled<Item>) -> Integer {
+								constant first: Item = items::firstItem()
+								constant words: Both<Item, String> = ["a"]
+								constant mixed: Both<Item, String> = ["a", first]
+								constant nested: Filled<Filled<Item>> = [[first]]
+
+								<- words::length()::add(mixed::length())::add(nested::length())
+							}
+
+							Terminal.inspect(countOf([1, 2]))
+						}`),
+					).toEqual([])
+				})
+			})
+
+			// `[1]` decides an `Item` the call could take, so the report points
+			// at the empty List, which no `Item` makes a `NonEmptyList`.
+			it("should point at the item no inferred Type Parameter admits", () => {
+				let source = `implementation {
+					function nested<infer Item>(_ rows: List<NonEmptyList<Item>>) -> Integer {
+						<- rows::length()
+					}
+
+					Terminal.print(nested([[1], []]))
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["argument-type-mismatch"])
+				expect(
+					underlinedBy(
+						source,
+						diagnostics[0].labels.find((label) =>
+							label.message.startsWith("this item"),
+						),
+					),
+				).toBe("[]")
+			})
+
 			// Two applications of one Alias are two questions about one written
 			// List, each answer kept apart for the Overload probes.
 			it("should decide each application of one Alias on its own", () => {
