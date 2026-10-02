@@ -8276,6 +8276,95 @@ describe("Extract to a Constant", () => {
 		}
 	})
 
+	// `isAtLeast(5)` asks what its body asks, so the `if` narrows `n`. With
+	// the body's call in a Constant it would ask nothing.
+	it("offers nothing for the question a Method's whole body asks of `@`", () => {
+		let lines = [
+			"implementation {",
+			"\ttype Stocked = Integer where @::isGreaterThanOrEqualTo(5)",
+			"",
+			"\tnamespace Stock for Integer {",
+			"\t\tisAtLeast(_ count: Integer) -> Boolean {",
+			"\t\t\t<- @::isGreaterThanOrEqualTo(count)",
+			"\t\t}",
+			"",
+			"\t\tisBelow(_ count: Integer) -> Boolean {",
+			"\t\t\t<- @::isGreaterThanOrEqualTo(count)::negate()",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction shipped(_ n: Stocked) -> Integer {",
+			"\t\t<- n",
+			"\t}",
+			"",
+			"\tfunction shippedOrNone(_ n: Integer) -> Integer {",
+			"\t\tif n::isAtLeast(5) {",
+			"\t\t\t<- shipped(n)",
+			"\t\t}",
+			"",
+			"\t\t<- 0",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(
+			extractions(
+				lines,
+				spanOf(lines, 6, "@::isGreaterThanOrEqualTo(count)"),
+			),
+		).toEqual([])
+		expect(
+			extractions(
+				lines,
+				spanOf(lines, 10, "@::isGreaterThanOrEqualTo(count)"),
+			),
+		).toEqual([])
+		expect(
+			extractions(
+				lines,
+				spanOf(lines, 10, "@::isGreaterThanOrEqualTo(count)::negate()"),
+			),
+		).toEqual([])
+	})
+
+	// Only a Method's own body, written to answer a `Boolean`, asks a
+	// question: `doubled` answers an Integer, and `isSmall` asks in a branch.
+	it("lifts a call on `@` from a body that asks no question", () => {
+		let lines = [
+			"implementation {",
+			"\tnamespace Sizes for Integer {",
+			"\t\tdoubled() -> Integer {",
+			"\t\t\t<- @::multiply(with 2)",
+			"\t\t}",
+			"",
+			"\t\tisSmall(_ flag: Boolean) -> Boolean {",
+			"\t\t\tif flag {",
+			"\t\t\t\t<- @::isLessThan(10)",
+			"\t\t\t}",
+			"",
+			"\t\t\t<- false",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [doubled] = extractions(
+			lines,
+			rangeOf(lines, "@::multiply(with 2)"),
+		)
+
+		expect(applied(lines, doubled).slice(3, 5)).toEqual([
+			"\t\t\tconstant multiply = @::multiply(with 2)",
+			"\t\t\t<- multiply",
+		])
+		expectRefactored(lines, applied(lines, doubled))
+
+		let [small] = extractions(lines, rangeOf(lines, "@::isLessThan(10)"))
+
+		expectRefactored(lines, applied(lines, small))
+	})
+
 	// `limit` is no literal, so the condition proves nothing.
 	it("lifts a condition that proves nothing", () => {
 		let lines = [

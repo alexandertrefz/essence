@@ -151,6 +151,13 @@ conjunct itself. `mayNarrow` reads the shape `conditionEvidence` reads: a Method
 condition alone whenever the Enricher might narrow on it. See "Narrowing" in
 packages/compiler/src/enricher/DEVELOPMENT.md.
 
+A Method written to answer a `Boolean`, whose whole body asks one question of `@`, is read as asking that question.
+`isAtLeast` with the body `<- @::isGreaterThanOrEqualTo(count)` is one. A condition calling it narrows, and a refinement
+may be written with it. `isForwardedQuestion` keeps that call where it is, with its `::negate()`, and so the condition
+of an `if` whose branches answer written Booleans. It asks `predicateBodies` whether the body is a Method's own, since a
+branch or a Method answering anything else asks nothing. See "Predicate aliases" in
+packages/compiler/src/enricher/DEVELOPMENT.md.
+
 `readsResolveAbove` checks that every name the Expression reads is in scope where the Constant will stand, since
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match
 with a `case #Value(item)` can be lifted. Every Expression `collectEager` reaches is read where the Statement

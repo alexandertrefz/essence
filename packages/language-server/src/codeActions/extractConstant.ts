@@ -15,7 +15,11 @@ import {
 	trimmedRange,
 } from "./geometry"
 import type { CodeActionEdit, CodeActionEntry } from "./index"
-import { enclosingStatementOf, findInnermostNodeContaining } from "./lookups"
+import {
+	enclosingStatementOf,
+	findInnermostNodeContaining,
+	walk,
+} from "./lookups"
 import { availableName } from "./names"
 import { renameCommand } from "./renameCommand"
 
@@ -52,7 +56,10 @@ export function extractConstantActions(
 
 	// Only an Expression the Statement always evaluates, as `collectEager`
 	// finds them.
-	if (!collectEager(statement).has(expression)) {
+	if (
+		!collectEager(statement).has(expression) ||
+		isForwardedQuestion(program, enclosing.body, expression)
+	) {
 		return []
 	}
 
@@ -285,6 +292,126 @@ function collectArguments(
 	for (let argument of nodeArguments) {
 		collectInto(argument.value, found)
 	}
+}
+
+// A Method answering a `Boolean` whose whole body asks one question of `@` is
+// read as asking that question, and a condition calling it narrows. See
+// "Extracting a Constant" in DEVELOPMENT.md.
+function isForwardedQuestion(
+	program: parser.Program,
+	body: Array<parser.ImplementationNode>,
+	expression: parser.ExpressionNode,
+): boolean {
+	return (
+		asksTheQuestion(body, expression) && predicateBodies(program).has(body)
+	)
+}
+
+// The bodies of the instance Methods written to answer a `Boolean`.
+function predicateBodies(
+	program: parser.Program,
+): Set<Array<parser.ImplementationNode>> {
+	let bodies = new Set<Array<parser.ImplementationNode>>()
+	let add = (method: parser.FunctionValueNode | null) => {
+		let returnType = method?.value.returnType
+
+		if (
+			method !== null &&
+			returnType?.nodeType === "IdentifierTypeDeclaration" &&
+			returnType.type.content === "Boolean"
+		) {
+			bodies.add(method.value.body)
+		}
+	}
+
+	walk(program, (node) => {
+		if (node.nodeType === "NamespaceDefinitionStatement") {
+			for (let entry of Object.values(node.methods)) {
+				if (entry.nodeType === "SimpleMethod") {
+					add(entry.method)
+				} else if (entry.nodeType === "OverloadedMethod") {
+					entry.methods.forEach(add)
+				}
+			}
+		}
+
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			for (let entry of Object.values(node.methods)) {
+				if (entry.nodeType === "SimpleProtocolMethod") {
+					add(entry.signature.body)
+				} else if (entry.nodeType === "OverloadedProtocolMethod") {
+					for (let signature of entry.signatures) {
+						add(signature.body)
+					}
+				}
+			}
+		}
+	})
+
+	return bodies
+}
+
+function asksTheQuestion(
+	body: Array<parser.ImplementationNode>,
+	expression: parser.ExpressionNode,
+): boolean {
+	let [statement] = body
+
+	if (body.length !== 1 || statement === undefined) {
+		return false
+	}
+
+	if (statement.nodeType === "ReturnStatement") {
+		let answer = statement.expression
+
+		if (isNegation(answer)) {
+			return (
+				asksOfSelf(answer.base) &&
+				(expression === answer || expression === answer.base)
+			)
+		}
+
+		return asksOfSelf(answer) && expression === answer
+	}
+
+	return (
+		statement.nodeType === "IfElseStatement" &&
+		answersBoolean(statement.trueBody) &&
+		answersBoolean(statement.falseBody) &&
+		asksOfSelf(statement.condition) &&
+		expression === statement.condition
+	)
+}
+
+function isNegation(
+	node: parser.ExpressionNode,
+): node is parser.MethodInvocationNode {
+	return (
+		node.nodeType === "MethodInvocation" &&
+		node.member.content === "negate" &&
+		node.arguments.length === 0
+	)
+}
+
+// A call on `@`, or one `@` is handed to, as `other::isAtLeast(@)`.
+function asksOfSelf(node: parser.ExpressionNode): boolean {
+	return (
+		node.nodeType === "MethodInvocation" &&
+		(node.base.nodeType === "Self" ||
+			node.arguments.some(
+				(argument) => argument.value.nodeType === "Self",
+			))
+	)
+}
+
+function answersBoolean(body: Array<parser.ImplementationNode>): boolean {
+	let [statement] = body
+
+	return (
+		body.length === 1 &&
+		statement?.nodeType === "ReturnStatement" &&
+		statement.expression.nodeType === "BooleanValue"
+	)
 }
 
 // A condition narrows the names it proves something about, and a Constant
