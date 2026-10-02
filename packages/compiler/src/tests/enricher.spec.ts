@@ -2599,6 +2599,33 @@ describe("Enricher", () => {
 			).toEqual(["unknown-name", "unknown-name"])
 		})
 
+		// A literal whose body answers a hole has the hole as its return Type.
+		// One passed to a call that resolved to nothing takes no Types. Neither
+		// is a second mistake.
+		it("should report nothing for a Function literal past an earlier Error", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant column = zz
+					constant read = [1]::map((x) { <- column })
+					constant later = Async.deferred(() { <- column })
+					constant missed = Async.deferredLater(() { <- 1 })
+
+					Terminal.print(read::length())
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-name", "unknown-member"])
+		})
+
+		// A literal with no Parameters is reported at its empty Parameter list.
+		it("should place an unreadable return Type on a literal with no Parameters", () => {
+			let source = `implementation {
+				constant later = Async.deferred(() { 1 })
+			}`
+			let [unreadable] = diagnosticsFor(source)
+
+			expect(unreadable?.code).toBe("uninferable-return-type")
+			expect(underlinedText(source, unreadable!)).toBe("()")
+		})
+
 		it("should apply defaults for unbound plain Generics", () => {
 			expect(
 				typeOfFirstConstant(`implementation {

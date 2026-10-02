@@ -522,6 +522,10 @@ of that test (`undecidedWithoutAReturnType`): `ambiguous-case` and `undecided-ty
 them by reading without an expected Type, and the real pass silences them through `positionWasRefused`. Counting
 them would leave a body like `((value) { <- #Value(value) })` with no report at all.
 
+A `<-` answering an Error that the pass did not raise itself was reported where that Error was written, as a
+Constant whose value named nothing is. The pass then answers the Error, so the literal returns the hole and nothing
+reports on it again. An Error the pass raised, from a bare Case it could not resolve, still answers null.
+
 Only a literal in Argument position may omit its annotations, since its Types are written down elsewhere, in the
 signature it is passed to (`resolveContextualReturnType`). Anywhere else a missing `-> Type` is
 `missing-return-type`. The Help spells the Type the body would answer, read once for the Diagnostic alone, unless
@@ -532,7 +536,8 @@ names only a call still matching produces.
 
 A literal whose return Type could not be read is remembered in `literalsAnsweringNothing`. The call around it then
 stays silent about its unbound Type Parameters, since they follow from that one mistake. Inside a call that
-resolved to nothing, a literal's Parameters stay Error without a report (`refusedCallDepth`).
+resolved to nothing, a literal's Parameters and return Type stay Error without a report (`refusedCallDepth`). A
+literal with no Parameters is reported at its empty Parameter list.
 
 ## Invocation and overload selection
 

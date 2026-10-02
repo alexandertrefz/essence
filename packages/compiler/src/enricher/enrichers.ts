@@ -9495,11 +9495,11 @@ function inferReturnTypeFromBody(
 				types,
 			)
 
-			// An Error among the returned Types answers null. A body with no
-			// `<-` also answers null, and the validator reports the missing
+			// An Error among the returned Types answers the hole. A body with
+			// no `<-` answers null, and the validator reports the missing
 			// return.
 			if (types.some((type) => type.type === "Error")) {
-				return null
+				return { type: "Error" as const }
 			}
 
 			let answer: common.Type | null = unionOfTypes(types)
@@ -9526,7 +9526,11 @@ function inferReturnTypeFromBody(
 			refused.body = true
 		}
 
-		return result
+		// An Error this pass raised itself, as a bare Case it could not resolve
+		// does, answers null. Any other was reported where it was written.
+		return result?.type === "Error" && containsErrors(diagnostics)
+			? null
+			: result
 	} finally {
 		inferReturnTypeFromBodyDepth -= 1
 	}
@@ -15778,22 +15782,28 @@ function resolveContextualReturnType(
 
 	// Without an expected signature only the body could say what this returns,
 	// which is hard to follow across a Program. Only a literal in Argument
-	// position may omit `-> Type`.
+	// position may omit `-> Type`. One passed to a refused call is silent; see
+	// `refusedCallDepth`.
 	if (expectedFunction === null) {
-		reportError(
-			"This Function must write its return Type",
-			node.parameterListPosition,
-			{
-				code: "missing-return-type",
-				labels: [
-					primary(node.parameterListPosition, "no '-> Type' here"),
-				],
-				notes: [
-					"Only a Function passed as an Argument takes its Types from the surrounding context.",
-				],
-				helps: [returnTypeHelp(node, parameterTypes, scope)],
-			},
-		)
+		if (refusedCallDepth === 0) {
+			reportError(
+				"This Function must write its return Type",
+				node.parameterListPosition,
+				{
+					code: "missing-return-type",
+					labels: [
+						primary(
+							node.parameterListPosition,
+							"no '-> Type' here",
+						),
+					],
+					notes: [
+						"Only a Function passed as an Argument takes its Types from the surrounding context.",
+					],
+					helps: [returnTypeHelp(node, parameterTypes, scope)],
+				},
+			)
+		}
 
 		return { type: "Error" }
 	}
@@ -15820,7 +15830,9 @@ function resolveContextualReturnType(
 			return { type: "Error" }
 		}
 
-		let position = functionLiteralPosition(node)
+		// The first Parameter, or the empty list of a literal with none.
+		let position =
+			node.parameters[0]?.position ?? node.parameterListPosition
 		let message = "The return Type could not be inferred from the body"
 		// A missing `<-` is the usual cause, so the Help names it first; an
 		// annotation would only move the report to `missing-return`.
@@ -15833,21 +15845,13 @@ function resolveContextualReturnType(
 
 		literalsAnsweringNothing.add(node)
 
-		if (position === null) {
-			reportError(message, null, {
-				code: "uninferable-return-type",
-				labels: [],
-				helps,
-			})
-		} else {
-			reportError(message, position, {
-				code: "uninferable-return-type",
-				labels: [
-					primary(position, "the body's Type is not determined here"),
-				],
-				helps,
-			})
-		}
+		reportError(message, position, {
+			code: "uninferable-return-type",
+			labels: [
+				primary(position, "the body's Type is not determined here"),
+			],
+			helps,
+		})
 
 		return { type: "Error" }
 	}
@@ -15861,12 +15865,6 @@ function parameterLabel(parameter: parser.ParameterNode): string {
 		parameter.externalName?.content ??
 		"_"
 	)
-}
-
-function functionLiteralPosition(
-	node: parser.FunctionDefinitionNode,
-): common.Position | null {
-	return node.parameters[0]?.position ?? null
 }
 
 // What a Type Alias means, `where` clause included. The predicate is enriched
