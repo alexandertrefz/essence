@@ -278,6 +278,52 @@ describe("Validator", () => {
 			})
 		})
 
+		// A Matcher can not test a refinement's predicate, so the Help names
+		// the base, once for every refinement of it. The Note lists the
+		// members as the Union writes them.
+		it("should name a refinement member by the base a Matcher can test", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Healthy = Integer where @::isGreaterThan(4)
+				type Depleted = Integer where @::isLessThan(5)
+
+				function describe(_ level: Healthy | Depleted | String) -> String {
+					<- match level -> String {
+						case String { <- @ }
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].notes).toEqual([
+				"Unhandled: 'Healthy', 'Depleted'.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Add 'case Integer', or a 'case _' that covers the rest.",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-case",
+				unhandled: ["Integer"],
+			})
+		})
+
+		it("should list a member carrying a refinement as the Union writes it", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Healthy = Integer where @::isGreaterThan(4)
+
+				function describe(_ levels: List<Healthy> | String) -> String {
+					<- match levels -> String {
+						case String { <- @ }
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].notes).toEqual([
+				"Unhandled: 'List<Healthy>'.",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Add 'case List<Integer>', or a 'case _' that covers the rest.",
+			])
+		})
+
 		it("should warn about unreachable Match cases", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Value = Integer | Rational

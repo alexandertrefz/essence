@@ -14,10 +14,10 @@ import {
 	asynchronyHelps,
 	booleanQuestionFor,
 	countOf,
-	describeMatcher,
 	describeParameter,
 	describeSignature,
 	describeType,
+	describeUnhandled,
 	displayProtocolName,
 	erasedDispatchEvidence,
 	recordMismatchEvidence,
@@ -1283,7 +1283,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		// One Diagnostic for every unhandled member, which share a cause and
 		// a fix. One Matcher answers for every application of a Case.
 		if (unhandledTypes.length > 0) {
-			let descriptions = [...new Set(unhandledTypes.map(describeMatcher))]
+			let { members, matchers } = describeUnhandled(unhandledTypes)
 
 			reportError(
 				`This Match Expression does not handle every Case`,
@@ -1297,14 +1297,14 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 						),
 					],
 					notes: [
-						`Unhandled: ${descriptions.map((description) => `'${description}'`).join(", ")}.`,
+						`Unhandled: ${members.map((member) => `'${member}'`).join(", ")}.`,
 					],
 					helps: [
-						`Add ${descriptions.map((description) => `'case ${description}'`).join(", ")}, or a 'case _' that covers the rest.`,
+						`Add ${matchers.map((matcher) => `'case ${matcher}'`).join(", ")}, or a 'case _' that covers the rest.`,
 					],
-					// The same spellings, for the Quick Fix that writes the
+					// The Help's spellings, for the Quick Fix that writes the
 					// Handlers.
-					data: { kind: "missing-case", unhandled: descriptions },
+					data: { kind: "missing-case", unhandled: matchers },
 				},
 			)
 		}

@@ -3,6 +3,7 @@ import * as path from "node:path"
 import type { common, enricher } from "@essence-lang/interfaces"
 
 import { primary, secondary } from "../diagnostics/index"
+import { eraseRefinements } from "./eraseRefinements"
 import { closestMatch } from "./suggest"
 import {
 	type AsynchronyMismatch,
@@ -303,12 +304,32 @@ export function namespaceWhere(
 	return conditions.length === 0 ? "" : ` where ${conditions.join(", ")}`
 }
 
-// A member Type as a `case` writes it. A Case Matcher takes no Type Arguments
-// and covers every application of its Case, so a Case is spelled without them.
-export function describeMatcher(type: common.Type): string {
+// A Union member as a Diagnostic names it. A Case Matcher takes no Type
+// Arguments and covers every application of its Case, so a Case is spelled
+// without them.
+function describeMember(type: common.Type): string {
 	return type.type === "Case"
 		? `${displayChoiceName(type.choice)}#${type.name}`
 		: describeType(type)
+}
+
+// A member Type as a `case` writes it. A Matcher can not test a refinement's
+// predicate, so a refinement is spelled as its base, as
+// `refinement-as-matcher` asks.
+export function describeMatcher(type: common.Type): string {
+	return describeMember(eraseRefinements(type))
+}
+
+// What a Match leaves unhandled, as `missing-case` reports it. The Note lists
+// the members as the Union writes them, and the Help the `case` each needs.
+export function describeUnhandled(types: Array<common.Type>): {
+	members: Array<string>
+	matchers: Array<string>
+} {
+	return {
+		members: [...new Set(types.map(describeMember))],
+		matchers: [...new Set(types.map(describeMatcher))],
+	}
 }
 
 // The Choice a Case belongs to, applied as `Box<Integer>` where the Case carries

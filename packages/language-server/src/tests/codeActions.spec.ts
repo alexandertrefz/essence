@@ -406,6 +406,27 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("missing-case")
 			expect(codesOf(result)).not.toContain("unreachable-case")
 		})
+
+		// A Matcher can not test a refinement's predicate, so the arm tests
+		// the base, which covers the member.
+		it("should write a refinement member as its base", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant rootTwo = 2::squareRoot()",
+				"\tconstant described = match rootTwo -> String {",
+				'\t\tcase Algebraic { <- "algebraic" }',
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe("Add missing Cases")
+			expect(result[4]).toBe("\t\tcase Integer {}")
+			// Only the empty arm's hole is left.
+			expect(codesOf(result)).toEqual(["missing-return"])
+		})
 	})
 
 	describe("unreachable-case", () => {
@@ -6035,6 +6056,34 @@ describe("Code Actions", () => {
 
 			expect(codesOf(result)).not.toContain("syntax-error")
 			expect(refusalOf(result)).toBeNull()
+		})
+
+		// A Matcher can not test a refinement's predicate. Two refinements of
+		// one base share its arm, since a second would be unreachable.
+		it("should scaffold a refinement member under its base", () => {
+			let lines = [
+				"implementation {",
+				"\ttype Healthy = Integer where @::isGreaterThan(4)",
+				"\ttype Depleted = Integer where @::isLessThan(5)",
+				"",
+				"\tfunction describe (level: Healthy | Depleted | Algebraic) -> String {",
+				"\t\tconstant described = level",
+				'\t\t<- ""',
+				"\t}",
+				"}",
+			]
+
+			let [refactor] = matchActions(lines, spanOf(lines, 6, "level"))
+			let result = applied(lines, refactor)
+
+			expect(result.slice(5, 9)).toEqual([
+				"\t\tconstant described = match level -> Healthy | Depleted | Algebraic {",
+				"\t\t\tcase Integer {}",
+				"\t\t\tcase Algebraic {}",
+				"\t\t}",
+			])
+			// Only the empty arms' hole is left.
+			expect(codesOf(result)).toEqual(["missing-return"])
 		})
 
 		it("should reach the call a chain ends in", () => {
