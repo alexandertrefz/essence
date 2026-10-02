@@ -2816,6 +2816,47 @@ export {
 		)
 	})
 
+	// A refined value the evaluator can not read decides the inferred `Item`
+	// by its own Type, from another Module as from its own.
+	it("admits an imported refined value into an inferred Parameter's written List", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Rows.es" { nested }
+}
+
+implementation {
+	constant proven: NonEmptyList<Integer> = [7, 8]
+
+	Terminal.inspect(nested([proven, [9]]))
+}
+`,
+				"Rows.es": `implementation {
+	function nested<infer Item>(_ rows: List<NonEmptyList<Item>>) -> Integer {
+		<- rows::length()
+	}
+}
+
+export {
+	nested
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual(["2"])
+			},
+		)
+	})
+
 	// An imported Namespace is no value either, and the Help reads a member the
 	// declaring Module wrote.
 	it("refuses an imported Namespace used as a value", () => {

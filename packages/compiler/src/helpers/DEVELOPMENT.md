@@ -201,7 +201,9 @@ The table holds only primitives, since a conjunct is stored resolved: `isGreater
 `admittedTypeOf` asks a written List item by item. The List predicates read only the count, so `[[1], [2, 3]]` is
 a `List<NonEmptyList<Integer>>` for the reason `[1]` is a `NonEmptyList<Integer>`. It answers a List of what the
 items decided, so an item Type that still binds Type Parameters gets the instantiation the values made. An item
-that decides nothing must fit as it stands. A written Dictionary is asked the same way, key and value per entry.
+that decides nothing must fit as it stands. At an Argument it may decide the call's Type Parameters by its own
+Type, so a `NonEmptyList<Integer>` Constant beside `[9]` fits `List<NonEmptyList<Item>>`. A written Dictionary
+is asked the same way, key and value per entry.
 An empty Literal decides nothing, and needs to decide nothing, since its `Unknown` slots fit every container.
 
 `refinementInside` gates all of this. It looks down List items and Dictionary slots only, since a Record or a Case
@@ -233,8 +235,9 @@ refinement as written. Its Type Parameters are the enclosing Declaration's, fixe
 `first: Item` is admitted. `Both<Item, String> = ["a"]` is admitted too, since its base `List<Item | String>`
 takes a String without saying what `Item` is.
 
-`unadmittedWrittenItem` names the part a Diagnostic points at. It asks each part with `binds` set, as an
-Argument's would be, so it passes over a part an inferred `Item` could take.
+`unadmittedWrittenItem` names the part a Diagnostic points at. It asks each part as an Argument's admission
+does: admitted with `binds` set, or fitting as it stands with the call's Type Parameters bindable. So it passes
+over a part an inferred `Item` could take, such as a `NonEmptyList<Integer>` Constant, and names the `[]`.
 
 ### The literal table
 

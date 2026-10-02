@@ -58,7 +58,10 @@ export function admittedTypeOf(
 	for (let item of value.values) {
 		let decided = admittedTypeOf(expected.itemType, item, binds)
 
-		if (decided === null && !matchesType(expected.itemType, item.type)) {
+		if (
+			decided === null &&
+			!fitsAsItStands(expected.itemType, item.type, binds)
+		) {
 			return null
 		}
 
@@ -95,9 +98,10 @@ function admittedDictionaryTypeOf(
 		let held = admittedTypeOf(expected.valueType, entry.value, binds)
 
 		if (
-			(key === null && !matchesType(expected.keyType, entry.key.type)) ||
+			(key === null &&
+				!fitsAsItStands(expected.keyType, entry.key.type, binds)) ||
 			(held === null &&
-				!matchesType(expected.valueType, entry.value.type))
+				!fitsAsItStands(expected.valueType, entry.value.type, binds))
 		) {
 			return null
 		}
@@ -111,6 +115,24 @@ function admittedDictionaryTypeOf(
 		keyType: buildUnion(keyTypes),
 		valueType: buildUnion(valueTypes),
 	}
+}
+
+// Whether a part nothing was decided about fits as it stands. Where the
+// position binds its Type Parameters, the part may decide them, as a
+// `NonEmptyList<Integer>` decides `Item` for a `NonEmptyList<Item>` item.
+function fitsAsItStands(
+	expected: common.Type,
+	actual: common.Type,
+	binds: boolean,
+): boolean {
+	let parameters = genericNamesMentioned(expected)
+
+	return binds && parameters.size > 0
+		? matchesTypeWithBindings(expected, actual, {
+				bindableNames: parameters,
+				bindings: new Map(),
+			})
+		: matchesType(expected, actual)
 }
 
 // Whether a written value fits where it stands: assignable, or admitted. A
@@ -162,7 +184,7 @@ export function unadmittedWrittenItem(
 		value.nodeType === "DictionaryValue"
 	) {
 		for (let entry of value.entries) {
-			if (!fitsWritten(container.keyType, entry.key, true)) {
+			if (!partFits(container.keyType, entry.key)) {
 				return unadmittedWrittenPart(
 					container.keyType,
 					entry.key,
@@ -170,7 +192,7 @@ export function unadmittedWrittenItem(
 				)
 			}
 
-			if (!fitsWritten(container.valueType, entry.value, true)) {
+			if (!partFits(container.valueType, entry.value)) {
 				return unadmittedWrittenPart(
 					container.valueType,
 					entry.value,
@@ -191,7 +213,7 @@ export function unadmittedWrittenItem(
 	}
 
 	for (let item of value.values) {
-		if (fitsWritten(container.itemType, item, true)) {
+		if (partFits(container.itemType, item)) {
 			continue
 		}
 
@@ -199,6 +221,17 @@ export function unadmittedWrittenItem(
 	}
 
 	return null
+}
+
+// Whether a part fits as an Argument's admission takes it: admitted, or
+// fitting as it stands with the call's Type Parameters bindable.
+function partFits(
+	slot: common.Type,
+	part: common.typed.ExpressionNode,
+): boolean {
+	return (
+		fitsWritten(slot, part, true) || fitsAsItStands(slot, part.type, true)
+	)
 }
 
 // The deepest thing inside a part that did not fit, named by its own word, or

@@ -3653,6 +3653,84 @@ describe("Validator", () => {
 				// Inside the Namespace, `@` binds `Item` to the Declaration's
 				// opaque symbol. The admission answers `Filled<String>`, which
 				// ordinary assignability refuses for `Filled<Item>`.
+				// A value the evaluator can not read decides `Item` by its own
+				// Type, as an unrefined `List<Item>` would let it.
+				it("should admit a written List of refined values beside written Lists", () => {
+					expect(
+						diagnosticsFor(`implementation {
+							function nested<infer Item>(_ rows: List<NonEmptyList<Item>>) -> Integer {
+								<- rows::length()
+							}
+
+							function keyed<infer Item>(_ rows: Dictionary<String, NonEmptyList<Item>>) -> Integer {
+								<- rows::length()
+							}
+
+							constant proven: NonEmptyList<Integer> = [1, 2]
+
+							Terminal.inspect(nested([proven, [9]]))
+							Terminal.inspect(keyed(["a" = proven, "b" = [9]]))
+						}`),
+					).toEqual([])
+				})
+
+				// `ints` fits `NonEmptyList<Item>` as it stands, so each report
+				// points at the part no `Item` makes fit.
+				it("should point past a refined value an inferred Type Parameter takes", () => {
+					let source = `implementation {
+						function nested<infer Item>(_ rows: List<NonEmptyList<Item>>) -> Integer {
+							<- rows::length()
+						}
+
+						function keyed<infer Item>(_ rows: Dictionary<String, NonEmptyList<Item>>) -> Integer {
+							<- rows::length()
+						}
+
+						constant ints: NonEmptyList<Integer> = [1, 2]
+						constant empty: List<Integer> = []
+
+						Terminal.inspect(nested([ints, []]))
+						Terminal.inspect(keyed(["a" = ints, "b" = empty]))
+					}`
+					let diagnostics = diagnosticsFor(source)
+
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.code),
+					).toEqual([
+						"argument-type-mismatch",
+						"argument-type-mismatch",
+					])
+					expect(
+						diagnostics.map((diagnostic) =>
+							underlinedBy(
+								source,
+								diagnostic.labels.find((label) =>
+									/^this (item|value) is/.test(label.message),
+								),
+							),
+						),
+					).toEqual(["[]", "empty"])
+				})
+
+				// The closure binds nothing, so its `Item` is the opaque one, and
+				// a List of Integers is no List of `Item`s.
+				it("should refuse refined values against an opaque Type Parameter's items", () => {
+					expect(
+						diagnosticsFor(`implementation {
+							function countOf<infer Item>(_ items: NonEmptyList<Item>) -> Integer {
+								constant counted = (_ rows: List<NonEmptyList<Item>>) -> Integer {
+									<- rows::length()
+								}
+								constant ints: NonEmptyList<Integer> = [1]
+
+								<- counted([ints, [2]])
+							}
+
+							Terminal.inspect(countOf([1]))
+						}`).map((diagnostic) => diagnostic.code),
+					).toEqual(["argument-type-mismatch"])
+				})
+
 				it("should refuse a written List against an opaque Type Parameter", () => {
 					let { diagnostics } = enrich(
 						parse(`implementation {
