@@ -1,0 +1,5 @@
+[test]
+# Bun reads only the bunfig.toml of the directory a run starts in, so a run
+# started here preloads the repository's test budget itself. See "The test
+# budget" in scripts/DEVELOPMENT.md.
+preload = ["../../scripts/testBudget.ts"]

@@ -3,6 +3,7 @@
 .gitignore
 .gitattributes
 bun.lock
+bunfig.toml
 DEVELOPMENT.md
 buildServer.js
 tsconfig.json

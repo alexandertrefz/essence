@@ -7,8 +7,9 @@ root is the release checklist.
 ## The test budget
 
 `testBudget.ts` gives every spec in the repository one timeout, preloaded by `bunfig.toml` into each test process,
-the parallel runner's workers included. Bun reads `bunfig.toml` only from the directory a run starts in, so a run
-started inside a package keeps Bun's default. Most of this suite compiles a Program and often runs it, and how long
+the parallel runner's workers included. Bun reads `bunfig.toml` only from the directory a run starts in, so every
+workspace holding a spec has one that preloads the same file, and so does the root. A run started deeper inside a
+package keeps Bun's default. Most of this suite compiles a Program and often runs it, and how long
 that takes depends on the host more than on the code. Bun's default of five seconds is ample on an idle machine, but
 with several suites sharing a loaded machine, fast tests time out at random.
 
@@ -31,7 +32,8 @@ that puts the call at the start of every `*.spec.ts` file Bun loads. The call sh
 `ESSENCE_TEST_BUDGET` sets the budget in milliseconds. Anything but a positive number keeps the minute, since a
 timeout of zero turns timeouts off. `tests/testBudget.spec.ts` sets a short budget this way. It runs files that
 outlast it after another file: plainly, under `--isolate` and under `--parallel`. A later file left on Bun's default
-passes there, which fails the spec. It also refuses a test file whose name the plugin's filter misses.
+passes there, which fails the spec. It also starts a run inside every workspace holding a spec, and refuses a test
+file whose name the plugin's filter misses.
 
 ## Publishing packages
 
