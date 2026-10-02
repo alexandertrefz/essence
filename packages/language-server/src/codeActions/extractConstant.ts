@@ -116,7 +116,6 @@ function isExtractable(
 		case "Combination":
 		case "Match":
 		case "Define":
-		case "RecordValue":
 		case "ListValue":
 		case "DictionaryValue":
 		case "InterpolatedStringValue":
@@ -128,6 +127,11 @@ function isExtractable(
 			return true
 		case "CaseValue":
 			return node.choice !== null
+		// A path key reaches into a value its position supplies.
+		case "RecordValue":
+			return Object.values(node.members).every(
+				(member) => member.steps === undefined,
+			)
 		default:
 			return false
 	}
@@ -177,7 +181,16 @@ function collectInto(
 	}
 
 	found.add(node)
+	collectParts(node, found)
+}
 
+// What an Expression reads besides itself. A part that is no value on its
+// own is entered but not collected: a `with` key list, and a path key's
+// member list.
+function collectParts(
+	node: parser.ImplementationNode,
+	found: Set<parser.ImplementationNode>,
+) {
 	switch (node.nodeType) {
 		case "MethodInvocation":
 			collectInto(node.base, found)
@@ -189,7 +202,13 @@ function collectInto(
 			return
 		case "Combination":
 			collectInto(node.lhs, found)
-			collectInto(node.rhs, found)
+
+			if (node.bare === true) {
+				collectParts(node.rhs, found)
+			} else {
+				collectInto(node.rhs, found)
+			}
+
 			return
 		case "Lookup":
 			collectInto(node.base, found)
@@ -214,7 +233,7 @@ function collectInto(
 				}
 
 				if (member.group !== undefined) {
-					collectInto(member.group, found)
+					collectParts(member.group, found)
 				}
 			}
 

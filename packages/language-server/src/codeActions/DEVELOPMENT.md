@@ -104,12 +104,15 @@ A reader dragging over characters is often off by one, and still means the same 
 Only some Expressions are worth naming, and `isExtractable` lists them. A bare Identifier already has a name, and
 a scalar Literal reads as its own value. Others take their meaning from where they are written and would lose it.
 A Function literal and a bare `#Case` take their Type from their position. A member path stands for a Function of
-the Argument it is handed.
+the Argument it is handed. A Record written with a path key reaches into a value its position supplies: the value a
+`with` updates, or a Parameter's default.
 
 `collectEager` collects the Expressions a Statement reads every time it is reached, which are the ones a Constant
 before it may hold. Its walk stops at anything that opens a body of its own, such as a Function literal or a Match
 Handler. A selection inside such a body is lifted within it instead, as `enclosingStatementOf` finds it. The walk
 also stops at forms read only conditionally: a `define` arm, a Match Guard, and a Parameter's or Case's default.
+Some parts are no value of their own, so `collectParts` enters them without collecting them. A `with` key list such as
+`column = 1` would otherwise be written as a Constant's value, and so would a path key's member list.
 
 `readsResolveAbove` checks that every name the Expression reads is in scope where the Constant will stand, since
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match

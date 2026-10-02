@@ -8013,6 +8013,75 @@ describe("Extract to a Constant", () => {
 		)
 	})
 
+	// `column = 1` and `"kim" = 7` would be written as a Constant's value,
+	// which reads neither.
+	it("offers nothing for the key list of a `with`", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction moved(_ cell: { row: Integer, column: Integer }) -> { row: Integer, column: Integer } {",
+			"\t\t<- { cell with column = cell.column::add(1) }",
+			"\t}",
+			"",
+			"\tfunction aged(_ ages: Dictionary<String, Integer>) -> Dictionary<String, Integer> {",
+			'\t\t<- [ages with "kim" = 7]',
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "column = cell.column::add(1)")),
+		).toEqual([])
+		expect(extractions(lines, rangeOf(lines, '"kim" = 7'))).toEqual([])
+	})
+
+	it("lifts a value out of the key list of a `with`", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction moved(_ cell: { row: Integer, column: Integer }) -> { row: Integer, column: Integer } {",
+			"\t\t<- { cell with column = cell.column::add(1) }",
+			"\t}",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "cell.column::add(1)"))
+		let result = applied(lines, action)
+
+		expect(result.slice(2, 4)).toEqual([
+			"\t\tconstant add = cell.column::add(1)",
+			"\t\t<- { cell with column = add }",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// A path key reaches into a value the position supplies: the value being
+	// updated, or a Parameter's default.
+	it("offers nothing for a Record written with a path key", () => {
+		let lines = [
+			"implementation {",
+			"\ttype Config = { server: { port: Integer, host: String } }",
+			"",
+			"\tfunction grouped(_ config: Config) -> Config {",
+			'\t\t<- { config with server.{ port = 1, host = "db" } }',
+			"\t}",
+			"",
+			'\tfunction serve(_ config: Config = { server = { port = 80, host = "web" } }) -> Integer {',
+			"\t\t<- config.server.port",
+			"\t}",
+			"",
+			"\tconstant port = serve({ server.port = 8080 })",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, '{ port = 1, host = "db" }')),
+		).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "{ server.port = 8080 }")),
+		).toEqual([])
+	})
+
 	it("offers nothing where the Statement does not open its line", () => {
 		let lines = [
 			"implementation {",
