@@ -8013,6 +8013,60 @@ describe("Extract to a Constant", () => {
 		)
 	})
 
+	// A Method taken as a value loses its defaults, and one with Protocol-bound
+	// Type Parameters is refused as a value.
+	it("offers nothing for a callee, but lifts the whole call", () => {
+		let lines = [
+			"implementation {",
+			"\tnamespace Greeting for String {",
+			'\t\tstatic greet(_ name: String, ending: String = "!") -> String {',
+			"\t\t\t<- name::append(ending)",
+			"\t\t}",
+			"\t}",
+			"",
+			'\tTerminal.print(Greeting.greet("kim"))',
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(extractions(lines, rangeOf(lines, "Terminal.print"))).toEqual([])
+		expect(extractions(lines, rangeOf(lines, "Greeting.greet"))).toEqual([])
+
+		let [action] = extractions(
+			lines,
+			rangeOf(lines, 'Greeting.greet("kim")'),
+		)
+		let result = applied(lines, action)
+
+		expect(result.slice(7, 9)).toEqual([
+			'\tconstant greet = Greeting.greet("kim")',
+			"\tTerminal.print(greet)",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// `adder(1)` answers a Function value, which a Constant holds as it is.
+	it("lifts a callee that a call answers", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction adder(_ n: Integer) -> (_ value: Integer) -> Integer {",
+			"\t\t<- (_ x: Integer) -> Integer { <- x::add(n) }",
+			"\t}",
+			"",
+			"\tconstant total = adder(1)(2)",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "adder(1)"))
+		let result = applied(lines, action)
+
+		expect(result.slice(5, 7)).toEqual([
+			"\tconstant adder2 = adder(1)",
+			"\tconstant total = adder2(2)",
+		])
+		expectRefactored(lines, result)
+	})
+
 	// `column = 1` and `"kim" = 7` would be written as a Constant's value,
 	// which reads neither.
 	it("offers nothing for the key list of a `with`", () => {

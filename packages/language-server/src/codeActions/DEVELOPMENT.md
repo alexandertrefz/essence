@@ -112,7 +112,10 @@ before it may hold. Its walk stops at anything that opens a body of its own, suc
 Handler. A selection inside such a body is lifted within it instead, as `enclosingStatementOf` finds it. The walk
 also stops at forms read only conditionally: a `define` arm, a Match Guard, and a Parameter's or Case's default.
 Some parts are no value of their own, so `collectParts` enters them without collecting them. A `with` key list such as
-`column = 1` would otherwise be written as a Constant's value, and so would a path key's member list.
+`column = 1` would otherwise be written as a Constant's value, and so would a path key's member list. A callee written
+as a name or a Lookup is entered too: a Method taken as a value loses its defaults, and one with Protocol-bound Type
+Parameters is refused as a value. A callee that a call answers, as `adder(1)` in `adder(1)(2)`, is a Function value
+already, and is collected.
 
 `readsResolveAbove` checks that every name the Expression reads is in scope where the Constant will stand, since
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match

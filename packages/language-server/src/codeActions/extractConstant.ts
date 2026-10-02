@@ -184,9 +184,9 @@ function collectInto(
 	collectParts(node, found)
 }
 
-// What an Expression reads besides itself. A part that is no value on its
-// own is entered but not collected: a `with` key list, and a path key's
-// member list.
+// What an Expression reads besides itself. A part that is no value of its
+// own is entered but not collected: a named callee, a `with` key list, a
+// path key's members.
 function collectParts(
 	node: parser.ImplementationNode,
 	found: Set<parser.ImplementationNode>,
@@ -196,8 +196,18 @@ function collectParts(
 			collectInto(node.base, found)
 			collectArguments(node.arguments, found)
 			return
+		// A callee a call answers, as `adder(1)` in `adder(1)(2)`, is a
+		// Function value already.
 		case "FunctionInvocation":
-			collectInto(node.name, found)
+			if (
+				node.name.nodeType === "Identifier" ||
+				node.name.nodeType === "Lookup"
+			) {
+				collectParts(node.name, found)
+			} else {
+				collectInto(node.name, found)
+			}
+
 			collectArguments(node.arguments, found)
 			return
 		case "Combination":
