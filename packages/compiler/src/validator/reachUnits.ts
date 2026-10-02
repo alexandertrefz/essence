@@ -7,7 +7,9 @@ import { forEachTypedChild, type TypedNode } from "../visitor/index"
 // What code needs while it runs. See "Use before declaration" in
 // DEVELOPMENT.md.
 export type Dependency = {
-	kind: "namespace"
+	// A Namespace's class, a top-level Constant, or a static Property, whose
+	// `name` is `Namespace.member`.
+	kind: "namespace" | "constant" | "property"
 	name: string
 	position: common.Position
 	label: string
@@ -23,6 +25,8 @@ export type Run = { target: string; position: common.Position; label: string }
 // value, or a body's part before or after its first suspension.
 export type Unit = {
 	id: string
+	// A root's place among the Properties its Statement gives values, from 1.
+	step: number
 	// How a Note names the body, as `'run'` or `'Parity::isEvenly'`.
 	name: string
 	dependencies: Array<Dependency>
@@ -51,8 +55,10 @@ export type Units = {
 	suspensions: Array<number>
 }
 
+// `declared` is the index of the top-level Statement that declares a
+// Constant or a Variable.
 type Binding =
-	| { kind: "value"; bodies: Array<string> | null }
+	| { kind: "value"; bodies: Array<string> | null; declared?: number }
 	| { kind: "namespace"; id: string }
 
 type Scope = { parent: Scope | null; names: Map<string, Binding> }
@@ -105,7 +111,7 @@ export function collectUnits(
 	})
 	let pending: Array<{ walk: Pending; home: string | null }> = []
 
-	for (let node of nodes) {
+	for (let [index, node] of nodes.entries()) {
 		if (node.nodeType === "FunctionStatement") {
 			let id = `fn ${node.name.content}`
 
@@ -126,7 +132,11 @@ export function collectUnits(
 			node.nodeType === "ConstantDeclarationStatement" ||
 			node.nodeType === "VariableDeclarationStatement"
 		) {
-			top.names.set(node.name.content, { kind: "value", bodies: null })
+			top.names.set(node.name.content, {
+				kind: "value",
+				bodies: null,
+				declared: index,
+			})
 		} else if (node.nodeType === "NamespaceDefinitionStatement") {
 			for (let method of declareMethods(build, node, node.name.content)) {
 				pending.push({ walk: method, home: node.name.content })
@@ -136,12 +146,16 @@ export function collectUnits(
 
 	// A body may call a Constant's Function value, which a call through it
 	// follows, wherever the body is written.
-	for (let node of nodes) {
+	for (let [index, node] of nodes.entries()) {
 		if (node.nodeType === "ConstantDeclarationStatement") {
 			let ids = valueOf(node.value, topWalk(newUnit("", ""), null))
 
 			nameLiteral(build, node, ids)
-			top.names.set(node.name.content, { kind: "value", bodies: ids })
+			top.names.set(node.name.content, {
+				kind: "value",
+				bodies: ids,
+				declared: index,
+			})
 		}
 	}
 
@@ -173,8 +187,10 @@ function rootUnits(
 	index: number,
 	walkFor: (unit: Unit, home: string | null) => Walk,
 ): Array<Unit> {
-	let rootUnit = (suffix: string): Unit =>
-		newUnit(`statement ${index}${suffix}`, "")
+	let rootUnit = (step: number): Unit => ({
+		...newUnit(`statement ${index} ${step}`, ""),
+		step,
+	})
 
 	switch (node.nodeType) {
 		case "FunctionStatement":
@@ -188,7 +204,7 @@ function rootUnits(
 					return []
 				}
 
-				let unit = rootUnit(` ${order}`)
+				let unit = rootUnit(order + 1)
 
 				visitExpression(
 					property.value,
@@ -199,7 +215,7 @@ function rootUnits(
 				return [unit]
 			})
 		default: {
-			let unit = rootUnit("")
+			let unit = rootUnit(1)
 
 			visitStatement(node, walkFor(unit, null))
 
@@ -211,6 +227,7 @@ function rootUnits(
 function newUnit(id: string, name: string): Unit {
 	return {
 		id,
+		step: 1,
 		name,
 		dependencies: [],
 		runs: [],
@@ -385,11 +402,18 @@ function visitStatement(
 		case "ConstantDeclarationStatement": {
 			let ids = valueOf(node.value, walk)
 
+			let declared = resolve(walk.scope, node.name.content)
+
 			nameLiteral(walk.build, node, ids)
 			visitExpression(node.value, walk, ids === null ? "value" : "bound")
+
+			// A top-level Constant keeps the Statement declaring it.
 			walk.scope.names.set(node.name.content, {
 				kind: "value",
 				bodies: ids,
+				...(walk.scope.parent === null && declared?.kind === "value"
+					? { declared: declared.declared }
+					: {}),
 			})
 
 			return
@@ -564,6 +588,22 @@ function namesOtherCode(
 	)
 }
 
+// A top-level Constant or Variable, which holds nothing until its Statement
+// runs.
+function readConstant(walk: Walk, node: common.typed.IdentifierNode): void {
+	let binding = resolve(walk.scope, node.content)
+
+	if (binding?.kind === "value" && binding.declared !== undefined) {
+		walk.unit.dependencies.push({
+			kind: "constant",
+			name: node.content,
+			position: node.position,
+			label: "this reads it",
+			home: walk.home,
+		})
+	}
+}
+
 function depend(
 	walk: Walk,
 	namespace: string,
@@ -696,7 +736,13 @@ function visitExpression(
 		case "Identifier":
 			if (node.type.type === "Namespace") {
 				depend(walk, node.content, node.position, "this names it")
-			} else if (use === "value") {
+
+				return
+			}
+
+			readConstant(walk, node)
+
+			if (use === "value") {
 				escape(walk, node)
 			}
 
@@ -876,6 +922,20 @@ function visitLookup(
 		node.base.type.type === "Namespace"
 	) {
 		depend(walk, node.base.content, node.base.position, "this names it")
+
+		// A static Property holds nothing until its initialiser runs.
+		if (
+			namespace === node.base.content &&
+			Object.hasOwn(node.base.type.properties, node.member.content)
+		) {
+			walk.unit.dependencies.push({
+				kind: "property",
+				name: `${namespace}.${node.member.content}`,
+				position: node.member.position,
+				label: "this reads it",
+				home: walk.home,
+			})
+		}
 	} else {
 		visitExpression(node.base, walk, "bound")
 

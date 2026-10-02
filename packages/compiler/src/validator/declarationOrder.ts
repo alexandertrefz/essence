@@ -16,13 +16,23 @@ export type TopLevelNamespaces = Map<
 	{ index: number; position: common.Position }
 >
 
+// Where each top-level Constant and static Property is declared. A static
+// Property's `step` is its place in its Namespace's written order, from 1.
+type Declarations = Map<
+	string,
+	{ index: number; step: number; position: common.Position }
+>
+
 // What one validation knows about the order of a Program's top-level
 // Statements. `reported` holds `index name` for each Namespace a Statement's
 // own use was reported for, so a call reaching it is not reported again.
 export type DeclarationOrder = {
 	nodes: Array<common.typed.ImplementationNode>
 	namespaces: TopLevelNamespaces
-	lastNamespaceIndex: number
+	constants: Declarations
+	properties: Declarations
+	// The last Statement that declares anything code can reach too early.
+	last: number
 	reported: Set<string>
 	run: Simulation | null
 }
@@ -45,7 +55,7 @@ type Closure = {
 // Statement it may go on at.
 type Simulation = {
 	units: Units
-	namespaces: TopLevelNamespaces
+	order: DeclarationOrder
 	closures: Map<Unit, Closure>
 	escaped: Set<string>
 	escapedClosure: Closure
@@ -67,7 +77,9 @@ export function collectDeclarationOrder(
 	nodes: Array<common.typed.ImplementationNode>,
 ): DeclarationOrder {
 	let namespaces: TopLevelNamespaces = new Map()
-	let lastNamespaceIndex = -1
+	let constants: Declarations = new Map()
+	let properties: Declarations = new Map()
+	let last = -1
 
 	for (let [index, node] of nodes.entries()) {
 		// The first Declaration of a name is recorded. The enricher reports
@@ -80,7 +92,31 @@ export function collectDeclarationOrder(
 				index,
 				position: node.name.position,
 			})
-			lastNamespaceIndex = index
+			last = index
+
+			for (let [step, property] of Object.values(
+				node.properties,
+			).entries()) {
+				properties.set(
+					`${node.name.content}.${property.name.content}`,
+					{
+						index,
+						step: step + 1,
+						position: property.name.position,
+					},
+				)
+			}
+		} else if (
+			(node.nodeType === "ConstantDeclarationStatement" ||
+				node.nodeType === "VariableDeclarationStatement") &&
+			!constants.has(node.name.content)
+		) {
+			constants.set(node.name.content, {
+				index,
+				step: 1,
+				position: node.name.position,
+			})
+			last = index
 		}
 	}
 
@@ -89,7 +125,9 @@ export function collectDeclarationOrder(
 	return {
 		nodes,
 		namespaces,
-		lastNamespaceIndex,
+		constants,
+		properties,
+		last,
 		reported: new Set(),
 		run: null,
 	}
@@ -102,13 +140,13 @@ export function reportReachedNamespaces(
 	order: DeclarationOrder,
 	index: number,
 ): void {
-	if (index > order.lastNamespaceIndex) {
+	if (index > order.last) {
 		return
 	}
 
 	let simulation = (order.run ??= {
 		units: collectUnits(order.nodes, new Set(order.namespaces.keys())),
-		namespaces: order.namespaces,
+		order,
 		closures: new Map(),
 		escaped: new Set(),
 		escapedClosure: emptyClosure(),
@@ -123,9 +161,9 @@ export function reportReachedNamespaces(
 			: null
 	let reported = new Set<string>()
 	let roots: Array<{ unit: Unit; moment: number; via: Via | null }> =
-		simulation.units.roots[index].map((unit, order) => ({
+		simulation.units.roots[index].map((unit) => ({
 			unit,
-			moment: index * STEPS + order + 1,
+			moment: index * STEPS + unit.step,
 			via: null,
 		}))
 
@@ -177,12 +215,23 @@ function merged(left: Closure, right: Closure): Closure {
 	}
 }
 
-// The moment from which a Dependency is met.
+// The last moment a Dependency is not met yet. A Constant or a static
+// Property holds its value once its own moment is over.
 function availableFrom(
 	dependency: Dependency,
-	namespaces: TopLevelNamespaces,
+	order: DeclarationOrder,
 ): number {
-	let declaration = namespaces.get(dependency.name)
+	if (dependency.kind !== "namespace") {
+		let declaration = (
+			dependency.kind === "constant" ? order.constants : order.properties
+		).get(dependency.name)
+
+		return declaration === undefined
+			? -1
+			: declaration.index * STEPS + declaration.step
+	}
+
+	let declaration = order.namespaces.get(dependency.name)
 
 	if (declaration === undefined) {
 		return -1
@@ -194,12 +243,12 @@ function availableFrom(
 		: declaration.index * STEPS + STEPS - 1
 }
 
-function ownClosure(unit: Unit, namespaces: TopLevelNamespaces): Closure {
+function ownClosure(unit: Unit, order: DeclarationOrder): Closure {
 	return {
 		latest: Math.max(
 			-1,
 			...unit.dependencies.map((dependency) =>
-				availableFrom(dependency, namespaces),
+				availableFrom(dependency, order),
 			),
 		),
 		unknownCall: unit.unknownCall !== null,
@@ -217,7 +266,6 @@ function closureOf(simulation: Simulation, root: Unit): Closure {
 		return known
 	}
 
-	let namespaces = simulation.namespaces
 	let index = new Map<Unit, number>()
 	let low = new Map<Unit, number>()
 	let stack: Array<Unit> = []
@@ -287,7 +335,7 @@ function closureOf(simulation: Simulation, root: Unit): Closure {
 		let closure = emptyClosure()
 
 		for (let unit of group) {
-			closure = merged(closure, ownClosure(unit, namespaces))
+			closure = merged(closure, ownClosure(unit, simulation.order))
 
 			for (let successor of successorsOf(simulation, unit)) {
 				let outside = simulation.closures.get(successor)
@@ -422,7 +470,6 @@ function reportFrom(
 		via: { position: common.Position; label: string } | null
 	}
 
-	let namespaces = order.namespaces
 	let index = Math.floor(moment / STEPS)
 	let seen = new Set<Unit>([root.unit])
 	// Started work is walked from where it was started.
@@ -442,18 +489,22 @@ function reportFrom(
 		reachWork.visits++
 
 		for (let dependency of step.unit.dependencies) {
-			let declaration = namespaces.get(dependency.name)
+			let declaration = declarationOf(order, dependency)
+			let key = `${dependency.kind} ${dependency.name}`
 
+			// A Constant or a Property the Statement reads itself is the
+			// enricher's and `checkPropertyIsBound`'s to report.
 			if (
 				declaration === undefined ||
-				availableFrom(dependency, namespaces) < moment ||
+				availableFrom(dependency, order) < moment ||
+				(step.parent === null && dependency.kind !== "namespace") ||
 				order.reported.has(`${index} ${dependency.name}`) ||
-				reported.has(dependency.name)
+				reported.has(key)
 			) {
 				continue
 			}
 
-			reported.add(dependency.name)
+			reported.add(key)
 
 			if (step.parent === null) {
 				reportUse(dependency, declaration)
@@ -513,7 +564,17 @@ function reportFrom(
 			first = current
 		}
 
-		reportReachedDependency(first.via!, path, dependency, declaration, home)
+		if (dependency.kind === "namespace") {
+			reportReachedDependency(
+				first.via!,
+				path,
+				dependency,
+				declaration,
+				home,
+			)
+		} else {
+			reportReadTooEarly(first.via!, path, dependency, declaration)
+		}
 	}
 }
 
@@ -581,6 +642,55 @@ function reportReachedDependency(
 				own
 					? `Work the value out in a Method of '${dependency.name}' instead.`
 					: moveHelp(dependency.name),
+			],
+		},
+	)
+}
+
+function declarationOf(
+	order: DeclarationOrder,
+	dependency: Dependency,
+): { position: common.Position } | undefined {
+	switch (dependency.kind) {
+		case "namespace":
+			return order.namespaces.get(dependency.name)
+		case "constant":
+			return order.constants.get(dependency.name)
+		case "property":
+			return order.properties.get(dependency.name)
+	}
+}
+
+// A Constant or a static Property a body the Statement runs reads before it
+// holds its value.
+function reportReadTooEarly(
+	via: { position: common.Position; label: string },
+	path: Array<string>,
+	dependency: Dependency,
+	declaration: { position: common.Position },
+): void {
+	let constant = dependency.kind === "constant"
+
+	reportError(
+		`${constant ? "Constant" : "Property"} '${dependency.name}' is read before it has a value`,
+		via.position,
+		{
+			code: "use-before-declaration",
+			labels: [
+				primary(via.position, via.label),
+				secondary(declaration.position, "it is given its value here"),
+				secondary(dependency.position, dependency.label),
+			],
+			notes: [
+				constant
+					? "A Constant is given its value where it is written, so nothing that runs above it can read it."
+					: "A static Property is given its value where it is written, in order, so one written above it has nothing to read yet.",
+				`This reads '${dependency.name}' through ${path.join(", then ")}.`,
+			],
+			helps: [
+				constant
+					? `Move the Declaration of '${dependency.name}' above this Statement, or this Statement below it.`
+					: "Move this Declaration below the one it reads.",
 			],
 		},
 	)

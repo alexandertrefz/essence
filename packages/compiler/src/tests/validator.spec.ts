@@ -2470,6 +2470,58 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 
+			// The Method runs while `first` is given its value, when `later`
+			// has none yet.
+			it("reports a static Property calling a Method that reads one written below it", () => {
+				let source = `implementation {
+					namespace Box for Integer {
+						static first = Box.compute()
+
+						static compute() -> Integer { <- Box.later::add(1) }
+
+						static later = 3
+					}
+
+					Terminal.inspect(Box.first)
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].code).toBe("use-before-declaration")
+				expect(diagnostics[0].message).toBe(
+					"Property 'Box.later' is read before it has a value",
+				)
+				expect(
+					diagnostics[0].labels.map((label) => [
+						label.message,
+						underlinedBy(source, label),
+					]),
+				).toEqual([
+					["this call reaches it", "Box.compute"],
+					["it is given its value here", "later"],
+					["this reads it", "later"],
+				])
+				expect(diagnostics[0].helps).toEqual([
+					"Move this Declaration below the one it reads.",
+				])
+			})
+
+			it("accepts a static Property calling a Method that reads one written above it", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						namespace Box for Integer {
+							static later = 3
+
+							static first = Box.compute()
+
+							static compute() -> Integer { <- Box.later::add(1) }
+						}
+
+						Terminal.inspect(Box.first)
+					}`),
+				).toEqual([])
+			})
+
 			// A Property holding a Function is called through the Lookup that
 			// reads it, so the call examines it.
 			it("reports a static Property calling one written below it", () => {
@@ -3114,6 +3166,53 @@ describe("Validator", () => {
 				expect(diagnostics[0].notes[1]).toBe(
 					"This reaches 'Parity' through 'run', then 'Helper::isFine'.",
 				)
+			})
+
+			// A Function is hoisted, but the Constant its body reads holds
+			// nothing until its own Statement runs.
+			it("reports a Function called above a Constant its body reads", () => {
+				let source = `implementation {
+					Terminal.inspect(f())
+
+					constant k = 3
+
+					function f() -> Integer {
+						<- k
+					}
+				}`
+				let diagnostics = diagnosticsFor(source)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(diagnostics[0].message).toBe(
+					"Constant 'k' is read before it has a value",
+				)
+				expect(
+					diagnostics[0].labels.map((label) => [
+						label.message,
+						underlinedBy(source, label),
+					]),
+				).toEqual([
+					["this call reaches it", "f"],
+					["it is given its value here", "k"],
+					["this reads it", "k"],
+				])
+				expect(diagnostics[0].notes[1]).toBe(
+					"This reads 'k' through 'f'.",
+				)
+			})
+
+			it("accepts a Function called below the Constant its body reads", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant k = 3
+
+						Terminal.inspect(f())
+
+						function f() -> Integer {
+							<- k
+						}
+					}`),
+				).toEqual([])
 			})
 
 			// Each body's closure is worked out once, so a chain of N Functions

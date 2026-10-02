@@ -122,8 +122,14 @@ Statement at or after the start that holds a `complete`, or after the last one. 
 walked is walked with it, until nothing new is released. A suspension inside a branch, a Handler or a `define` is not
 sure.
 
+A unit also records the top-level Constants and Variables it reads, and the static Properties of top-level Namespaces.
+Each holds nothing until its own Statement, or its own initialiser, runs. A body that runs earlier and reads one is
+reported, as `Constant 'k' is read before it has a value` or the same for a Property. A read the Statement makes
+itself is left to the enricher, which reports a Constant named above its line, and to `checkPropertyIsBound`.
+
 Each unit's closure over the bodies it runs is worked out once, per strongly connected group, as the latest moment
-it needs something to exist. A Statement whose closure needs nothing later than itself costs no further walk.
+it needs something to exist. Moments count Statements, and a Namespace's Statement gives one to each Property in
+written order. A Statement whose closure needs nothing later than itself costs no further walk.
 Otherwise a walk with parent links finds each Namespace it reaches too early, and reports it once per Statement at
 what reaches it, unless `checkNamespaceIsDeclared` reported it for that Statement already. `reachWork` counts the
 walk for a spec that holds it linear.
