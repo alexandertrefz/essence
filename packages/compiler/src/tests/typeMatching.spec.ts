@@ -688,6 +688,86 @@ describe("Type matching", () => {
 				source.split("\n")[1].indexOf("Integer.add") + 1,
 			)
 		})
+
+		// A Constant, Variable, Pattern or static Property holding a refused
+		// Function was reported at its value, so reading it reports nothing
+		// more. A Function's own name is written where it is read.
+		it("should refuse a Function value where it is written, not where it is read", () => {
+			let errors = errorsFor(`implementation {
+				function shown<infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				constant bounded = <infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+				constant added = Integer.add
+				variable kept = Integer.add
+				constant record = { rule = Integer.add }
+				constant { rule } = { rule = Integer.add }
+
+				namespace Holder for Integer {
+					static held = Integer.add
+				}
+
+				Terminal.inspect({ a = bounded })
+				Terminal.inspect(added)
+				Terminal.print(added::toString())
+				Terminal.print("{added}")
+				Terminal.inspect([kept])
+				Terminal.inspect(record.rule)
+				Terminal.inspect(rule)
+				Terminal.inspect(Holder.held)
+				Terminal.inspect(shown)
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"protocol-bound-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+			])
+		})
+
+		// A Function literal's Parameter typed from a refused value was refused
+		// where that value was written, so reading it reports nothing more.
+		it("should not refuse a Parameter typed from a refused value", () => {
+			let errors = errorsFor(`implementation {
+				constant added = Integer.add
+
+				Terminal.inspect([added]::map((rule) { <- rule }))
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+			])
+		})
+
+		// A remembered Constant is matched by its value's Type as well as its
+		// name. A Function of that name read elsewhere is still refused.
+		it("should refuse a Function named like a remembered Constant", () => {
+			let errors = errorsFor(`implementation {
+				function early() -> Integer {
+					constant shown = Integer.add
+					<- shown(1, 2)
+				}
+
+				function shown<infer Item is Printable>(_ item: Item) -> String {
+					<- item::toString()
+				}
+
+				Terminal.print(early())
+				Terminal.inspect([shown])
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+				"protocol-bound-function-value",
+			])
+		})
 	})
 
 	// Two Modules may each declare `choice Outcome`, so a Choice's identity is

@@ -8,7 +8,8 @@ not rule out, and reports Diagnostics only. Where it runs in the pipeline is in 
 The validator keeps its walk state in module variables, such as `witnessScopes`, `waitingBodies` and
 `abandonedLines`, as the Diagnostic collection does. The alternative is threading each through every `validate…`
 function, and only one Program is validated at a time. `validate` resets them on entry, except `waitingBodies`, so
-no Program is checked against state another Program left. The stacks `waitingBodies`, `witnessScopes` and
+no Program is checked against state another Program left. That includes the map in `refusedValues.ts`, through
+`forgetRefusedValues`. The stacks `waitingBodies`, `witnessScopes` and
 `writtenBounds` are pushed and popped in a `finally`, so a throw mid-walk can not leave them wrong.
 
 `validate` walks the implementation's top-level Statements, then the tests section's when the compile asked for
@@ -176,7 +177,12 @@ A value that is or holds a Function refused as a value fits as well, and an Argu
 `partial-type-mismatch`, or a call whose receiver or Argument holds one a `no-matching-overload` in the enricher.
 `validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
 is not reported itself, since its arms carry the value. Nor is a `start` or a `complete` before no work, which
-answers its operand.
+answers its operand. Nor is a read of a Constant, a Variable, a Pattern's binding or a static Property whose value
+was refused, or a member read off one: `refusedValues.ts` remembers each by name and the Type of its value, after
+that value is validated. A Parameter holding one is remembered too, since no written Type is a refused Function, so
+it took its Type from a value refused where it was written. A Function's own name is still refused where it is
+read, since that is where it is written as a value. A name imported from another Module is not remembered, and is
+refused at each read.
 
 `validateValue` checks a value where it is written: an Argument, a receiver, a default, a String hole, a member of a
 Record, a List or a Dictionary, a Case payload, a declaration's value, a `<-`, a `define` arm, and a `start` or

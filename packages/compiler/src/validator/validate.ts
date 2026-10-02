@@ -37,7 +37,6 @@ import {
 	applyGenericBindings,
 	createFreshenedInference,
 	flattenUnionMembers,
-	isBoundFunctionType,
 	holdsFunctionRefusedAsValue,
 	isMergedLevel,
 	isPartialOf,
@@ -63,6 +62,11 @@ import {
 } from "./declarationOrder"
 import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
+import {
+	forgetRefusedValues,
+	rememberRefusedValue,
+	validateNoBoundFunctionValue,
+} from "./refusedValues"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
@@ -175,6 +179,7 @@ export const validate = (
 	topLevelStatementFloor = 0
 	alreadyReported = options.reported === true
 	readerSpelling = programSpelling(program)
+	forgetRefusedValues()
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let [index, node] of program.implementation.nodes.entries()) {
@@ -510,69 +515,6 @@ function reportDiscardedWork(node: common.typed.ExpressionNode): void {
 function validateValue(node: common.typed.ExpressionNode): void {
 	validateExpression(node)
 	validateNoBoundFunctionValue(node)
-}
-
-// A Function with Protocol-bounded Type Parameters can not be a value: its
-// hidden conformance Parameters exist only at a direct call.
-function validateNoBoundFunctionValue(node: common.typed.ExpressionNode): void {
-	// A `define` or a `match` answers with what its arms answer. A `start` or a
-	// `complete` before no work answers its operand. Each is checked where it
-	// stands.
-	if (["Define", "Match", "Start", "Complete"].includes(node.nodeType)) {
-		return
-	}
-
-	// An overloaded Function names every overload at once, and only a direct
-	// call picks one.
-	if (
-		node.type.type === "OverloadedMethod" ||
-		node.type.type === "OverloadedStaticMethod"
-	) {
-		let count = node.type.overloads.length
-
-		reportError(
-			"An overloaded Function can not be used as a value",
-			node.position,
-			{
-				code: "overloaded-function-value",
-				labels: [
-					primary(
-						node.position,
-						`this names all ${count} overloads at once`,
-					),
-				],
-				helps: [
-					"Invoke it, or wrap the overload you mean in a Function literal.",
-				],
-			},
-		)
-
-		return
-	}
-
-	if (isBoundFunctionType(node.type)) {
-		reportError(
-			"A Function with Protocol-bound Type Parameters can not be used as a value",
-			node.position,
-			{
-				code: "protocol-bound-function-value",
-				labels: [
-					primary(
-						node.position,
-						"this Function is stored, not called",
-					),
-				],
-				notes: [
-					"A bounded Function carries hidden conformance Parameters that only exist at a direct invocation.",
-				],
-				// Wrapping the call in a literal keeps a value, and the call
-				// inside it is direct.
-				helps: [
-					"Invoke it, or wrap the call in a Function literal written for the Types you mean.",
-				],
-			},
-		)
-	}
 }
 
 // Whether the invariant rails stand down. See "Compiler invariant rails" in
@@ -1096,6 +1038,16 @@ function validateFunctionDefinition(
 	node: common.typed.FunctionDefinitionNode,
 	position: common.Position,
 ): common.typed.FunctionDefinitionNode {
+	// A written Type is never a refused Function, so a Parameter holding one
+	// took it from a value refused where it was written.
+	for (let parameter of node.parameters) {
+		let name = parameter.internalName ?? parameter.externalName
+
+		if (name !== null) {
+			rememberRefusedValue(name.content, parameter.type)
+		}
+	}
+
 	// The hidden conformance Parameters this Function is emitted with, read off
 	// the Generics as the simplifier reads them.
 	witnessScopes.push(
@@ -2586,6 +2538,7 @@ function validateConstantDeclarationStatement(
 	}
 
 	validateValue(node.value)
+	rememberRefusedValue(node.name.content, node.value.type)
 
 	return node
 }
@@ -2605,6 +2558,7 @@ function validateVariableDeclarationStatement(
 	}
 
 	validateValue(node.value)
+	rememberRefusedValue(node.name.content, node.value.type)
 
 	return node
 }
@@ -2886,11 +2840,12 @@ function validateNamespaceDefinitionStatement(
 
 	for (let propertyName in node.properties) {
 		let property = node.properties[propertyName]
+		let qualifiedName = `${node.name.content}.${property.name.content}`
 
 		if (!fitsExpectedType(property.type, property.value)) {
 			reportDeclarationMismatch(
 				"Property",
-				`${node.name.content}.${property.name.content}`,
+				qualifiedName,
 				property.type,
 				property.value,
 			)
@@ -2900,6 +2855,7 @@ function validateNamespaceDefinitionStatement(
 
 		try {
 			validateValue(property.value)
+			rememberRefusedValue(qualifiedName, property.value.type)
 		} finally {
 			initialisingProperty = null
 		}
