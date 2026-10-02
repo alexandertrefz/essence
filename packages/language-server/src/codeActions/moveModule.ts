@@ -5,6 +5,10 @@ import {
 	derivedEquatableNamespaceName,
 	derivedPrintableNamespaceName,
 } from "@essence-lang/compiler/helpers"
+import {
+	findParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -110,6 +114,9 @@ type Move = {
 	context: ImportContext
 	lines: Array<string>
 	name: string
+	statement: parser.ImplementationNode
+	// This Module's typed Program, before the move.
+	typed: common.typed.Program
 	// The Statement with its `§§` block.
 	span: common.Position
 	text: string
@@ -262,6 +269,8 @@ function movableAt(
 			context,
 			lines,
 			name,
+			statement,
+			typed: enrichedProgram,
 			needed: reads.needed,
 			imports,
 			span,
@@ -1519,7 +1528,7 @@ function moveEntry(move: Move, target: Target): CodeActionEntry | null {
 	if (
 		imports === null ||
 		readsUnderAnotherName(move, landingNamings) ||
-		importsEachOther(move, target, imports, landingNamings) ||
+		cycleMayFail(move, target, imports, landingNamings) ||
 		namespacesCollide(move, target, landingNamings)
 	) {
 		return null
@@ -1623,9 +1632,13 @@ function readsUnderAnotherName(
 	)
 }
 
-// Whether this Module and the destination would import each other. See
-// "Moving a Declaration" in DEVELOPMENT.md.
-function importsEachOther(
+// What a Module of the cycle imports from the other, by the name the other
+// publishes and the name it reads.
+type Crossing = Array<{ name: string; local: string }>
+
+// Whether the move leaves this Module and the destination importing each
+// other in a way that can fail. See "Moving a Declaration" in DEVELOPMENT.md.
+function cycleMayFail(
 	move: Move,
 	target: Target,
 	imports: Array<ImportEntry>,
@@ -1642,10 +1655,13 @@ function importsEachOther(
 		move.imports.filter((read) => !read.keptHere).map((read) => read.entry),
 	)
 	let backToSource = relativeSpecifier(target.filePath, source)
-	let towardsSource = [
+	let towardsSource: Crossing = [
 		...imports
 			.filter((entry) => entry.specifier === backToSource)
-			.map((entry) => entry.name),
+			.map((entry) => ({
+				name: entry.name,
+				local: entry.alias ?? entry.name,
+			})),
 		...(target.program?.imports?.entries ?? [])
 			.filter(
 				(entry) =>
@@ -1654,10 +1670,12 @@ function importsEachOther(
 						.dependenciesOf(target.filePath)
 						.get(entry.source.path) === source,
 			)
-			.map((entry) => entry.name.content),
+			.map(crossingOf),
 	]
-	let towardsTarget = [
-		...(move.usedHere ? [move.name] : []),
+	let towardsTarget: Crossing = [
+		...(move.usedHere
+			? [{ name: move.alias ?? move.name, local: move.name }]
+			: []),
 		...(move.context.program.imports?.entries ?? [])
 			.filter(
 				(entry) =>
@@ -1665,10 +1683,261 @@ function importsEachOther(
 					workspace.dependenciesOf(source).get(entry.source.path) ===
 						target.filePath,
 			)
-			.map((entry) => entry.name.content),
+			.map(crossingOf),
 	]
 
-	return towardsSource.length > 0 && towardsTarget.length > 0
+	if (towardsSource.length === 0 || towardsTarget.length === 0) {
+		return false
+	}
+
+	let moved = move.typed.implementation.nodes.find((node) =>
+		isSamePosition(node.position, move.statement.position),
+	)
+	let targetTyped =
+		target.program === null ? null : workspace.enrichedOf(target.filePath)
+
+	let statements = [
+		...move.context.program.implementation.nodes.filter(
+			(node) => node !== move.statement,
+		),
+		...(target.program?.implementation.nodes ?? []),
+		move.statement,
+	]
+
+	// The Compiler refuses a Constant read across a cycle. A body may run
+	// another Module's code only once that Module's body has run, and a cycle
+	// does not say which body runs first.
+	return (
+		moved === undefined ||
+		(target.program !== null && targetTyped === null) ||
+		statements.some(
+			(node) =>
+				!isDeclaration(node) ||
+				waitsForConstant(node, [move.context.program, target.program]),
+		) ||
+		towardsSource.some(({ name }) => !hoists(move.context.program, name)) ||
+		towardsTarget.some(({ name }) =>
+			name === (move.alias ?? move.name)
+				? !isHoisted(move.statement)
+				: !hoists(target.program, name),
+		) ||
+		runsOtherModule(
+			bodyTimeRoots(
+				move.typed.implementation.nodes.filter(
+					(node) => node !== moved,
+				),
+			),
+			towardsTarget,
+			move,
+			target,
+		) ||
+		runsOtherModule(
+			bodyTimeRoots([
+				...(targetTyped?.implementation.nodes ?? []),
+				moved,
+			]),
+			towardsSource,
+			move,
+			target,
+		)
+	)
+}
+
+// Whether a Statement only declares. Any other top-level Statement of a cycle
+// is the Warning `cyclic-side-effects`.
+function isDeclaration(node: parser.ImplementationNode): boolean {
+	switch (node.nodeType) {
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+		case "FunctionStatement":
+		case "OverloadedFunctionStatement":
+		case "TypeAliasStatement":
+		case "ChoiceDeclarationStatement":
+		case "ProtocolDeclarationStatement":
+		case "NamespaceDefinitionStatement":
+			return true
+		default:
+			return false
+	}
+}
+
+// Whether a Namespace can not hoist, which leaves the other Module of a cycle
+// unable to bind it. An unannotated static Property whose value names a
+// Constant or a Variable of either Module waits for the Statement declaring
+// it.
+function waitsForConstant(
+	node: parser.ImplementationNode,
+	programs: Array<parser.Program | null>,
+): boolean {
+	if (node.nodeType !== "NamespaceDefinitionStatement") {
+		return false
+	}
+
+	let constants = new Set(
+		programs.flatMap((program) =>
+			(program?.implementation.nodes ?? []).flatMap((statement) =>
+				(statement.nodeType === "ConstantDeclarationStatement" ||
+					statement.nodeType === "VariableDeclarationStatement") &&
+				statement.name.nodeType === "Identifier"
+					? [statement.name.content]
+					: [],
+			),
+		),
+	)
+	let names = (child: ParserNode): true | undefined =>
+		(child.nodeType === "Identifier" && constants.has(child.content)) ||
+		findParserChild(child, names)
+			? true
+			: undefined
+
+	return Object.values(node.properties).some(
+		(property) =>
+			property.type === null &&
+			property.value !== null &&
+			names(property.value) === true,
+	)
+}
+
+function crossingOf(entry: parser.ImportNode): Crossing[number] {
+	return {
+		name: entry.name.content,
+		local: (entry.alias ?? entry.name).content,
+	}
+}
+
+// Whether the Module publishes the name as a Declaration of its own that
+// hoists, which is anything but a Constant or a Variable.
+function hoists(
+	program: parser.Program | null,
+	publishedName: string,
+): boolean {
+	let entry = program?.exports?.entries.find(
+		(candidate) =>
+			candidate.source === null &&
+			(candidate.alias ?? candidate.name).content === publishedName,
+	)
+	let statement =
+		entry === undefined
+			? undefined
+			: program?.implementation.nodes.find(
+					(node) =>
+						declarationOf(node)?.name.content ===
+						entry.name.content,
+				)
+
+	return statement !== undefined && isHoisted(statement)
+}
+
+function isHoisted(node: parser.ImplementationNode): boolean {
+	return (
+		node.nodeType !== "ConstantDeclarationStatement" &&
+		node.nodeType !== "VariableDeclarationStatement"
+	)
+}
+
+// What runs while a Module body runs: every top-level Statement but a
+// Declaration that hoists, and a Namespace's static Properties.
+function bodyTimeRoots(
+	nodes: Array<common.typed.ImplementationNode>,
+): Array<common.typed.ExpressionNode | common.typed.ImplementationNode> {
+	return nodes.flatMap((node) => {
+		switch (node.nodeType) {
+			case "FunctionStatement":
+			case "TypeAliasStatement":
+			case "ChoiceDeclarationStatement":
+			case "ProtocolDeclarationStatement":
+				return []
+			case "NamespaceDefinitionStatement":
+				return Object.values(node.properties).map(
+					(property) => property.value,
+				)
+			default:
+				return [node]
+		}
+	})
+}
+
+// Whether code run by a Module body reads a name from the other Module. A call
+// into code either Module declares counts, since that code may read one.
+function runsOtherModule(
+	roots: Array<unknown>,
+	crossing: Crossing,
+	move: Move,
+	target: Target,
+): boolean {
+	let other = new Set(crossing.map(({ local }) => local))
+	let declared = new Set([
+		move.name,
+		...topLevelNames(move.context.program),
+		...(target.program === null ? [] : topLevelNames(target.program)),
+		...[move.context.program, target.program].flatMap((program) =>
+			(program?.imports?.entries ?? []).map(
+				(entry) => crossingOf(entry).local,
+			),
+		),
+		...move.needed.map(({ local }) => local),
+	])
+
+	let runs = (node: unknown): boolean => {
+		if (Array.isArray(node)) {
+			return node.some(runs)
+		}
+
+		if (node === null || typeof node !== "object") {
+			return false
+		}
+
+		let record = node as Record<string, unknown>
+
+		if (typeof record["type"] === "string" && !("nodeType" in record)) {
+			return false
+		}
+
+		let named =
+			record["nodeType"] === "Identifier" &&
+			typeof record["content"] === "string"
+				? record["content"]
+				: null
+		let called =
+			record["nodeType"] === "Lookup"
+				? lookedUpNamespace(record)
+				: isCallable(record["type"])
+					? named
+					: null
+
+		return (
+			(named !== null && other.has(named)) ||
+			(called !== null && declared.has(called)) ||
+			usesRecordedOn(record).some(
+				({ local }) => local !== null && declared.has(local),
+			) ||
+			Object.values(record).some(runs)
+		)
+	}
+
+	return roots.some(runs)
+}
+
+// The Namespace a Lookup reads a Method or a Function Property off, or null
+// for any other Lookup.
+function lookedUpNamespace(record: Record<string, unknown>): string | null {
+	let base = record["base"] as common.typed.ExpressionNode
+
+	return isCallable(record["type"]) &&
+		base.nodeType === "Identifier" &&
+		base.type.type === "Namespace"
+		? base.content
+		: null
+}
+
+function isCallable(type: unknown): boolean {
+	let tag = (type as { type?: unknown } | undefined)?.type
+
+	return (
+		tag === "Function" ||
+		tag === "StaticMethod" ||
+		tag === "OverloadedStaticMethod"
+	)
 }
 
 // What lands in the destination: the Statement, its export entry where

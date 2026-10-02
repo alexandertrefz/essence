@@ -5951,9 +5951,9 @@ describe("Workspace", () => {
 				expect(moves(workspace, pathOf("A.es"), 8, "run")).toEqual([])
 			})
 
-			// Only Functions would cross here, but a cycle can also leave a
-			// static Property read before its Module declares it.
-			it("should offer nothing that would make two Modules import each other", () => {
+			// `kept` calls `run` while A's body runs, and `run` would then come
+			// from a Module of the cycle, whose body may not have run yet.
+			it("should offer nothing where a Module body would run code of a cycle", () => {
 				let { workspace, pathOf } = makeWorkspace({
 					"A.es": [
 						"implementation {",
@@ -5978,6 +5978,246 @@ describe("Workspace", () => {
 				})
 
 				expect(moves(workspace, pathOf("A.es"), 6, "run")).toEqual([])
+			})
+
+			// `empty` reads the Constant `size` and has no annotation, so the
+			// Namespace `Board` can not hoist, and B could not bind it.
+			it("should offer nothing that would put a Namespace that can not hoist in a cycle", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\ttype Board = List<Integer>",
+						"",
+						"\tconstant size = 2",
+						"",
+						"\tnamespace Board for Board {",
+						"\t\tstatic empty = List.repeat(0, times size)",
+						"",
+						"\t\tfilled() -> Integer {",
+						"\t\t\t<- @::length()",
+						"\t\t}",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tBoard",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"import {",
+						'\tfrom "./A.es" { Board }',
+						"}",
+						"",
+						"implementation {",
+						"\ttype Game = { board: Board }",
+						"",
+						"\tfunction cells(_ game: Game) -> Integer {",
+						"\t\t<- game.board::filled()",
+						"\t}",
+						"",
+						"\tfunction start() -> Game {",
+						"\t\t<- { board = Board.empty }",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tGame",
+						"\tcells",
+						"\tstart",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("B.es"), 8, "cells").map(
+						(action) => action.title,
+					),
+				).not.toContain("Move 'cells' to ./A.es")
+			})
+
+			// Main's `Terminal.print` would run in an order the cycle does not
+			// state, which is the Warning `cyclic-side-effects`.
+			it("should offer nothing that would put a Statement with effects in a cycle", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Lib.es": [
+						"implementation {",
+						"\tfunction helper(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(1)",
+						"\t}",
+						"",
+						"\tfunction twice(_ n: Integer) -> Integer {",
+						"\t\t<- helper(helper(n))",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\ttwice",
+						"}",
+						"",
+					].join("\n"),
+					"Main.es": [
+						"import {",
+						'\tfrom "./Lib.es" { twice }',
+						"}",
+						"",
+						"implementation {",
+						'\tTerminal.print("hello")',
+						"",
+						"\tfunction run() -> Integer {",
+						"\t\t<- twice(1)",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("Lib.es"), 2, "helper").map(
+						(action) => action.title,
+					),
+				).not.toContain("Move 'helper' to ./Main.es")
+			})
+
+			// Only Function bodies read across the cycle, and those run once
+			// both Module bodies have.
+			it("should make two Modules import each other where neither body runs the other", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"implementation {",
+						"\tfunction base() -> Integer {",
+						"\t\t<- 1",
+						"\t}",
+						"",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(base())",
+						"\t}",
+						"",
+						"\tfunction twice(_ n: Integer) -> Integer {",
+						"\t\t<- run(run(n))",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tbase",
+						"\ttwice",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": ["implementation {", "}", ""].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					6,
+					"run",
+					"Move 'run' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[declaringPath]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" { run }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction base() -> Integer {",
+						"\t\t<- 1",
+						"\t}",
+						"",
+						"\tfunction twice(_ n: Integer) -> Integer {",
+						"\t\t<- run(run(n))",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tbase",
+						"\ttwice",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("B.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./A.es" { base }',
+						"}",
+						"",
+						"implementation {",
+						"\tfunction run(_ n: Integer) -> Integer {",
+						"\t\t<- n::add(base())",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\trun",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				for (let name of ["A.es", "B.es"]) {
+					expect(codesAfter(workspace, texts, pathOf(name))).toEqual(
+						[],
+					)
+				}
+			})
+
+			// `empty` reads `Board.empty` while A's body runs, which fails where
+			// B's body has not run yet.
+			it("should offer nothing where a Module body would read a Namespace of a cycle", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": [
+						"import {",
+						'\tfrom "./B.es" { Board }',
+						"}",
+						"",
+						"implementation {",
+						"\ttype Game = { board: Board }",
+						"",
+						"\tconstant empty: Game = { board = Board.empty }",
+						"",
+						"\tfunction cells(_ game: Game) -> Integer {",
+						"\t\t<- game.board::length()",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tGame",
+						"\tcells",
+						"\tempty",
+						"}",
+						"",
+					].join("\n"),
+					"B.es": [
+						"implementation {",
+						"\ttype Board = List<Integer>",
+						"",
+						"\tnamespace Board for Board {",
+						"\t\tstatic empty: Board = [0, 0]",
+						"\t}",
+						"}",
+						"",
+						"export {",
+						"\tBoard",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				expect(
+					moves(workspace, pathOf("A.es"), 10, "cells").map(
+						(action) => action.title,
+					),
+				).toEqual(["Move 'cells' to a new Module"])
 			})
 
 			// The group that goes shares its line with the new one written

@@ -311,9 +311,14 @@ Method the Statement calls through a builtin Namespace for that receiver. A rece
 Record, since Records are structural, and a refinement counts as its base. A Namespace already in reach brings nothing
 new. A target that can not be resolved, such as a Type Parameter, meets every receiver.
 
-The move may leave this file and the destination importing each other. A cycle breaks more than its Constants, which
-do not hoist: a static Property read across one may not be declared yet either. So `importsEachOther` turns such a
-destination away. It looks at the two Modules only, not at a longer cycle through others.
+The move may leave this file and the destination importing each other. A cycle does not say which Module body runs
+first, so code that runs while one body runs must not need the other. That code is every top-level Statement but a
+hoisted Declaration, and every static Property of a Namespace. `cycleMayFail` turns the destination away where such
+code in either Module reads a name from the other, or calls code either Module declares, which may read one. A
+Constant imported across the cycle turns it away too, since the Compiler refuses that. So does a top-level Statement
+of either Module that is no Declaration, which `cyclic-side-effects` warns about. So does a Namespace whose static
+Property has no annotation and names a Constant: it can not hoist, so the other Module could not bind it. It looks at
+the two Modules only, not at a longer cycle through others.
 
 The edits follow from who still names the Declaration:
 
