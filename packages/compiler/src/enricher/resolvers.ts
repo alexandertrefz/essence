@@ -73,12 +73,12 @@ import {
 	disagreeingTypeArguments,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
-	holdsFunctionRefusedAsValue,
 	isPartialOf,
 	isReportedValue,
 	matchesType,
 	NotHoistedYet,
 	refinementWithTypeArguments,
+	refusedFunctionsAsHoles,
 	resolveUnknownSlots,
 	type GenericBindings,
 	type NamespaceTarget,
@@ -305,19 +305,19 @@ export function combinationTypeOf(
 	let resolved = resolveUnknownSlots(lhsType, rhsType)
 	let combined = resolved.type === "Record" ? resolved : lhsType
 
-	// A Function refused as a value is reported as that, by the validator.
-	if (
-		isPartialOf(combined, rhsType) ||
-		holdsFunctionRefusedAsValue(rhsType)
-	) {
+	// A Function refused as a value is reported by the validator, so it is a
+	// hole here. Holing keeps a Record a Record.
+	let written = refusedFunctionsAsHoles(rhsType) as common.RecordType
+
+	if (isPartialOf(combined, written)) {
 		return combined
 	}
 
 	// A member written but left undecided, such as `items = 1` over an
 	// `items` from `[]`, is explained as a Variable's assignment would be.
-	let undecided = undecidedSlotEvidence(combined, rhsType, null)
+	let undecided = undecidedSlotEvidence(combined, written, null)
 	// A Partial, so only what the update writes can be wrong.
-	let record = recordMismatchEvidence(combined, rhsType, rhs ?? null, {
+	let record = recordMismatchEvidence(combined, written, rhs ?? null, {
 		partial: true,
 		subject: "the value it updates",
 	})
@@ -331,7 +331,7 @@ export function combinationTypeOf(
 				record.lead ??
 					primary(
 						rhsPosition,
-						`this is ${withArticle(describeType(rhsType))}`,
+						`this is ${withArticle(describeType(written))}`,
 					),
 				...record.labels,
 				secondary(

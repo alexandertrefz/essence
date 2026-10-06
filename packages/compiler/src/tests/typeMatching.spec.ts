@@ -1084,6 +1084,56 @@ describe("Type matching", () => {
 			])
 		})
 
+		// An update is measured around a refused Function as a Literal is, a
+		// path key included.
+		it("should name only the update mismatch around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = (_: Integer, _: Integer) -> Integer
+				type Settings = { rule: Rule, count: Integer }
+
+				constant first = (_ a: Integer, _ b: Integer) -> Integer { <- a }
+				constant base: Settings = { rule = first, count = 1 }
+				constant outer = { settings = base }
+				constant wrong = { base with rule = Integer.add, count = "x" }
+				constant pathed = { outer with settings.rule = Integer.add, settings.count = "x" }
+				constant alone = { base with rule = Integer.add }
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"partial-type-mismatch",
+					[
+						"this is a String, and Settings declares an Integer",
+						"this is a Settings",
+					],
+				],
+				[
+					"partial-type-mismatch",
+					[
+						"this is a String, and Settings declares an Integer",
+						"this is a Settings",
+					],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
+
 		// A written part is asked for its evidence with each refused Function
 		// in it a hole. The List still has an item, and `3` still is no zero.
 		it("should admit a written part around a refused Function", () => {

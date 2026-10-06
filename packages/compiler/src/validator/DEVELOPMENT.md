@@ -180,8 +180,9 @@ A Function refused as a value fits as well. A value holding one is measured with
 still proves a `NonEmptyList` has an item, and a mismatch reported about it labels no hole. A Case payload and an
 Argument are measured the same way, so `#Has({ rule = Integer.add, count = "x" })` still reports its `count`. A call
 the enricher refuses is matched again with each such Function a hole (`typerAroundRefusedFunctions`). It is no
-`no-matching-overload` where a candidate then accepts it. An update writing one is no `partial-type-mismatch`, and a
-call whose receiver holds one no `no-matching-overload`.
+`no-matching-overload` where a candidate then accepts it. An update is measured with such a Function a hole too, so
+`{ base with rule = Integer.add, count = "x" }` still reports its `count`. A call whose receiver holds one is no
+`no-matching-overload`.
 `validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
 is not reported itself, since its arms carry the value. Nor is a `start` or a `complete` before no work, which
 answers its operand. Nor is a read of a Constant, a Variable, a Pattern's binding or a static Property whose value
