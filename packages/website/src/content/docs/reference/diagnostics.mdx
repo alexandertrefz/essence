@@ -5772,14 +5772,14 @@ Warning: 'area' is imported and never used
    │                              ╰─── nothing reads this name
    │ 
    │ Help: Remove the entry.
-   │ 
-   │ Note: A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.
 ───╯
 ```
 
 </div>
 
 Delete `from "./Geometry.es" { area }`, or read `area` in the file.
+
+A Note says what else counts as a use, for a kind of import a file may use without spelling it: a namespace a call dispatches through, a choice whose case is written or whose derived conformance is reached, a refinement a narrowing proves. A constant, a function or a record type is used only where it is written, so it gets no Note.
 
 A protocol entry is used where the file names it or calls a method it provides.
 A call to a function bounded by the protocol does not count, since the call needs

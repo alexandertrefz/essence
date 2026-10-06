@@ -5550,6 +5550,89 @@ implementation {
 		)
 	})
 
+	// Only a Namespace is used through a dispatch. A Choice and a refinement
+	// have uses of their own a file need not spell. A Constant, a Function or
+	// a Record Alias is used only where it is written.
+	it("says what counts as a use of each kind of import", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Kinds.es" {
+		Clock
+		Colour
+		greet
+		one
+		Point
+		Small
+	}
+}
+
+implementation {
+	Terminal.inspect(3)
+}
+`,
+				"Kinds.es": `implementation {
+	constant one = 1
+
+	function greet() -> String {
+		<- "hi"
+	}
+
+	namespace Clock {
+		static now() -> Integer {
+			<- 1
+		}
+	}
+
+	choice Colour { Red, Green }
+
+	type Small = Integer where @::isLessThan(10)
+
+	type Point = { x: Integer }
+}
+
+export {
+	Clock
+	Colour
+	greet
+	one
+	Point
+	Small
+}
+`,
+			},
+			(directory) => {
+				expect(
+					analysedAt(directory, "Main.es", "Main.es").map(
+						(diagnostic) => [diagnostic.message, diagnostic.notes],
+					),
+				).toEqual([
+					[
+						"'Clock' is imported and never used",
+						[
+							"A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
+						],
+					],
+					[
+						"'Colour' is imported and never used",
+						[
+							"A Choice counts as used where this file names it, writes one of its Cases, or reaches a conformance it derives.",
+						],
+					],
+					["'greet' is imported and never used", []],
+					["'one' is imported and never used", []],
+					["'Point' is imported and never used", []],
+					[
+						"'Small' is imported and never used",
+						[
+							"A refinement counts as used where this file names it, or where a narrowing proves it of a value.",
+						],
+					],
+				])
+			},
+		)
+	})
+
 	// `Main.es` declares the bound itself without importing `Sized`, which
 	// is `unknown-protocol` there. The refused bound asks nothing of the call.
 	it("stays quiet at a call to a Function whose bound its own Module refused", () => {

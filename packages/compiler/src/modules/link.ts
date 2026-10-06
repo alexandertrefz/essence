@@ -1768,9 +1768,6 @@ function reportUnusedImports(
 		}
 
 		let local = binding.entry.alias ?? binding.entry.name
-		let isProtocol =
-			state.scope.protocols[binding.localName] !== undefined &&
-			state.scope.members[binding.localName] === undefined
 
 		reportWarning(
 			`'${binding.localName}' is imported and never used`,
@@ -1778,16 +1775,43 @@ function reportUnusedImports(
 			{
 				code: "unused-import",
 				labels: [primary(local.position, "nothing reads this name")],
-				notes: [
-					isProtocol
-						? "A Protocol counts as used where this file names it or calls a Method it provides."
-						: "A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
-				],
+				notes: unusedImportNotes(state.scope, binding.localName),
 				helps: ["Remove the entry."],
 				tags: ["unnecessary"],
 			},
 		)
 	}
+}
+
+// What else counts as a use, for each kind the name binds that a file may use
+// without spelling it. A Constant, a Function or any other Type is used only
+// where it is written, which the label says already.
+function unusedImportNotes(scope: enricher.Scope, name: string): Array<string> {
+	let type = scope.types[name]
+	let body = type?.type === "GenericAlias" ? type.aliasedType : type
+
+	return [
+		...(scope.protocols[name] === undefined
+			? []
+			: [
+					"A Protocol counts as used where this file names it or calls a Method it provides.",
+				]),
+		...(scope.members[name]?.type === "Namespace"
+			? [
+					"A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
+				]
+			: []),
+		...(type !== undefined && casesOf(type).length > 0
+			? [
+					"A Choice counts as used where this file names it, writes one of its Cases, or reaches a conformance it derives.",
+				]
+			: []),
+		...(body?.type === "Refinement"
+			? [
+					"A refinement counts as used where this file names it, or where a narrowing proves it of a value.",
+				]
+			: []),
+	]
 }
 
 // The body's first Statement that is not a declaration. Inside a cycle, the

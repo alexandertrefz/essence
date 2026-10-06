@@ -3764,8 +3764,6 @@ Warning: 'area' is imported and never used
    │          ╰─── nothing reads this name
    │ 
    │ Help: Remove the entry.
-   │ 
-   │ Note: A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.
 ───╯
 
 ─── 4 errors, 1 warning
