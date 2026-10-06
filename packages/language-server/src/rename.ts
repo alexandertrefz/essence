@@ -1306,26 +1306,28 @@ function walkNode(node: ParserNode, walk: Walk) {
 		case "FunctionValue":
 			walkFunctionDefinition(node.value, walk, node.position)
 			return
-		// Walked by hand until each Type kind descends as well.
-		case "IdentifierTypeDeclaration":
 		case "RecordTypeDeclaration":
-		case "UnionTypeDeclaration":
-		case "FunctionTypeDeclaration":
-		case "GenericTypeDeclaration":
-			walkTypeDeclaration(node, walk)
-			return
+			registerRecordSite(Object.values(node.members), context)
+			break
 	}
 
 	forEachParserChild(node, walkChild, walk)
 }
 
-// The fields whose Identifier names a Type: the Choice of `Choice#Case`.
-const typeNameFields = new Set(["choice"])
+// The fields whose Identifier names a Type: a written Type's name, and the
+// Choice of `Choice#Case`.
+const typeNameFields = new Set(["type", "choice"])
 
 // The fields whose Identifier names no Declaration a Scope holds. The typed
 // pass resolves a member or a path step. A Case resolves through its Choice,
-// and a Method call's label through the Method.
-const unscopedNameFields = new Set(["member", "steps", "caseName", "name"])
+// and a label through the Function or Method it labels.
+const unscopedNameFields = new Set([
+	"member",
+	"steps",
+	"caseName",
+	"name",
+	"externalName",
+])
 
 // A child reached through `forEachParserChild`. An Identifier there names a
 // value, unless the field holding it says otherwise.
@@ -1810,45 +1812,8 @@ function walkTypeDeclaration(
 	node: parser.TypeDeclarationNode | null,
 	walk: Walk,
 ) {
-	if (node === null) {
-		return
-	}
-
-	let { scope, context } = walk
-
-	switch (node.nodeType) {
-		case "IdentifierTypeDeclaration":
-			reference(scope, "types", node.type, context)
-			return
-		case "RecordTypeDeclaration":
-			registerRecordSite(Object.values(node.members), context)
-
-			for (let member of Object.values(node.members)) {
-				walkTypeDeclaration(member.type, walk)
-			}
-
-			return
-		case "UnionTypeDeclaration":
-			for (let type of node.types) {
-				walkTypeDeclaration(type, walk)
-			}
-
-			return
-		case "FunctionTypeDeclaration":
-			for (let parameter of node.parameterTypes) {
-				walkTypeDeclaration(parameter.type, walk)
-			}
-
-			walkTypeDeclaration(node.returnType, walk)
-			return
-		case "GenericTypeDeclaration":
-			walkTypeDeclaration(node.baseType, walk)
-
-			for (let generic of node.generics) {
-				walkTypeDeclaration(generic, walk)
-			}
-
-			return
+	if (node !== null) {
+		walkNode(node, walk)
 	}
 }
 
