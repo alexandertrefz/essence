@@ -5392,6 +5392,83 @@ implementation {
 		)
 	})
 
+	// A Function refused as a value is reported where the exporting Module
+	// wrote it. An importer reading the Constant, a member of it or a static
+	// Property, under any name, writes no new value. A Function's own name is
+	// still written as a value where it is read.
+	it("reports a value another Module refused where it was written", () => {
+		withProject(
+			{
+				"Lib.es": `implementation {
+	function shown<infer Item is Printable>(_ item: Item) -> String {
+		<- item::toString()
+	}
+
+	constant added = Integer.add
+	constant record = { rule = Integer.add }
+
+	namespace Holder for Integer {
+		static held = Integer.add
+	}
+}
+
+export {
+	shown
+	added
+	record
+	Holder
+}
+`,
+				"Mid.es": `implementation {
+	constant unrelated = 1
+}
+
+export {
+	unrelated
+	from "./Lib.es" { added }
+}
+`,
+				"Main.es": `import {
+	from "./Lib.es" {
+		shown
+		added as plus
+		record
+		Holder
+	}
+	from "./Mid.es" { added }
+}
+
+implementation {
+	Terminal.inspect(plus)
+	Terminal.inspect(record.rule)
+	Terminal.inspect(Holder.held)
+	Terminal.inspect(added)
+	Terminal.inspect(shown)
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					["dependency-has-errors", "./Lib.es has errors of its own"],
+					["dependency-has-errors", "./Mid.es has errors of its own"],
+					[
+						"protocol-bound-function-value",
+						"A Function with Protocol-bound Type Parameters can not be used as a value",
+					],
+				])
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Lib.es")),
+				).toEqual([
+					"overloaded-function-value",
+					"overloaded-function-value",
+					"overloaded-function-value",
+				])
+			},
+		)
+	})
+
 	// `Halved` provides a `z` answering a Number, and `Counted` one answering an
 	// Integer. `Main.es` hands a value bounded by an extension of either or both
 	// to a bound on `Halved`.

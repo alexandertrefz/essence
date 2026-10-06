@@ -81,7 +81,7 @@ import {
 import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 import {
-	forgetRefusedValues,
+	resetRefusedValues,
 	rememberRefusedValue,
 	validateNoBoundFunctionValue,
 } from "./refusedValues"
@@ -207,7 +207,7 @@ export const validate = (
 	alreadyReported = options.reported === true
 	readerSpelling = programSpelling(program)
 	boundSpelling = programSpelling(program, true)
-	forgetRefusedValues()
+	resetRefusedValues(program.imports)
 
 	let { diagnostics } = collectDiagnostics(() => {
 		for (let [index, node] of program.implementation.nodes.entries()) {

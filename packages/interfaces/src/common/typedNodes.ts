@@ -223,6 +223,9 @@ export type ImportNode = {
 	cyclic: boolean
 	// What the entry bound, the member or else the Type, for a Hover.
 	type: Type | null
+	// Whether the name is a Constant or a Variable, whose value its own Module
+	// wrote and validated.
+	writtenValue: boolean
 	position: Position
 }
 

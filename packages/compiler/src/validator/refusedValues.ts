@@ -11,8 +11,26 @@ import {
 // static Property's name is qualified by its Namespace's.
 let refusedValues = new Map<string, common.Type>()
 
-export function forgetRefusedValues(): void {
+// A Program starts from its imported Constants, Variables and static
+// Properties, whose values their own Modules validated.
+export function resetRefusedValues(
+	imports: common.typed.ImportSectionNode | null,
+): void {
 	refusedValues = new Map()
+
+	for (let entry of imports?.entries ?? []) {
+		let name = entry.alias ?? entry.name
+
+		if (entry.writtenValue && entry.type !== null) {
+			rememberRefusedValue(name, entry.type)
+		} else if (entry.type?.type === "Namespace") {
+			for (let [property, type] of Object.entries(
+				entry.type.properties,
+			)) {
+				rememberRefusedValue(`${name}.${property}`, type)
+			}
+		}
+	}
 }
 
 // Called once the value is validated, which reported each such Function where

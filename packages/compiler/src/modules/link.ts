@@ -257,6 +257,12 @@ function isRuntimeName(surface: ExportSurface | null, name: string): boolean {
 	return surface !== null && surface.values[name] !== undefined
 }
 
+function isWrittenValue(surface: ExportSurface | null, name: string): boolean {
+	let kind = surface?.kinds[name]
+
+	return kind === "constant" || kind === "variable"
+}
+
 // What a Hover over an entry prints. A name bound in both tables answers with
 // the member, which is what it means in an expression.
 function boundEntryType(
@@ -313,6 +319,10 @@ function moduleSections(
 									type: boundEntryType(
 										state.scope,
 										binding.localName,
+									),
+									writtenValue: isWrittenValue(
+										surfaceFor(binding.dependencyPath),
+										binding.entry.name.content,
 									),
 									position: binding.entry.position,
 								},

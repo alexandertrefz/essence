@@ -9,7 +9,7 @@ The validator keeps its walk state in module variables, such as `witnessScopes`,
 `abandonedLines`, as the Diagnostic collection does. The alternative is threading each through every `validate…`
 function, and only one Program is validated at a time. `validate` resets them on entry, except `waitingBodies`, so
 no Program is checked against state another Program left. That includes the map in `refusedValues.ts`, through
-`forgetRefusedValues`, and the set in `untypedReads.ts`, which `collectDeclarationOrder` clears. The stacks
+`resetRefusedValues`, and the set in `untypedReads.ts`, which `collectDeclarationOrder` clears. The stacks
 `waitingBodies`, `witnessScopes` and `writtenBounds` are pushed and popped in a `finally`, so a throw mid-walk can
 not leave them wrong.
 
@@ -198,8 +198,10 @@ answers its operand. Nor is a read of a Constant, a Variable, a Pattern's bindin
 was refused, or a member read off one: `refusedValues.ts` remembers each by name and the Type of its value, after
 that value is validated. A Parameter holding one is remembered too, since no written Type is a refused Function, so
 it took its Type from a value refused where it was written. A Function's own name is still refused where it is read,
-since that is where it is written as a value. A name imported from another Module is not remembered, and is refused
-at each read.
+since that is where it is written as a value. An imported Constant or Variable, and each static Property of an
+imported Namespace, is remembered under the name the import binds, since its own Module validated its value
+(`resetRefusedValues`). The linker marks such an entry `writtenValue`. An imported Function is refused where it is
+read, as one of the Module's own is.
 
 `validateValue` checks a value where it is written: an Argument, a receiver, a default, a String hole, a member of a
 Record, a List or a Dictionary, a Case payload, a declaration's value, a `<-`, a `define` arm, and a `start` or
