@@ -1921,8 +1921,8 @@ function sectionSlot(
 }
 
 // Moves an `import` or `export` block written on the wrong side of the
-// implementation. The Parser drops it, so moving it is the only reading, and
-// the fix is preferred.
+// implementation. Its order is the mistake the Diagnostic names, so the fix is
+// preferred.
 export function moveModuleSectionAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,

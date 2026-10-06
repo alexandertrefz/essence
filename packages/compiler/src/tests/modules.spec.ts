@@ -5392,6 +5392,47 @@ implementation {
 		)
 	})
 
+	// A block on the wrong side of the implementation is the one mistake. It
+	// is kept, so the names it imports or exports are not reported again.
+	it("reports a misplaced block once, not each name it lists", () => {
+		withProject(
+			{
+				"Library.es": `export {
+	greeting
+	shout
+}
+
+implementation {
+	constant greeting = "hi"
+
+	function shout(_ text: String) -> String {
+		<- text::append("!")
+	}
+}
+`,
+				"Main.es": `implementation {
+	Terminal.print(shout(greeting))
+}
+
+import {
+	from "./Library.es" {
+		greeting
+		shout
+	}
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["misplaced-module-section", "dependency-has-errors"])
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Library.es")),
+				).toEqual(["misplaced-module-section"])
+			},
+		)
+	})
+
 	// A Function refused as a value is reported where the exporting Module
 	// wrote it. An importer reading the Constant, a member of it or a static
 	// Property, under any name, writes no new value. A Function's own name is

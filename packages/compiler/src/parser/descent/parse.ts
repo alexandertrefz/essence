@@ -1020,8 +1020,9 @@ class DescentParser {
 	}
 
 	// Which of the blocks read on either side the Program keeps. A block on the
-	// wrong side is reported and dropped. A `declarations { … }` Program keeps
-	// its sections like any other.
+	// wrong side is reported and kept, unless one of its kind stands on the
+	// right side. What it names is then not reported again. A
+	// `declarations { … }` Program keeps its sections like any other.
 	protected resolveModuleSections(
 		sections: Array<ModuleSectionRead>,
 		implementationPosition: common.Position,
@@ -1033,18 +1034,17 @@ class DescentParser {
 		let exports: parser.ExportSectionNode | null = null
 
 		for (let section of sections) {
+			let isImport = section.node.nodeType === "ImportSection"
+			let placed = section.side === (isImport ? "above" : "below")
+
+			if (!placed) {
+				this.reportMisplacedSection(section, implementationPosition)
+			}
+
 			if (section.node.nodeType === "ImportSection") {
-				if (section.side === "above") {
-					imports = section.node
-				} else {
-					this.reportMisplacedSection(section, implementationPosition)
-				}
+				imports = placed ? section.node : (imports ?? section.node)
 			} else {
-				if (section.side === "below") {
-					exports = section.node
-				} else {
-					this.reportMisplacedSection(section, implementationPosition)
-				}
+				exports = placed ? section.node : (exports ?? section.node)
 			}
 		}
 
@@ -1069,7 +1069,7 @@ class DescentParser {
 			{
 				code: "misplaced-module-section",
 				// The whole block's span for the Quick Fix that moves it, since
-				// the Diagnostic underlines the Keyword and the section is dropped.
+				// the Diagnostic underlines the Keyword.
 				data: {
 					kind: "section-order",
 					section: isImport ? "import" : "export",

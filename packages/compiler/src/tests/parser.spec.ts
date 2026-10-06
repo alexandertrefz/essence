@@ -3827,7 +3827,7 @@ constant other = 1`
 				expect(diagnostics[0].labels[1]?.position).toEqual(
 					program.implementation.position,
 				)
-				expect(program.exports).toBeNull()
+				expect(program.exports?.entries[0].name.content).toBe("x")
 				expect(diagnostics[0].helps).toEqual([
 					"Move the 'export { … }' block below 'implementation { … }'.",
 				])
@@ -3852,12 +3852,14 @@ constant other = 1`
 				expect(diagnostics[0].message).toBe(
 					"The 'import { … }' block belongs above the implementation",
 				)
-				expect(program.imports).toBeNull()
+				expect(program.imports?.entries[0].name.content).toBe(
+					"Rectangle",
+				)
 			})
 
-			// The block is dropped and the Diagnostic underlines the Keyword,
-			// so the block's own span tells a fix what text to move.
-			it("should carry the dropped block's own span", () => {
+			// The Diagnostic underlines the Keyword, so the block's own span
+			// tells a fix what text to move.
+			it("should carry the misplaced block's own span", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					`implementation { }
 
@@ -3889,6 +3891,19 @@ import { from "./Geometry.es" { Rectangle } }`,
 				).toEqual(["misplaced-module-section", "syntax-error"])
 			})
 
+			// The misplaced block is kept, so the names it imports or exports
+			// are not reported again where they are read.
+			it("should keep a misplaced section where none stands in its place", () => {
+				let { program } = parseWithDiagnostics(
+					`export { B }
+					implementation { }
+					import { from "./A.es" { A } }`,
+				)
+
+				expect(program.imports?.entries[0].name.content).toBe("A")
+				expect(program.exports?.entries[0].name.content).toBe("B")
+			})
+
 			it("should keep a well-placed section beside a misplaced one", () => {
 				let { program, diagnostics } = parseWithDiagnostics(
 					`import { from "./A.es" { A } }
@@ -3900,6 +3915,17 @@ import { from "./Geometry.es" { Rectangle } }`,
 				expect(diagnostics[0].code).toBe("misplaced-module-section")
 				expect(program.imports?.entries).toHaveLength(1)
 				expect(program.imports?.entries[0].name.content).toBe("A")
+			})
+
+			it("should keep a well-placed export section beside a misplaced one", () => {
+				let { program } = parseWithDiagnostics(
+					`export { A }
+					implementation { }
+					export { B }`,
+				)
+
+				expect(program.exports?.entries).toHaveLength(1)
+				expect(program.exports?.entries[0].name.content).toBe("B")
 			})
 		})
 
@@ -3950,7 +3976,7 @@ import { from "./Geometry.es" { Rectangle } }`,
 			})
 
 			it("should still refuse a misplaced section in a standard library file", () => {
-				let { program, diagnostics } = parseWithDiagnostics(
+				let { diagnostics } = parseWithDiagnostics(
 					`declarations { }
 					import { from "./A.es" { A } }`,
 					{ allowDeclarationsHeader: true },
@@ -3958,7 +3984,6 @@ import { from "./Geometry.es" { Rectangle } }`,
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("misplaced-module-section")
-				expect(program.imports).toBeNull()
 			})
 		})
 
