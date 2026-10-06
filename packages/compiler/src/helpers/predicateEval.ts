@@ -21,8 +21,8 @@ function admittedByEvaluation(
 }
 
 // The Type a written value is admitted at, given the Type its position asks
-// for, or null where nothing was decided. Lists and Dictionaries are asked part
-// by part. See "Containers" in DEVELOPMENT.md.
+// for, or null where nothing was decided. Lists, Dictionaries and Records are
+// asked part by part. See "Containers" in DEVELOPMENT.md.
 export function admittedTypeOf(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -43,6 +43,10 @@ export function admittedTypeOf(
 		value.nodeType === "DictionaryValue"
 	) {
 		return admittedDictionaryTypeOf(expected, value, binds)
+	}
+
+	if (expected.type === "Record" && value.nodeType === "RecordValue") {
+		return admittedRecordTypeOf(expected, value, binds)
 	}
 
 	if (
@@ -117,6 +121,35 @@ function admittedDictionaryTypeOf(
 	}
 }
 
+// A written Record, asked member by member. A member the Record does not
+// declare keeps its own Type, so the whole still fits by the ordinary rules. A
+// level a path key built is a partial, which only the merge can measure.
+function admittedRecordTypeOf(
+	expected: common.RecordType,
+	value: common.typed.RecordValueNode,
+	binds: boolean,
+): common.Type | null {
+	if (value.merged === true || !refinementInside(expected)) {
+		return null
+	}
+
+	let members: Record<string, common.Type> = {}
+
+	for (let [name, member] of Object.entries(value.members)) {
+		let slot = Object.hasOwn(expected.members, name)
+			? expected.members[name]
+			: undefined
+
+		members[name] =
+			(slot === undefined ? null : admittedTypeOf(slot, member, binds)) ??
+			member.type
+	}
+
+	let admitted: common.RecordType = { type: "Record", members }
+
+	return fitsAsItStands(expected, admitted, binds) ? admitted : null
+}
+
 // Whether a part nothing was decided about fits as it stands. Where the
 // position binds its Type Parameters, the part may decide them, as a
 // `NonEmptyList<Integer>` decides `Item` for a `NonEmptyList<Item>` item.
@@ -150,14 +183,17 @@ export function fitsWritten(
 }
 
 // Whether a position asks a written value for evidence at all, checked before
-// anything is read. Only List items and Dictionary slots are looked down.
+// anything is read. Only List items, Dictionary slots and Record members are
+// looked down. A Case is not: its payload is asked where it is constructed.
 export function refinementInside(type: common.Type): boolean {
 	return (
 		type.type === "Refinement" ||
 		(type.type === "List" && refinementInside(type.itemType)) ||
 		(type.type === "Dictionary" &&
 			(refinementInside(type.keyType) ||
-				refinementInside(type.valueType)))
+				refinementInside(type.valueType))) ||
+		(type.type === "Record" &&
+			Object.values(type.members).some(refinementInside))
 	)
 }
 

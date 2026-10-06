@@ -175,12 +175,12 @@ fills in, by the rule `missingRecordMembers` applies to an Argument.
 
 A refinement usually needs a branch in front of it, something that asked its question. A value written down needs
 nobody to ask: `constant d: NonZeroInteger = 3` is a `NonZeroInteger` because 3 is not zero. `predicateEval.ts`
-decides such predicates while compiling, for a declared Constant, an Argument, a returned value and a Property.
-It reports nothing. A value it does not admit gets the ordinary mismatch where it stands, and `describePredicate`
-names the question it left unanswered. A value whose Type the base does not take is refused before any question,
-so `fitsRefinementBase` has the mismatch name the base instead and offer no check. Only an Argument's callee's
-own `infer` Type Parameters bind while the base is matched. An enclosing Declaration's `Item` is fixed, so a
-`List<String>` is no `List<Item>`.
+decides such predicates while compiling, for a declared Constant, an Argument, a returned value, a Property and a
+Case payload. It reports nothing. A value it does not admit gets the ordinary mismatch where it stands, and
+`describePredicate` names the question it left unanswered. A value whose Type the base does not take is refused
+before any question, so `fitsRefinementBase` has the mismatch name the base instead and offer no check. Only an
+Argument's callee's own `infer` Type Parameters bind while the base is matched. An enclosing Declaration's `Item`
+is fixed, so a `List<String>` is no `List<Item>`.
 
 Only a written Literal is admitted. Deciding anything else would need an interpreter and a second implementation
 of every native. So the evaluator is an allowlist: a table of predicates over JavaScript scalars, keyed by the
@@ -206,8 +206,14 @@ Type, so a `NonEmptyList<Integer>` Constant beside `[9]` fits `List<NonEmptyList
 is asked the same way, key and value per entry.
 An empty Literal decides nothing, and needs to decide nothing, since its `Unknown` slots fit every container.
 
-`refinementInside` gates all of this. It looks down List items and Dictionary slots only, since a Record or a Case
-member is a position the evaluator can not read.
+A written Record is asked member by member, so `{ count = 3 }` is a `{ count: NonZeroInteger }` for the reason `3`
+is a `NonZeroInteger`. A member the expected Record does not declare keeps its own Type, and the whole must still
+fit as it stands. A level a path key built is a partial, which only the merge with its default can measure, so it
+is not asked. A Case payload is a written Record too: the validator asks it against the Case's members, and
+`wrapSingleMemberShorthand` reads an admitted Record as the payload rather than wrapping it.
+
+`refinementInside` gates all of this. It looks down List items, Dictionary slots and Record members. It never looks
+into a Case, since a payload is asked where it is constructed.
 
 `admissionOfWrittenValue` asks many refinements of one value, for a Method receiver. A receiver is typed bottom-up
 and has no expected Type, so it asks every refinement in scope. It checks the refinement's base as well as the

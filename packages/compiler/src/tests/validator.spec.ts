@@ -5012,6 +5012,137 @@ describe("Validator", () => {
 				).toEqual([])
 			})
 		})
+
+		// A written Record is asked member by member, as a written List is
+		// asked item by item, however deep the member stands.
+		describe("into a refined member", () => {
+			it("should admit a written member at every position", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Rule = (_ n: Integer) -> Integer
+						type Counted = { count: NonZeroInteger }
+
+						function use(_ settings: Counted) -> Integer {
+							<- settings.count
+						}
+
+						function apply(_ settings: { rules: NonEmptyList<Rule> }) -> Integer {
+							<- settings.rules::firstItem()(3)
+						}
+
+						function made() -> Counted {
+							<- { count = 5 }
+						}
+
+						function defaulted(_ settings: Counted = { count = 6 }) -> Integer {
+							<- settings.count
+						}
+
+						constant someRule = (_ n: Integer) -> Integer { <- n::add(1) }
+						constant declared: Counted = { count = 2 }
+						constant listed: List<Counted> = [{ count = 7 }]
+						constant nested: { inner: Counted } = { inner = { count = 9 } }
+						constant grouped: List<NonEmptyList<Counted>> = [[{ count = 3 }]]
+						constant table: Dictionary<String, Counted> = ["a" = { count = 4 }]
+
+						Terminal.inspect(use({ count = 1 }))
+						Terminal.inspect(apply({ rules = [someRule] }))
+						Terminal.inspect(made().count)
+						Terminal.inspect(defaulted())
+						Terminal.inspect(declared.count)
+						Terminal.inspect(listed::length())
+						Terminal.inspect(nested.inner.count)
+						Terminal.inspect(grouped::length())
+						Terminal.inspect(table::length())
+					}`),
+				).toEqual([])
+			})
+
+			// A payload is a written Record too, spelled out or through the
+			// one-member shorthand.
+			it("should admit a written member of a Case payload", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						choice Holder {
+							Has { count: NonZeroInteger, label: String },
+							Lacks,
+						}
+
+						choice Single {
+							Full { count: NonZeroInteger },
+							Empty,
+						}
+
+						function hold(_ holder: Holder) -> Holder {
+							<- holder
+						}
+
+						constant held: Holder = #Has({ count = 3, label = "x" })
+						constant named = Holder#Has({ count = 3, label = "x" })
+						constant short: Single = #Full(3)
+						constant spelled: Single = #Full({ count = 3 })
+						constant inside: { holder: Holder } = { holder = #Has({ count = 3, label = "x" }) }
+
+						Terminal.inspect(hold(#Has({ count = 3, label = "x" })))
+						Terminal.inspect([held, named])
+						Terminal.inspect([short, spelled])
+						Terminal.inspect(inside)
+					}`),
+				).toEqual([])
+			})
+
+			// A member nobody wrote out is judged by its Type, and a written one
+			// the predicate refuses is no evidence.
+			it("should refuse a member the predicate refuses or the Program computes", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					type Counted = { count: NonZeroInteger }
+
+					choice Single {
+						Full { count: NonZeroInteger },
+						Empty,
+					}
+
+					function use(_ settings: Counted) -> Integer {
+						<- settings.count
+					}
+
+					constant three = 3
+					constant zero = use({ count = 0 })
+					constant computed: Counted = { count = three }
+					constant payload: Single = #Full(0)
+					constant listed: List<Counted> = [{ count = 3 }, { count = 0 }]
+					constant emptied: { rules: NonEmptyList<Integer> } = { rules = [] }
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.labels[0]?.message,
+					]),
+				).toEqual([
+					[
+						"argument-type-mismatch",
+						"this is an Integer, and Counted declares a NonZeroInteger",
+					],
+					[
+						"assignment-type-mismatch",
+						"this is an Integer, and Counted declares a NonZeroInteger",
+					],
+					[
+						"payload-type-mismatch",
+						"'count' is an Integer, and '#Full' declares a NonZeroInteger",
+					],
+					[
+						"assignment-type-mismatch",
+						"this is a List<{ count: Integer }>",
+					],
+					[
+						"assignment-type-mismatch",
+						"this is a List<Unknown>, and the declared Type declares a NonEmptyList<Integer>",
+					],
+				])
+			})
+		})
 	})
 })
 

@@ -1174,6 +1174,51 @@ describe("Choices", () => {
 				])
 			})
 
+			// A written payload is evidence about the Types it was written with,
+			// never about an enclosing Function's own `Item`, which a caller
+			// decides.
+			it("proves nothing about an enclosing Function's own Type Parameter", async () => {
+				const box = `choice Box<Item> {
+					Full { items: NonEmptyList<Item> },
+					Rows { rows: List<NonEmptyList<Item>> },
+					Empty,
+				}`
+				let wrapped = (payload: string) => `implementation { ${box}
+					function wrap<infer Item>(_ x: Item) -> Box<Item> {
+						<- ${payload}
+					}
+
+					constant b: Box<String> = wrap("a")
+				}`
+
+				for (let payload of [
+					"#Full({ items = [1] })",
+					"#Full([1])",
+					"Box<Item>#Full([1])",
+					"#Rows([[1]])",
+				]) {
+					expect([payload, codesOf(wrapped(payload))]).toEqual([
+						payload,
+						["payload-type-mismatch"],
+					])
+				}
+
+				expect(
+					await run(`implementation { ${box}
+						function wrap<infer Item>(_ x: Item) -> Box<Item> {
+							<- #Full({ items = [x] })
+						}
+
+						function twice<infer Item>(_ x: Item) -> Box<Item> {
+							<- #Full([x, x])
+						}
+
+						Terminal.inspect(wrap("a"))
+						Terminal.inspect(twice(1))
+					}`),
+				).toEqual(['Box#Full([ "a" ])', "Box#Full([ 1, 1 ])"])
+			})
+
 			// The rule asks only where a payload stands for the Case. A missing
 			// payload is `missing-payload`, and one that does not fit is
 			// `payload-type-mismatch`.

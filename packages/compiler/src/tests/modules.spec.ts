@@ -2857,6 +2857,170 @@ export {
 		)
 	})
 
+	// A written member answers an imported refinement as a written value does,
+	// in a Record, a payload and a List item alike.
+	const refinedShapes = `implementation {
+	type Rule = (_ n: Integer) -> Integer
+	type Counted = { count: NonZeroInteger }
+
+	choice Single {
+		Full { count: NonZeroInteger },
+		Empty,
+	}
+
+	function use(_ settings: Counted) -> Integer {
+		<- settings.count
+	}
+
+	function apply(_ settings: { rules: NonEmptyList<Rule> }) -> Integer {
+		<- settings.rules::firstItem()(3)
+	}
+
+	function fullCount(_ single: Single) -> Integer {
+		<- match single -> Integer {
+			case #Full(count) { <- count }
+			case #Empty { <- 0 }
+		}
+	}
+}
+
+export {
+	Counted
+	Rule
+	Single
+	apply
+	fullCount
+	use
+}
+`
+
+	it("admits a written member into an imported refined Record or payload", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Shapes.es" {
+		Counted
+		Single
+		apply
+		fullCount
+		use
+	}
+}
+
+implementation {
+	constant someRule = (_ n: Integer) -> Integer { <- n::add(1) }
+	constant declared: Counted = { count = 2 }
+	constant listed: List<Counted> = [{ count = 7 }]
+
+	Terminal.print(use({ count = 1 }))
+	Terminal.print(declared.count)
+	Terminal.print(apply({ rules = [someRule] }))
+	Terminal.print(listed::length())
+	Terminal.print(fullCount(Single#Full(11)))
+	Terminal.print(fullCount(#Full({ count = 12 })))
+}
+`,
+				"Shapes.es": refinedShapes,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual([
+					"1",
+					"2",
+					"4",
+					"1",
+					"11",
+					"12",
+				])
+			},
+		)
+	})
+
+	// An imported Choice's payload proves nothing about the enclosing
+	// Function's own `Item`, which a caller decides.
+	it("refuses a written payload as evidence about an enclosing Type Parameter", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Boxes.es" { Box }
+}
+
+implementation {
+	function wrap<infer Item>(_ x: Item) -> Box<Item> {
+		<- #Full([1])
+	}
+
+	constant b: Box<String> = wrap("a")
+}
+`,
+				"Boxes.es": `implementation {
+	choice Box<Item> {
+		Full { items: NonEmptyList<Item> },
+		Empty,
+	}
+}
+
+export {
+	Box
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					[
+						"payload-type-mismatch",
+						"This payload does not fit Case '#Full'",
+					],
+				])
+			},
+		)
+	})
+
+	it("refuses a written member an imported refinement's predicate refuses", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Shapes.es" {
+		Single
+		fullCount
+		use
+	}
+}
+
+implementation {
+	Terminal.print(use({ count = 0 }))
+	Terminal.print(fullCount(#Full({ count = 0 })))
+}
+`,
+				"Shapes.es": refinedShapes,
+			},
+			(directory) => {
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					[
+						"argument-type-mismatch",
+						"This Argument does not fit Parameter 1",
+					],
+					[
+						"payload-type-mismatch",
+						"This payload does not fit Case '#Full'",
+					],
+				])
+			},
+		)
+	})
+
 	// An imported Namespace is no value either, and the Help reads a member the
 	// declaring Module wrote.
 	it("refuses an imported Namespace used as a value", () => {

@@ -10932,6 +10932,32 @@ describe("Enricher", () => {
 				).toBe("String")
 			})
 		})
+
+		// A literal written inside a Record literal answers as a written
+		// Argument does, so the refined entry takes it.
+		it("should admit a written member into the refined entry", () => {
+			let entryFor = (call: string) =>
+				lastConstantMethodInvocation(`implementation {
+					namespace Taker for Integer {
+						overload take {
+							(_ n: { count: PositiveInteger }) -> String { <- "positive" }
+							(_ n: { count: Integer }) -> String { <- "integer" }
+						}
+
+						overload listed {
+							(_ b: { rows: NonEmptyList<Integer> }) -> String { <- "filled" }
+							(_ b: { rows: List<Integer> }) -> String { <- "rows" }
+						}
+					}
+
+					constant answer = 1::${call}
+				}`).overloadedMethodIndex
+
+			expect(entryFor("take({ count = 3 })")).toBe(0)
+			expect(entryFor("take({ count = -3 })")).toBe(1)
+			expect(entryFor("listed({ rows = [1] })")).toBe(0)
+			expect(entryFor("listed({ rows = [] })")).toBe(1)
+		})
 	})
 
 	// No position asks a receiver a question, so a written receiver asks every

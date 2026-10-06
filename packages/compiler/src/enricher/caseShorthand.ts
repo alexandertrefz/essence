@@ -1,8 +1,10 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { admittedTypeOf } from "../helpers/predicateEval"
 import {
 	applyGenericBindings,
 	createFreshenedChoiceInference,
+	genericNamesMentioned,
 	isPartialOf,
 	matchesTypeWithBindings,
 	mergedRecordType,
@@ -46,8 +48,16 @@ export function wrapSingleMemberShorthand(
 		value.type.type === "Record"
 			? refusedFunctionsAsHoles(value.type)
 			: value.type
+	// A written member carries its own evidence for a refinement. It may bind
+	// the fresh Choice names only, never a caller's own Type Parameter.
+	let bindsFresh = [...genericNamesMentioned(recordShape)].every((name) =>
+		fitContext.bindableNames.has(name),
+	)
 
-	if (matchesTypeWithBindings(recordShape, written, fitContext)) {
+	if (
+		matchesTypeWithBindings(recordShape, written, fitContext) ||
+		admittedTypeOf(recordShape, value, bindsFresh) !== null
+	) {
 		return value
 	}
 

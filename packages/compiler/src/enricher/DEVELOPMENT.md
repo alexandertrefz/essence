@@ -29,6 +29,7 @@ readings, and `wrapSingleMemberShorthand` wraps a value that does not fit the Re
 `#Done({ value = 5 })` reach the instantiation identically. A Record that fits wins the ambiguity. The fit check
 binds the Choice's own Type Parameters under fresh names, so a Record that fits once they bind reads as the Record.
 A Function refused as a value is a hole in a Record, so `#Has({ rule = Integer.add })` reads as the Record too.
+So does a Record whose written members prove a refinement, as `{ count = 3 }` proves a `NonZeroInteger` member.
 A Case that defaults its payload also accepts a Record Literal that is a partial of its Record, as in
 `#Post({ url = "/x" })`.
 

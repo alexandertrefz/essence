@@ -2245,7 +2245,10 @@ function validateCaseValue(
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
 	} else if (
-		!matchesType(payloadType, casePayloadType(node.type, node.value))
+		!matchesType(payloadType, casePayloadType(node.type, node.value)) &&
+		// A written payload carries its own evidence for a refinement. It binds
+		// no Type Parameter: an enclosing Function's own are fixed.
+		admittedTypeOf(payloadType, node.value, false) === null
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
