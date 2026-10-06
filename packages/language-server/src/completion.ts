@@ -31,11 +31,7 @@ import {
 	qualifiedCallSnippetsFor,
 } from "./callSnippets"
 import { parseDocument } from "./compilation"
-import {
-	defineConditions,
-	defineExpressions,
-	defineValues,
-} from "./defineArmChildren"
+import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import {
 	moduleSectionCompletions,
@@ -1235,55 +1231,19 @@ function analyseCaseProbe(program: common.typed.Program): {
 	let expected: common.Type | null | undefined = undefined
 	let choices = new Map<string, Array<common.CaseType>>()
 
-	function visitBody(
-		nodes: Array<common.typed.ImplementationNode>,
+	// The children in `field` are read against `expectedType`; the rest against
+	// nothing.
+	function visitExpecting(
+		node: TypedNode,
+		field: string,
 		expectedType: common.Type | null,
 	) {
-		for (let node of nodes) {
-			visitNode(node, expectedType)
-		}
+		forEachTypedChild(node, (child, _state, childField) =>
+			visitNode(child, childField === field ? expectedType : null),
+		)
 	}
 
-	// A default is read against its own Parameter's Type, so `= #|` offers its
-	// Choice. Walked per Parameter, since `parameterDefaults` drops the Type.
-	function visitFunction(definition: common.typed.FunctionDefinitionNode) {
-		visitDefaults(definition.parameters)
-		visitBody(definition.body, definition.returnType)
-	}
-
-	function visitDefaults(parameters: Array<common.typed.ParameterNode>) {
-		for (let parameter of parameters) {
-			if (parameter.defaultValue !== null) {
-				visitNode(
-					parameter.defaultValue,
-					parameter.internalName?.type ??
-						parameter.externalName?.type ??
-						null,
-				)
-			}
-		}
-	}
-
-	function visitArguments(
-		nodeArguments: Array<common.typed.ArgumentNode>,
-		parameterTypes: common.BaseFunction["parameterTypes"] | null,
-	) {
-		nodeArguments.forEach((argument, index) => {
-			let parameterType = parameterTypes?.[index]?.type ?? null
-
-			visitNode(
-				argument.value,
-				parameterType !== null && parameterType.type !== "GenericUse"
-					? parameterType
-					: null,
-			)
-		})
-	}
-
-	function visitNode(
-		node: common.typed.ImplementationNode,
-		expectedType: common.Type | null,
-	) {
+	function visitNode(node: TypedNode, expectedType: common.Type | null) {
 		switch (node.nodeType) {
 			case "ChoiceDeclarationStatement":
 				if (!choices.has(node.name.content)) {
@@ -1294,15 +1254,19 @@ function analyseCaseProbe(program: common.typed.Program): {
 				}
 
 				// Read against the payload member it fills, so `= { item = #| }` offers its
-				// Choice. Walked per Case, since `caseDefaults` drops the Type.
-				for (let choiceCase of node.cases) {
-					if (choiceCase.defaultValue !== null) {
-						visitNode(choiceCase.defaultValue, {
-							type: "Record",
-							members: choiceCase.type.members,
-						})
-					}
-				}
+				// Choice.
+				forEachTypedChild(node, (child, _state, field, key) =>
+					visitNode(
+						child,
+						field === "defaultValue"
+							? {
+									type: "Record",
+									members:
+										node.cases[key as number]!.type.members,
+								}
+							: null,
+					),
+				)
 
 				return
 			case "CaseValue":
@@ -1310,201 +1274,119 @@ function analyseCaseProbe(program: common.typed.Program): {
 					expected = expectedType
 				}
 
-				if (node.value !== null) {
-					visitNode(
-						node.value,
-						node.type.type === "Case"
-							? { type: "Record", members: node.type.members }
-							: null,
-					)
-				}
-
-				return
-			case "ConstantDeclarationStatement":
-			case "VariableDeclarationStatement":
-				visitNode(node.value, node.declaredType ?? node.type)
-				return
-			case "VariableAssignmentStatement":
-				visitNode(node.value, null)
-				return
-			case "FunctionStatement":
-				visitFunction(node.value)
-				return
-			case "FunctionValue":
-				visitFunction(node.value)
-				return
-			case "NamespaceDefinitionStatement":
-				for (let property of Object.values(node.properties)) {
-					visitNode(property.value, null)
-				}
-
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitFunction(method.value)
-					}
-				}
-
-				for (let shim of node.nativeShims) {
-					visitDefaults(shim.parameters)
-				}
-
-				return
-			case "ProtocolDeclarationStatement":
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitFunction(method.value)
-					}
-				}
-
-				return
-			case "IfStatement":
-				visitNode(node.condition, null)
-				visitBody(node.body, null)
-				return
-			case "IfElseStatement":
-				visitNode(node.condition, null)
-				visitBody(node.trueBody, null)
-				visitBody(node.falseBody, null)
-				return
-			case "ReturnStatement":
-				visitNode(node.expression, expectedType)
-				return
-			// `expect outcome::is(#|)` offers what the Method expects, as any call does.
-			case "ExpectStatement":
-			case "RequireStatement":
-				for (let expression of typedAssertionExpressions(node)) {
-					visitNode(expression, null)
-				}
-
-				return
-			case "FunctionInvocation": {
-				let calleeType = node.name.type
-
-				visitNode(node.name, null)
-				visitArguments(
-					node.arguments,
-					calleeType.type === "Function"
-						? calleeType.parameterTypes
+				visitExpecting(
+					node,
+					"value",
+					node.type.type === "Case"
+						? { type: "Record", members: node.type.members }
 						: null,
 				)
 				return
-			}
-			case "MethodInvocation":
-				visitNode(node.base, null)
-				visitArguments(node.arguments, null)
+			case "ConstantDeclarationStatement":
+			case "VariableDeclarationStatement":
+				visitExpecting(node, "value", node.declaredType ?? node.type)
 				return
-			case "Lookup":
-				visitNode(node.base, null)
+			// A default is read against its own Parameter's Type, so `= #|` offers its
+			// Choice.
+			case "Parameter":
+				visitExpecting(
+					node,
+					"defaultValue",
+					node.internalName?.type ?? node.externalName?.type ?? null,
+				)
 				return
-			// Nothing travels through: the Keyword's operand is a Future or a Started,
-			// and no Case is either.
-			case "Start":
-			case "Complete":
-				visitNode(node.expression, null)
+			case "FunctionDefinition":
+				visitExpecting(node, "body", node.returnType)
 				return
-			// The position expects what the brackets would read, not the value
-			// before them.
-			case "RefusedValue":
-				visitNode(node.base, null)
-				return
+			// An Argument is read against what its Parameter expects, and each half of
+			// an update against the whole.
+			case "ReturnStatement":
+			case "Argument":
 			case "Combination":
-				visitNode(node.lhs, expectedType)
-				visitNode(node.rhs, expectedType)
+				forEachTypedChild(node, visitNode, expectedType)
 				return
+			case "FunctionInvocation": {
+				let calleeType = node.name.type
+				let parameterTypes =
+					calleeType.type === "Function"
+						? calleeType.parameterTypes
+						: null
+
+				forEachTypedChild(node, (child, _state, field, key) => {
+					let parameterType =
+						field === "arguments"
+							? (parameterTypes?.[key as number]?.type ?? null)
+							: null
+
+					visitNode(
+						child,
+						parameterType !== null &&
+							parameterType.type !== "GenericUse"
+							? parameterType
+							: null,
+					)
+				})
+				return
+			}
+			// A Handler's body answers the whole `match`. A Guard and a Matcher's
+			// literals are read against nothing.
 			case "Match":
-				visitNode(node.value, null)
-
-				for (let handler of node.handlers) {
-					for (let expression of typedHandlerExpressions(handler)) {
-						visitNode(expression, null)
-					}
-
-					visitBody(handler.body, expectedType)
-				}
-
+				visitExpecting(node, "body", expectedType)
 				return
 			// Every arm answers the whole `define`, so each is read against the
 			// expected Type. A Condition, like a Guard, is a Boolean and is read
 			// against none.
 			case "Define":
-				for (let value of defineValues(node)) {
-					visitNode(value, expectedType)
-				}
-
-				for (let condition of defineConditions(node)) {
-					visitNode(condition, null)
-				}
-
+				visitExpecting(node, "value", expectedType)
 				return
+			// Each member against the Type the position expects of it, as a List's items
+			// are: a half-typed `#Sta` has an Error for its own Type.
 			case "RecordValue":
-				// Each member against the Type the position expects of it, as a List's items
-				// are: a half-typed `#Sta` has an Error for its own Type.
-				for (let [name, member] of Object.entries(node.members)) {
+				forEachTypedChild(node, (member, _state, _field, name) =>
 					visitNode(
 						member,
 						expectedType?.type === "Record"
-							? (expectedType.members[name] ?? null)
+							? (expectedType.members[name as string] ?? null)
 							: null,
-					)
-				}
-
+					),
+				)
 				return
-			case "ListValue": {
-				let itemType =
-					expectedType?.type === "List" ? expectedType.itemType : null
-
-				for (let value of node.values) {
-					visitNode(value, itemType)
-				}
-
+			case "ListValue":
+				visitExpecting(
+					node,
+					"values",
+					expectedType?.type === "List"
+						? expectedType.itemType
+						: null,
+				)
 				return
-			}
 			// Each half against its slot: a key against the key Type, a value against
 			// the value Type.
 			case "DictionaryValue": {
 				let dictionary =
 					expectedType?.type === "Dictionary" ? expectedType : null
 
-				for (let entry of node.entries) {
-					visitNode(entry.key, dictionary?.keyType ?? null)
-					visitNode(entry.value, dictionary?.valueType ?? null)
-				}
-
+				forEachTypedChild(node, (child, _state, field) =>
+					visitNode(
+						child,
+						field === "key"
+							? (dictionary?.keyType ?? null)
+							: (dictionary?.valueType ?? null),
+					),
+				)
 				return
 			}
-			case "InterpolatedStringValue":
-				for (let segment of node.segments) {
-					if (segment.kind === "expression") {
-						visitNode(segment.expression, null)
-					}
-				}
-
-				return
 			case "TypeAliasStatement":
-			case "Identifier":
-			case "Self":
-			case "StringValue":
-			case "IntegerValue":
-			case "RationalValue":
-			case "BooleanValue":
 				return
 		}
+
+		forEachTypedChild(node, visitNode, null)
 	}
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body, null)
+		for (let node of body) {
+			visitNode(node, null)
+		}
 	}
 
 	return { expected: expected ?? null, choices }
