@@ -2047,6 +2047,71 @@ describe("Enricher", () => {
 			expect(diagnostics[0].position?.start.line).toBe(3)
 		})
 
+		// The undeclared Type is the one mistake. The Function hoists holding
+		// it, so a call written above it reads a hole rather than no name.
+		it("should hoist a Function whose Parameter Type is declared nowhere", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function early() -> String {
+						<- describe(1)
+					}
+
+					constant now = describe(2)
+
+					function describe(_ value: Colr) -> String {
+						<- "x"
+					}
+
+					constant later = describe(3)
+				}`).map((diagnostic) => [diagnostic.code, diagnostic.message]),
+			).toEqual([["unknown-type", "Type 'Colr' is not declared"]])
+		})
+
+		// `Pair` never hoists, so the Function naming it is read in order,
+		// once `Pair` is declared, rather than refused for naming it.
+		it("should leave a Function naming a Type still waiting to its place", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Pair = Integer | Colr
+
+					function describe(_ value: Pair) -> String {
+						<- "x"
+					}
+
+					constant later = describe(3)
+				}`).map((diagnostic) => diagnostic.message),
+			).toEqual(["Type 'Colr' is not declared"])
+		})
+
+		// The waiting `Pair` and `Tools` are names the signature does not
+		// write, so `f` still hoists holding its hole.
+		it("should hoist such a Function beside a declaration still waiting", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					constant early = f(1)
+
+					function f(_ x: Colr) -> Integer {
+						<- 1
+					}
+
+					type Pair = { a: Colr }
+
+					namespace Tools for Integer {
+						paint(_ c: Colr) -> Integer {
+							<- 1
+						}
+					}
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-type", 4],
+				["unknown-type", 8],
+				["unknown-type", 11],
+			])
+		})
+
 		it("should hoist a Protocol extending one declared after it", () => {
 			expect(
 				diagnosticsFor(`implementation {

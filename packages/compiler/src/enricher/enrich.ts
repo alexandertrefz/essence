@@ -1242,6 +1242,100 @@ function reportRecursiveProtocolDeclarations(
 	return recursive
 }
 
+function pendingProtocolNames(
+	pendingNodes: Array<PendingDeclaration>,
+): Map<enricher.Scope, Set<string>> {
+	let pendingProtocols = new Map<enricher.Scope, Set<string>>()
+
+	for (let { node, scope } of pendingNodes) {
+		if (node.nodeType !== "ProtocolDeclarationStatement") {
+			continue
+		}
+
+		let names = pendingProtocols.get(scope)
+
+		if (names === undefined) {
+			pendingProtocols.set(scope, new Set([node.name.content]))
+		} else {
+			names.add(node.name.content)
+		}
+	}
+
+	return pendingProtocols
+}
+
+// A Function still waiting when the rounds end holds an Error for good, unless
+// its signature names a declaration still waiting in its Scope. It hoists
+// holding the Error. See "Functions that never resolve" in DEVELOPMENT.md.
+function hoistRefusedFunctions(
+	pendingNodes: Array<PendingDeclaration>,
+	sink: HoistDiagnosticSink,
+	hoistedTypes: HoistedTypes,
+): void {
+	let waiting = new Map<enricher.Scope, Set<string>>()
+
+	for (let { node, scope } of pendingNodes) {
+		if (node.nodeType !== "FunctionStatement") {
+			let names = waiting.get(scope) ?? new Set<string>()
+
+			waiting.set(scope, names.add(node.name.content))
+		}
+	}
+
+	for (let { node, scope } of pendingNodes) {
+		if (
+			node.nodeType !== "FunctionStatement" ||
+			signatureTypeNames(node.value).some(
+				(name) => waiting.get(scope)?.has(name) === true,
+			) ||
+			scope.members[node.name.content] != null
+		) {
+			continue
+		}
+
+		let resolved: {
+			result: common.FunctionType
+			diagnostics: Array<common.Diagnostic>
+		}
+
+		// A throw leaves the Function to the in-order enrichment.
+		try {
+			resolved = collectDiagnostics(() =>
+				resolveFunctionSignatureType(node.value, scope),
+			)
+		} catch {
+			continue
+		}
+
+		sink(node, resolved.diagnostics)
+		scope.members[node.name.content] = resolved.result
+		scope.constants.add(node.name.content)
+		countTypeDeclaration()
+		invalidateNamespacesInScope(scope, node.name.content, resolved.result)
+		hoistedTypes.set(node, resolved.result)
+	}
+}
+
+// The Type and Protocol names a Function's signature writes.
+function signatureTypeNames(
+	node: parser.FunctionDefinitionNode,
+): Array<string> {
+	let written = [
+		...node.parameters.map((parameter) => parameter.type),
+		node.returnType,
+		...node.generics.map((generic) => generic.defaultType),
+	]
+
+	return [
+		...written.flatMap((type) =>
+			type === null ? [] : referencedTypeNames(type),
+		),
+		...node.generics.flatMap((generic) =>
+			generic.constraint === null ? [] : [generic.constraint],
+		),
+	].map((name) => name.content)
+}
+
 // Puts the hoistable declarations' Types into Scope before the in-order
 // enrichment. The registry of pending refinement copies is closed in the
 // `finally`, so a throw can not leave it open. See "Hoisting" in DEVELOPMENT.md.
@@ -1392,21 +1486,7 @@ function hoistDeclarationsInner(
 		let remainingNodes: Array<PendingDeclaration> = []
 		// The Protocols still pending, per Scope. A Namespace conforming to
 		// one throws `NotHoistedYet`, since it must reach Scope with its bounds.
-		let pendingProtocols = new Map<enricher.Scope, Set<string>>()
-
-		for (let { node, scope } of pendingNodes) {
-			if (node.nodeType !== "ProtocolDeclarationStatement") {
-				continue
-			}
-
-			let names = pendingProtocols.get(scope)
-
-			if (names === undefined) {
-				pendingProtocols.set(scope, new Set([node.name.content]))
-			} else {
-				names.add(node.name.content)
-			}
-		}
+		let pendingProtocols = pendingProtocolNames(pendingNodes)
 
 		for (let pending of pendingNodes) {
 			let { node, scope } = pending
@@ -1609,6 +1689,7 @@ function hoistDeclarationsInner(
 	// The last declarations to hoist were never offered to the seeding, and
 	// an import naming one still has to bind before the bodies.
 	seedRound?.(true)
+	hoistRefusedFunctions(pendingNodes, sink, hoistedTypes)
 
 	// The final reading, after the seeding, since an answering Namespace may
 	// arrive through an import. Nothing past hoisting meets `conjuncts: null`.

@@ -992,7 +992,8 @@ inside a collection of its own. A resolution without an Error enters Scope, unle
 an Error, or one that throws `NotHoistedYet`, waits for a later round, by when what it names may have hoisted. A round
 that makes no progress, where nothing hoisted, no import was seeded and no predicate filled, is followed by one that
 settles (see "Static Properties while hoisting"). The rounds stop when that one makes no progress either. A
-declaration that never hoists is left to the in-order enrichment, which reports it.
+declaration that never hoists is left to the in-order enrichment, which reports it, apart from the Functions of
+"Functions that never resolve".
 
 Only an Error keeps a declaration back. A Warning, such as one about its documentation, says nothing about
 whether the Type resolved. The Warnings of a kept resolution are reported then, since a hoisted Type is reused
@@ -1013,15 +1014,25 @@ matter during the rounds, because a bodied static Property's value is enriched w
 Each round starts with `seedRound`, which binds the imports that became bindable since the last one. An import
 across a cycle of Modules can only be bound once the declaration it names has hoisted. Seeding first means a
 Module has the import in Scope while its own declarations resolve. After the last round, `seedRound(true)` binds
-what the last declarations to hoist made bindable. It is the last moment a hoisted name may be written into a
-Scope before the bodies are enriched. Only a Constant of another Module of the cycle binds later, as "Enriching a
-group in turns" says.
+what the last declarations to hoist made bindable. It is the last moment an import may be bound before the bodies
+are enriched. Only a Constant of another Module of the cycle binds later, as "Enriching a group in turns" says.
 
 A Namespace conforming to a Protocol that has not hoisted yet waits too (`deferOnPendingConformance`). It has to
 reach Scope with its conditional bounds woven in, or a use site before it would solve against an unbounded Method.
 `settleConformanceClauses` reads every hoisted Namespace's clauses again after the final seeding, so a clause is
 dropped only where its Protocol never arrives. The Namespace memos of every Scope are then dropped, since the
 rounds solved against the unsettled clauses.
+
+### Functions that never resolve
+
+A Function whose signature names a Type nothing declares resolves with an Error in every round, so it never hoists.
+A call written above it would read an undeclared name, and report `unknown-name` after the signature's own
+`unknown-type`. Once the rounds end and the final seeding has run, a name the signature lacks arrives only if a
+declaration still waiting in its Scope declares it. Where the signature names no such declaration
+(`signatureTypeNames`), its Error is final. `hoistRefusedFunctions` resolves it once more and puts it into Scope
+holding the Error, with its Diagnostics handed to the sink. A call above it measures nothing against the hole. A
+Function naming a declaration that still waits is left to the in-order enrichment, which reads it once that
+declaration is in Scope.
 
 ### Enriching a group in turns
 
