@@ -1242,6 +1242,24 @@ describe("Enricher", () => {
 			expect(diagnostics[0].tags).toEqual(["unnecessary"])
 		})
 
+		// A Warning does not stop a compile, so the Program is also asked to
+		// report nothing once the Help is followed.
+		it("should report nothing once the call is dropped", () => {
+			let source = `implementation {
+				constant count = 3
+				constant message = "count: {count::toString()}"
+			}`
+
+			expect(diagnosticsFor(source)[0]?.helps).toEqual([
+				"Drop the '::toString()' and interpolate the value itself.",
+			])
+
+			let followed = source.replace("{count::toString()}", "{count}")
+
+			expect(compiles(followed)).toBe(true)
+			expect(diagnosticsFor(followed)).toEqual([])
+		})
+
 		it("should warn about a 'toString' on a String, which is its own representation", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant name = "Ada"
@@ -6007,6 +6025,36 @@ describe("Enricher", () => {
 			})
 		})
 
+		// Warnings do not stop a compile, so each followed Help is also asked
+		// to leave nothing to report.
+		it("should report nothing once the line names the Parameter", () => {
+			let greet = (tag: string) => `implementation {
+				§§ Greets.
+				§§ @param ${tag} — who to greet
+				function greet(subject: String) -> String { <- subject }
+			}`
+
+			expect(compiles(greet("subject"))).toBe(true)
+			expect(diagnosticsFor(greet("subject"))).toEqual([])
+		})
+
+		it("should report nothing once an unlabelled Parameter's line is '_'", () => {
+			let double = (tag: string) => `implementation {
+				§§ Doubles a number.
+				§§
+				§§ @param ${tag} — the number to double
+				function double(_ number: Integer) -> Integer {
+					<- number::multiply(with 2)
+				}
+			}`
+
+			expect(diagnosticsFor(double("number"))[0]?.helps).toEqual([
+				"Write '@param _' — Parameter 1 carries no label.",
+			])
+			expect(compiles(double("_"))).toBe(true)
+			expect(diagnosticsFor(double("_"))).toEqual([])
+		})
+
 		it("should match a '@param' to the Parameter at its position", () => {
 			// Both lines name real Parameters, but the first names the second,
 			// as when a line is left out.
@@ -6115,6 +6163,20 @@ describe("Enricher", () => {
 			expect(diagnostics[0].notes).toHaveLength(1)
 		})
 
+		it("should report nothing once the missing line is written", () => {
+			let followed = `implementation {
+				§§ Joins.
+				§§ @param left — the text to put first
+				§§ @param right — the text to put after
+				function join(left: String, right: String) -> String {
+					<- left::append(right)
+				}
+			}`
+
+			expect(compiles(followed)).toBe(true)
+			expect(diagnosticsFor(followed)).toEqual([])
+		})
+
 		// A misnamed line and an undocumented Parameter are one missing line
 		// seen from both ends, so the report says which to put right first.
 		it("should say which line to put right first", () => {
@@ -6135,6 +6197,24 @@ describe("Enricher", () => {
 			expect(diagnostics[1].notes[1]).toBe(
 				"'by' is already written on line 1 of the run, where it documents Parameter 1 — put that line right first, and the run reads in Parameter order.",
 			)
+			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
+				["Write '@param _' — Parameter 1 carries no label."],
+				["Write '@param by — …' as line 2 of the run."],
+			])
+
+			let followed = `implementation {
+				§§ Scales a number.
+				§§
+				§§ @returns — the scaled number
+				§§ @param _ — the number to scale
+				§§ @param by — the factor
+				function scale(_ number: Integer, by factor: Integer) -> Integer {
+					<- number::multiply(with factor)
+				}
+			}`
+
+			expect(compiles(followed)).toBe(true)
+			expect(diagnosticsFor(followed)).toEqual([])
 		})
 
 		// The Help and the Quick Fix `data` name the same thing. `after` is the
@@ -6670,6 +6750,36 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual([
 				"Take the value as a Parameter, or drop 'static' to make this an instance Method — then every call writes its receiver, 'value::name(…)' rather than 'Namespace.name(…)'.",
 			])
+		})
+
+		// Each half of the Help, followed with the calls it says to rewrite.
+		it("should compile either way the Help names", () => {
+			let maker = (method: string, call: string) => `implementation {
+				namespace Maker for Integer {
+					${method} {
+						<- base::add(1)
+					}
+				}
+
+				constant made = ${call}
+			}`
+
+			expect(
+				compiles(
+					maker(
+						"static make(_ base: Integer) -> Integer",
+						"Maker.make(7)",
+					),
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					maker("make() -> Integer", "7::make()").replace(
+						"base::add(1)",
+						"@::add(1)",
+					),
+				),
+			).toBe(true)
 		})
 
 		it("should reject '@' in an overloaded static Method body", () => {

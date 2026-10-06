@@ -112,6 +112,7 @@ export function helpsOfCode(
 export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 	[
 		"ambiguous-case",
+		"at-in-static-method",
 		"dictionary-entry-syntax",
 		"duplicate-type-parameter",
 		"foreign-syntax",
@@ -120,6 +121,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"invalid-escape",
 		"malformed-unicode-escape",
 		"method-called-with-dot",
+		"misnamed-documentation-parameter",
 		"missing-documentation-separator",
 		"namespace-as-value",
 		"nested-example",
@@ -128,10 +130,12 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"path-without-context",
 		"picked-requirement",
 		"protocol-bound-namespace-generic",
+		"redundant-interpolation-to-string",
 		"redundant-pattern-binder",
 		"restated-inferred-parameter",
 		"surrogate-unicode-escape",
 		"unbraced-unicode-escape",
+		"undocumented-parameter",
 		"unicode-escape-out-of-range",
 		"uninferable-item-type",
 		"uninferable-property-type",
