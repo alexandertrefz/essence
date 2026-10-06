@@ -13,8 +13,8 @@ import {
 	type ArgumentTyper,
 	probeContextualFunctionTypes,
 	resolveMethodInvocation,
-	underRefusedCall,
 } from "./enrichers"
+import { underRefusedCall } from "./refusedCalls"
 import {
 	type ConformanceSourceNamespace,
 	conformanceProvidersIn,

@@ -195,9 +195,10 @@ Diagnostics and helpers:
 Enricher, including `helpers/types.ts`:
 
 - Stacks and flags that the work setting them restores in `finally`. In `enricher/enrichers.ts`:
-  `captureBoundaries`, `probeRecordings`, `inferReturnTypeFromBodyDepth`, `refusedCallDepth`,
-  `probingDeadFallback` and `erasingRefinementProof`. In `enricher/resolvers.ts`: `reachedNames`, opened by
-  `collectReachedNames`. In `enricher/annotations.ts`: `activeAnnotations`, opened by `collectAnnotations`.
+  `captureBoundaries`, `probeRecordings`, `inferReturnTypeFromBodyDepth`, `probingDeadFallback` and
+  `erasingRefinementProof`. In `enricher/refusedCalls.ts`: `callRefused`, set by `underRefusedCall`. In
+  `enricher/resolvers.ts`: `reachedNames`, opened by `collectReachedNames`. In `enricher/annotations.ts`:
+  `activeAnnotations`, opened by `collectAnnotations`.
 - `openHoists` and `pendingRefinementCopies` in `helpers/types.ts`: a hoist opens and closes them, and the
   outermost close clears the map. `activeCasePairs` is empty between top-level `matchTypes` calls.
 - Memos keyed by object identity, in `WeakMap`s and `WeakSet`s, which nothing resets. In `enrichers.ts`:

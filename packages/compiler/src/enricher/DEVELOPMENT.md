@@ -198,9 +198,10 @@ debugger all see the Function literal the author could have written instead.
 
 The path reads its first member off the one Parameter of the Function the position expects (`memberPathRootType`).
 A position expecting a Function of another arity, or no Function at all, names no Root Type, and the path reports
-`path-without-context`. A structural language can not invent a Root Type from a member name, which is the same rule
-a bare `#Case` follows. An Argument is matched in one pass and enriched in another. So a path matched as an
-Argument reads back the Type the matching recorded (`recordedMemberPathType`).
+`path-without-context`. Inside a call that resolved to nothing it stays silent, since the call's own refusal is the
+mistake (`callRefused`). A structural language can not invent a Root Type from a member name, which is the
+same rule a bare `#Case` follows. An Argument is matched in one pass and enriched in another. So a path matched as
+an Argument reads back the Type the matching recorded (`recordedMemberPathType`).
 
 Each step reads a member off a Record or a Case. An Optional, a Union, a Choice or a List has to be decided by a
 Match before it is read. A step off one reports `path-step-not-a-record`. A step off an Error, an Unknown or an
@@ -577,9 +578,10 @@ not an open slot, so it is taken as it stands. `mentionsUnsolvedTypeParameter` t
 names only a call still matching produces.
 
 A literal whose return Type could not be read is remembered in `literalsAnsweringNothing`. The call around it then
-stays silent about its unbound Type Parameters, since they follow from that one mistake. Inside a call that
-resolved to nothing, a literal's Parameters and return Type stay Error without a report (`refusedCallDepth`). A
-literal with no Parameters is reported at its empty Parameter list.
+stays silent about its unbound Type Parameters, since they follow from that one mistake. Passed to a call that
+resolved to nothing, a literal's Parameters and return Type stay Error without a report (`callRefused`). The
+flag covers the call's own Arguments only: a call inside one reads its own Arguments' positions, and a literal's body
+stands in no Argument. A literal with no Parameters is reported at its empty Parameter list.
 
 ## Invocation and overload selection
 

@@ -137,6 +137,7 @@ import {
 	reportConstantReassignment,
 } from "./reassignment"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
+import { insideRefusedCall, underRefusedCall } from "./refusedCalls"
 import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
 	checkProtocolConformance,
@@ -378,10 +379,15 @@ function enrichCalleeExpression(
 	writtenArguments = 0,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
+		// A call reads its own Arguments' positions; see `callRefused`.
 		case "MethodInvocation":
-			return enrichMethodInvocation(node, scope, expectedType)
+			return underRefusedCall(false, () =>
+				enrichMethodInvocation(node, scope, expectedType),
+			)
 		case "FunctionInvocation":
-			return enrichFunctionInvocation(node, scope, expectedType)
+			return underRefusedCall(false, () =>
+				enrichFunctionInvocation(node, scope, expectedType),
+			)
 		case "Combination":
 			return enrichCombination(node, scope)
 		case "RecordValue":
@@ -970,7 +976,7 @@ function enrichMethodInvocation(
 			name: node.member.content,
 			position: node.member.position,
 		},
-		arguments: underRefusedCall(type.type === "Error", () =>
+		arguments: underRefusedCall(resolved.failed === true, () =>
 			node.arguments.map((argument) =>
 				typer.enrichArgumentNode(argument),
 			),
@@ -1020,7 +1026,8 @@ function enrichFunctionInvocation(
 	return {
 		nodeType: "FunctionInvocation",
 		name,
-		arguments: underRefusedCall(type.type === "Error", () =>
+		// A call answering an Error is no refusal while it selected a candidate.
+		arguments: underRefusedCall(type.type === "Error" && !selected, () =>
 			node.arguments.map((argument) =>
 				typer.enrichArgumentNode(argument),
 			),
@@ -1835,9 +1842,12 @@ function enrichFunctionDefinition(
 		),
 		// A Parameter's Pattern desugars into Constants at the head of the
 		// body, as a Matcher's bindings do.
+		// A body stands in no Argument; see `callRefused`.
 		body: [
 			...bindings,
-			...node.body.flatMap((node) => enrichNode(node, newScope)),
+			...underRefusedCall(false, () =>
+				node.body.flatMap((node) => enrichNode(node, newScope)),
+			),
 		],
 		returnType,
 		inferredReturnType: node.returnType === null ? returnType : null,
@@ -2901,7 +2911,10 @@ function enrichMemberPath(
 	let rootType = memberPathRootType(expected)
 
 	if (rootType === null) {
-		reportPathWithoutContext(node, expected)
+		// Silent inside a refused call; see `callRefused`.
+		if (!insideRefusedCall()) {
+			reportPathWithoutContext(node, expected)
+		}
 
 		return memberPathFunction(
 			node,
@@ -10888,10 +10901,13 @@ type ResolvedMethodInvocation = {
 	// its runtime helper is curried with, in the order of the conformances.
 	derivedMembers?: Array<string>
 	dispatch: Array<common.DispatchCase> | null
+	// Set where no Method resolved, rather than one answering an Error.
+	failed?: true
 }
 
 function resolveFailedMethodInvocation(): ResolvedMethodInvocation {
 	return {
+		failed: true,
 		namespace: placeholderNamespace(),
 		type: { type: "Error" },
 		overloadedMethodIndex: null,
@@ -15471,25 +15487,6 @@ function needsContext(node: parser.FunctionDefinitionNode): boolean {
 	)
 }
 
-// How many calls that resolved to nothing are having their Arguments enriched.
-// A Function literal passed to one has no Parameter Types to take, and the
-// call's own refusal is the one to report.
-let refusedCallDepth = 0
-
-export function underRefusedCall<T>(refused: boolean, work: () => T): T {
-	if (!refused) {
-		return work()
-	}
-
-	refusedCallDepth++
-
-	try {
-		return work()
-	} finally {
-		refusedCallDepth--
-	}
-}
-
 // An unannotated Parameter takes its Type and label from the expected signature
 // by position, so the Parser records no external name for it. Annotated and
 // unannotated Parameters may mix.
@@ -15518,8 +15515,8 @@ function resolveContextualParameterTypes(
 		let expectedParameter = expectedFunction?.parameterTypes[index]
 
 		if (expectedParameter === undefined) {
-			// Silent inside a refused call; see `refusedCallDepth`.
-			if (refusedCallDepth > 0) {
+			// Silent inside a refused call; see `callRefused`.
+			if (insideRefusedCall()) {
 				return { name: null, type: { type: "Error" }, documentation }
 			}
 
@@ -15637,9 +15634,9 @@ function resolveContextualReturnType(
 	// Without an expected signature only the body could say what this returns,
 	// which is hard to follow across a Program. Only a literal in Argument
 	// position may omit `-> Type`. One passed to a refused call is silent; see
-	// `refusedCallDepth`.
+	// `callRefused`.
 	if (expectedFunction === null) {
-		if (refusedCallDepth === 0) {
+		if (!insideRefusedCall()) {
 			reportError(
 				"This Function must write its return Type",
 				node.parameterListPosition,

@@ -1668,6 +1668,67 @@ describe("Code Generation", () => {
 			expect(diagnostics[0].code).toBe("path-without-context")
 		})
 
+		// A call that resolved to nothing names no Parameter Type, and its own
+		// refusal is the mistake.
+		it("reports only the call around a path when the call resolved to nothing", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant total = sumBy(products, .price)
+				constant other = products::sumBy(.price)
+				constant third = Nowhere.sumBy(products, .price)
+				constant fourth = undeclared::map(.price)
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-name",
+				"unknown-method",
+				"unknown-name",
+				"unknown-name",
+			])
+		})
+
+		// A call inside the refused one reads its own Arguments' positions. A
+		// literal's body stands in no Argument. A path in either is a mistake of
+		// its own.
+		it("still reports a path a call or a body inside that call holds", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant shown = sumBy(Terminal.print(.price))
+				constant read = sumBy((x: Integer) -> Integer {
+					constant price = .price
+					<- x
+				})
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-name", 10],
+				["path-without-context", 10],
+				["unknown-name", 11],
+				["path-without-context", 12],
+			])
+		})
+
+		// The path's own hole binds `T`, so the call answers an Error, yet it
+		// selected `id`. The path is the one mistake.
+		it("still reports a path a call answering an Error selected", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				function id<infer T>(_ value: T) -> T {
+					<- value
+				}
+
+				constant read = id(.price)
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"path-without-context",
+			])
+		})
+
 		it("refuses a step read off a List", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				type Basket = { lines: List<Integer> }
