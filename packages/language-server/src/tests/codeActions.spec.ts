@@ -2085,6 +2085,46 @@ describe("Code Actions", () => {
 		})
 	})
 
+	describe("unexpected-token", () => {
+		// The `}` that ended the implementation early is the one removed, and
+		// the brace the reader wrote at the end closes the block again.
+		it("should remove the '}' that closed the implementation early", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction answer() -> Integer {",
+				"\t\t<- 42",
+				"\t}}",
+				"",
+				"\tTerminal.print(answer())",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+
+			expect(fix.title).toBe("Remove the '}'")
+			expect(fix.diagnosticCode).toBe("unexpected-token")
+
+			let result = applied(lines, fix)
+
+			expect(result[3]).toBe("\t}")
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// Moving Statements in is the reader's edit, so nothing is offered.
+		it("should offer nothing for Statements written after the Program", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant answer = 42",
+				"}",
+				"",
+				"constant other = 1",
+			]
+
+			expect(codesOf(lines)).toEqual(["unexpected-token"])
+			expect(quickFixes(lines)).toEqual([])
+		})
+	})
+
 	describe("unclosed-string", () => {
 		it("should close the String at the end of the line it opened on", () => {
 			let lines = [

@@ -3697,6 +3697,133 @@ export { from "./Geometry.es" { Rectangle } }`,
 				expect(diagnostics[0].code).toBe("unexpected-token")
 				expect(diagnostics[0].labels[1]?.kind).toBe("secondary")
 			})
+
+			it("should compile once the stray Token is removed", () => {
+				let source = `implementation {
+					constant answer = 42
+				}
+				}`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect(diagnostics[0]?.helps).toEqual(["Remove the '}'."])
+				expect(compiles(source.slice(0, source.lastIndexOf("}")))).toBe(
+					true,
+				)
+			})
+
+			// What follows ends in the `}` written for the implementation. The one
+			// that closed it early goes, and the report stands on it. Removing each
+			// Token after the end in turn never reaches the Program.
+			it("should name the '}' that closed the implementation early", () => {
+				let source = `implementation {
+	function answer() -> Integer {
+		<- 42
+	}}
+
+	Terminal.print(answer())
+}`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				let brace = {
+					start: { line: 4, column: 3 },
+					end: { line: 4, column: 4 },
+				}
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["unexpected-token"])
+				expect(diagnostics[0].message).toBe(
+					"This '}' ends the implementation block early",
+				)
+				expect(diagnostics[0].position).toEqual(brace)
+				expect(diagnostics[0].helps).toEqual(["Remove the '}'."])
+				expect(diagnostics[0].data).toEqual({
+					kind: "essence-spelling",
+					position: brace,
+					spelling: "",
+				})
+				expect(compiles(source.replace("}}", "}"))).toBe(true)
+			})
+
+			// The `}` written for the implementation may have its sections after
+			// it, which balance.
+			it("should name the early '}' where an export block follows", () => {
+				let source = `implementation {
+	function answer() -> Integer {
+		<- 42
+	}}
+
+	constant value = answer()
+}
+
+export { value }`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect(diagnostics[0]?.message).toBe(
+					"This '}' ends the implementation block early",
+				)
+				expect(diagnostics[0]?.labels[2]?.position.start).toEqual({
+					line: 7,
+					column: 1,
+				})
+				expect(compiles(source.replace("}}", "}"))).toBe(true)
+			})
+
+			// A file of tests alone has no implementation block to move into,
+			// and its tests block may hold the Statements. Its `}` can close the
+			// block early just as the implementation's can.
+			it("should answer a file of tests alone with its tests block", () => {
+				let written = (body: string, after: string) => `tests {
+	test "it" {
+		expect true
+	}${body}
+}
+${after}`
+				let codes = (source: string) =>
+					parseWithDiagnostics(source).diagnostics
+
+				expect(
+					codes(written("", "constant other = 1"))[0]?.helps,
+				).toEqual([
+					"Move what follows into the 'tests { … }' block, or remove it.",
+				])
+				expect(
+					compiles(written("\n\n\tconstant other = 1", ""), {
+						tests: true,
+					}),
+				).toBe(true)
+
+				let early =
+					'tests {\n\ttest "it" {\n\t\texpect true\n\t}}\n\n\tconstant other = 1\n}'
+
+				expect(codes(early)[0]?.message).toBe(
+					"This '}' ends the tests block early",
+				)
+				expect(codes(early)[0]?.helps).toEqual(["Remove the '}'."])
+				expect(
+					compiles(early.replace("\t}}", "\t}"), { tests: true }),
+				).toBe(true)
+			})
+
+			it("should ask for Statements written after the Program to move in", () => {
+				let source = `implementation {
+	constant answer = 42
+}
+
+constant other = 1`
+				let { diagnostics } = parseWithDiagnostics(source)
+
+				expect(diagnostics[0]?.helps).toEqual([
+					"Move what follows into the 'implementation { … }' block, or remove it.",
+				])
+				expect(diagnostics[0]?.data).toBeUndefined()
+				expect(
+					compiles(`implementation {
+	constant answer = 42
+	constant other = 1
+}`),
+				).toBe(true)
+			})
 		})
 
 		describe("Misplaced sections", () => {

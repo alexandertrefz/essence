@@ -145,6 +145,23 @@ Where `outdentedClose` answers, `unclosed-block` stands on that block's `{`, wit
 Label. Where it does not, the report stands at the end of the input about the outermost block. Only the innermost
 torn-open block reports, since one missing `}` tears open every enclosing block too.
 
+### Text after the Program
+
+`reportTrailingTokens` in `trailingTokens.ts` reports what is left once every section has been read, as
+`unexpected-token`. Its Help depends on what is left:
+
+- A stray `}` or `;`, or one Token on its own, is removed, and the Quick Fix deletes it.
+- Tokens that directly follow the implementation's or the tests block's `}` and close exactly one `}` they never
+  open were written inside that block, and that `}` was written to close it. Whatever follows that `}`, such as an
+  `export` block, must balance. One `}` too many above them ended the block early. The report stands on the `}` that
+  ended it, which is the brace to remove, so the Help and the Quick Fix write where the report stands.
+- Anything else is code written after the Program. The Help says to move it into the implementation block, or into
+  the tests block of a file of tests alone, which has no implementation block, or to remove it. No Quick Fix is
+  offered, since either edit is the reader's to make.
+
+A Help that removed the first Token alone would answer the next Token with the same report, and never reach a
+Program.
+
 ## Contextual keywords
 
 `identifierTokenTypes` is the Identifier rule of the grammar. Every Keyword in it is also a valid Identifier, and

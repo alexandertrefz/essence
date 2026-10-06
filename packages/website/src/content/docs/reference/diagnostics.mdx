@@ -138,7 +138,37 @@ Error: Unexpected '}' after the end of the Program
 
 Delete it. A file holds one `implementation { … }` block, with an optional `import { … }` block above it, and optional `export { … }` and `tests { … }` blocks below it, in that order.
 
-Quick Fix: **Remove the '}'** — the span the label points at is what goes.
+Where what follows ends in the `}` written for the implementation block, a `}` too many above it ended the block early. The report then stands on that brace, and its help removes it:
+
+<div class="error-output">
+
+```
+[unexpected-token]
+Error: This '}' ends the implementation block early
+   ╭─┤ Answer.es:4:3 │
+   │
+ 4 │     }}
+   │      ▲  
+   │      ╰── the implementation block ends here
+   │ 
+ 6 │     Terminal.print(answer())
+   │     ────┬───  
+   │         ╰───── so this stands after the end of the Program
+ 7 │ }
+   │ ▲  
+   │ ╰── and this '}' was written to close the block
+   │ 
+   │ Help: Remove the '}'.
+   │ 
+   │ Note: What follows the block closes one more '}' than it opens, so it was written inside the block.
+───╯
+```
+
+</div>
+
+A `tests` block closed early is answered the same way. Other code written after the program, such as `constant other = 1` below the block, is answered "Move what follows into the 'implementation \{ … \}' block, or remove it." A file of tests alone has no implementation block, and its `tests` block may hold statements, so it is told to move the code there instead. Removing the first word alone would only leave the next one to report.
+
+Quick Fix: **Remove the '}'** — the span the report stands on is what goes. Code written after the program gets none, since moving it in is your edit.
 
 Taught on: [Programs and values › The shape of a file](/docs/language/programs-and-values#the-shape-of-a-file)
 

@@ -224,6 +224,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"undispatchable-method",
 		"undocumented-parameter",
 		"unexpected-payload",
+		"unexpected-token",
 		"ungeneratable-type",
 		"unicode-escape-out-of-range",
 		"uninferable-item-type",

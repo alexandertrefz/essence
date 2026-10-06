@@ -40,6 +40,7 @@ import {
 	TokenStream,
 	type TokenStreamState,
 } from "./tokenStream"
+import { reportTrailingTokens } from "./trailingTokens"
 
 const TokenType = lexer.TokenType
 type Token = lexer.Token
@@ -856,11 +857,7 @@ class DescentParser {
 				tests.position,
 			)
 
-			this.reportTrailingTokens(
-				below,
-				tests.position,
-				"the tests block ends here",
-			)
+			this.reportTrailingTokens(below, tests, null)
 
 			return generators.program(
 				generators.implementationSection([], tests.position),
@@ -948,13 +945,7 @@ class DescentParser {
 			implementation.position,
 		)
 
-		this.reportTrailingTokens(
-			below,
-			tests?.position ?? closingPosition,
-			tests === null
-				? "the implementation block ends here"
-				: "the tests block ends here",
-		)
+		this.reportTrailingTokens(below, tests, closingPosition)
 
 		// A Program's Position is the implementation block's span, which the
 		// formatter reads. Each section carries its own span.
@@ -969,47 +960,23 @@ class DescentParser {
 		)
 	}
 
-	// Reports whatever is left once every section has been read. `endPosition`
-	// is where the Program should have ended when no section follows the block.
+	// Reports whatever is left once every section has been read. `closing` is
+	// the implementation's `}`, null for a file of tests alone.
 	protected reportTrailingTokens(
 		below: Array<ModuleSectionRead>,
-		endPosition: common.Position,
-		endDescription: string,
+		tests: { position: common.Position } | null,
+		closing: common.Position | null,
 	): void {
-		if (this.tokens.isAtEnd() || this.suppressDiagnostics) {
-			return
-		}
-
-		let token = this.peekOrFail()
-		let lastSection = below[below.length - 1]
-
-		reportError(
-			`Unexpected ${describeToken(token)} after the end of the Program`,
-			token.position,
-			{
-				code: "unexpected-token",
-				labels: [
-					primary(token.position, "nothing may follow here"),
-					secondary(
-						lastSection?.node.position ?? endPosition,
-						lastSection === undefined
-							? endDescription
-							: "the Program ends here",
-					),
-				],
-				notes: [
-					"A Program is one 'implementation { … }' block, framed by an optional 'import { … }' block above it and an optional 'tests { … }' and 'export { … }' block below it.",
-				],
-				// An empty `essence-spelling` asks the Quick Fix to delete the
-				// primary span, as for a `;`.
-				helps: [`Remove the ${describeToken(token)}.`],
-				data: {
-					kind: "essence-spelling",
-					position: token.position,
-					spelling: "",
+		if (!this.suppressDiagnostics) {
+			reportTrailingTokens(
+				this.tokens.between(this.tokens.save().index, Infinity),
+				{
+					lastSection: below[below.length - 1]?.node.position ?? null,
+					tests: tests?.position ?? null,
+					implementation: closing,
 				},
-			},
-		)
+			)
+		}
 	}
 
 	// Reads `import` and `export` blocks on either side of the implementation,
