@@ -126,8 +126,10 @@ sure.
 
 A unit also records the top-level Constants and Variables it reads, and the static Properties of top-level Namespaces.
 Each holds nothing until its own Statement, or its own initialiser, runs. A body that runs earlier and reads one is
-reported, as `Constant 'k' is read before it has a value` or the same for a Property. A read the Statement makes
-itself is left to the enricher, which reports a Constant named above its line, and to `checkPropertyIsBound`.
+reported, as `Constant 'k' is read before it has a value` or the same for a Property. A Property whose Namespace does
+not exist yet either is left to the Namespace's report (`awaitsItsNamespace`), since moving the Statement answers
+both. A read the Statement makes itself is left to the enricher, which reports a Constant named above its line, and
+to `checkPropertyIsBound`.
 
 A Module of an import cycle may load before the Module it imports from. So code that runs while it loads may not use
 a name bound from another Module of the cycle, which the linker marks `cyclic` on the typed import entry. A unit records

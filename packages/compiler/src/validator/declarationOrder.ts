@@ -279,6 +279,24 @@ function availableFrom(
 		: declaration.index * STEPS + STEPS - 1
 }
 
+function awaitsItsNamespace(
+	dependency: Dependency,
+	order: DeclarationOrder,
+	moment: number,
+): boolean {
+	return (
+		dependency.kind === "property" &&
+		availableFrom(
+			{
+				...dependency,
+				kind: "namespace",
+				name: dependency.name.slice(0, dependency.name.indexOf(".")),
+			},
+			order,
+		) >= moment
+	)
+}
+
 function ownClosure(unit: Unit, order: DeclarationOrder): Closure {
 	return {
 		latest: Math.max(
@@ -563,13 +581,15 @@ function reportFrom(
 			}
 
 			// A Constant or a Property the Statement reads itself is the
-			// enricher's and `checkPropertyIsBound`'s to report.
+			// enricher's and `checkPropertyIsBound`'s to report. A Property of
+			// a Namespace that does not exist yet is the Namespace's report.
 			if (
 				declaration === undefined ||
 				availableFrom(dependency, order) < moment ||
 				(step.parent === null &&
 					(dependency.kind === "constant" ||
 						dependency.kind === "property")) ||
+				awaitsItsNamespace(dependency, order, moment) ||
 				order.reported.has(`${index} ${dependency.name}`) ||
 				reported.has(key)
 			) {

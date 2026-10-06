@@ -2621,6 +2621,57 @@ describe("Validator", () => {
 				])
 			})
 
+			// The Property can not be read while its Namespace does not exist
+			// either, and only moving the Statement answers both.
+			it.each([
+				[
+					"a call",
+					`function useIt() -> Integer {
+						<- Sizes.base
+					}`,
+					"Terminal.print(useIt())",
+				],
+				[
+					"a Function handed on",
+					"",
+					"Terminal.inspect([1, 2]::map((value) { <- value::add(Sizes.base) }))",
+				],
+			])(
+				"reports a static Property read through %s above its Namespace once",
+				(_, declarations, statement) => {
+					let program = (order: Array<string>) => `implementation {
+						constant size = 4
+
+						${declarations}
+
+						${order.join("\n\n")}
+					}`
+					let namespace = `namespace Sizes {
+							static base: Integer = size
+						}`
+					let diagnostics = diagnosticsFor(
+						program([statement, namespace]),
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => [
+							diagnostic.message,
+							diagnostic.helps,
+						]),
+					).toEqual([
+						[
+							"Namespace 'Sizes' is used before it is declared",
+							[
+								"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+							],
+						],
+					])
+					expect(
+						diagnosticsFor(program([namespace, statement])),
+					).toEqual([])
+				},
+			)
+
 			it("names every Function a call runs through", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					function outer() -> Boolean {
@@ -3380,8 +3431,7 @@ describe("Validator", () => {
 						${sizes("static base = size")}
 					}`)
 
-					expect(codes).toContain("use-before-declaration")
-					expect(codes).not.toContain("uninferable-property-type")
+					expect(codes).toEqual(["use-before-declaration"])
 				},
 			)
 
