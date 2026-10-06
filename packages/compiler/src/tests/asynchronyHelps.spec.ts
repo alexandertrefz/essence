@@ -257,3 +257,70 @@ describe("Every report that could offer 'complete'", () => {
 		})
 	}
 })
+
+// The other side of the same word: a `complete` written where nothing can wait.
+// Each shape of the report names its own edit, followed and compiled here.
+describe("A 'complete' where nothing can wait", () => {
+	let helpsOf = (source: string) =>
+		analysedDiagnosticsFor(source)
+			.filter(
+				(diagnostic) => diagnostic.code === "complete-outside-future",
+			)
+			.map((diagnostic) => diagnostic.helps)
+
+	it("compiles once the Function declares a Future", () => {
+		let headline = (returned: string) => `implementation {
+			function headline(_ url: String) -> ${returned} {
+				constant answered = complete Async.deferred(() { <- url })
+
+				<- answered
+			}
+		}`
+
+		expect(helpsOf(headline("String"))).toEqual([
+			["Declare the return Type 'Future<String>'."],
+		])
+		expect(compiles(headline("Future<String>"))).toBe(true)
+	})
+
+	it("compiles once a word before no work is dropped", () => {
+		let doubled = (returned: string) => `implementation {
+			function doubled(_ x: Integer) -> Integer {
+				<- ${returned}
+			}
+		}`
+
+		expect(helpsOf(doubled("complete x"))).toEqual([
+			["Drop the 'complete'."],
+		])
+		expect(compiles(doubled("x"))).toBe(true)
+	})
+
+	it("compiles once a default reads work completed above it", () => {
+		let shown = (completed: string, defaulted: string) => `implementation {
+			function fetched() -> Future<Integer> {
+				<- Async.deferred(() { <- 1 })
+			}
+
+			${completed}
+
+			function shown(_ count: Integer = ${defaulted}) -> String {
+				<- "{count}"
+			}
+
+			Terminal.print(shown())
+		}`
+
+		expect(helpsOf(shown("", "complete fetched()"))).toEqual([
+			barredCompletion("parameter-default").helps,
+		])
+		expect(
+			compiles(
+				shown(
+					"constant fetchedCount = complete fetched()",
+					"fetchedCount",
+				),
+			),
+		).toBe(true)
+	})
+})

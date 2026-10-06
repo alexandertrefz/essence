@@ -113,6 +113,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 	[
 		"ambiguous-case",
 		"at-in-static-method",
+		"complete-outside-future",
 		"dictionary-entry-syntax",
 		"duplicate-type-parameter",
 		"expect-not-boolean",
