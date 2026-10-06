@@ -8,14 +8,16 @@ import {
 	caseDefaults,
 	isMergedLevel,
 	memberExpression,
-	parameterDefaults,
 	parameterInternalName,
 	patternBindings,
 } from "@essence-lang/compiler/helpers"
+import {
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { defineExpressions } from "./defineArmChildren"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains, isSmaller } from "./positions"
 import {
@@ -499,8 +501,9 @@ export function indexProgram(
 
 	if (enrichedProgram !== null) {
 		for (let section of typedProgramSections(enrichedProgram)) {
-			walkTypedBody(section.head, context)
-			walkTypedBody(section.nodes, context)
+			for (let node of [...section.head, ...section.nodes]) {
+				walkTypedNode(node, context)
+			}
 		}
 	}
 
@@ -2649,72 +2652,10 @@ function boundProtocol(type: common.Type | null): string | undefined {
 	return type?.type === "GenericUse" ? type.constraint : undefined
 }
 
-function walkTypedBody(
-	nodes: Array<common.typed.ImplementationNode>,
-	context: WalkContext,
-) {
-	for (let node of nodes) {
-		walkTypedNode(node, context)
-	}
-}
-
-function walkTypedArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-	context: WalkContext,
-) {
-	for (let argument of nodeArguments) {
-		walkTypedNode(argument.value, context)
-	}
-}
-
-// A default may name a Method or member, which only the typed pass binds.
-function walkTypedCaseDefaults(
-	cases: common.typed.ChoiceDeclarationStatementNode["cases"],
-	context: WalkContext,
-) {
-	for (let defaultValue of caseDefaults(cases)) {
-		walkTypedNode(defaultValue, context)
-	}
-}
-
-function walkTypedParameterDefaults(
-	parameters: Array<common.typed.ParameterNode>,
-	context: WalkContext,
-) {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		walkTypedNode(defaultValue, context)
-	}
-}
-
-function walkTypedMethods(methods: common.typed.Methods, context: WalkContext) {
-	for (let member of Object.values(methods)) {
-		let entries =
-			member.nodeType === "OverloadedMethod" ||
-			member.nodeType === "OverloadedStaticMethod"
-				? member.methods
-				: [member.method]
-
-		for (let method of entries) {
-			walkTypedParameterDefaults(method.value.parameters, context)
-			walkTypedBody(method.value.body, context)
-		}
-	}
-}
-
-function walkTypedNode(
-	node: common.typed.ImplementationNode,
-	context: WalkContext,
-) {
+// The typed pass. A kind that binds a member does so before its children
+// are walked, and a Lookup after its base, which is written first.
+function walkTypedNode(node: TypedNode, context: WalkContext) {
 	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			walkTypedNode(node.value, context)
-			return
-		case "FunctionStatement":
-			walkTypedParameterDefaults(node.value.parameters, context)
-			walkTypedBody(node.value.body, context)
-			return
 		case "NamespaceDefinitionStatement": {
 			let keys = context.namespaceKeys.get(node.name.content) ?? []
 			let nested = nestedKey(node.name.content, node.name.position)
@@ -2723,46 +2664,14 @@ function walkTypedNode(
 				node.type,
 				keys.includes(nested) ? nested : node.name.content,
 			)
-
-			for (let property of Object.values(node.properties)) {
-				walkTypedNode(property.value, context)
-			}
-
-			walkTypedMethods(node.methods, context)
-
-			// A native Method's defaults live in the frame the Compiler
-			// synthesizes for them, such as `= @::length()`.
-			for (let shim of node.nativeShims) {
-				walkTypedParameterDefaults(shim.parameters, context)
-			}
-
-			return
+			break
 		}
 		case "ProtocolDeclarationStatement":
 			context.ownProtocols.set(
 				node.protocolType.identity,
 				protocolIdentityKey(node.protocolType.identity),
 			)
-			walkTypedMethods(node.methods, context)
-			return
-		case "IfStatement":
-			walkTypedNode(node.condition, context)
-			walkTypedBody(node.body, context)
-			return
-		case "IfElseStatement":
-			walkTypedNode(node.condition, context)
-			walkTypedBody(node.trueBody, context)
-			walkTypedBody(node.falseBody, context)
-			return
-		case "ReturnStatement":
-			walkTypedNode(node.expression, context)
-			return
-		// The Enricher desugars a `require` Matcher's bindings into Constants
-		// of this body, so only the asserted value is left to walk.
-		case "ExpectStatement":
-		case "RequireStatement":
-			walkTypedNode(node.value, context)
-			return
+			break
 		case "MethodInvocation":
 			bindNamespaceMember(
 				node.namespace.name,
@@ -2777,140 +2686,56 @@ function walkTypedNode(
 					node.namespace.type.providedMembers?.[node.member.name] ??
 					boundProtocol(node.namespace.type.targetType),
 			)
-			walkTypedNode(node.base, context)
-			walkTypedArguments(node.arguments, context)
+			break
+		case "Lookup":
+			forEachTypedChild(node, walkTypedNode, context)
+			bindLookupMember(node, context)
 			return
-		case "FunctionInvocation":
-			walkTypedNode(node.name, context)
-			walkTypedArguments(node.arguments, context)
-			return
-		case "Lookup": {
-			walkTypedNode(node.base, context)
-
-			let baseType = node.base.type
-
-			if (baseType.type === "Namespace") {
-				bindNamespaceMember(
-					baseType.name,
-					baseType,
-					node.member.content,
-					node.member.position,
-					context,
-					// As for a MethodInvocation: `Number.isLessThan` names the
-					// conforming Namespace, but the declaration is the Protocol's.
-					node.providedBy,
-				)
-			} else if (baseType.type === "GenericUse") {
-				// `Value.empty()` on a bounded Type Parameter reads a static
-				// member of its bound.
-				let bound = boundProtocol(baseType)
-
-				if (bound !== undefined) {
-					bindNamespaceMember(
-						bound,
-						baseType,
-						node.member.content,
-						node.member.position,
-						context,
-						node.providedBy ?? bound,
-					)
-				}
-			} else if (baseType.type === "Record") {
-				context.recordLookups.push({
-					names: Object.keys(baseType.members),
-					name: node.member.content,
-					position: node.member.position,
-				})
-			}
-
-			return
-		}
 		case "Combination":
 			registerPathKeySite(node, context)
-			walkTypedNode(node.lhs, context)
-			walkTypedNode(node.rhs, context)
-			return
-		case "Start":
-		case "Complete":
-			walkTypedNode(node.expression, context)
-			return
-		// The name inside `primes[0]` may be a member a rename must reach.
-		case "RefusedValue":
-			walkTypedNode(node.base, context)
-			return
-		case "Match":
-			walkTypedNode(node.value, context)
-
-			for (let handler of node.handlers) {
-				for (let expression of typedHandlerExpressions(handler)) {
-					walkTypedNode(expression, context)
-				}
-
-				walkTypedBody(handler.body, context)
-			}
-
-			return
-		case "Define":
-			for (let expression of defineExpressions(node)) {
-				walkTypedNode(expression, context)
-			}
-
-			return
+			break
 		case "RecordValue":
 			registerMergedKeySite(node, context)
+			break
+	}
 
-			for (let member of Object.values(node.members)) {
-				walkTypedNode(member, context)
-			}
+	forEachTypedChild(node, walkTypedNode, context)
+}
 
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				walkTypedNode(value, context)
-			}
+function bindLookupMember(node: common.typed.LookupNode, context: WalkContext) {
+	let baseType = node.base.type
 
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				walkTypedNode(entry.key, context)
-				walkTypedNode(entry.value, context)
-			}
+	if (baseType.type === "Namespace") {
+		bindNamespaceMember(
+			baseType.name,
+			baseType,
+			node.member.content,
+			node.member.position,
+			context,
+			// As for a MethodInvocation: `Number.isLessThan` names the
+			// conforming Namespace, but the declaration is the Protocol's.
+			node.providedBy,
+		)
+	} else if (baseType.type === "GenericUse") {
+		// `Value.empty()` on a bounded Type Parameter reads a static member of
+		// its bound.
+		let bound = boundProtocol(baseType)
 
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					walkTypedNode(segment.expression, context)
-				}
-			}
-
-			return
-		case "FunctionValue":
-			walkTypedBody(node.value.body, context)
-			return
-		case "CaseValue":
-			if (node.value !== null) {
-				walkTypedNode(node.value, context)
-			}
-
-			return
-		case "ChoiceDeclarationStatement":
-			walkTypedCaseDefaults(node.cases, context)
-			return
-		// A checked refinement's predicate calls Methods, and only the
-		// typed predicate knows which Namespace answered them.
-		case "TypeAliasStatement":
-			if (node.predicate !== null) {
-				walkTypedNode(node.predicate, context)
-			}
-
-			return
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return
+		if (bound !== undefined) {
+			bindNamespaceMember(
+				bound,
+				baseType,
+				node.member.content,
+				node.member.position,
+				context,
+				node.providedBy ?? bound,
+			)
+		}
+	} else if (baseType.type === "Record") {
+		context.recordLookups.push({
+			names: Object.keys(baseType.members),
+			name: node.member.content,
+			position: node.member.position,
+		})
 	}
 }

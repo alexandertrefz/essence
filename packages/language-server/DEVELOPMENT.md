@@ -172,7 +172,8 @@ Scope's `values` correspond to the Enricher's members, and its `types` to the En
 ### Names the typed Program resolves
 
 A Method, a property or a Record member resolves through Types, not Scopes. When an enriched Program is at hand,
-`walkTypedBody` binds these in a second pass over the typed tree:
+`walkTypedNode` binds these in a second pass over the typed tree. It descends through `forEachTypedChild`, so it
+reaches every child the typed table holds, and only the kinds that bind a member have a case of their own:
 
 - The typed tree names the Namespace that answered each Method Invocation, and `namespaceMembers` binds the call to
   that Namespace's Declaration. A Namespace this file does not declare goes to `externalMembers` for the workspace
