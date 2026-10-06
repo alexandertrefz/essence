@@ -48,6 +48,7 @@ import {
 } from "../helpers/patterns"
 import {
 	admissionOfWrittenValue,
+	admittedPartialType,
 	admittedTypeOf,
 	describePredicate,
 	fitsWritten,
@@ -7113,10 +7114,13 @@ function enrichCasePayloadDefault(
 		return value
 	}
 
-	if (!isPartialOf(payloadType, value.type) && !isReportedValue(value.type)) {
+	// A written member carries its own evidence for a refinement.
+	let written = admittedPartialType(payloadType, value.type, value)
+
+	if (!isPartialOf(payloadType, written) && !isReportedValue(value.type)) {
 		// A partial, so a member the default leaves out is not missing. Only
 		// what it writes can be wrong.
-		let record = recordMismatchEvidence(payloadType, value.type, value, {
+		let record = recordMismatchEvidence(payloadType, written, value, {
 			partial: true,
 			subject: `'#${caseType.name}'`,
 		})

@@ -4857,6 +4857,37 @@ describe("Choices", () => {
 			).toContain("default-type-mismatch")
 		})
 
+		// A written member is evidence for a refined member, however deep it
+		// stands, and only where the predicate holds of it.
+		it("admits a default whose written member proves a refinement", async () => {
+			expect(
+				await run(`implementation {
+					type Server = { port: PositiveInteger, host: String }
+
+					choice Call {
+						Post { server: Server, body: String } = { server = { port = 80, host = "a" } },
+						Idle,
+					}
+
+					constant call: Call = #Post({ body = "x" })
+
+					Terminal.inspect(call)
+				}`),
+			).toEqual([
+				'Call#Post { body = "x", server = { port = 80, host = "a" } }',
+			])
+			expect(
+				codesOf(`implementation {
+					type Server = { port: PositiveInteger, host: String }
+
+					choice Call {
+						Post { server: Server, body: String } = { server = { port = 0, host = "a" } },
+						Idle,
+					}
+				}`),
+			).toEqual(["default-type-mismatch"])
+		})
+
 		it("refuses a default that is not a Record Literal", () => {
 			expect(
 				codesOf(`implementation {

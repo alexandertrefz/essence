@@ -112,7 +112,9 @@ therefore has to become data where the Choice is declared, and it travels on the
 `payloadDefault.values`.
 
 `enrichCasePayloadDefault` reads the default against the payload Record in the Module's own Scope. The default is a
-Record Literal whose written members say what it fills in; it is a partial, so members it leaves out are fine.
+Record Literal whose written members say what it fills in; it is a partial, so members it leaves out are fine. Its
+written members are asked as an update's are (`admittedPartialType`), so `{ server = { port = 80 } }` fills a
+`PositiveInteger` port.
 `bakeCaseDefaultValue` then turns each member into data. A literal is itself, and a List, Record or Case value
 built of literals is baked member by member. A name stands for a Constant of this Module whose value is written
 down (`bakeNamedCaseDefaultValue`). Following one Constant to another is allowed, as long as every leaf is a
