@@ -3495,6 +3495,54 @@ describe("Enricher", () => {
 			})
 		})
 
+		// The target Type already reads `Other`, so declaring it is the whole
+		// edit.
+		it("should compile once the Generic is declared", () => {
+			let source = (generics: string) => `implementation {
+				namespace Pairs<${generics}> for { first: Item, second: Other } is Printable where Other is Printable {
+					toString() -> String {
+						<- "{@.second}"
+					}
+				}
+			}`
+
+			expect(
+				diagnosticsFor(source("infer Item")).map(
+					(diagnostic) => diagnostic.helps,
+				),
+			).toContainEqual([
+				"Declare it in the Namespace's Generic list: '<infer Other>'.",
+			])
+			expect(compiles(source("infer Item, infer Other"))).toBe(true)
+		})
+
+		// A target Type that never reads `Other` can not witness the condition.
+		// That is the next question the declaration raises, and its own Help
+		// answers it.
+		it("should lead a Generic the target never reads to the report that says so", () => {
+			let source = (generics: string, target: string) => `implementation {
+				namespace Pairs<${generics}> for ${target} is Printable where Other is Printable {
+					toString() -> String {
+						<- "pairs"
+					}
+				}
+			}`
+
+			expect(
+				diagnosticsFor(
+					source("infer Item, infer Other", "List<Item>"),
+				).map((diagnostic) => diagnostic.code),
+			).toEqual(["unwitnessable-where-condition"])
+			expect(
+				compiles(
+					source(
+						"infer Item, infer Other",
+						"{ items: List<Item>, other: Other }",
+					),
+				),
+			).toBe(true)
+		})
+
 		it("should reject a where condition on a Generic the target Type never mentions", () => {
 			// A phantom Generic's condition can never be witnessed at a use site,
 			// so it is refused at the Namespace.
@@ -3787,6 +3835,20 @@ describe("Enricher", () => {
 			])
 		})
 
+		it("should compile once the bound is written without 'infer'", () => {
+			expect(
+				compiles(`implementation {
+					namespace Restating<infer Item> for { value: Item } {
+						shown<Item is Printable>() -> String {
+							<- "{@.value}"
+						}
+					}
+
+					Terminal.print({ value = 1 }::shown())
+				}`),
+			).toBe(true)
+		})
+
 		it("should refuse a re-declaration carrying no bound at all", () => {
 			let { diagnostics } = enrichSource(
 				`implementation {
@@ -3917,6 +3979,20 @@ describe("Enricher", () => {
 					"shadowed-type-parameter",
 				],
 			])
+		})
+
+		it("should compile once the restated entry is dropped", () => {
+			expect(
+				compiles(`implementation {
+					namespace Restating<infer Item> for { value: Item } {
+						held() -> Item {
+							<- @.value
+						}
+					}
+
+					Terminal.print({ value = 1 }::held())
+				}`),
+			).toBe(true)
 		})
 
 		// One Help, since `unsatisfied-bound` names the Protocol once the entry
