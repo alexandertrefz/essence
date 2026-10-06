@@ -599,6 +599,37 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		// A Case Matcher's payload Pattern is offered the payload's member, and
+		// the body still reads `radus`.
+		it("should offer a Case payload's member for a misspelt Pattern member", () => {
+			let lines = [
+				"implementation {",
+				"\tchoice Shape { Circle { radius: Integer }, Square { side: Integer } }",
+				"",
+				"\tfunction area(_ shape: Shape) -> Integer {",
+				"\t\t<- match shape -> Integer {",
+				"\t\t\tcase #Circle({ radus }) { <- radus }",
+				"\t\t\tcase #Square({ side }) { <- side }",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.print(area(#Square({ side = 2 })))",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines, spanOf(lines, 6, "radus"))
+
+			expect(fix?.title).toBe("Change to 'radius as radus'")
+			expect(fix?.diagnosticCode).toBe("unknown-member")
+
+			let result = applied(lines, fix!)
+
+			expect(result[5]).toBe(
+				"\t\t\tcase #Circle({ radius as radus }) { <- radus }",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
 		// `{ kye, key }` would take `key` apart twice as `{ key as kye, key }`,
 		// and `{ key, key }` would also unbind `kye`. A member with a binder
 		// of its own is only a name, which the spelling fix may change.

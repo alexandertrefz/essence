@@ -1579,6 +1579,8 @@ Use one of the listed members.
 
 A bare member in a [pattern](/docs/language/patterns) that no arm of the value declares lands here too, at the member, in a `case` as in a declaration or a parameter. Over `Click | KeyPress`, `case { kye }` is refused with `Did you mean 'key'?`, and a second Help offers writing its type where a record could carry the member. A `case` naming a member only some arms carry is fine: that is how a match tells the arms apart. So is a member written with its type, as in `case { label: String }`: a record may carry members its type leaves out, so that is a test the value may pass.
 
+A misspelt member in a case's payload pattern is read against the payload where the payload holds its near miss and the one member's value does not. So `case #Circle({ radus })` is refused as `'Shape#Circle' has no member 'radus'`, with `Did you mean 'radius'?` and a Quick Fix that writes `radius as radus`, so the body's reads of `radus` still resolve. Where the one member holds a record with the near miss, as `centre: { x: Integer, y: Integer }` does for `{ xx }`, the report names that record and offers `x`.
+
 Quick Fix: **Change to 'x'** when a member name is close.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)

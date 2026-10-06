@@ -1052,9 +1052,10 @@ describe("Patterns", () => {
 		})
 
 		// The nested Pattern reads members of a value the payload has not got,
-		// so they are no second mistake.
+		// so they are no second mistake. `state` carries no `stat` either, so
+		// the misspelling is the payload's.
 		it("report a missing member that takes a nested Pattern at its name", () => {
-			let diagnostics = diagnosticsOf(`implementation {
+			let program = (member: string): string => `implementation {
 				choice Progress {
 					Going { state: { index: Integer, total: Integer } },
 					Stopped,
@@ -1065,10 +1066,11 @@ describe("Patterns", () => {
 				})
 
 				Terminal.inspect(match started -> String {
-					case #Going({ stat as { index = 1, total } }) { <- "first" }
+					case #Going({ ${member} as { index = 1, total } }) { <- "first" }
 					case _ { <- "later" }
 				})
-			}`)
+			}`
+			let diagnostics = diagnosticsOf(program("stat"))
 
 			expect(
 				diagnostics.map((diagnostic) => [
@@ -1079,10 +1081,83 @@ describe("Patterns", () => {
 			).toEqual([
 				[
 					"unknown-member",
-					"'{ index: Integer, total: Integer }' has no member 'stat'",
+					"'Progress#Going' has no member 'stat'",
 					{ line: 12, column: 20 },
 				],
 			])
+			expect(diagnostics[0]?.helps).toEqual(["Did you mean 'state'?"])
+			expect(diagnostics[0]?.data).toEqual({
+				kind: "suggestion",
+				suggestion: "state",
+			})
+			expect(compiles(program("state"))).toBe(true)
+		})
+
+		// `{ radus }` names nothing an Integer carries, so it is the payload's
+		// `radius` misspelt, not the one member's value taken apart.
+		it("report a misspelt member of a one-member payload against the payload", () => {
+			let program = (member: string): string => `implementation {
+				choice Shape { Circle { radius: Integer }, Square { side: Integer } }
+
+				function area(_ shape: Shape) -> Integer {
+					<- match shape -> Integer {
+						case #Circle({ ${member} }) { <- 1 }
+						case #Square({ side }) { <- side }
+					}
+				}
+
+				Terminal.print(area(#Square({ side = 2 })))
+			}`
+			let [refusal] = diagnosticsOf(program("radus"))
+
+			expect(refusal?.message).toBe(
+				"'Shape#Circle' has no member 'radus'",
+			)
+			expect(refusal?.notes).toEqual(["'Shape#Circle' has 'radius'."])
+			expect(refusal?.helps).toEqual(["Did you mean 'radius'?"])
+			expect(refusal?.data).toEqual({
+				kind: "suggestion",
+				suggestion: "radius",
+			})
+			expect(compiles(program("radius"))).toBe(true)
+		})
+
+		// `centre` holds a Record, so `{ xx }` may be its one member's value
+		// taken apart, where `x` is the near miss. `{ centr }` has a near miss
+		// only among the payload's members, so it is the payload misspelt.
+		it("report a misspelt member against the reading that holds its near miss", () => {
+			let program = (
+				member: string,
+				read: string,
+			): string => `implementation {
+				choice Shape { Circle { centre: { x: Integer, y: Integer } }, Square { side: Integer } }
+
+				function px(_ shape: Shape) -> Integer {
+					<- match shape -> Integer {
+						case #Circle({ ${member} }) { <- ${read} }
+						case #Square({ side }) { <- side }
+					}
+				}
+
+				Terminal.print(px(#Square({ side = 2 })))
+			}`
+			let [shorthand] = diagnosticsOf(program("xx", "xx"))
+			let [payload] = diagnosticsOf(program("centr", "1"))
+
+			expect(shorthand?.message).toBe(
+				"'{ x: Integer, y: Integer }' has no member 'xx'",
+			)
+			expect(shorthand?.helps[0]).toBe("Did you mean 'x'?")
+			expect(shorthand?.data).toEqual({
+				kind: "suggestion",
+				suggestion: "x",
+			})
+			expect(compiles(program("x as xx", "xx"))).toBe(true)
+			expect(payload?.message).toBe(
+				"'Shape#Circle' has no member 'centr'",
+			)
+			expect(payload?.helps).toEqual(["Did you mean 'centre'?"])
+			expect(compiles(program("centre", "1"))).toBe(true)
 		})
 
 		// The requirement is the annotation with the nested members merged in,

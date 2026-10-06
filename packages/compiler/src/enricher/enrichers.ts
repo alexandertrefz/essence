@@ -117,6 +117,7 @@ import {
 import {
 	isOneShapeMatch,
 	isUnknownMember,
+	misspellsPayloadMember,
 	unresolvedCaseBindings,
 } from "./patternMembers"
 import {
@@ -14518,7 +14519,13 @@ function resolvePatternMatcherType(
 		let carried = memberTypeOf(valueType, name)
 		// Decided before a nested Pattern is walked, which would otherwise report
 		// its own members against `Unknown`.
-		let unknown = isUnknownMember(member, carried, valueType, oneShape)
+		let unknown = isUnknownMember(
+			member,
+			carried,
+			valueType,
+			oneShape,
+			path,
+		)
 
 		if (member.kind === "Value") {
 			let enrichedValue = enrichExpression(member.value, scope)
@@ -14846,24 +14853,28 @@ function resolvePayloadRequirements(
 }
 
 // Which reading a payload Pattern is: the payload Record where the Case carries
-// every member the Pattern names, else the one-member shorthand. See "Matcher
-// Patterns" in DEVELOPMENT.md.
+// every member the Pattern names, else the one-member shorthand. A misspelt
+// payload member keeps the Record. See "Matcher Patterns" in DEVELOPMENT.md.
 function payloadPatternSubject(
 	pattern: parser.PatternNode,
 	matcher: common.CaseType,
 ): { path: Array<string>; type: common.Type } {
-	let memberNames = Object.keys(matcher.members)
+	let [memberName, ...others] = Object.keys(matcher.members)
 	let fitsPayloadRecord = Object.keys(pattern.members).every((name) =>
 		Object.hasOwn(matcher.members, name),
 	)
+	let value = memberName === undefined ? null : matcher.members[memberName]!
 
-	if (fitsPayloadRecord || memberNames.length !== 1) {
+	if (
+		fitsPayloadRecord ||
+		value === null ||
+		others.length > 0 ||
+		misspellsPayloadMember(pattern, matcher, value)
+	) {
 		return { path: [], type: matcher }
 	}
 
-	let memberName = memberNames[0]!
-
-	return { path: [memberName], type: matcher.members[memberName]! }
+	return { path: [memberName!], type: value }
 }
 
 // The Type of each name `patternBindings` brings in. `subjectType` is the Type

@@ -359,6 +359,12 @@ Record reading is tried first: it applies where the Case carries every member th
 one-member Case reads the Pattern as its one member's value, the shorthand. A Case with several members always gets
 the Record reading.
 
+A misspelt payload member may keep the Record reading (`misspellsPayloadMember`). That is asked only where the one
+member's value carries none of the names and a bare one is in neither, so both readings refuse the Pattern and the
+choice changes no verdict. The payload is the likelier meaning where the value has no members, as the Integer of
+`case #Circle({ radus })`, or where only the payload holds a near miss. A value that is a Record keeps the shorthand
+where it holds one: `{ xx }` against `centre: { x: Integer, y: Integer }` offers `x`.
+
 The payload's requirements stand beside the Matcher rather than inside it (`resolvePayloadRequirements`). The
 Matcher says which arm this is, and the validator reads it for coverage and reachability. Narrowing it would call
 the Case partly handled and the Handler dead. A requirement the declared Type already guarantees is dropped. So
@@ -393,7 +399,8 @@ The typed spelling is offered as a second Help only where the member is read aga
 nothing else could pass the test. Under a Case payload's Record reading that holds, and a payload may carry members
 its Case leaves out too. `resolvePayloadRequirements` always keeps the requirement for such a member, since nothing
 guarantees a payload has it. Under the one-member shorthand the member is read against that member's value, which
-may be no Record at all.
+may be no Record at all. A one-member Case's payload is offered no typed spelling either, since writing one would
+take the shorthand reading.
 
 ## Undecided slots
 
