@@ -13,6 +13,7 @@ import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // Asynchrony end to end: the two Keywords, the two Types, the rule that makes
 // a body a completing one, and what it emits. A future is a description, so
@@ -264,6 +265,24 @@ describe("Asynchrony", () => {
 	Terminal.print(compute(1)::toString())
 }`),
 			).toEqual(["reserved-parameter-label"])
+		})
+
+		// Either Help gives the Parameter a label a call can write.
+		it("compiles the signature either Help writes", () => {
+			for (let [label, argument] of [
+				["from", "from 1"],
+				["_", "1"],
+			]) {
+				expect(
+					compiles(`implementation {
+	function compute(${label} value: Integer) -> Integer {
+		<- value
+	}
+
+	Terminal.print(compute(${argument})::toString())
+}`),
+				).toBe(true)
+			}
 		})
 
 		// A Parameter named with either word behind a label of its own is

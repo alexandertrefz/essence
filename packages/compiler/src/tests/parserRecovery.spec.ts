@@ -4,6 +4,7 @@ import type { parser } from "@essence-lang/interfaces"
 
 import { parseWithDiagnostics } from "../parser/index"
 import { testDiagnostic } from "./diagnosticFactory"
+import { compiles } from "./followedHelps"
 
 describe("Parser Recovery", () => {
 	it("should report zero diagnostics for a valid program", () => {
@@ -333,6 +334,17 @@ describe("Parser Recovery", () => {
 
 		expect(nodes).toHaveLength(1)
 		expect(nodes[0].nodeType).toBe("FunctionStatement")
+	})
+
+	it("should compile once the missing '}' is added", () => {
+		let source = 'implementation {\n\tconstant greeting = "Hello"'
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"unclosed-block",
+		])
+		expect(diagnostics[0].helps).toEqual(["Add the missing '}'."])
+		expect(compiles(`${source}\n}`)).toBe(true)
 	})
 
 	it("should report an unterminated String Literal once", () => {
@@ -880,6 +892,9 @@ are red"::append("x")
 		expect(diagnostics[0].labels[0]?.message).toBe(
 			"every value here has a condition on it",
 		)
+		expect(diagnostics[0].helps).toEqual([
+			"Write the last arm as 'as <value> otherwise'.",
+		])
 
 		let nodes = program.implementation.nodes
 
@@ -907,6 +922,23 @@ are red"::append("x")
 		expect(diagnostics[0].helps).toEqual([
 			"Write an arm: 'as <value> otherwise'.",
 		])
+	})
+
+	// A written `otherwise` arm answers when every condition fails.
+	it("should compile once the 'otherwise' arm is written", () => {
+		for (let arms of [
+			["as 1 if flag", "as 0 otherwise"],
+			["as 0 otherwise"],
+		]) {
+			expect(
+				compiles(`implementation {
+				constant flag = true
+				constant grade = define {
+					${arms.join("\n\t\t\t\t\t")}
+				}
+			}`),
+			).toBe(true)
+		}
 	})
 
 	// Reported and dropped rather than thrown, so the `define` and its

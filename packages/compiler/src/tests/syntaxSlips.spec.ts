@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { common } from "@essence-lang/interfaces"
 
 import { parseWithDiagnostics } from "../parser/index"
+import { compiles } from "./followedHelps"
 
 // The common ways a file is first broken: a bracket left open, one too many,
 // a `{` a block needs and did not get. What matters is where each is reported,
@@ -314,6 +315,20 @@ describe("Syntax slips", () => {
 				})
 			})
 		}
+
+		it("should compile once the '}' is written where the Help says", () => {
+			expect(
+				compiles(`implementation {
+	constant count = 5
+
+	if count::isGreaterThan(3) {
+		Terminal.print("many")
+	}
+
+	Terminal.print("done")
+}`),
+			).toBe(true)
+		})
 	})
 
 	// Every list answers a wrong closing bracket behind a trailing comma

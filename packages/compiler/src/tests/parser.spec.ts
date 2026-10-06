@@ -5,6 +5,7 @@ import type { parser } from "@essence-lang/interfaces"
 import { containsErrors } from "../diagnostics/index"
 import { parameterInternalName } from "../helpers/names"
 import { parse, parseWithDiagnostics } from "../parser/index"
+import { compiles } from "./followedHelps"
 
 describe("Parser", () => {
 	describe("Expressions", () => {
@@ -651,6 +652,18 @@ describe("Parser", () => {
 				expect(diagnostics[0]!.helps).toEqual([
 					"Write 'server.port = port'.",
 				])
+			})
+
+			// The Help reads the last step as the name of a value in scope, as
+			// a bare key's shorthand does.
+			it("should compile the path key the Help writes", () => {
+				expect(
+					compiles(`implementation {
+						constant config = { server = { port = 80 }, name = "db" }
+						constant port = 8080
+						constant value = { config with server.port = port, name = "a" }
+					}`),
+				).toBe(true)
 			})
 
 			it("should refuse a bare path rather than a bare name", () => {
@@ -3333,6 +3346,14 @@ describe("Parser", () => {
 			expect(program.implementation.nodes[0].nodeType).toBe(
 				"ConstantDeclarationStatement",
 			)
+			expect(diagnostic?.helps).toEqual([
+				"Open the Program with 'implementation { … }' instead.",
+			])
+			expect(
+				compiles(`implementation {
+					constant x = 1
+				}`),
+			).toBe(true)
 		})
 
 		it("should reject an overload function block outside the standard library", () => {
@@ -3703,6 +3724,16 @@ export { from "./Geometry.es" { Rectangle } }`,
 					program.implementation.position,
 				)
 				expect(program.exports).toBeNull()
+				expect(diagnostics[0].helps).toEqual([
+					"Move the 'export { … }' block below 'implementation { … }'.",
+				])
+				expect(
+					compiles(`implementation {
+						constant x = 1
+					}
+
+					export { x }`),
+				).toBe(true)
 			})
 
 			it("should report an import section below the implementation", () => {

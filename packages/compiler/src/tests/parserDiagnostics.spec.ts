@@ -757,6 +757,7 @@ _ 2
 			expect(diagnostics[0].helps).toContain(
 				"Write the digits before the point: '0.5'.",
 			)
+			expect(compiles("implementation { constant a = 0.5 }")).toBe(true)
 		})
 
 		it("should refuse a decimal with nothing behind the point", () => {
@@ -769,9 +770,12 @@ _ 2
 			expect(diagnostics[0].labels[0]?.message).toBe(
 				"no digits stand flush behind the point",
 			)
-			expect(diagnostics[0].helps).toContain(
+			expect(diagnostics[0].helps).toEqual([
 				"Write the digits behind the point: '1.0'.",
-			)
+				"Or drop the '.' — a whole Number is written on its own.",
+			])
+			expect(compiles("implementation { constant a = 1.0 }")).toBe(true)
+			expect(compiles("implementation { constant a = 1 }")).toBe(true)
 		})
 
 		// The digits must be flush against the point, as a denominator must be
@@ -1691,6 +1695,9 @@ describe("Parser AST", () => {
 	Terminal.inspect(names)
 }`
 
+			expect(parseWithDiagnostics(source).diagnostics[0]?.code).toBe(
+				"path-is-members-only",
+			)
 			expect(helpsOf(source)).toEqual([
 				"Write the Function literal instead: '(_ item) { <- item.title::uppercase() }'.",
 			])
@@ -1801,10 +1808,20 @@ describe("Parser AST", () => {
 	Terminal.inspect(same)
 }`
 
+			expect(parseWithDiagnostics(source).diagnostics[0]?.code).toBe(
+				"empty-path-group",
+			)
 			expect(helpsOf(source)).toEqual([
 				"Write the members to update inside it.",
 				"Or drop the key — and where it is the only one, drop the update with it and write 'config' on its own.",
 			])
+			expect(
+				compiles(`implementation {
+	constant config = { server = { port = 80 } }
+	constant same = { config with server.{ port = 8080 } }
+	Terminal.inspect(same)
+}`),
+			).toBe(true)
 			expect(
 				compiles(`implementation {
 	constant config = { server = { port = 80 } }
@@ -1847,12 +1864,22 @@ describe("Parser AST", () => {
 		// The Help and the Quick Fix read one computation, so both offer the
 		// value written.
 		it("offers the value the two mixed spellings say between them", () => {
+			expect(
+				parseWithDiagnostics("implementation { constant a = 1.5/2 }")
+					.diagnostics[0]?.code,
+			).toBe("mixed-rational-literal")
 			expect(helpsOf("implementation { constant a = 1.5/2 }")).toEqual([
 				"Write it as '3/4' — or as '0.75', which is the same value written the other way.",
 			])
 			expect(helpsOf("implementation { constant a = 2.5/3 }")).toEqual([
 				"Write it as '5/6', which is the value the two spellings say between them.",
 			])
+
+			for (let followed of ["3/4", "0.75", "5/6"]) {
+				expect(
+					compiles(`implementation { constant a = ${followed} }`),
+				).toBe(true)
+			}
 		})
 
 		// A trailing comma is dropped. A second value can not be, so the Help
