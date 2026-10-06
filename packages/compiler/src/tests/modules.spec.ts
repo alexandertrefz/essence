@@ -854,7 +854,7 @@ implementation {
 
 		expect(
 			helpFor(
-				`import {\n\tfrom "./Main.es" { area }\n}\n\n${moduleProgram()}`,
+				`import {\n\tfrom "./Main.es" { area }\n}\n\n${moduleProgram("\tfunction area() -> Integer {\n\t\t<- 1\n\t}")}`,
 			),
 		).toBe(
 			`Remove the whole 'from "./Main.es" { … }' group — every name it asks for is in scope here already.`,
@@ -872,6 +872,82 @@ export {
 }
 `),
 		).toBe(`Write 'area' as a bare entry: 'export { area }'.`)
+	})
+
+	// An entry that renames the Module's own name leaves uses of the new name,
+	// which the Module's own name replaces once the group goes.
+	it("names the Module's own name a self-import renamed", () => {
+		let main = (
+			imports: string,
+			call: string,
+		) => `${imports}implementation {
+	function helper() -> Integer {
+		<- 1
+	}
+
+	Terminal.print(${call}())
+}
+`
+		let helps = withProject(
+			{
+				"Main.es": main(
+					`import {\n\tfrom "./Main.es" { helper as h }\n}\n\n`,
+					"h",
+				),
+			},
+			(directory) =>
+				moduleAt(
+					directory,
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+					"Main.es",
+				).diagnostics[0]?.helps,
+		)
+
+		expect(helps).toEqual([
+			`Remove the whole 'from "./Main.es" { … }' group — every name it asks for is in scope here already, so write 'helper' in place of 'h'.`,
+		])
+		expect(compiles({ "Main.es": main("", "helper") })).toBe(true)
+	})
+
+	// A name the Module never declares is not in scope here either, so the Help
+	// says which ones. Removing the group leaves their uses unknown.
+	it("names what a self-import asks for that the Module never declares", () => {
+		let main = (imports: string) => `${imports}implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side
+	}
+
+	Terminal.print(area(helper()))
+}
+`
+		let helps = withProject(
+			{
+				"Main.es": main(
+					`import {\n\tfrom "./Main.es" { area helper }\n}\n\n`,
+				),
+			},
+			(directory) =>
+				moduleAt(
+					directory,
+					loadModuleGraph(
+						path.join(directory, "Main.es"),
+						diskModuleHost,
+					),
+					"Main.es",
+				).diagnostics[0]?.helps,
+		)
+
+		expect(helps).toEqual([
+			`Remove the whole 'from "./Main.es" { … }' group — a Module's own names are in scope here already, and 'helper' is declared nowhere in it.`,
+		])
+		expect(
+			withProject({ "Main.es": main("") }, (directory) =>
+				codesOf(analysedAt(directory, "Main.es", "Main.es")),
+			),
+		).toEqual(["unknown-name"])
 	})
 
 	it("compiles with the group removed or written bare", () => {

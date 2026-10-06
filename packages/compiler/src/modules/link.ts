@@ -157,7 +157,7 @@ function declarationsOf(
 // Read off the AST, since collisions and kinds are needed before enrichment.
 // A name's first declaration is kept, since a duplicate never reaches the
 // Scope.
-function topLevelDeclarations(
+export function topLevelDeclarations(
 	program: parser.Program,
 ): Map<string, Declaration> {
 	let declarations = new Map<string, Declaration>()

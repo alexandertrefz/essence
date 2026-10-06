@@ -5384,7 +5384,7 @@ Error: A Module can not import itself
 
 </div>
 
-The whole group goes, not one entry: the report is on the specifier, and every name under it comes from the file it names.
+The whole group goes, not one entry: the report is on the specifier, and every name under it comes from the file it names. A name the module never declares is in scope nowhere, so the help names it instead — `… and 'helper' is declared nowhere in it.` — and once the group goes, its uses are reported as [`unknown-name`](#unknown-name). An entry that renamed one of the module's own names, `helper as h`, leaves uses of `h` behind, so the help asks for `'helper' in place of 'h'` as well.
 
 Quick Fix: **Remove the entry for "./Main.es"**.
 

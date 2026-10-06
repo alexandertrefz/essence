@@ -8,6 +8,7 @@ import {
 } from "../diagnostics/index"
 import { parseDocument } from "../documents"
 import type { ModuleHost } from "./host"
+import { topLevelDeclarations } from "./link"
 import {
 	canonicalPath,
 	resolveSpecifier,
@@ -94,6 +95,7 @@ function extensionOf(specifier: string): string | null {
 function reportRejection(
 	reason: SpecifierRejection,
 	written: WrittenSpecifier,
+	program: parser.Program,
 ): void {
 	let { source, section, names } = written
 	let specifier = source.path
@@ -219,7 +221,7 @@ function reportRejection(
 				// writes bare instead.
 				helps: [
 					section === "import"
-						? `Remove the whole 'from "${specifier}" { … }' group — every name it asks for is in scope here already.`
+						? selfImportRemoval(specifier, names, program)
 						: names.length === 1
 							? `Write '${names[0]}' as a bare entry: 'export { ${names[0]} }'.`
 							: "Write the names as bare entries in the 'export { … }' block — this Module declares them itself.",
@@ -228,6 +230,39 @@ function reportRejection(
 
 			return
 	}
+}
+
+// The group goes either way. A name the Module never declares is not in scope
+// either, so the Help names it rather than call every name in scope. A renamed
+// entry's uses take the Module's own name back.
+function selfImportRemoval(
+	specifier: string,
+	names: Array<string>,
+	program: parser.Program,
+): string {
+	let declared = topLevelDeclarations(program)
+	let undeclared = names
+		.filter((name) => !declared.has(name))
+		.map((name) => `'${name}'`)
+	let renamed = (program.imports?.groups ?? [])
+		.filter((group) => group.source.path === specifier)
+		.flatMap((group) => group.entries)
+		.filter(
+			(entry) => entry.alias !== null && declared.has(entry.name.content),
+		)
+		.map(
+			(entry) =>
+				`'${entry.name.content}' in place of '${entry.alias?.content}'`,
+		)
+	let removal = `Remove the whole 'from "${specifier}" { … }' group`
+
+	if (undeclared.length > 0) {
+		return `${removal} — a Module's own names are in scope here already, and ${undeclared.length === 1 ? `${undeclared[0]} is` : `${undeclared.slice(0, -1).join(", ")} and ${undeclared.at(-1)} are`} declared nowhere in it.`
+	}
+
+	return renamed.length === 0
+		? `${removal} — every name it asks for is in scope here already.`
+		: `${removal} — every name it asks for is in scope here already, so write ${renamed.join(", ")}.`
 }
 
 function reportMissingModule(
@@ -265,7 +300,7 @@ function resolveDependencies(
 		}
 
 		if (resolution.kind === "rejected") {
-			reportRejection(resolution.reason, written)
+			reportRejection(resolution.reason, written, module.program)
 
 			continue
 		}
