@@ -961,6 +961,43 @@ describe("A Case another application's Case crosses into at a member", () => {
 		expect(analysedDiagnosticsFor(followed)).toEqual([])
 	})
 
+	// Down a path of Records, `as` Patterns bind the member the crossing is
+	// at, so the Match the Help asks for is on that member.
+	it("should compile with a deeper member bound through 'as' Patterns", () => {
+		let held = (cases: string) => `implementation {
+			${box}
+
+			choice Holder {
+				Hold { wrap: { box: Box<Integer> | Box<String> } },
+				Nothing,
+			}
+
+			function describe(_ value: Holder) -> String {
+				<- match value -> String {
+					${cases}
+					case _ { <- "other" }
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				held(`case #Hold({ wrap as { box: Box<Integer> } }) { <- "integers" }
+					case #Hold({ wrap as { box: Box<String> } }) { <- "strings" }`),
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Bind 'box' in one 'case Holder#Hold({ wrap as { box } })' in place of these Cases, and match it there with 'case Box#Count' and 'case Box#Empty' first.",
+		])
+
+		let followed = held(`case Holder#Hold({ wrap as { box } }) {
+			${split}
+		}`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
 	it("should compile with the member bound in one Record Case", () => {
 		let records = (cases: string) => `implementation {
 			${box}

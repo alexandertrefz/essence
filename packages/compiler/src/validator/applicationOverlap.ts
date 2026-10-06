@@ -225,8 +225,9 @@ function containerAlong(path: Array<string>): "List" | "Dictionary" | null {
 	return step === "[item]" ? "List" : "Dictionary"
 }
 
-// One Case binding the member's first step, whose Match answers for the
-// crossing Cases first. A deeper crossing is that Match's to report.
+// One Case binding the member the crossing is at, through `as` Patterns down
+// a path of Records, whose Match answers for the crossing Cases first. A path
+// through anything else binds its first step, whose Match reports again.
 function bindingHelp(
 	memberType: common.Type,
 	path: Array<string>,
@@ -234,7 +235,13 @@ function bindingHelp(
 	memberTypes: Array<common.Type>,
 	spell: Spelling,
 ): string {
-	let [step] = path
+	let held = typesAlong(memberType, path)
+	let bound = held === null ? path.slice(0, 1) : path
+	let inner = bound.reduceRight(
+		(pattern, step) =>
+			pattern === "" ? step : `${step} as { ${pattern} }`,
+		"",
+	)
 	let owner =
 		memberType.type === "Case"
 			? spellMatcher(memberType, spell, memberTypes)
@@ -243,8 +250,9 @@ function bindingHelp(
 		memberType.type === "Case"
 			? owner === null
 				? null
-				: `${owner}({ ${step} })`
-			: `{ ${step} }`
+				: `${owner}({ ${inner} })`
+			: `{ ${inner} }`
+	let step = bound[bound.length - 1]
 
 	if (pattern === null) {
 		return `Bind '${step}' in one Case in place of these Cases, and match it there.`
@@ -252,29 +260,48 @@ function bindingHelp(
 
 	let binding = `Bind '${step}' in one 'case ${pattern}' in place of these Cases`
 	let matchers =
-		path.length === 1
-			? spelledMatchers(crossings, typesAt(memberType, step), spell)
-			: null
+		held === null ? null : spelledMatchers(crossings, held, spell)
 
 	return matchers === null
 		? `${binding}, and match it there.`
 		: `${binding}, and match it there with ${quoted(matchers)} first.`
 }
 
-// The Types a Record or Case member can hold, so a Case Matcher written for one
-// of them is checked against the others.
-function typesAt(memberType: common.Type, step: string): Array<common.Type> {
+// The Types the member at the end of `path` can hold, where every step before
+// the last goes into a Record, or null.
+function typesAlong(
+	memberType: common.Type,
+	path: Array<string>,
+): Array<common.Type> | null {
+	let [step, ...rest] = path
 	let held =
 		(memberType.type === "Record" || memberType.type === "Case") &&
+		step !== undefined &&
 		Object.hasOwn(memberType.members, step)
 			? memberType.members[step]
 			: null
 
 	if (held === null) {
-		return []
+		return null
 	}
 
-	return held.type === "UnionType" ? flattenUnionMembers(held) : [held]
+	let arms = held.type === "UnionType" ? flattenUnionMembers(held) : [held]
+
+	if (rest.length === 0) {
+		return arms
+	}
+
+	let records = arms.filter((arm) => arm.type === "Record")
+
+	if (records.length !== arms.length) {
+		return null
+	}
+
+	let deeper = records.map((record) => typesAlong(record, rest))
+
+	return deeper.every((types) => types !== null)
+		? deeper.flatMap((types) => types ?? [])
+		: null
 }
 
 function crossingNote(

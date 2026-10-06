@@ -293,14 +293,15 @@ the later one that shares the member's shape. At a Case it asks what `crossingAp
 in place of the later Case. A crossing at one member counts only where the two arms can share a value at every other
 member, so `n: Integer` against `n: String` keeps the Cases apart. `emptyCrossover` asks the later Case the same of
 an empty container inside a member. No Matcher can name a Case of every application inside a Pattern, so the Help
-binds the member in one Case and matches it there, Case Matchers first. A crossing deeper down is that Match's own
-to report. A Case that takes every value of the matched Type, such as `case _`, has no member to bind in place of
-the Cases, so it is not told about a crossing inside a member. And a member is reported once, on the first Case it
-is reported on, so a `case _` is not told again what the Case above it was told. The walk also enters a List's items
-and a Dictionary's keys and values, since a List holding only crossing Cases crosses with them. No Case can be
-written for such a List, and a `hasItems()` Guard leaves it crossing, so the Help asks for one application of the
-Choice, and the Match goes with it. A Guard on the earlier Case still claims nothing, so a guarded
-`case List<Box<Integer>>` is not blamed.
+binds the member in one Case and matches it there, Case Matchers first. Down a path of Records, `as` Patterns bind
+the member the crossing is at, as `case #Hold({ wrap as { box } })` does. A path through anything else binds its
+first step, and that Match reports again. A Case that takes every value of the matched Type, such as `case _`, has
+no member to bind in place of the Cases, so it is not told about a crossing inside a member. And a member is
+reported once, on the first Case it is reported on, so a `case _` is not told again what the Case above it was told.
+The walk also enters a List's items and a Dictionary's keys and values, since a List holding only crossing Cases
+crosses with them. No Case can be written for such a List, and a `hasItems()` Guard leaves it crossing, so the Help
+asks for one application of the Choice, and the Match goes with it. A Guard on the earlier Case still claims
+nothing, so a guarded `case List<Box<Integer>>` is not blamed.
 
 Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
 conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it
