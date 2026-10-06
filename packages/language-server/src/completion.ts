@@ -10,7 +10,11 @@ import {
 	signaturesOf,
 	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
-import { findTypedChild, type TypedNode } from "@essence-lang/compiler/visitor"
+import {
+	findTypedChild,
+	forEachTypedChild,
+	type TypedNode,
+} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
@@ -874,35 +878,36 @@ function namespacePropertyDocumentation(
 ): Map<string, string> {
 	let documented = new Map<string, string>()
 
-	function visitBody(nodes: Array<common.typed.ImplementationNode>) {
-		for (let node of nodes) {
-			if (node.nodeType === "NamespaceDefinitionStatement") {
-				if (node.name.content !== name) {
-					continue
-				}
+	function visit(node: TypedNode) {
+		if (
+			node.nodeType === "NamespaceDefinitionStatement" &&
+			node.name.content === name
+		) {
+			for (let [propertyName, property] of Object.entries(
+				node.properties,
+			)) {
+				let description = describe(property.documentation)
 
-				for (let [propertyName, property] of Object.entries(
-					node.properties,
-				)) {
-					let description = describe(property.documentation)
-
-					if (description !== "") {
-						documented.set(propertyName, description)
-					}
+				if (description !== "") {
+					documented.set(propertyName, description)
 				}
-			} else if (node.nodeType === "IfStatement") {
-				visitBody(node.body)
-			} else if (node.nodeType === "IfElseStatement") {
-				visitBody(node.trueBody)
-				visitBody(node.falseBody)
-			} else if (node.nodeType === "FunctionStatement") {
-				visitBody(node.value.body)
 			}
+		}
+
+		if (
+			node.nodeType === "FunctionStatement" ||
+			node.nodeType === "FunctionDefinition" ||
+			node.nodeType === "IfStatement" ||
+			node.nodeType === "IfElseStatement"
+		) {
+			forEachTypedChild(node, visit)
 		}
 	}
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body)
+		for (let node of body) {
+			visit(node)
+		}
 	}
 
 	return documented
