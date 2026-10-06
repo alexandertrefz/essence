@@ -86,6 +86,7 @@ import {
 	typeMentionsGeneric,
 } from "../helpers/types"
 import { recordAnnotation } from "./annotations"
+import { derivesWithImports } from "./derivedImports"
 import { reportTypeWithoutMembers } from "./memberHelps"
 import { narrowedBodyReport } from "./narrowedMethods"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
@@ -109,12 +110,13 @@ import {
 	choiceBindingIn,
 	choiceNameIn,
 	foreignChoiceRemedy,
+	foreignChoicesOf,
+	foreignChoicesSpelled,
 	spellingAfterImport,
 	spellingIn,
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
-	unboundForeignChoice,
 	unknownTypeRemedy,
 	withImportOf,
 } from "./spelling"
@@ -6194,9 +6196,22 @@ function conformanceRemedy(
 	// where a Namespace states it, so that remedy declares one as well.
 	let printing =
 		protocolName === printableProtocolName && carriesNoPayload(culprit)
-	let unbound = unboundForeignChoice(culprit, scope)
+	let foreigns =
+		printing || derivesOnceImported(culprit, protocolName)
+			? foreignChoicesOf(culprit, scope)
+			: null
 	let foreign =
-		printing || derivesOnceImported(culprit, protocolName) ? unbound : null
+		foreigns !== null &&
+		(printing ||
+			derivesWithImports(
+				culprit,
+				protocolName,
+				foreigns,
+				scope,
+				position,
+			))
+			? foreigns
+			: null
 
 	// No Namespace can target a Case, so the edit is about its Choice. Where
 	// the Choice conforms, it is an annotation. Otherwise it is the Choice's own
@@ -6232,7 +6247,7 @@ function conformanceRemedy(
 	}
 
 	if (foreign !== null) {
-		return foreignChoiceRemedy(foreign, protocol, printing)
+		return foreignChoiceRemedy(culprit, foreign, protocol, printing, scope)
 	}
 
 	let unimported = unimportedNamespacesOf(scope).filter((candidate) =>
@@ -6277,14 +6292,13 @@ function conformanceRemedy(
 		(choice) => declaredChoiceGenerics(choice, scope),
 		(bound) => describeProtocol(bound, scope),
 	)
-	// A Choice no name binds is written as the Help's import will bind it.
-	let head = namespaceHead(
-		culprit,
-		"",
-		unbound === null
-			? spellingIn(scope)
-			: spellingAfterImport(scope, unbound),
+	// Each Choice the head names and no name binds, a Type Argument's too, is
+	// written as the Help's import will bind it.
+	let imports = foreignChoicesSpelled(
+		(spell) => namespaceHead(culprit, "", spell),
+		scope,
 	)
+	let head = namespaceHead(culprit, "", spellingAfterImport(scope, imports))
 
 	return {
 		notes: unnameable === null ? [] : [unnameable],
@@ -6302,7 +6316,7 @@ function conformanceRemedy(
 						]
 					: [
 							withImportOf(
-								unbound,
+								imports,
 								protocolName === printableProtocolName &&
 									choiceCasesArePayloadFree(culprit)
 									? `Declare a Namespace '${head} is ${declaring}${where}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`

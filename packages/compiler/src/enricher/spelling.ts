@@ -9,6 +9,7 @@ import {
 	declaredNameOf,
 	displayChoiceName,
 	isDeclaration,
+	spellCaseChoice,
 	type Spelling,
 	spellType,
 } from "../helpers/describe"
@@ -204,55 +205,133 @@ function exportedChoiceName(
 }
 
 // What to say of a Choice no name here binds: import it under the name its
-// Module exports it as, or export it first. Printing also needs a Namespace
-// that states it.
+// Module exports it as, or export it first. A Choice its Type Arguments name
+// is imported too, since its derive is found the same way. Printing also needs
+// a Namespace that states it.
 export function foreignChoiceRemedy(
-	foreign: ForeignChoice,
+	culprit: common.Type,
+	foreigns: Array<ForeignChoice>,
 	protocol: string,
 	printing: boolean,
+	scope: enricher.Scope,
 ): {
 	notes: Array<string>
 	helps: Array<string>
 	data?: common.DiagnosticData
 } {
-	let written = foreign.exportedAs ?? foreign.name
+	let [first] = foreigns as [ForeignChoice, ...Array<ForeignChoice>]
+	let spell = spellingAfterImport(scope, foreigns)
+	let written =
+		culprit.type === "Case"
+			? spellCaseChoice(culprit, spell)
+			: spellType(culprit, spell)
+	let names = foreigns.map((foreign) => `'${foreign.name}'`).join(" or ")
 
 	return {
 		notes: [
-			`A Choice's derived '${protocol}' is found through a name for the Choice, and no name here binds '${foreign.name}'.`,
+			`A Choice's derived '${protocol}' is found through a name for the Choice, and no name here binds ${names}.`,
 		],
 		helps: [
 			printing
 				? withImportOf(
-						foreign,
+						foreigns,
 						`Declare a Namespace 'for ${written} is ${protocol}' — its body may be empty, since a Choice whose Cases carry no payload prints as their names.`,
 					)
-				: `${importOf(foreign)}, so its derived '${protocol}' is in scope.`,
+				: `${importsOf(foreigns)}, so ${foreigns.length === 1 ? "its" : "their"} derived '${protocol}' is in scope.`,
 		],
 		// The import a Quick Fix writes, naming the Module by its canonical
-		// path. The language server works out the specifier. For printing it
-		// is only the first of two edits.
-		...(foreign.exportedAs === null
+		// path. The language server works out the specifier. Where a Namespace
+		// or another import is owed too, it is only the first edit.
+		...(first.exportedAs === null
 			? {}
 			: {
 					data: {
 						kind: "import-declaration" as const,
-						name: foreign.exportedAs,
-						modulePath: foreign.modulePath,
-						...(printing ? { partial: true as const } : {}),
+						name: first.exportedAs,
+						modulePath: first.modulePath,
+						...(printing || foreigns.length > 1
+							? { partial: true as const }
+							: {}),
 					},
 				}),
 	}
 }
 
-// A Help led by the import a Choice no name here binds needs first.
+// The Types the imports of these Choices would bind, under the names their
+// Modules export them as. Null where one is kept private, which no import
+// reaches until it is exported.
+export function importedChoiceTypes(
+	foreigns: Array<ForeignChoice>,
+	scope: enricher.Scope,
+): Record<string, common.Type> | null {
+	let types: Record<string, common.Type> = {}
+
+	for (let { exportedAs, modulePath } of foreigns) {
+		let exported =
+			exportedAs === null
+				? undefined
+				: exportedTypesIn(modulePath, scope)?.[exportedAs]
+
+		if (exportedAs === null || exported === undefined) {
+			return null
+		}
+
+		types[exportedAs] = exported
+	}
+
+	return types
+}
+
+function exportedTypesIn(
+	modulePath: string,
+	scope: enricher.Scope,
+): Record<string, common.Type> | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.exportedTypes !== undefined) {
+			return current.exportedTypes(modulePath)
+		}
+	}
+
+	return null
+}
+
+// Every Choice of another Module that a Type's spelling names and no name here
+// binds, its Type Arguments' too. Null where there is none.
+export function foreignChoicesOf(
+	type: common.Type,
+	scope: enricher.Scope,
+): Array<ForeignChoice> | null {
+	let found = foreignChoicesSpelled((spell) => spellType(type, spell), scope)
+
+	return found.length === 0 ? null : found
+}
+
+// A Help led by the imports the Choices no name here binds need first.
 export function withImportOf(
-	foreign: ForeignChoice | null,
+	foreigns: ReadonlyArray<ForeignChoice>,
 	help: string,
 ): string {
-	return foreign === null
+	return foreigns.length === 0
 		? help
-		: `${importOf(foreign)}, and ${help[0].toLowerCase()}${help.slice(1)}`
+		: `${importsOf(foreigns)}, and ${help[0].toLowerCase()}${help.slice(1)}`
+}
+
+// Choices one Module exports under their own names are imported together.
+function importsOf(foreigns: ReadonlyArray<ForeignChoice>): string {
+	let together = foreigns.every(
+		(foreign) =>
+			foreign.exportedAs === foreign.name &&
+			foreign.modulePath === foreigns[0].modulePath,
+	)
+	let names = foreigns.map((foreign) => `'${foreign.name}'`)
+
+	return foreigns.length > 1 && together
+		? `${names.slice(0, -1).join(", ")} and ${names.at(-1)} are declared in ${foreigns[0].fileName} — import them here`
+		: foreigns.map(importOf).join("; ")
 }
 
 // The import of a Choice under the name its Module exports it as, or the
@@ -265,18 +344,50 @@ function importOf({ name, exportedAs, fileName }: ForeignChoice): string {
 			: `'${name}' is declared in ${fileName}, which exports it as '${exportedAs}' — import '${exportedAs}' here`
 }
 
-// The reader's spelling once the Help's import binds the Choice.
+// The reader's spelling once the Help's imports bind the Choices.
 export function spellingAfterImport(
 	scope: enricher.Scope,
-	foreign: ForeignChoice,
+	foreigns: ReadonlyArray<ForeignChoice>,
 ): Spelling {
 	let spell = spellingIn(scope)
 
-	return (declared, carrier) =>
-		spell(declared, carrier) ??
-		(choiceCarried(carrier) === foreign.identity
-			? (foreign.exportedAs ?? foreign.name)
-			: null)
+	return (declared, carrier) => {
+		let foreign = foreigns.find(
+			(candidate) => candidate.identity === choiceCarried(carrier),
+		)
+
+		return (
+			spell(declared, carrier) ??
+			(foreign === undefined
+				? null
+				: (foreign.exportedAs ?? foreign.name))
+		)
+	}
+}
+
+// The Choices of other Modules that a spelling names and no name here binds,
+// in the order it names them. Each needs an import before the spelling can be
+// written.
+export function foreignChoicesSpelled(
+	spellWith: (spell: Spelling) => string,
+	scope: enricher.Scope,
+): Array<ForeignChoice> {
+	let spell = spellingIn(scope)
+	let found = new Map<string, ForeignChoice>()
+
+	spellWith((declared, carrier) => {
+		let written = spell(declared, carrier)
+		let foreign =
+			written === null ? unboundForeignChoice(carrier, scope) : null
+
+		if (foreign !== null && !found.has(foreign.identity)) {
+			found.set(foreign.identity, foreign)
+		}
+
+		return written
+	})
+
+	return [...found.values()]
 }
 
 // A generic Alias of an application that writes a Case's application. It comes

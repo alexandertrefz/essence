@@ -1117,7 +1117,13 @@ name or the name an import gave it, so `Box as Carton` keeps its equality. A Cho
 `derivesOnceImported` decides where importing it brings the derive, and the refusal then offers the import under
 the name its Module exports it as (`foreignChoiceRemedy`). Where the import brings none, as for printing, which needs
 a Namespace stating `is Printable`, or for `Comparable`, the Help that declares the Namespace leads with the import
-(`withImportOf`), since its `for` clause names the Choice.
+(`withImportOf`), since its `for` clause names the Choice. The clause may name others in its Type Arguments, as
+`for Box<Light>` names `Light`. `foreignChoicesSpelled` collects every Choice the spelling names that no name binds,
+and the Help imports each. A derive is found the same way: `Box<Light>` derives equality through both names, so the
+import the refusal offers names each Choice the culprit's spelling names (`foreignChoicesOf`). The import alone is
+offered only where it brings the derive, which a Scope binding those Choices answers (`derivesWithImports`). `Light |
+Integer` or `(_: Light) -> Integer` derives nothing even then, so its Help declares a Namespace as well. The names
+that question reaches are no uses of the file's, so an import only it reaches is still reported as `unused-import`.
 
 ### Derived equality for a generic Choice
 

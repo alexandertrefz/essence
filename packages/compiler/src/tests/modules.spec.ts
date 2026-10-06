@@ -11667,6 +11667,294 @@ implementation {${declared}
 		)
 	})
 
+	// `for Box<Light>` names `Light` too, which `Main.es` binds no more than
+	// `Box`, so the Help imports both.
+	it("leads a Namespace Help with the import of every Choice its head names", () => {
+		let printed = (entries: string, declared: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lamps.es" {
+		${entries}
+	}
+}
+
+implementation {${declared}
+	Terminal.print(make())
+}
+`,
+					"Lamps.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Light { Red, Green }
+
+	function make() -> Box<Light> {
+		<- #Full(#Red)
+	}
+}
+
+export {
+	Box
+	Light
+	make
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let helpOf = (entries: string) =>
+			printed(entries, "")
+				.find((diagnostic) => diagnostic.code === "unsatisfied-bound")
+				?.helps.at(-1)
+
+		expect(helpOf("make")).toBe(
+			"'Box' and 'Light' are declared in Lamps.es — import them here, and declare a Namespace 'for Box<Light> is Printable'.",
+		)
+		expect(helpOf("Box\n\t\tmake")).toBe(
+			"'Light' is declared in Lamps.es — import it here, and declare a Namespace 'for Box<Light> is Printable'.",
+		)
+		expect(
+			codesOf(
+				printed(
+					"Box\n\t\tLight\n\t\tmake",
+					`
+	namespace BoxShown for Box<Light> is Printable {
+		toString() -> String {
+			<- "box"
+		}
+	}
+`,
+				),
+			),
+		).toEqual([])
+	})
+
+	// Equality of a `Box<Light>` is derived through `Box` and through `Light`,
+	// and each derive is found through a name for its Choice. Imported, both
+	// derive it, and no Namespace is owed.
+	it("imports every Choice a derived conformance is found through", () => {
+		let compared = (entries: string, value: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lamps.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function same<infer T is Equatable>(_ a: T, _ b: T) -> Boolean {
+		<- a::is(b)
+	}
+
+	Terminal.inspect(same(${value}, ${value}))
+}
+`,
+					"Lamps.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Light { Red, Green }
+
+	function make() -> Box<Light> {
+		<- #Full(#Red)
+	}
+
+	constant full = Box<Light>#Full(Light#Red)
+}
+
+export {
+	Box
+	full
+	Light as Lamp
+	make
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let helpsOf = (entries: string, value: string) =>
+			compared(entries, value).map((diagnostic) => diagnostic.helps)
+
+		expect(helpsOf("make", "make()")).toEqual([
+			[
+				"'Box' is declared in Lamps.es — import it here; 'Light' is declared in Lamps.es, which exports it as 'Lamp' — import 'Lamp' here, so their derived 'Equatable' is in scope.",
+			],
+		])
+		expect(helpsOf("Box\n\t\tmake", "make()")).toEqual([
+			[
+				"'Light' is declared in Lamps.es, which exports it as 'Lamp' — import 'Lamp' here, so its derived 'Equatable' is in scope.",
+			],
+		])
+		expect(helpsOf("full", "full")).toEqual(helpsOf("make", "make()"))
+		expect(codesOf(compared("Box\n\t\tLamp\n\t\tmake", "make()"))).toEqual(
+			[],
+		)
+		expect(codesOf(compared("Box\n\t\tfull\n\t\tLamp", "full"))).toEqual([])
+	})
+
+	// Imported, `Light` makes a `List<Light>` and a `{ l: Light }` equal by
+	// what they hold. A Union of `Light` and an Integer, or a Function taking
+	// a `Light`, still derives nothing, so the Help declares a Namespace too.
+	it("imports a Choice alone only where the import brings the derive", () => {
+		let compared = (entries: string, declared: string, value: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lamps.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function same<infer T is Equatable>(_ a: T, _ b: T) -> Boolean {
+		<- a::is(b)
+	}
+${declared}
+	constant v = ${value}()
+	Terminal.inspect(same(v, v))
+}
+`,
+					"Lamps.es": `implementation {
+	choice Light { Red, Green }
+
+	function lights() -> List<Light> {
+		<- [#Red]
+	}
+
+	function either() -> Light | Integer {
+		<- 1
+	}
+
+	function callback() -> (_ l: Light) -> Integer {
+		<- (_ l: Light) -> Integer { <- 1 }
+	}
+}
+
+export {
+	callback
+	either
+	Light
+	lights
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let helpsOf = (value: string) =>
+			compared(value, "", value).map((diagnostic) => diagnostic.helps)
+		let equality = (target: string) => `
+	namespace Equality for ${target} is Equatable {
+		is(_ other: ${target}) -> Boolean {
+			<- true
+		}
+	}
+`
+
+		expect(helpsOf("lights")).toEqual([
+			[
+				"'Light' is declared in Lamps.es — import it here, so its derived 'Equatable' is in scope.",
+			],
+		])
+		expect(helpsOf("either")).toEqual([
+			[
+				"'Light' is declared in Lamps.es — import it here, and declare a Namespace 'for Light | Integer is Equatable'.",
+			],
+		])
+		expect(helpsOf("callback")).toEqual([
+			[
+				"'Light' is declared in Lamps.es — import it here, and declare a Namespace 'for (_: Light) -> Integer is Equatable'.",
+			],
+		])
+		expect(codesOf(compared("Light\n\t\tlights", "", "lights"))).toEqual([])
+		expect(
+			codesOf(
+				compared(
+					"either\n\t\tLight",
+					equality("Light | Integer"),
+					"either",
+				),
+			),
+		).toEqual([])
+		expect(
+			codesOf(
+				compared(
+					"callback\n\t\tLight",
+					equality("(_: Light) -> Integer"),
+					"callback",
+				),
+			),
+		).toEqual([])
+	})
+
+	// Asking whether importing `Light` brings the derive reaches `FnEq`. That
+	// question is the Help's, not the file's, so `FnEq` stays unused until
+	// the import is written.
+	it("still warns about an import only a derive's question reaches", () => {
+		let reports = (entries: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lamps.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function same<infer T is Equatable>(_ a: T, _ b: T) -> Boolean {
+		<- a::is(b)
+	}
+	constant v: Pair<Integer, Integer> = Pair<Integer, Integer>#Neither
+	Terminal.inspect(same(pair(), pair()))
+}
+`,
+					"Lamps.es": `implementation {
+	choice Light { Red, Green }
+	choice Pair<X, Y> { Both { x: X, y: Y }, Neither }
+
+	namespace FnEq for (_ x: Integer) -> Integer is Equatable {
+		is(_ other: (_ x: Integer) -> Integer) -> Boolean {
+			<- true
+		}
+	}
+
+	function pair() -> Pair<Light, (_ x: Integer) -> Integer> {
+		<- #Neither
+	}
+}
+
+export {
+	FnEq
+	Light
+	Pair
+	pair
+}
+`,
+				},
+				(directory) =>
+					analysedAt(directory, "Main.es", "Main.es").map(
+						(diagnostic) => [
+							diagnostic.code,
+							diagnostic.message,
+							diagnostic.helps,
+						],
+					),
+			)
+
+		expect(reports("pair\n\t\tPair\n\t\tFnEq")).toEqual([
+			[
+				"unused-import",
+				"'FnEq' is imported and never used",
+				["Remove the entry."],
+			],
+			[
+				"unsatisfied-bound",
+				expect.any(String),
+				[
+					"'Light' is declared in Lamps.es — import it here, so its derived 'Equatable' is in scope.",
+				],
+			],
+		])
+		expect(reports("pair\n\t\tPair\n\t\tFnEq\n\t\tLight")).toEqual([])
+	})
+
 	let shelfModule = `implementation {
 	choice Box<Value> { Full { value: Value }, Empty }
 	choice Light { Red, Green }
