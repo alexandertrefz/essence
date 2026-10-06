@@ -56,6 +56,12 @@ A prefixed `Holder#Case` is decided by the Type Arguments it writes, then by its
 validator checks it. So `Holder#Full({ value = 1 })` where nothing expects a Holder is undecided too. A Choice
 without Type Parameters has nothing to decide.
 
+The prefix may be a generic Alias of an application, as `Crate` is in `type Crate<V> = Box<V>`. Its Cases mention
+the Alias's own Type Parameters, and those are decided as a Choice's are (`aliasTypeParameters`): by the Type
+Arguments written, then by the position, and otherwise `undecided-type-arguments` spells the Alias. The position
+offers only the instantiations the Alias can write (`offeredCases`), so `Boxes#Full`, under `type Boxes<A> =
+Box<List<A>>`, takes no `Box<Integer>`.
+
 `reportUndecidedTypeArguments` in `undecidedCases.ts` is the one report for every undecided construction, spelled
 the way the source wrote it. Its notes name the Choice's own Type Parameters. Those names are not in scope at the
 construction, so the Helps spell an application instead. Each Argument the payload decided is written out, with `…`

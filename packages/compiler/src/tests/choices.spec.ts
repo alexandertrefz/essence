@@ -2394,6 +2394,53 @@ describe("Choices", () => {
 				).toEqual(["undecided-type-arguments"])
 			})
 
+			// `Crate` renames `Box`, so a Case written through it is decided as
+			// one through `Box` is: by its position, or not at all. The Helps
+			// write `Crate`, the name the construction used.
+			it("decides a Case written through a generic Alias as the Choice's", async () => {
+				let program = (body: string): string => `implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+					type Crate<V> = Box<V>
+					choice Bag { Full { value: Integer }, Empty }
+
+					${body}
+				}`
+				let undecided = program("Terminal.inspect(Crate#Full(1))")
+
+				expect(messagesOf(undecided)).toEqual([
+					"Nothing decides the Type Arguments of 'Crate#Full'",
+				])
+				expect(helpsOf(undecided)).toEqual([
+					"Apply the Type Arguments here — 'Crate<…>#Full(…)', with the Type you mean in place of each '…'.",
+				])
+				expect(
+					await run(
+						program(`constant applied = Crate<Integer>#Full(1)
+					constant annotated: Crate<Integer> = Crate#Full(2)
+					constant either: Crate<Integer> | Bag = Crate#Full(3)
+
+					Terminal.inspect(applied)
+					Terminal.inspect(annotated)
+					Terminal.inspect(either)`),
+					),
+				).toEqual(["Box#Full(1)", "Box#Full(2)", "Box#Full(3)"])
+			})
+
+			// `Boxes` writes only a List's application of `Box`, so the
+			// `Box<Integer>` the position offers decides nothing for it.
+			it("decides through a generic Alias only what the Alias can write", () => {
+				expect(
+					messagesOf(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+						type Boxes<A> = Box<List<A>>
+
+						constant box: Box<Integer> = Boxes#Full([1])
+					}`),
+				).toEqual([
+					"Nothing decides the Type Arguments of 'Boxes#Full'",
+				])
+			})
+
 			// Reported once, since no unsolved Type Parameter leaves through the
 			// return Type to be reported again.
 			it("says so once, and lets nothing carry the Parameter onward", () => {

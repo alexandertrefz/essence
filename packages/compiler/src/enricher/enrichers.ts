@@ -105,6 +105,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { aliasTypeParameters, offeredCases } from "./aliasCases"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
@@ -14227,7 +14228,10 @@ function resolvePrefixedCaseValueType(
 		)
 	}
 
-	if (declaredCase.choiceGenerics === undefined) {
+	let aliasGenerics = aliasTypeParameters(choice.content, declaredCase, scope)
+	let generics = aliasGenerics ?? declaredCase.choiceGenerics
+
+	if (generics === undefined) {
 		return declaredCase
 	}
 
@@ -14236,6 +14240,7 @@ function resolvePrefixedCaseValueType(
 			declaredCase,
 			expectedType,
 			payloadUnder,
+			aliasGenerics,
 		)
 
 		if (decided !== null) {
@@ -14247,7 +14252,7 @@ function resolvePrefixedCaseValueType(
 		`${choice.content}#${node.caseName.content}`,
 		choice.content,
 		node.caseName.content,
-		declaredCase.choiceGenerics,
+		generics,
 		node,
 		Object.keys(declaredCase.members).length > 0,
 	)
@@ -14285,13 +14290,10 @@ function decideCaseFromExpectedType(
 	declaredCase: common.CaseType,
 	expectedType: common.Type,
 	payloadUnder: PayloadReader,
+	// Set where the Case is written through a generic Alias of an application.
+	aliasGenerics: Array<common.GenericDeclaration> | null,
 ): common.CaseType | null {
-	let candidates = unionArmsOf(expectedType).filter(
-		(member): member is common.CaseType =>
-			member.type === "Case" &&
-			member.name === declaredCase.name &&
-			member.choice === declaredCase.choice,
-	)
+	let candidates = offeredCases(declaredCase, expectedType, aliasGenerics)
 
 	if (candidates.length <= 1) {
 		return candidates[0] ?? null
