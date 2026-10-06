@@ -230,3 +230,19 @@ export function collectDiagnostics<T>(work: () => T): {
 		activeDiagnostics = previousDiagnostics
 	}
 }
+
+// As `collectDiagnostics`, into a list a collection left earlier. A Program
+// enriched a Statement at a time keeps one list, which `reportedOnLine` reads.
+export function collectDiagnosticsInto<T>(
+	diagnostics: Array<common.Diagnostic>,
+	work: () => T,
+): T {
+	let previousDiagnostics = activeDiagnostics
+	activeDiagnostics = diagnostics
+
+	try {
+		return work()
+	} finally {
+		activeDiagnostics = previousDiagnostics
+	}
+}

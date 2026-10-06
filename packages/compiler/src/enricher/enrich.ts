@@ -3,6 +3,7 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 import type { CompileMode } from "../compileMode"
 import {
 	collectDiagnostics,
+	collectDiagnosticsInto,
 	containsErrors,
 	primary,
 	report,
@@ -71,6 +72,7 @@ import {
 	resolveTestModifiers,
 	type TestModifiers,
 } from "./tests"
+import { enrichInTurns, type LateNames } from "./turns"
 
 // Names to leave out of the top level Scope, per table. A standard library
 // source edited as a document declares names the builtin tables already hold,
@@ -375,8 +377,11 @@ export type EnrichProgramsOptions = CompileMode & {
 	// Called before every hoist round and once after the last, to seed the
 	// imports a cycle of Modules can bind only once their declarations hoist.
 	// `true` means something new was bound, which keeps the rounds going.
-	// `final` is the last chance to write into a Scope before the bodies.
+	// `final` is the last chance to bind a hoisted name before the bodies.
 	seedRound?: (final: boolean) => boolean
+	// The names a Module of a cycle reads before another Module declares
+	// them. Left out, each Program is enriched whole, one after another.
+	lateNames?: LateNames
 	// The one input whose written annotations a Hover wants.
 	annotationsFor?: number
 }
@@ -449,36 +454,80 @@ const enrichProgramsInner = (
 		options.seedRound,
 	)
 
-	return inputs.map(({ program, scope, source }) => {
-		let { result: collected, names } = collectReachedNames(() =>
-			collectDiagnostics((): common.typed.Program => {
-				for (let node of program.implementation.nodes) {
-					for (let diagnostic of hoistDiagnostics.get(node) ?? []) {
-						report(diagnostic)
-					}
-				}
+	let enriched = inputs.map((input) => {
+		let diagnostics: Array<common.Diagnostic> = []
+		let reachedNames = new Set<string>()
+		// Each turn reports into the Program's one collection.
+		let within = <Result>(work: () => Result): Result => {
+			let { result, names } = collectReachedNames(() =>
+				collectDiagnosticsInto(diagnostics, work),
+			)
 
-				return {
-					nodeType: "Program",
-					imports: null,
-					implementation: enrichImplementation(
-						program.implementation,
-						scope,
-						hoistedTypes,
-					),
-					tests: testsSectionOf(program, scope, options, source),
-					exports: null,
-					position: program.position,
+			for (let name of names) {
+				reachedNames.add(name)
+			}
+
+			return result
+		}
+
+		within(() => {
+			for (let node of input.program.implementation.nodes) {
+				for (let diagnostic of hoistDiagnostics.get(node) ?? []) {
+					report(diagnostic)
 				}
-			}),
-		)
+			}
+		})
 
 		return {
-			program: collected.result,
-			diagnostics: collected.diagnostics,
-			reachedNames: names,
+			...input,
+			diagnostics,
+			reachedNames,
+			within,
+			nodes: [] as Array<common.typed.ImplementationNode>,
+			tests: null as common.typed.TestsSectionNode | null,
 		}
 	})
+
+	enrichInTurns(
+		enriched.map((entry) => ({
+			nodes: entry.program.implementation.nodes,
+			step: (node) => {
+				entry.nodes.push(
+					...entry.within(() =>
+						enrichTopLevelNode(node, entry.scope, hoistedTypes),
+					),
+				)
+			},
+			finish: () => {
+				entry.tests = entry.within(() =>
+					testsSectionOf(
+						entry.program,
+						entry.scope,
+						options,
+						entry.source,
+					),
+				)
+			},
+		})),
+		options.lateNames,
+	)
+
+	return enriched.map((entry) => ({
+		program: {
+			nodeType: "Program",
+			imports: null,
+			implementation: {
+				nodeType: "ImplementationSection",
+				nodes: entry.nodes,
+				position: entry.program.implementation.position,
+			},
+			tests: entry.tests,
+			exports: null,
+			position: entry.program.position,
+		},
+		diagnostics: entry.diagnostics,
+		reachedNames: entry.reachedNames,
+	}))
 }
 
 // A Program's Nodes and the Scope they hoist into. Each Module has its own,
@@ -1666,21 +1715,28 @@ const enrichImplementation = (
 	return {
 		nodeType: "ImplementationSection",
 		nodes: implementation.nodes.flatMap((node) =>
-			// An `overload function` block becomes one top-level Function per
-			// bodied entry, named `<name>__overload$N` for its slot.
-			guarded(node.position, () =>
-				node.nodeType === "OverloadedFunctionStatement"
-					? enrichOverloadedFunctionStatement(
-							node,
-							scope,
-							hoistedTypes.get(node),
-						)
-					: enrichNode(node, scope, hoistedTypes),
-			),
+			enrichTopLevelNode(node, scope, hoistedTypes),
 		),
 		position: implementation.position,
 	}
 }
+
+// An `overload function` block becomes one top-level Function per bodied
+// entry, named `<name>__overload$N` for its slot.
+const enrichTopLevelNode = (
+	node: parser.ImplementationNode,
+	scope: enricher.Scope,
+	hoistedTypes: HoistedTypes,
+): Array<common.typed.ImplementationNode> =>
+	guarded(node.position, () =>
+		node.nodeType === "OverloadedFunctionStatement"
+			? enrichOverloadedFunctionStatement(
+					node,
+					scope,
+					hoistedTypes.get(node),
+				)
+			: enrichNode(node, scope, hoistedTypes),
+	)
 
 // A throw here is a compiler bug. It is reported as an `internal-error`, so
 // one broken Statement does not stop the rest of the Program.

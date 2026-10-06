@@ -3859,26 +3859,30 @@ Error: 'nowhere' is not declared in this Module
 
 exports[`Module Diagnostic Showcase Ping.es should render the same report every time: Ping.es 1`] = `
 "[cyclic-constant-import]
-Error: Constant 'STEP' is imported across a cycle
-   ╭─┤ Ping.es:2:21 │
+Error: Constant 'STEP' is read before ./Pong.es declares it
+   ╭─┤ Ping.es:8:17 │
    │
  2 │     from "./Pong.es" { STEP }
    │                        ──┬─  
-   │                          ╰─── this Constant is not readable here
+   │                          ╰─── imported from a Module of this cycle
    │ 
-   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+ 8 │        <- value::add(STEP)
+   │                      ──┬─  
+   │                        ╰─── this needs the Type of 'STEP'
+   │ 
+   │ Help: Declare 'STEP' above the Statements of ./Pong.es that read a Constant of this cycle, or move it into a Module outside the cycle.
    │ 
    │ Note 1: ./Pong.es imports this Module back, directly or through further Modules.
-   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+   │ Note 2: A Constant does not hoist, so its Type is known only once its Module has been read down to it. ./Pong.es reads a Constant of this cycle before it has declared 'STEP', and that Constant waits on this Module's code from this Statement on.
 ───╯
 
 [cyclic-side-effects]
 Warning: This Statement runs in an order the cycle does not state
-    ╭─┤ Ping.es:11:2 │
+    ╭─┤ Ping.es:13:2 │
     │
- 11 │     Terminal.inspect(stepped(1)::toString())
-    │     ────────────────────┬───────────────────  
-    │                         ╰───────────────────── this runs when the Module body runs
+ 13 │     Terminal.inspect(stepped(START)::toString())
+    │     ──────────────────────┬─────────────────────  
+    │                           ╰─────────────────────── this runs when the Module body runs
     │ 
     │ Help: Break the cycle, or move the Statement into a Module outside it.
     │ 
@@ -3893,17 +3897,17 @@ Warning: This Statement runs in an order the cycle does not state
 exports[`Module Diagnostic Showcase Ping.es should render the same report every time: Pong.es 1`] = `
 "[cyclic-side-effects]
 Warning: This Statement runs in an order the cycle does not state
-   ╭─┤ Pong.es:9:2 │
-   │
- 9 │     Terminal.inspect(stepped(0)::toString())
-   │     ────────────────────┬───────────────────  
-   │                         ╰───────────────────── this runs when the Module body runs
-   │ 
-   │ Help: Break the cycle, or move the Statement into a Module outside it.
-   │ 
-   │ Note 1: This Module is in a cycle with ./Ping.es.
-   │ Note 2: A Module body runs once, on first import. Inside a cycle there is no first — whichever Module is reached first runs first, and that is decided by the entry point rather than by any of them.
-───╯
+    ╭─┤ Pong.es:16:2 │
+    │
+ 16 │     Terminal.inspect(started()::toString())
+    │     ───────────────────┬───────────────────  
+    │                        ╰───────────────────── this runs when the Module body runs
+    │ 
+    │ Help: Break the cycle, or move the Statement into a Module outside it.
+    │ 
+    │ Note 1: This Module is in a cycle with ./Ping.es.
+    │ Note 2: A Module body runs once, on first import. Inside a cycle there is no first — whichever Module is reached first runs first, and that is decided by the entry point rather than by any of them.
+────╯
 
 ─── 1 warning
 "

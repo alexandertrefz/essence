@@ -266,29 +266,32 @@ A TypeScript barrel can forward everything with `export *`. An Essence facade na
 
 ### Constants and cycles
 
-Two modules can import each other. Functions, types, choices, protocols and namespaces are hoisted, so a cycle can name any of them. A constant cannot cross a cycle. Suppose `Receipt.es` held a constant `Separator`, and `Money.es` imported it back. The import is refused with [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import):
+Two modules can import each other. Functions, types, choices, protocols and namespaces are hoisted, so a cycle can name any of them. A constant can cross a cycle too, but only code that runs once the modules have loaded may read it. Suppose `Receipt.es` held a constant `Separator`, and `Money.es` imported it back. A method of `Money` may read `Separator` in its body. A static property may not: its value is worked out while `Money.es` loads, and `Receipt.es` may load after it. `static Joiner: String = Separator` is refused with [`cyclic-load-time-use`](/docs/reference/diagnostics#cyclic-load-time-use):
 
 <div class="error-output">
 
 ```
-[cyclic-constant-import]
-Error: Constant 'Separator' is imported across a cycle
-   ╭─┤ Money.es:2:24 │
-   │
- 2 │     from "./Receipt.es" { Separator }
-   │                           ────┬────
-   │                               ╰────── this Constant is not readable here
-   │
-   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
-   │
-   │ Note 1: ./Receipt.es imports this Module back, directly or through further Modules.
-   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
-───╯
+[cyclic-load-time-use]
+Error: 'Separator' is used while this Module loads, but comes from a Module of its import cycle
+    ╭─┤ Money.es:26:27 │
+    │
+  2 │     from "./Receipt.es" { Separator }
+    │                           ────┬────
+    │                               ╰────── bound from ./Receipt.es here
+    │
+ 26 │        static Joiner: String = Separator
+    │                                ────┬────
+    │                                    ╰────── this reads it
+    │
+    │ Help: Use it inside a Function that runs once the Modules have loaded, or break the cycle.
+    │
+    │ Note: ./Receipt.es imports this Module back, directly or through further Modules, so it may load after this one.
+────╯
 ```
 
 </div>
 
-Expose the value as a function instead, `separator() -> String`, and the same cycle compiles. In ES modules the same cycle loads, and reading `Separator` before its module has run throws a `ReferenceError`. Essence refuses it while compiling.
+Make it a static function instead, `static joiner() -> String { <- Separator }`, and the same cycle compiles. In ES modules the same cycle loads, and reading `Separator` before its module has run throws a `ReferenceError`. Essence refuses it while compiling.
 
 </StepItem>
 

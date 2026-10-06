@@ -5611,29 +5611,33 @@ Taught on: [Modules › Exporting names](/docs/language/modules#exporting-names)
 
 ### `cyclic-constant-import`
 
-**Error.** A constant is imported from a module that imports this one back. Inside a cycle, the order the module bodies run in is not stated, so the constant could be read before its module has run. In JavaScript the same pair of files can throw `ReferenceError: Cannot access 'pong' before initialization`, depending on which file runs first.
+**Error.** A module reads a constant from a module of its own import cycle, and the modules of the cycle wait on each other. A constant's type is known only once its value has been read. So the compiler reads each module of a cycle from the top, and a statement that reads a constant of another module of the cycle waits until that module has been read down to the constant. Here the other module reads a constant of this one above its own constant, and that constant is declared below the read.
 
 <div class="error-output">
 
 ```
 [cyclic-constant-import]
-Error: Constant 'pong' is imported across a cycle
-   ╭─┤ Ping.es:2:21 │
+Error: Constant 'STEP' is read before ./Pong.es declares it
+   ╭─┤ Ping.es:8:17 │
    │
- 2 │     from "./Pong.es" { pong }
+ 2 │     from "./Pong.es" { STEP }
    │                        ──┬─  
-   │                          ╰─── this Constant is not readable here
+   │                          ╰─── imported from a Module of this cycle
    │ 
-   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
+ 8 │        <- value::add(STEP)
+   │                      ──┬─  
+   │                        ╰─── this needs the Type of 'STEP'
+   │ 
+   │ Help: Declare 'STEP' above the Statements of ./Pong.es that read a Constant of this cycle, or move it into a Module outside the cycle.
    │ 
    │ Note 1: ./Pong.es imports this Module back, directly or through further Modules.
-   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
+   │ Note 2: A Constant does not hoist, so its Type is known only once its Module has been read down to it. ./Pong.es reads a Constant of this cycle before it has declared 'STEP', and that Constant waits on this Module's code from this Statement on.
 ───╯
 ```
 
 </div>
 
-Move the constant into a module outside the cycle, or export a function that returns it. Functions, type aliases, choices, protocols and namespaces may cross a cycle.
+Declare the constant above the other module's statements that read a constant of the cycle: here `constant STEP = 2` above `function started` in `Pong.es`. Moving the constant into a module outside the cycle works too. A constant read across a cycle inside a function body is fine otherwise. A read while a module loads is [`cyclic-load-time-use`](#cyclic-load-time-use).
 
 Taught on: [Modules › Run order and cycles](/docs/language/modules#run-order-and-cycles)
 

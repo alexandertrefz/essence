@@ -10,3 +10,4 @@ export {
 	topLevelScope,
 	type TopLevelScopeOptions,
 } from "./enrich"
+export type { LateNames } from "./turns"

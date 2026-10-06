@@ -960,14 +960,37 @@ matter during the rounds, because a bodied static Property's value is enriched w
 Each round starts with `seedRound`, which binds the imports that became bindable since the last one. An import
 across a cycle of Modules can only be bound once the declaration it names has hoisted. Seeding first means a
 Module has the import in Scope while its own declarations resolve. After the last round, `seedRound(true)` binds
-what the last declarations to hoist made bindable. It is the last moment anything may be written into a Scope
-before the bodies are enriched.
+what the last declarations to hoist made bindable. It is the last moment a hoisted name may be written into a
+Scope before the bodies are enriched. Only a Constant of another Module of the cycle binds later, as "Enriching a
+group in turns" says.
 
 A Namespace conforming to a Protocol that has not hoisted yet waits too (`deferOnPendingConformance`). It has to
 reach Scope with its conditional bounds woven in, or a use site before it would solve against an unbounded Method.
 `settleConformanceClauses` reads every hoisted Namespace's clauses again after the final seeding, so a clause is
 dropped only where its Protocol never arrives. The Namespace memos of every Scope are then dropped, since the
 rounds solved against the unsettled clauses.
+
+### Enriching a group in turns
+
+After the hoist, `enrichInTurns` in `turns.ts` enriches each Program of the group in its written order, a top-level
+Statement at a time. Each Program keeps one Diagnostic collection across its turns, entered with
+`collectDiagnosticsInto`, so `reportedOnLine` and the deduplication in `report` see every Statement before.
+
+A Constant does not hoist, so one that another Module of the cycle declares has no Type until the in-order
+enrichment reaches it. The linker hands over `lateNames`, the local names each Program may not read yet. A Statement
+that reads one of them waits, and the next Program takes its turn. After a Statement, `rebind` binds what it made
+readable.
+
+A needless wait can end in a refusal, so `firstRead` in `waitingReads.ts` counts only a value read. A label, a
+member, a Record field and a Case are no read, and neither is a name a Parameter, a local declaration or a
+Matcher's binder hides. A Parameter's default sees the Parameters before it. Its own name, a later Parameter's and
+a Pattern's bindings are refused there, and the report asks what the name means outside, so they still wait.
+
+A Program's tests section is enriched at the end of the first round of turns that finds its Statements done and
+none of its names waiting. Once every Program's Statements are done, the names that never bound are given up and
+the sections still waiting follow. Without waiting names, each Program is enriched whole and then its tests. When every unfinished
+Program waits, `refuse` gives one name up and the turns go on. See "Constants across a cycle" in
+packages/compiler/src/modules/DEVELOPMENT.md.
 
 ### Static Properties while hoisting
 

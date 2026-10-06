@@ -344,6 +344,55 @@ export const both = [one, two]
 		expect(module.both).toEqual([1n, 4n])
 		expect(text.match(/function squared\(/g)).toHaveLength(1)
 	})
+
+	// Each Module of the cycle is served on its own, and each reads the other's
+	// Constant inside a body, which runs once both have loaded.
+	it("serves a cycle whose Modules read each other's Constants", async () => {
+		let directory = project({
+			"A.es": `import {
+	from "./B.es" { SCALE }
+}
+
+implementation {
+	constant OFFSET = 10
+
+	function scaled(_ value: Integer) -> Integer {
+		<- value::multiply(with SCALE)
+	}
+}
+
+export {
+	OFFSET
+	scaled
+}
+`,
+			"B.es": `import {
+	from "./A.es" { OFFSET scaled }
+}
+
+implementation {
+	constant SCALE = 3
+
+	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)::add(OFFSET)
+	}
+}
+
+export {
+	SCALE
+	shifted
+}
+`,
+			"entry.js": `import { shifted } from "./B.es"
+import { scaled } from "./A.es"
+
+export const both = [scaled(2n), shifted(2n)]
+`,
+		})
+		let { module } = await built(directory, "entry.js")
+
+		expect(module.both).toEqual([6n, 16n])
+	})
 })
 
 describe("The Bun plugin under the runtime", () => {

@@ -279,7 +279,7 @@ A file is a module with named exports, the way ES modules work.
 | `import * as money from "./x"` | none; [each name is imported](/docs/reference/syntax-glossary#import) | [`syntax-error`](/docs/reference/diagnostics#syntax-error) |
 | `import { chunk } from "lodash"` | none; a [specifier](/docs/language/modules) is a relative path to an `.es` file | [`invalid-module-specifier`](/docs/reference/diagnostics#invalid-module-specifier) |
 | `require("./x")` | none; [`import`](/docs/reference/syntax-glossary#import) only | [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax) |
-| two modules importing each other | allowed for [functions](/docs/language/modules); a constant cannot cross the cycle | [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import) |
+| two modules importing each other | allowed; a [constant](/docs/language/modules#run-order-and-cycles) of the other module is read only once the modules have loaded | [`cyclic-load-time-use`](/docs/reference/diagnostics#cyclic-load-time-use) |
 
 ## Tooling
 

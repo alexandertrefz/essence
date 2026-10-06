@@ -8,9 +8,12 @@ implementation {
 		<- value::add(STEP)
 	}
 
-	Terminal.inspect(stepped(1)::toString())
+	constant START = 1
+
+	Terminal.inspect(stepped(START)::toString())
 }
 
 export {
+	START
 	stepped
 }

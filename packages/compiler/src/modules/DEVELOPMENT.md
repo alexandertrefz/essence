@@ -27,8 +27,8 @@ builds one from whatever its Scope holds at that moment, so the surface grows fr
 - A collision with a declaration of the importing Module is reported on the first pass. The declarations are
   read off the AST, so the collision is found before hoisting puts the declaration in Scope.
 - An export list is read off the AST too, so a name missing from it is reported on the first pass.
-- A Constant does not hoist. From a Module of the same cycle, its ESM binding could be read in its temporal
-  dead zone, so the entry is refused with `cyclic-constant-import`.
+- A Constant does not hoist, so one from a Module of the same cycle has no Type yet. The entry waits. See
+  "Constants across a cycle".
 - Otherwise the entry binds whatever tables the surface offers the name, counted by `tablesOffered`.
 
 One name can live in several tables, such as a `type NonEmptyList` beside a `namespace NonEmptyList`, and the
@@ -50,9 +50,35 @@ first.
 
 `moduleSections` marks each typed import entry `cyclic` where its Module is in the importing Module's group. The
 validator refuses code that runs while the Module loads and uses such a name, as `cyclic-load-time-use`. See "Use
-before declaration" in packages/compiler/src/validator/DEVELOPMENT.md. The three rules stand beside each other.
-`cyclic-constant-import` refuses the import of a Constant itself, wherever it is read. `cyclic-side-effects` warns
-about the order of a Module body's own effects, which a use of the other Module need not be part of.
+before declaration" in packages/compiler/src/validator/DEVELOPMENT.md. A Constant counts as such a name too, so
+reading one inside a body that runs later is safe, and reading one while the Module loads is refused there.
+`cyclic-side-effects` warns about the order of a Module body's own effects, which a use of the other Module need
+not be part of.
+
+### Constants across a cycle
+
+A Constant enters its Module's Scope only when the in-order enrichment reaches its Statement, after every hoist
+round. So an entry naming a Constant of another Module of the group is left `waiting` rather than refused, and
+`refuseUnboundImports` passes it over.
+
+`lateNamesOf` tells the enricher which local names wait in each Module. The enricher takes the group's Programs a
+Statement at a time and holds back a Statement that reads a waiting name. See "Enriching a group in turns" in
+packages/compiler/src/enricher/DEVELOPMENT.md.
+
+Each waiting entry is filed under the Module that declares its Constant, found by `declaringModule`. A Module that
+only forwards the name in its export block is passed through, since it never holds the Constant itself. After a
+Statement declares Constants, `rebind` offers their surfaces to the entries waiting for those names alone. Each
+dependency's surface is built once per Statement, so the work grows with the Constants that bind.
+
+The turns stall when every unfinished Module waits. Each waits on the Module declaring the Constant its next
+Statement reads, so following those waits closes a cycle of Modules. Refusing a Module outside that cycle would
+report a Constant that was coming. Of the cycle, the Module first by path is refused, as `cyclic-constant-import`
+at the read, and its name is bound as an Error. The group's order follows the entry, so it decides nothing here:
+an editor keeps a file's Diagnostics from whichever graph checked it first.
+
+A wait on a declaring Module that has finished means that Module's Statement never bound the Constant, which it
+reported itself. So the name is bound as an Error in silence. So is every entry still waiting once the last
+Statement is enriched.
 
 ## Unused imports
 

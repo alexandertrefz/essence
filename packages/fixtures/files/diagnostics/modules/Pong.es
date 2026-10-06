@@ -1,12 +1,19 @@
 import {
-	from "./Ping.es" { stepped }
+	from "./Ping.es" {
+		START
+		stepped
+	}
 }
 
 implementation {
 
+	function started() -> Integer {
+		<- stepped(START)
+	}
+
 	constant STEP = 2
 
-	Terminal.inspect(stepped(0)::toString())
+	Terminal.inspect(started()::toString())
 }
 
 export {

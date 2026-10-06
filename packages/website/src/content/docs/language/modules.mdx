@@ -560,29 +560,9 @@ implementation {
 
 `Totals.es` imports the function `rounded`, and `Rounding.es` imports the type `Amount` back. `Invoice.es` runs the program from outside the cycle, because a `Terminal.print` inside `Totals.es` would be the Warning below.
 
-A constant cannot cross a cycle. Its value exists only once its module's body has run. Inside a cycle, which body runs first depends on which module the entry file reaches first, not on the two modules. Suppose `Rounding.es` also exported `constant taxPercent = 119` and `Totals.es` imported it. The compiler refuses the entry with [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import):
+A constant can cross a cycle too. Suppose `Rounding.es` also exported `constant taxPercent = 119`, and `withTax` imported it and multiplied by `taxPercent`. That compiles, since nothing calls `withTax` until both modules have loaded. A constant's type comes from its value, so the compiler reads `withTax` only once it has read `Rounding.es` down to `taxPercent`. Two modules that each wait for a constant the other declares further down are refused with [`cyclic-constant-import`](/docs/reference/diagnostics#cyclic-constant-import).
 
-<div class="error-output">
-
-```
-[cyclic-constant-import]
-Error: Constant 'taxPercent' is imported across a cycle
-   ╭─┤ Totals.es:4:3 │
-   │
- 4 │        taxPercent
-   │        ─────┬────
-   │             ╰────── this Constant is not readable here
-   │
-   │ Help: Move the Constant into a Module outside the cycle, or expose it as a Function.
-   │
-   │ Note 1: ./Rounding.es imports this Module back, directly or through further Modules.
-   │ Note 2: A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.
-───╯
-```
-
-</div>
-
-Code that runs while a module loads may not use a name from another module of its cycle. That code is a constant's value, a static property's value and a top-level statement, and the functions they call. The other module may load later, so its namespaces may not exist yet. Suppose `Rounding.es` also imported `withTax` and wrote `constant sample = withTax({ cents = 100 })`. That call runs into `Totals.es` while `Rounding.es` loads, and the compiler refuses it with [`cyclic-load-time-use`](/docs/reference/diagnostics#cyclic-load-time-use). The same call inside a function body is fine, since nothing calls it until the modules have loaded.
+Code that runs while a module loads may not use a name from another module of its cycle. That code is a constant's value, a static property's value and a top-level statement, and the functions they call. The other module may load later, so its constants may hold no value and its namespaces may not exist yet. Suppose `Rounding.es` also imported `withTax` and wrote `constant sample = withTax({ cents = 100 })`. That call runs into `Totals.es` while `Rounding.es` loads, and the compiler refuses it with [`cyclic-load-time-use`](/docs/reference/diagnostics#cyclic-load-time-use). The same call inside a function body is fine, since nothing calls it until the modules have loaded.
 
 A top-level statement in a module inside a cycle, such as a `Terminal.print` in the body of `Rounding.es`, is the Warning [`cyclic-side-effects`](/docs/reference/diagnostics#cyclic-side-effects). The program compiles. Whether that statement runs before or after the other module's body depends on which module the entry file reaches first.
 
@@ -608,7 +588,7 @@ export function rounded(cents: number): number {
 }
 ```
 
-ES modules allow a `const` across a cycle and throw a `ReferenceError` at run time if it is read before its module has run. Essence refuses every constant import across a cycle when it compiles. More on [Coming from JavaScript › Modules](/docs/getting-started/coming-from-javascript#modules).
+ES modules allow a `const` across a cycle and throw a `ReferenceError` at run time if it is read before its module has run. Essence refuses a read made while a module loads, such as `highestTax`, when it compiles, and allows one inside a function body. More on [Coming from JavaScript › Modules](/docs/getting-started/coming-from-javascript#modules).
 
 ## Compiling a program of several files
 

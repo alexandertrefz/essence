@@ -21,6 +21,7 @@ import { emitToMemory } from "../embed/index"
 import { loadModuleGraph, type Module } from "../modules/graph"
 import { diskModuleHost, type ModuleHost } from "../modules/host"
 import {
+	lateBindingWork,
 	type LinkedGraph,
 	linkModuleGraph,
 	type LinkedModule,
@@ -2046,7 +2047,571 @@ export {
 
 	// A Constant does not hoist, so across a cycle its emitted binding would be
 	// read in its temporal dead zone.
-	it("refuses a Constant imported across a cycle", () => {
+	// Each Module reads the other's Constant inside a body that runs once both
+	// have loaded. The bundle runs from either entry.
+	it("reads a Constant across a cycle inside the bodies of both Modules", async () => {
+		let files = {
+			"A.es": `import {
+	from "./B.es" { SCALE }
+}
+
+implementation {
+	constant OFFSET = 10
+
+	function scaled(_ value: Integer) -> Integer {
+		<- value::multiply(with SCALE)
+	}
+}
+
+export {
+	OFFSET
+	scaled
+}
+`,
+			"B.es": `import {
+	from "./A.es" { OFFSET scaled }
+}
+
+implementation {
+	constant SCALE = 3
+
+	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)::add(OFFSET)
+	}
+}
+
+export {
+	SCALE
+	shifted
+}
+`,
+		}
+
+		for (let [first, second] of [
+			["A.es", "B.es"],
+			["B.es", "A.es"],
+		]) {
+			await withBuiltProject(
+				{
+					...files,
+					"Main.es": `import {
+	from "./${first}" { ${first === "A.es" ? "scaled" : "shifted"} }
+	from "./${second}" { ${second === "A.es" ? "scaled" : "shifted"} }
+}
+
+implementation {
+	Terminal.print(scaled(2))
+	Terminal.print(shifted(2))
+}
+`,
+				},
+				async (directory) => {
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["6", "16"])
+				},
+			)
+		}
+	})
+
+	// `A.es` waits for `SCALE`, which `B.es` declares below a body waiting
+	// for `OFFSET`, which `A.es` declares below the first wait.
+	const waitingCycle = (scale: string) => ({
+		"A.es": `import {
+	from "./B.es" { SCALE }
+}
+
+implementation {
+	function scaled(_ value: Integer) -> Integer {
+		<- value::multiply(with SCALE)
+	}
+
+	constant OFFSET = 10
+}
+
+export {
+	OFFSET
+	scaled
+}
+`,
+		"B.es": `import {
+	from "./A.es" { OFFSET scaled }
+}
+
+implementation {
+${scale}
+}
+
+export {
+	SCALE
+	shifted
+}
+`,
+		"Main.es": `import {
+	from "./A.es" { scaled }
+	from "./B.es" { shifted }
+}
+
+implementation {
+	Terminal.print(scaled(2))
+	Terminal.print(shifted(2))
+}
+`,
+	})
+
+	it("refuses a Constant every Module of a cycle waits for", async () => {
+		withProject(
+			waitingCycle(`	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)::add(OFFSET)
+	}
+
+	constant SCALE = 3`),
+			(directory) => {
+				let linked = linkProject(directory, "Main.es")
+				let a = linkedAt(directory, linked, "A.es")
+				let [refusal] = a.diagnostics
+
+				expect(reportsOf(a.diagnostics)).toEqual([
+					[
+						"cyclic-constant-import",
+						"Constant 'SCALE' is read before ./B.es declares it",
+					],
+				])
+				expect(
+					refusal?.labels.map((label) => [
+						label.position.start.line,
+						label.message,
+					]),
+				).toEqual([
+					[7, "this needs the Type of 'SCALE'"],
+					[2, "imported from a Module of this cycle"],
+				])
+				expect(refusal?.helps).toEqual([
+					"Declare 'SCALE' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+				])
+				// The name is bound as an Error, so `B.es` reads on.
+				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
+					[],
+				)
+			},
+		)
+
+		// The Help followed.
+		await withBuiltProject(
+			waitingCycle(`	constant SCALE = 3
+
+	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)::add(OFFSET)
+	}`),
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["6", "16"])
+			},
+		)
+	})
+
+	// `A.es` waits for `B.es`, which waits with `C.es` on each other. Only that
+	// pair can not go on, so the refusal lands in one of them.
+	it("refuses a wait where the waiting Modules close a cycle", () => {
+		withProject(
+			{
+				"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	function f() -> Integer {
+		<- k
+	}
+}
+
+export {
+	f
+}
+`,
+				"B.es": `import {
+	from "./A.es" { f }
+	from "./C.es" { c }
+}
+
+implementation {
+	function g() -> Integer {
+		<- c::add(f())
+	}
+
+	constant b = 1
+	constant k = 2
+}
+
+export {
+	b
+	g
+	k
+}
+`,
+				"C.es": `import {
+	from "./B.es" { b }
+}
+
+implementation {
+	function h() -> Integer {
+		<- b
+	}
+
+	constant c = 3
+}
+
+export {
+	c
+	h
+}
+`,
+			},
+			(directory) => {
+				let linked = linkProject(directory, "A.es")
+
+				expect(
+					["A.es", "B.es", "C.es"].map((name) =>
+						reportsOf(
+							linkedAt(directory, linked, name).diagnostics,
+						),
+					),
+				).toEqual([
+					[],
+					[
+						[
+							"cyclic-constant-import",
+							"Constant 'c' is read before ./C.es declares it",
+						],
+					],
+					[],
+				])
+			},
+		)
+	})
+
+	// `F.es` only forwards `k`, so the wait is on `B.es`, which declares it.
+	// `F.es` finishing first says nothing about `k`.
+	const forwardedWait = (b: string) => ({
+		"A.es": `import {
+	from "./F.es" { k }
+}
+
+implementation {
+	function useK() -> Integer {
+		<- k::add(1)
+	}
+
+	constant a = 1
+}
+
+export {
+	a
+	useK
+}
+`,
+		"B.es": `import {
+	from "./A.es" { a useK }
+}
+
+implementation {
+${b}
+}
+
+export {
+	k
+	useA
+}
+`,
+		"F.es": `implementation {
+}
+
+export {
+	from "./B.es" {
+		k
+	}
+}
+`,
+		"Main.es": `import {
+	from "./A.es" { useK }
+	from "./B.es" { useA }
+}
+
+implementation {
+	Terminal.print(useK())
+	Terminal.print(useA())
+}
+`,
+	})
+
+	it("refuses a wait through a forwarding Module at the Module declaring the Constant", async () => {
+		withProject(
+			forwardedWait(`	function useA() -> Integer {
+		<- a::add(useK())
+	}
+
+	constant k = 2`),
+			(directory) => {
+				let a = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"A.es",
+				)
+
+				expect(reportsOf(a.diagnostics)).toEqual([
+					[
+						"cyclic-constant-import",
+						"Constant 'k' is read before ./B.es declares it",
+					],
+				])
+				expect(a.diagnostics[0]?.helps).toEqual([
+					"Declare 'k' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+				])
+			},
+		)
+
+		// The Help followed.
+		await withBuiltProject(
+			forwardedWait(`	constant k = 2
+
+	function useA() -> Integer {
+		<- a::add(useK())
+	}`),
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["3", "4"])
+			},
+		)
+	})
+
+	// In `A.es` a Parameter, a default's earlier Parameter, a local Constant, a
+	// binder, a label, a member and a field are all spelled `k`. None reads
+	// `B.es`'s `k`, so `constant a` binds.
+	it("waits only for a read of the Constant, not for a name spelled like it", async () => {
+		let files = {
+			"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	type R = { k: Integer }
+
+	function twice(k: Integer, by factor: Integer = k) -> Integer {
+		<- k::multiply(with factor)
+	}
+
+	function local(_ r: R) -> Integer {
+		constant k = r.k
+
+		<- twice(k k)
+	}
+
+	function unwrapped(_ value: Optional<Integer>) -> Integer {
+		<- match value -> Integer {
+			case #Value(k) { <- k }
+			case #Empty    { <- 0 }
+		}
+	}
+
+	constant a = 1
+
+	function useK() -> Integer {
+		<- local({ k = k })::add(unwrapped(#Empty))
+	}
+}
+
+export {
+	a
+	useK
+}
+`,
+			"B.es": `import {
+	from "./A.es" { a }
+}
+
+implementation {
+	function useA() -> Integer {
+		<- a
+	}
+
+	constant k = 2
+}
+
+export {
+	k
+	useA
+}
+`,
+		}
+
+		withProject(files, (directory) => {
+			expect(
+				linkedAt(directory, linkProject(directory, "B.es"), "A.es")
+					.diagnostics,
+			).toEqual([])
+		})
+
+		await withBuiltProject(
+			{
+				...files,
+				"Main.es": `import {
+	from "./A.es" { useK }
+	from "./B.es" { useA }
+}
+
+implementation {
+	Terminal.print(useK())
+	Terminal.print(useA())
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["4", "1"])
+			},
+		)
+	})
+
+	// Which Module of a cycle loads first follows the entry, and the refusal
+	// does not.
+	it("refuses the same wait from every entry", () => {
+		withProject(
+			{
+				"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	function f() -> Integer {
+		<- k
+	}
+}
+
+export {
+	f
+}
+`,
+				"B.es": `import {
+	from "./A.es" { f }
+	from "./C.es" { c }
+}
+
+implementation {
+	function g() -> Integer {
+		<- c::add(f())
+	}
+
+	constant b = 1
+	constant k = 2
+}
+
+export {
+	b
+	g
+	k
+}
+`,
+				"C.es": `import {
+	from "./B.es" { b }
+}
+
+implementation {
+	function h() -> Integer {
+		<- b
+	}
+
+	constant c = 3
+}
+
+export {
+	c
+	h
+}
+`,
+			},
+			(directory) => {
+				let reported = ["A.es", "B.es", "C.es"].map((entry) => {
+					let linked = linkProject(directory, entry)
+
+					return ["A.es", "B.es", "C.es"].map((name) =>
+						reportsOf(
+							linkedAt(directory, linked, name).diagnostics,
+						),
+					)
+				})
+
+				expect(reported[1]).toEqual(reported[0])
+				expect(reported[2]).toEqual(reported[0])
+			},
+		)
+	})
+
+	// Each Module writes Functions reading the next Module's Constants, then
+	// its own. A Statement binds only the entries waiting for what it
+	// declares, so one surface is built per Constant.
+	it("binds waiting Constants with one surface per Constant", () => {
+		let modules = 6
+		let constants = 10
+		let files: Record<string, string> = {}
+
+		for (let index = 0; index < modules; index++) {
+			let next = (index + 1) % modules
+			let names = (module: number) =>
+				Array.from(
+					{ length: constants },
+					(_, item) => `c${module}k${item}`,
+				)
+			let functions = names(next).map(
+				(name, item) =>
+					`\tfunction f${index}k${item}() -> Integer {\n\t\t<- ${name}\n\t}\n`,
+			)
+			let declared = names(index).map(
+				(name, item) => `\tconstant ${name} = ${item}\n`,
+			)
+			let body =
+				index === modules - 1
+					? [...declared, ...functions]
+					: [...functions, ...declared]
+
+			files[`M${index}.es`] =
+				`import {\n\tfrom "./M${next}.es" { ${names(next).join(" ")} }\n}\n\n` +
+				`implementation {\n${body.join("\n")}}\n\nexport {\n\t${names(index).join("\n\t")}\n}\n`
+		}
+
+		withProject(files, (directory) => {
+			lateBindingWork.surfaces = 0
+
+			let linked = linkProject(directory, "M0.es")
+
+			expect(
+				[...linked.modules.values()].flatMap(
+					(module) => module.diagnostics,
+				),
+			).toEqual([])
+			expect(lateBindingWork.surfaces).toBeLessThanOrEqual(
+				modules * constants,
+			)
+		})
+	})
+
+	// The Constant's own Module reports its value. The reader waits for it and
+	// binds the Error quietly.
+	it("binds a Constant of the cycle whose value is broken without a report", () => {
 		withProject(
 			{
 				"A.es": `import {
@@ -2068,35 +2633,28 @@ export {
 }
 
 implementation {
-	constant SCALE = 3
+	constant SCALE = nowhere
 
-	function stepped(_ value: Integer) -> Integer {
+	function shifted(_ value: Integer) -> Integer {
 		<- scaled(value)
 	}
 }
 
 export {
 	SCALE
-	stepped
+	shifted
 }
 `,
 			},
 			(directory) => {
 				let linked = linkProject(directory, "A.es")
-				let a = linkedAt(directory, linked, "A.es")
 
-				expect(reportsOf(a.diagnostics)).toEqual([
-					[
-						"cyclic-constant-import",
-						"Constant 'SCALE' is imported across a cycle",
-					],
-				])
-
-				// The name is bound as an Error, so reading it reports nothing more.
-				expect(a.diagnostics[0]?.notes[0]).toContain("./B.es")
-				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
+				expect(linkedAt(directory, linked, "A.es").diagnostics).toEqual(
 					[],
 				)
+				expect(
+					codesOf(linkedAt(directory, linked, "B.es").diagnostics),
+				).toEqual(["unknown-name"])
 			},
 		)
 	})
@@ -6101,6 +6659,69 @@ export {
 					expect(
 						codesOf(analysedAt(directory, "P.es", "Q.es")),
 					).toEqual(["cyclic-load-time-use"])
+				},
+			)
+		})
+
+		// The read sits two calls deep, in a body that runs only because a
+		// Constant's value calls into it.
+		it("refuses a Constant of the cycle read while a Module loads through a call chain", () => {
+			withProject(
+				{
+					"A.es": `import {
+	from "./B.es" { SCALE }
+}
+
+implementation {
+	function scale() -> Integer {
+		<- SCALE
+	}
+
+	function doubled() -> Integer {
+		<- scale()::multiply(with 2)
+	}
+
+	constant early = doubled()
+
+	function scaled(_ value: Integer) -> Integer {
+		<- value::multiply(with early)
+	}
+}
+
+export {
+	scaled
+}
+`,
+					"B.es": `import {
+	from "./A.es" { scaled }
+}
+
+implementation {
+	constant SCALE = 3
+
+	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)
+	}
+}
+
+export {
+	SCALE
+	shifted
+}
+`,
+				},
+				(directory) => {
+					let diagnostics = analysedAt(directory, "A.es", "A.es")
+
+					expect(reportsOf(diagnostics)).toEqual([
+						[
+							"cyclic-load-time-use",
+							"'SCALE' is used while this Module loads, but comes from a Module of its import cycle",
+						],
+					])
+					expect(diagnostics[0]?.notes[1]).toBe(
+						"This uses 'SCALE' through 'doubled', then 'scale'.",
+					)
 				},
 			)
 		})

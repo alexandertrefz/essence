@@ -9,7 +9,11 @@ import {
 	secondary,
 } from "../diagnostics/index"
 import { exampleTestsOf } from "../enricher/examples"
-import { enrichPrograms, topLevelScope } from "../enricher/index"
+import {
+	enrichPrograms,
+	type LateNames,
+	topLevelScope,
+} from "../enricher/index"
 import {
 	invalidateNamespacesInScope,
 	printableProtocolName,
@@ -32,8 +36,8 @@ import type { Module, ModuleGraph } from "./graph"
 import { resolveSpecifier } from "./resolve"
 
 // What a top-level declaration was written as. A Variable can not be
-// exported, and a Constant can not be imported across a cycle. Every other
-// kind hoists.
+// exported, and a Constant binds across a cycle only once its Statement is
+// enriched. Every other kind hoists.
 export type DeclaredKind =
 	| "constant"
 	| "variable"
@@ -226,7 +230,9 @@ type ImportBinding = {
 	localName: string
 	// Null when the specifier resolved to nothing, which the graph reported.
 	dependencyPath: string | null
-	state: "pending" | "bound" | "refused"
+	// A `waiting` entry names a Constant of another Module of the cycle,
+	// which binds once its Statement is enriched.
+	state: "pending" | "waiting" | "bound" | "refused"
 	// How many tables the entry has bound, compared with `tablesOffered`.
 	boundTables: number
 }
@@ -779,6 +785,7 @@ function linkGroup(
 		{
 			...modeOf(options),
 			seedRound,
+			lateNames: lateNamesOf(states, declares, surfaceFor),
 			annotationsFor:
 				annotationsIndex === -1 ? undefined : annotationsIndex,
 		},
@@ -993,11 +1000,16 @@ function seedImports(
 	states: Map<string, ModuleState>,
 	declares: (filePath: string, name: string) => Declaration | null,
 	surfaceFor: (filePath: string) => ExportSurface | null,
+	// The entries to offer, where not every one is.
+	only?: ReadonlySet<ImportBinding>,
 ): boolean {
 	let bound = false
 
 	for (let binding of state.imports) {
-		if (binding.state === "refused") {
+		if (
+			binding.state === "refused" ||
+			(only !== undefined && !only.has(binding))
+		) {
 			continue
 		}
 
@@ -1070,17 +1082,15 @@ function seedImports(
 			continue
 		}
 
-		// A Constant does not hoist, so across a cycle its ESM binding may be
-		// read in its temporal dead zone.
-		if (kind === "constant" && states.has(dependencyPath)) {
-			reportCyclicConstantImport(entry)
-			bindAsError(state.scope, localName, entry.name.position)
-			binding.state = "refused"
+		let tables = tablesOffered(surface, exportedName)
+
+		// A Constant does not hoist. One from a Module of the cycle binds once
+		// the in-order enrichment has reached its Statement.
+		if (tables === 0 && kind === "constant" && states.has(dependencyPath)) {
+			binding.state = "waiting"
 
 			continue
 		}
-
-		let tables = tablesOffered(surface, exportedName)
 
 		if (tables === 0 || tables <= binding.boundTables) {
 			continue
@@ -1099,6 +1109,225 @@ function seedImports(
 	}
 
 	return bound
+}
+
+// Counts the surfaces built to bind waiting Constants, for a spec that holds
+// that work to one per Constant.
+export const lateBindingWork = { surfaces: 0 }
+
+// A waiting entry, with the Module of the group that declares its Constant
+// and the name the Constant is declared under there.
+type HeldEntry = {
+	state: ModuleState
+	binding: ImportBinding
+	declaring: ModuleState | null
+	declaredName: string
+}
+
+// The Module of the group that declares what `filePath` exports as `name`. A
+// Module forwarding the name is passed through.
+function declaringModule(
+	states: Map<string, ModuleState>,
+	filePath: string,
+	name: string,
+): { state: ModuleState; name: string } | null {
+	let seen = new Set<string>()
+	let path: string | undefined = filePath
+	let exported = name
+
+	while (path !== undefined && !seen.has(path)) {
+		seen.add(path)
+
+		let state = states.get(path)
+		let entry = state?.exports.get(exported)
+
+		if (state === undefined || entry === undefined) {
+			return null
+		}
+
+		if (entry.source === null) {
+			return { state, name: entry.name.content }
+		}
+
+		exported = entry.name.content
+		path = state.module.resolutions.get(entry.source.path)
+	}
+
+	return null
+}
+
+// Read once the hoist has seeded its last round, after which an entry only
+// ever stops waiting. Kept by importer and by declaring Module.
+function heldEntries(states: Map<string, ModuleState>): {
+	byImporter: Map<ModuleState, Array<HeldEntry>>
+	byDeclaring: Map<ModuleState, Array<HeldEntry>>
+} {
+	let byImporter = new Map<ModuleState, Array<HeldEntry>>()
+	let byDeclaring = new Map<ModuleState, Array<HeldEntry>>()
+
+	for (let state of states.values()) {
+		for (let binding of state.imports) {
+			if (
+				binding.state !== "waiting" ||
+				binding.dependencyPath === null
+			) {
+				continue
+			}
+
+			let declared = declaringModule(
+				states,
+				binding.dependencyPath,
+				binding.entry.name.content,
+			)
+			let held: HeldEntry = {
+				state,
+				binding,
+				declaring: declared?.state ?? null,
+				declaredName: declared?.name ?? binding.entry.name.content,
+			}
+
+			byImporter.set(state, [...(byImporter.get(state) ?? []), held])
+
+			if (held.declaring !== null) {
+				byDeclaring.set(held.declaring, [
+					...(byDeclaring.get(held.declaring) ?? []),
+					held,
+				])
+			}
+		}
+	}
+
+	return { byImporter, byDeclaring }
+}
+
+// The Constants each Module of a group waits for, read by the in-order
+// enrichment. See "Constants across a cycle" in DEVELOPMENT.md.
+function lateNamesOf(
+	states: Map<string, ModuleState>,
+	declares: (filePath: string, name: string) => Declaration | null,
+	surfaceFor: (filePath: string) => ExportSurface | null,
+): LateNames {
+	let ordered = [...states.values()]
+	let held: ReturnType<typeof heldEntries> | null = null
+	let waiting = (entries: Array<HeldEntry> | undefined) =>
+		(entries ?? []).filter(({ binding }) => binding.state === "waiting")
+	let waitingIn = (state: ModuleState) =>
+		waiting((held ??= heldEntries(states)).byImporter.get(state))
+	let inCollection = (state: ModuleState, work: () => void): void => {
+		state.diagnostics.push(...collectDiagnostics(work).diagnostics)
+	}
+	// The group's order follows the entry, and a Module's path does not.
+	let byPath = (left: number, right: number) =>
+		ordered[left]!.module.filePath < ordered[right]!.module.filePath
+			? -1
+			: 1
+	let refuseHeld = (entry: HeldEntry): void => {
+		bindAsError(
+			entry.state.scope,
+			entry.binding.localName,
+			entry.binding.entry.name.position,
+		)
+		entry.binding.state = "refused"
+	}
+
+	return {
+		waiting: (index) =>
+			new Set(
+				waitingIn(ordered[index]!).map(
+					({ binding }) => binding.localName,
+				),
+			),
+		rebind: (index, node) => {
+			let declared = new Set(
+				declarationsOf(node)
+					.filter(({ kind }) => kind === "constant")
+					.map(({ name }) => name.content),
+			)
+			let woken = waiting(
+				(held ??= heldEntries(states)).byDeclaring.get(ordered[index]!),
+			).filter(({ declaredName }) => declared.has(declaredName))
+			let surfaces = new Map<string, ExportSurface | null>()
+			let surfaceOnce = (filePath: string): ExportSurface | null => {
+				if (!surfaces.has(filePath)) {
+					lateBindingWork.surfaces++
+					surfaces.set(filePath, surfaceFor(filePath))
+				}
+
+				return surfaces.get(filePath) ?? null
+			}
+
+			for (let state of new Set(woken.map((entry) => entry.state))) {
+				let only = new Set(
+					woken
+						.filter((entry) => entry.state === state)
+						.map((entry) => entry.binding),
+				)
+
+				inCollection(state, () =>
+					seedImports(state, states, declares, surfaceOnce, only),
+				)
+			}
+		},
+		refuse: (reads) => {
+			let entryAt = (index: number): HeldEntry =>
+				waitingIn(ordered[index]!).find(
+					({ binding }) =>
+						binding.localName === reads.get(index)!.content,
+				)!
+			let waitsOn = (index: number): number => {
+				let declaring = entryAt(index).declaring
+
+				return declaring === null ? -1 : ordered.indexOf(declaring)
+			}
+			let stalled = [...reads.keys()].sort(byPath)
+
+			// A declaring Module that has finished never bound the Constant,
+			// and reported why itself.
+			let lost = stalled.find((index) => !reads.has(waitsOn(index)))
+
+			if (lost !== undefined) {
+				refuseHeld(entryAt(lost))
+
+				return
+			}
+
+			// Every wait leads to another stalled Module, so following them
+			// closes a cycle. Its Module first by path is refused.
+			let seen = new Set<number>()
+			let at = stalled[0]!
+
+			while (!seen.has(at)) {
+				seen.add(at)
+				at = waitsOn(at)
+			}
+
+			let members = [at]
+
+			for (let next = waitsOn(at); next !== at; next = waitsOn(next)) {
+				members.push(next)
+			}
+
+			let refused = members.sort(byPath)[0]!
+			let entry = entryAt(refused)
+
+			inCollection(entry.state, () =>
+				reportCyclicConstantImport(
+					entry,
+					reads.get(refused)!,
+					specifierTo(
+						entry.state.module.filePath,
+						entry.declaring!.module.filePath,
+					),
+				),
+			)
+			refuseHeld(entry)
+		},
+		settle: () => {
+			for (let state of ordered) {
+				waitingIn(state).forEach(refuseHeld)
+			}
+		},
+	}
 }
 
 // An entry still pending names an export that never resolved, which its own
@@ -1125,24 +1354,35 @@ function refuseUnboundImports(state: ModuleState): void {
 	}
 }
 
-function reportCyclicConstantImport(entry: parser.ImportNode): void {
+// Every Module of the cycle waits for a Constant another has not reached.
+// `declaring` spells the Module that declares it, which a forwarding Module
+// may stand in front of.
+function reportCyclicConstantImport(
+	{ binding: { entry }, declaredName }: HeldEntry,
+	read: parser.IdentifierNode,
+	declaring: string,
+): void {
 	reportError(
-		`Constant '${entry.name.content}' is imported across a cycle`,
-		entry.name.position,
+		`Constant '${entry.name.content}' is read before ${declaring} declares it`,
+		read.position,
 		{
 			code: "cyclic-constant-import",
 			labels: [
 				primary(
+					read.position,
+					`this needs the Type of '${entry.name.content}'`,
+				),
+				secondary(
 					entry.name.position,
-					"this Constant is not readable here",
+					"imported from a Module of this cycle",
 				),
 			],
 			notes: [
 				`${entry.source.path} imports this Module back, directly or through further Modules.`,
-				"A Function, a Type Alias, a Choice, a Protocol and a Namespace are all hoisted, so a cycle can name any of them. A Constant is not: its value exists only once its Module's body has run, and inside a cycle which body runs first is not something the source states.",
+				`A Constant does not hoist, so its Type is known only once its Module has been read down to it. ${declaring} reads a Constant of this cycle before it has declared '${declaredName}', and that Constant waits on this Module's code from this Statement on.`,
 			],
 			helps: [
-				"Move the Constant into a Module outside the cycle, or expose it as a Function.",
+				`Declare '${declaredName}' above the Statements of ${declaring} that read a Constant of this cycle, or move it into a Module outside the cycle.`,
 			],
 		},
 	)
