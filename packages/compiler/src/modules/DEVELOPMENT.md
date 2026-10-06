@@ -95,7 +95,9 @@ It reads both trees, since neither holds every use:
   resolved Invocation. That is the local name, since `underLocalName` binds a Namespace import as a copy
   carrying it. A `namespaceName` field covers Union branches and conformance witnesses, and `providedBy`
   names the Protocol whose provided Method was called. Every local name bound to that Protocol counts.
-- `reachedNames` from the enricher adds the names a conformance was reached through without being written.
+- `reachedNames` from the enricher adds the names a conformance was reached through without being written. It
+  adds the Namespaces declaring the Method of a `::` call that resolved to none, too, since that call's typed Node
+  names no Namespace (`noteRefusedCallNamespaces`).
 - A bare Case such as `#Hearts` with no Choice expected resolves through the Choices in Scope, so every name
   whose Type declares that Case counts. The typed tree does not say whether the position resolved it instead,
   so such a Case counts too, which only quiets the warning. A Matcher's bare Case resolves against its

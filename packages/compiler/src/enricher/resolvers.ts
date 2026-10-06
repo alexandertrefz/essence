@@ -2824,9 +2824,10 @@ export const enumerableProtocolName = "Enumerable"
 
 export const enumerableMethodName = "cases"
 
-// The names an enrichment reached a conformance through without writing
-// them, for the linker's unused-import check. A library load nested in a
-// compile records into its collection, which can only quiet the check.
+// The names an enrichment reached a conformance or a refused call through
+// without writing them, for the linker's unused-import check. A library load
+// nested in a compile records into its collection, which can only quiet the
+// check.
 let reachedNames: Set<string> | null = null
 
 export function collectReachedNames<Result>(run: () => Result): {
@@ -2845,7 +2846,7 @@ export function collectReachedNames<Result>(run: () => Result): {
 	}
 }
 
-function noteReachedName(name: string): void {
+export function noteReachedName(name: string): void {
 	reachedNames?.add(name)
 }
 

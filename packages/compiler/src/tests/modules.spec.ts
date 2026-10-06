@@ -5433,6 +5433,68 @@ import {
 		)
 	})
 
+	// A refused `::` call still reached the Namespaces declaring its Method,
+	// which dispatch spells nowhere. Their imports are used. An import nothing
+	// reaches is still reported.
+	it("counts the Namespaces a refused call reached as used", () => {
+		let namespace = (name: string, body: string) => `implementation {
+	namespace ${name} for Integer {
+		${body}
+	}
+}
+
+export {
+	${name}
+}
+`
+
+		withProject(
+			{
+				"Doubling.es": namespace(
+					"Doubling",
+					"twice() -> Integer {\n\t\t\t<- @::multiply(with 2)\n\t\t}",
+				),
+				"Twicing.es": namespace(
+					"Twicing",
+					"twice() -> Integer {\n\t\t\t<- @::add(@)\n\t\t}",
+				),
+				"Checks.es": namespace(
+					"Checks",
+					"static small(_ n: Integer) -> Boolean {\n\t\t\t<- n::isLessThan(10)\n\t\t}",
+				),
+				"Unread.es": namespace(
+					"Unread",
+					"never() -> Integer {\n\t\t\t<- 0\n\t\t}",
+				),
+				"Main.es": `import {
+	from "./Checks.es" { Checks }
+	from "./Doubling.es" { Doubling as Doubler }
+	from "./Twicing.es" { Twicing }
+	from "./Unread.es" { Unread }
+}
+
+implementation {
+	type Small = Integer where @::small(@)
+
+	Terminal.print(5::twice())
+}
+`,
+			},
+			(directory) => {
+				expect(
+					reportsOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual([
+					["unused-import", "'Unread' is imported and never used"],
+					["static-method-on-value", "'small' is a static Method"],
+					[
+						"ambiguous-namespace",
+						"'twice' is provided by more than one Namespace",
+					],
+				])
+			},
+		)
+	})
+
 	// A Function refused as a value is reported where the exporting Module
 	// wrote it. An importer reading the Constant, a member of it or a static
 	// Property, under any name, writes no new value. A Function's own name is

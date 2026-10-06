@@ -1,4 +1,11 @@
-import type { common } from "@essence-lang/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
+
+import { collectDiagnostics } from "../diagnostics/index"
+import {
+	namespacesDeclaringMethod,
+	noteReachedName,
+	resolveMethodLookupNamespacesForReceiverType,
+} from "./resolvers"
 
 // Whether the Arguments being enriched are those of a call that resolved to
 // nothing. A Function literal or a member path passed to one has no Parameter
@@ -27,4 +34,32 @@ export function insideRefusedCall(): boolean {
 // is decided by.
 export function refusedPosition(): common.ErrorType | null {
 	return callRefused ? { type: "Error" } : null
+}
+
+// A `::` call that resolved to no Method still reached the Namespaces that
+// declare it, so the linker does not report their imports as unused. See
+// "Unused imports" in packages/compiler/src/modules/DEVELOPMENT.md.
+export function noteRefusedCallNamespaces(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+): void {
+	let { result } = collectDiagnostics(() =>
+		namespacesDeclaringMethod(
+			node.member.content,
+			resolveMethodLookupNamespacesForReceiverType(
+				baseType,
+				node.namespaceSpecifier,
+				scope,
+			),
+			baseType,
+			scope,
+			node.position,
+			node.namespaceSpecifier,
+		),
+	)
+
+	for (let name of result.keys()) {
+		noteReachedName(name)
+	}
 }

@@ -150,6 +150,7 @@ import {
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import {
 	insideRefusedCall,
+	noteRefusedCallNamespaces,
 	refusedPosition,
 	underRefusedCall,
 } from "./refusedCalls"
@@ -986,6 +987,10 @@ function enrichMethodInvocation(
 		typer,
 		resolved,
 	)
+
+	if (resolved.failed === true) {
+		noteRefusedCallNamespaces(node, base.type, scope)
+	}
 
 	return {
 		nodeType: "MethodInvocation",
