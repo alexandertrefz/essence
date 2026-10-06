@@ -36,6 +36,16 @@ function keywordsOf(source: string, cursor: { line: number; column: number }) {
 		.map((entry) => entry.label)
 }
 
+// The source and the cursor of lines in which a `‸` marks the cursor.
+function atMarker(lines: Array<string>) {
+	let line = lines.findIndex((text) => text.includes("‸"))
+
+	return {
+		source: lines.join("\n").replace("‸", ""),
+		cursor: { line: line + 1, column: lines[line]!.indexOf("‸") + 1 },
+	}
+}
+
 describe("Completion", () => {
 	// A dotted key names members of the value being updated, one level at a
 	// time, so it is a reading of its own. See "Probes" in
@@ -3689,6 +3699,664 @@ describe("Completion inside a refused value", () => {
 
 		expect(entryFor(source, { line: 2, column: 55 }, "item")?.detail).toBe(
 			"Integer",
+		)
+	})
+})
+
+// Completion's walks over the typed Program reach every kind of node. A cursor
+// in any child answers as it would anywhere else.
+describe("Completion inside each kind of node", () => {
+	describe("a member's receiver", () => {
+		let head = [
+			"implementation {",
+			"\ttype Point = { x: Integer, y: Integer }",
+			"\tconstant point: Point = { x = 1, y = 2 }",
+			"\tchoice Shape { Dot { at: Point } }",
+			"",
+		]
+
+		let tests = (lines: Array<string>) => [
+			...head,
+			"}",
+			"",
+			"tests {",
+			...lines,
+			"}",
+		]
+
+		it.each([
+			[
+				"a Constant's value",
+				[...head, "\tconstant picked = point.‸", "}"],
+			],
+			[
+				"a Variable's value",
+				[...head, "\tvariable picked = point.‸", "}"],
+			],
+			[
+				"an assignment",
+				[...head, "\tvariable picked = 0", "\tpicked = point.‸", "}"],
+			],
+			[
+				"a Function's body",
+				[
+					...head,
+					"\tfunction pick() -> Integer {",
+					"\t\t<- point.‸",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Function's Parameter default",
+				[
+					...head,
+					"\tfunction pick(_ at: Integer = point.‸) -> Integer {",
+					"\t\t<- at",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"an if's Condition",
+				[
+					...head,
+					"\tfunction pick() -> Integer {",
+					"\t\tif point.‸ {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"",
+					"\t\t<- 2",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"an if's body",
+				[
+					...head,
+					"\tfunction pick() -> Integer {",
+					"\t\tif true {",
+					"\t\t\t<- point.‸",
+					"\t\t}",
+					"",
+					"\t\t<- 2",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"an else body",
+				[
+					...head,
+					"\tfunction pick() -> Integer {",
+					"\t\tif true {",
+					"\t\t\t<- 1",
+					"\t\t} else {",
+					"\t\t\t<- point.‸",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a static property",
+				[
+					...head,
+					"\tnamespace Picks {",
+					"\t\tstatic picked = point.‸",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Namespace Method's body",
+				[
+					...head,
+					"\tnamespace Picks {",
+					"\t\tstatic pick() -> Integer {",
+					"\t\t\t<- point.‸",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Namespace Method's Parameter default",
+				[
+					...head,
+					"\tnamespace Picks {",
+					"\t\tstatic pick(_ at: Integer = point.‸) -> Integer {",
+					"\t\t\t<- at",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"an Overload's body",
+				[
+					...head,
+					"\tnamespace Picks {",
+					"\t\toverload static pick {",
+					"\t\t\t() -> Integer {",
+					"\t\t\t\t<- 1",
+					"\t\t\t}",
+					"",
+					"\t\t\t(_ at: Integer) -> Integer {",
+					"\t\t\t\t<- point.‸",
+					"\t\t\t}",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a provided Method's body",
+				[
+					...head,
+					"\tprotocol Picking {",
+					"\t\tpick() -> Integer {",
+					"\t\t\t<- point.‸",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Method call's Argument",
+				[...head, "\tconstant picked = point.x::add(point.‸)", "}"],
+			],
+			[
+				"a Function call's Argument",
+				[
+					...head,
+					"\tfunction twice(_ value: Integer) -> Integer {",
+					"\t\t<- value",
+					"\t}",
+					"",
+					"\tconstant picked = twice(point.‸)",
+					"}",
+				],
+			],
+			[
+				"a Record literal's member",
+				[...head, "\tconstant picked = { at = point.‸ }", "}"],
+			],
+			[
+				"an update's value",
+				[...head, "\tconstant moved = { point with x = point.‸ }", "}"],
+			],
+			["a List literal", [...head, "\tconstant picked = [point.‸]", "}"]],
+			[
+				"a Dictionary's value",
+				[...head, '\tconstant picked = ["a" = point.‸]', "}"],
+			],
+			[
+				"a match's subject",
+				[
+					...head,
+					"\tconstant picked = match point.‸ -> Integer {",
+					"\t\tcase _ {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a match arm's Guard",
+				[
+					...head,
+					"\tconstant picked = match point -> Integer {",
+					"\t\tcase _ where point.‸ {",
+					"\t\t\t<- 1",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a match arm's body",
+				[
+					...head,
+					"\tconstant picked = match point -> Integer {",
+					"\t\tcase _ {",
+					"\t\t\t<- point.‸",
+					"\t\t}",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Function literal's body",
+				[
+					...head,
+					"\tconstant pick = () -> Integer {",
+					"\t\t<- point.‸",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a Case payload",
+				[...head, "\tconstant picked = #Dot({ at = point.‸ })", "}"],
+			],
+			[
+				"a Case payload default",
+				[
+					...head,
+					"\tchoice Mark {",
+					"\t\tAt { x: Integer } = { x = point.‸ },",
+					"\t}",
+					"}",
+				],
+			],
+			[
+				"a test's body",
+				tests([
+					'\ttest "picks" {',
+					"\t\tconstant picked = point.‸",
+					"\t}",
+				]),
+			],
+			[
+				"an expect",
+				tests(['\ttest "picks" {', "\t\texpect point.‸", "\t}"]),
+			],
+			[
+				"a require's asserted value",
+				tests([
+					'\ttest "picks" {',
+					"\t\trequire { x = 1 } = point.‸",
+					"\t}",
+				]),
+			],
+		])("should list a Record's members after a dot in %s", (_, lines) => {
+			let { source, cursor } = atMarker(lines)
+
+			expect(labelsOf(source, cursor)).toEqual(["x", "y"])
+		})
+	})
+
+	describe("a Case's expected Type", () => {
+		let head = [
+			"implementation {",
+			"\tchoice Edge { Front, Back }",
+			"\tchoice Size { Small, Large }",
+			"\tchoice Box { Packed { edge: Edge } }",
+			"",
+			"\tfunction place(_ edge: Edge) -> Edge {",
+			"\t\t<- edge",
+			"\t}",
+			"",
+		]
+
+		let casesAt = (lines: Array<string>) => {
+			let { source, cursor } = atMarker([...head, ...lines, "}"])
+
+			return findCompletions(source, cursor).map(
+				(entry) =>
+					`${entry.label}${entry.preselect ? " (preselected)" : ""}`,
+			)
+		}
+
+		it.each([
+			["an annotated Constant", ["\tconstant picked: Edge = #‸"]],
+			["an annotated Variable", ["\tvariable picked: Edge = #‸"]],
+			[
+				"a Function's return",
+				["\tfunction pick() -> Edge {", "\t\t<- #‸", "\t}"],
+			],
+			[
+				"a Function's Parameter default",
+				[
+					"\tfunction pick(_ at: Edge = #‸) -> Edge {",
+					"\t\t<- at",
+					"\t}",
+				],
+			],
+			["a Function call's Argument", ["\tconstant picked = place(#‸)"]],
+			[
+				"a Record literal's member",
+				["\tconstant picked: { edge: Edge } = { edge = #‸ }"],
+			],
+			["a List literal", ["\tconstant picked: List<Edge> = [#‸]"]],
+			[
+				"a Dictionary's key",
+				["\tconstant picked: Dictionary<Edge, Integer> = [#‸ = 1]"],
+			],
+			[
+				"a Dictionary's value",
+				['\tconstant picked: Dictionary<String, Edge> = ["a" = #‸]'],
+			],
+			[
+				"an update's value",
+				[
+					"\tconstant first: { edge: Edge } = { edge = #Front }",
+					"\tconstant picked: { edge: Edge } = { first with edge = #‸ }",
+				],
+			],
+			[
+				"a match arm's body",
+				[
+					"\tconstant picked: Edge = match true -> Edge {",
+					"\t\tcase true {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"\t\tcase false {",
+					"\t\t\t<- #Back",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a define arm",
+				[
+					"\tconstant picked: Edge = define {",
+					"\t\tas #‸ if true",
+					"\t\tas #Back otherwise",
+					"\t}",
+				],
+			],
+			[
+				"a define's otherwise arm",
+				[
+					"\tconstant picked: Edge = define {",
+					"\t\tas #Front if true",
+					"\t\tas #‸ otherwise",
+					"\t}",
+				],
+			],
+			[
+				"a Case payload",
+				["\tconstant picked: Box = #Packed({ edge = #‸ })"],
+			],
+			[
+				"a Case payload default",
+				[
+					"\tchoice Crate {",
+					"\t\tHeld { edge: Edge } = { edge = #‸ },",
+					"\t}",
+				],
+			],
+			[
+				"a Namespace Method's return",
+				[
+					"\tnamespace Edges {",
+					"\t\tstatic first() -> Edge {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a Namespace Method's Parameter default",
+				[
+					"\tnamespace Edges {",
+					"\t\tstatic first(_ at: Edge = #‸) -> Edge {",
+					"\t\t\t<- at",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a provided Method's return",
+				[
+					"\tprotocol Edged {",
+					"\t\tedge() -> Edge {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a Function literal's return",
+				["\tconstant pick = () -> Edge {", "\t\t<- #‸", "\t}"],
+			],
+			[
+				"a test's body",
+				[
+					"}",
+					"",
+					"tests {",
+					'\ttest "picks" {',
+					"\t\tconstant picked: Edge = #‸",
+					"\t}",
+				],
+			],
+		])("should offer the expected Choice's Cases in %s", (_, lines) => {
+			expect(casesAt(lines)).toEqual(["Front (preselected)", "Back"])
+		})
+
+		it.each([
+			[
+				"a Method call's Argument",
+				["\tconstant same = place(#Front)::is(#‸)"],
+			],
+			["an unannotated Constant", ["\tconstant picked = #‸"]],
+		])("should offer every Choice's Cases in %s", (_, lines) => {
+			expect(casesAt(lines)).toEqual([
+				"Front",
+				"Back",
+				"Small",
+				"Large",
+				"Packed",
+			])
+		})
+	})
+
+	describe("a declared name's detail", () => {
+		it.each([
+			[
+				"a Function's body",
+				[
+					"\tfunction pick(_ count: Integer) -> Integer {",
+					"\t\tconstant inner = 1",
+					"\t\t<- inner‸",
+					"\t}",
+				],
+			],
+			[
+				"an if's body",
+				[
+					"\tfunction pick(_ count: Integer) -> Integer {",
+					"\t\tif true {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- inner‸",
+					"\t\t}",
+					"",
+					"\t\t<- count",
+					"\t}",
+				],
+			],
+			[
+				"an else body",
+				[
+					"\tfunction pick(_ count: Integer) -> Integer {",
+					"\t\tif true {",
+					"\t\t\t<- count",
+					"\t\t} else {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- inner‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a match arm's body",
+				[
+					"\tfunction pick(_ count: Integer) -> Integer {",
+					"\t\t<- match true -> Integer {",
+					"\t\t\tcase true {",
+					"\t\t\t\tconstant inner = 1",
+					"\t\t\t\t<- inner‸",
+					"\t\t\t}",
+					"\t\t\tcase false {",
+					"\t\t\t\t<- count",
+					"\t\t\t}",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a Function literal's body",
+				[
+					"\tconstant picks = [1]::map((_ count: Integer) -> Integer {",
+					"\t\tconstant inner = 1",
+					"\t\t<- inner‸",
+					"\t})",
+				],
+			],
+			[
+				"a Namespace Method's body",
+				[
+					"\tnamespace Picks {",
+					"\t\tstatic pick(_ count: Integer) -> Integer {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- inner‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"an Overload's body",
+				[
+					"\tnamespace Picks {",
+					"\t\toverload static pick {",
+					"\t\t\t() -> Integer {",
+					"\t\t\t\t<- 1",
+					"\t\t\t}",
+					"",
+					"\t\t\t(_ count: Integer) -> Integer {",
+					"\t\t\t\tconstant inner = 1",
+					"\t\t\t\t<- inner‸",
+					"\t\t\t}",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a provided Method's body",
+				[
+					"\tprotocol Picking {",
+					"\t\tpick(_ count: Integer) -> Integer {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- inner‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+		])("should carry the Types of the names %s declares", (_, lines) => {
+			let { source, cursor } = atMarker([
+				"implementation {",
+				...lines,
+				"}",
+			])
+
+			expect(entryFor(source, cursor, "inner")?.detail).toBe("Integer")
+			expect(entryFor(source, cursor, "count")?.detail).toBe("Integer")
+		})
+
+		it.each([
+			[
+				"a test's body",
+				[
+					'\ttest "picks" {',
+					"\t\tconstant inner = 1",
+					"\t\texpect inner‸::is(1)",
+					"\t}",
+				],
+			],
+			[
+				"a suite's test",
+				[
+					'\tsuite "picks" {',
+					'\t\ttest "picks" {',
+					"\t\t\tconstant inner = 1",
+					"\t\t\texpect inner‸::is(1)",
+					"\t\t}",
+					"\t}",
+				],
+			],
+		])("should carry the Type of a name %s declares", (_, lines) => {
+			let { source, cursor } = atMarker([
+				"implementation {",
+				"}",
+				"",
+				"tests {",
+				...lines,
+				"}",
+			])
+
+			expect(entryFor(source, cursor, "inner")?.detail).toBe("Integer")
+		})
+
+		it("should carry a Method Parameter's @param text", () => {
+			let { source, cursor } = atMarker([
+				"implementation {",
+				"\tnamespace Picks {",
+				"\t\t§§ Picks one.",
+				"\t\t§§",
+				"\t\t§§ @param count — how many to pick",
+				"\t\tstatic pick(_ count: Integer) -> Integer {",
+				"\t\t\t<- count‸",
+				"\t\t}",
+				"\t}",
+				"}",
+			])
+
+			expect(entryFor(source, cursor, "count")?.documentation).toBe(
+				"how many to pick",
+			)
+		})
+	})
+
+	describe("a Namespace Property's documentation", () => {
+		let namespace = (indent: string) => [
+			`${indent}namespace Thing {`,
+			`${indent}\t§§ What to greet with.`,
+			`${indent}\tstatic label = "hi"`,
+			`${indent}}`,
+			"",
+		]
+
+		it.each([
+			[
+				"a Function's body",
+				[
+					"\tfunction greet() -> String {",
+					...namespace("\t\t"),
+					"\t\t<- Thing.‸",
+					"\t}",
+				],
+			],
+			[
+				"an if's body",
+				[
+					"\tfunction greet() -> String {",
+					"\t\tif true {",
+					...namespace("\t\t\t"),
+					"\t\t\t<- Thing.‸",
+					"\t\t}",
+					"",
+					'\t\t<- ""',
+					"\t}",
+				],
+			],
+		])(
+			"should carry the description of a Property %s declares",
+			(_, lines) => {
+				let { source, cursor } = atMarker([
+					"implementation {",
+					...lines,
+					"}",
+				])
+
+				expect(entryFor(source, cursor, "label")?.documentation).toBe(
+					"What to greet with.",
+				)
+			},
 		)
 	})
 })
