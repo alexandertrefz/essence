@@ -5,6 +5,7 @@ import {
 	holdsFunctionRefusedAsValue,
 	measuredValue,
 	refusedFunctionsAsHoles,
+	typeContainsError,
 } from "../helpers/types"
 import type { ArgumentTyper } from "./enrichers"
 
@@ -50,4 +51,20 @@ export function typerAroundRefusedFunctions(
 		enrichedArgumentValue: (value) =>
 			measuredValue(typer.enrichedArgumentValue(value)),
 	}
+}
+
+// Whether a written Argument holds a Function refused as a value and no other
+// Error, read before any hole is made. A Function literal is never read away
+// from its Parameter.
+export function holdsOnlyHoles(
+	argument: parser.ArgumentNode | undefined,
+	typer: ArgumentTyper,
+): boolean {
+	if (argument === undefined || argument.value.nodeType === "FunctionValue") {
+		return false
+	}
+
+	let type = typer.enrichedArgumentValue(argument.value).type
+
+	return holdsFunctionRefusedAsValue(type) && !typeContainsError(type)
 }

@@ -1053,7 +1053,7 @@ describe("Type matching", () => {
 			).toEqual([
 				[
 					"no-matching-overload",
-					"this Argument's Type could not be read",
+					"this is a { rule: …, n: String }",
 					"'n' is a String; the expected Record declares an Integer.",
 				],
 				[
@@ -1082,6 +1082,65 @@ describe("Type matching", () => {
 					undefined,
 				],
 			])
+		})
+
+		// The refused Argument is described as the validator describes one,
+		// with each refused Function a hole, since only that Function is
+		// unreadable.
+		it("should describe an Argument a call refuses around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				constant first = (_ a: Integer, _ b: Integer) -> Integer { <- a }
+				constant rules = [first]
+				constant more = rules::append(contentsOf [Integer.add, "x"])
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"no-matching-overload",
+					[
+						"this is a List<… | String>",
+						"'List::append' takes a List<(_: Integer, _: Integer) -> Integer> as Parameter 'contentsOf'",
+					],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
+
+		// Each Argument is judged by its own Errors: one beside a refused
+		// Function, rather than holding one, still could not be read.
+		it("should still call an Argument unreadable where its own Error is no hole", () => {
+			let labelOf = (argument: string) =>
+				errorsFor(`implementation {
+					type Rule = (_ n: Integer, _ m: Integer) -> Integer
+
+					namespace Tool for Integer {
+						overload both {
+							(_ r: Rule, _ xs: { a: Integer, b: Integer }) -> Integer { <- 1 }
+							(_ r: Rule, _ xs: { a: Integer, b: Boolean }) -> Integer { <- 2 }
+						}
+					}
+
+					Terminal.inspect(1::both(Integer.add, ${argument}))
+				}`).find((error) => error.code === "no-matching-overload")
+					?.labels[0]?.message
+
+			expect(labelOf(`{ a = nope, b = "x" }`)).toBe(
+				"this Argument's Type could not be read",
+			)
+			expect(labelOf(`(_ x) -> Integer { <- x }`)).toBe(
+				"this Argument's Type could not be read",
+			)
+			expect(labelOf(`{ a = 1, b = "x" }`)).toBe(
+				"this is a { a: Integer, b: String }",
+			)
 		})
 
 		// An update is measured around a refused Function as a Literal is, a

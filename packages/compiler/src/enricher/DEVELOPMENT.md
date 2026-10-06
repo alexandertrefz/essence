@@ -680,8 +680,12 @@ to the candidate declared first. A candidate whose Parameters the Arguments coul
 call's shape. If every candidate did, the report says how many Arguments the call passed and of which Types, and
 names any label no candidate declares (`unknownLabelEvidence`).
 
-Otherwise the primary label names the refused Argument and what it is. A secondary label at the callee says what
-the closest candidate takes there. A label mismatch is reported without asking the Argument's Type, which was never
+Otherwise the primary label names the refused Argument and what it is. An Argument whose Type holds an Error could
+not be read, and the label says so, unless its only Errors are holes for the Functions refused as values it holds.
+Such a hole is reported where it stands, so the label describes the Type with it, as the validator does. Each
+Argument is judged by its own Type before any hole is made (`holdsOnlyHoles`), so an Argument beside a refused
+Function is still unreadable when it holds an Error of its own. A secondary label at the callee says what the
+closest candidate takes there. A label mismatch is reported without asking the Argument's Type, which was never
 read. A Type mismatch adds notes about a refused Record member, a write into an undecided slot, or a Future where
 its value is wanted. The data for the `complete` Quick Fix is carried only for a written Argument, never a
 receiver, because `complete` takes the whole chain behind it.

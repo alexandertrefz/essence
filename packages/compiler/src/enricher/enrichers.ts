@@ -110,7 +110,7 @@ import {
 	unresolvedCaseBindings,
 } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
-import { typerAroundRefusedFunctions } from "./refusedArguments"
+import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -11921,6 +11921,10 @@ function overloadRefusalReport(
 		// Which barrier refused `complete`, since each leaves a different edit;
 		// see `barredCompletion`.
 		barrier?: enricher.CompletionBarrier | null
+		// Whether the only Errors in an Argument's Type are holes for the
+		// Functions refused as values it holds. Each is reported where it
+		// stands, so the Type is described.
+		holesOnly?: (argumentIndex: number) => boolean
 	},
 ): {
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
@@ -12029,7 +12033,8 @@ function overloadRefusalReport(
 		labels: [
 			primary(
 				position,
-				typeContainsError(detail.argumentType)
+				typeContainsError(detail.argumentType) &&
+					call.holesOnly?.(detail.argumentIndex) !== true
 					? "this Argument's Type could not be read"
 					: `this is ${withArticle(describeType(detail.argumentType))}`,
 			),
@@ -12170,6 +12175,9 @@ function reportNoMatchingOverload(
 				writtenArgumentTypes(node.arguments, measured ?? typer),
 			canWait: bodyCanWait(scope),
 			barrier: completionBarrierIn(scope),
+			// The receiver stands first among the matched Arguments.
+			holesOnly: (index) =>
+				holdsOnlyHoles(node.arguments[index - 1], typer),
 		},
 	)
 
@@ -13271,6 +13279,8 @@ function resolveFunctionInvocation(
 					writtenArgumentTypes(node.arguments, measured ?? typer),
 				canWait: bodyCanWait(scope),
 				barrier: completionBarrierIn(scope),
+				holesOnly: (index) =>
+					holdsOnlyHoles(node.arguments[index], typer),
 			},
 		)
 
