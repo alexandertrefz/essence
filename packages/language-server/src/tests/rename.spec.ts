@@ -991,6 +991,22 @@ describe("findDefinition", () => {
 		})
 	})
 
+	// The Type's members are declared before the literal's, so they are the
+	// definitions the literal's members join.
+	it("should point a typed Record literal's member at its Type's", () => {
+		let source = [
+			"implementation {",
+			"\tconstant point = { x: Integer, y: Integer } ~> { x = 1, y = 2 }",
+			"\tTerminal.inspect(point.x)",
+			"}",
+		].join("\n")
+
+		expect(definitionOf(source, { line: 3, column: 25 })).toEqual({
+			start: { line: 2, column: 21 },
+			end: { line: 2, column: 22 },
+		})
+	})
+
 	it("should point call site labels at the Parameter declaring them", () => {
 		let source = [
 			"implementation {",
@@ -3011,6 +3027,165 @@ describe("Rename through start and complete", () => {
 
 		expect(rename(source, { line: 3, column: 3 }, "twice")).toContain(
 			"\tTerminal.inspect(complete held(21::twice()))",
+		)
+	})
+})
+
+// A label, a member, a Case and a path step are spelled like a value's name,
+// and resolve through Types or the call instead. A Pattern's binder declares a
+// name of its own. Renaming a Constant of that name must leave each alone.
+describe("Rename of a Constant spelled like a label, a member, a Case or a binder", () => {
+	let source = [
+		"implementation {",
+		"\tchoice Tank {",
+		"\t\tFull { level: Integer },",
+		"\t\tEmpty,",
+		"\t}",
+		"",
+		"\tconstant level = 2",
+		"\tconstant by = 1",
+		"\tconstant Full = 3",
+		"\tconstant apply: (level: Integer) -> Integer = (level: Integer) -> Integer {",
+		"\t\t<- level",
+		"\t}",
+		"\tconstant tank = Tank#Full({ level })",
+		'\tconstant spaced = "a"::indent(by level)',
+		"\tconstant read = { level = level }.level",
+		"\tconstant depths = [{ level = 1 }]::map(.level)",
+		"",
+		"\tTerminal.inspect(apply(level by))",
+		"\tTerminal.inspect(Full)",
+		"}",
+	].join("\n")
+
+	it("should leave a Function Type's label, a Case's member and a Lookup alone", () => {
+		expect(rename(source, { line: 7, column: 11 }, "depth")).toBe(
+			[
+				"implementation {",
+				"\tchoice Tank {",
+				"\t\tFull { level: Integer },",
+				"\t\tEmpty,",
+				"\t}",
+				"",
+				"\tconstant depth = 2",
+				"\tconstant by = 1",
+				"\tconstant Full = 3",
+				"\tconstant apply: (level: Integer) -> Integer = (level: Integer) -> Integer {",
+				"\t\t<- level",
+				"\t}",
+				"\tconstant tank = Tank#Full({ level = depth })",
+				'\tconstant spaced = "a"::indent(by depth)',
+				"\tconstant read = { level = depth }.level",
+				"\tconstant depths = [{ level = 1 }]::map(.level)",
+				"",
+				"\tTerminal.inspect(apply(level by))",
+				"\tTerminal.inspect(Full)",
+				"}",
+			].join("\n"),
+		)
+	})
+
+	it("should leave a Method call's label alone", () => {
+		expect(rename(source, { line: 8, column: 11 }, "step")).toBe(
+			source
+				.replace("\tconstant by = 1", "\tconstant step = 1")
+				.replace("apply(level by)", "apply(level step)"),
+		)
+	})
+
+	it("should leave a Case of the Constant's name alone", () => {
+		expect(rename(source, { line: 9, column: 11 }, "Count")).toBe(
+			source
+				.replace("\tconstant Full = 3", "\tconstant Count = 3")
+				.replace("Terminal.inspect(Full)", "Terminal.inspect(Count)"),
+		)
+	})
+
+	it("should leave a Pattern binder that shadows the Constant alone", () => {
+		let shadowed = [
+			"implementation {",
+			"\tconstant outer = 1",
+			"\tconstant box = { width = 1, height = 2 }",
+			"",
+			"\tfunction measure() -> Integer {",
+			"\t\tconstant { width as outer } = box",
+			"",
+			"\t\t<- outer",
+			"\t}",
+			"",
+			"\tTerminal.inspect(measure()::add(outer))",
+			"}",
+		].join("\n")
+
+		expect(rename(shadowed, { line: 2, column: 11 }, "base")).toBe(
+			shadowed
+				.replace("\tconstant outer = 1", "\tconstant base = 1")
+				.replace("add(outer)", "add(base)"),
+		)
+	})
+})
+
+describe("Rename of a Type Alias through every Type position", () => {
+	it("should reach Function Types, Type Arguments, a Pattern and return Types", () => {
+		let source = [
+			"implementation {",
+			"\ttype Amount = Integer",
+			"",
+			"\tchoice Holder<Item> {",
+			"\t\tFull { item: Item },",
+			"\t\tEmpty,",
+			"\t}",
+			"",
+			"\tconstant convert: (value: Amount) -> List<Amount> = (value: Amount) -> List<Amount> {",
+			"\t\t<- [value]",
+			"\t}",
+			"\tconstant held: Holder<Amount> = Holder<Amount>#Full({ item = 1 })",
+			"\tconstant picked = match held -> Amount {",
+			"\t\tcase #Full({ item: Amount }) { <- item }",
+			"\t\tcase _ { <- 0 }",
+			"\t}",
+			"\tconstant chosen = define -> Amount {",
+			"\t\tas 1 if picked::isGreaterThan(0)",
+			"\t\tas 2 otherwise",
+			"\t}",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 7 }, "Money")).toBe(
+			source.replaceAll("Amount", "Money"),
+		)
+	})
+})
+
+// Only the typed walk knows which Namespace answered a Method call, so it has
+// to reach every value a call can stand in.
+describe("Rename of a Method called inside a value", () => {
+	it("should reach a condition, an interpolation, a List, a Dictionary and an update", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Gauge for Integer {",
+			"\t\tdoubled() -> Integer {",
+			"\t\t\t<- @::multiply(with 2)",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tfunction report(_ amount: Integer) -> String {",
+			"\t\tif amount::doubled()::isGreaterThan(4) {",
+			'\t\t\t<- "{amount::doubled()} is large"',
+			"\t\t}",
+			"",
+			'\t\t<- "{amount}"',
+			"\t}",
+			"",
+			"\tconstant readings = [1::doubled(), 2]",
+			'\tconstant labels = ["one" = 1::doubled(), "two" = 2]',
+			"\tconstant base = { size = 1 }",
+			"\tconstant merged = { base with size = 2::doubled() }",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 3, column: 3 }, "twice")).toBe(
+			source.replaceAll("doubled", "twice"),
 		)
 	})
 })

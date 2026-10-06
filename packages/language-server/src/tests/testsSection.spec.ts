@@ -300,6 +300,23 @@ describe("The tests section", () => {
 			expect(renamed).toContain("expect pointsFor(scored)::is(scored)")
 		})
 
+		// Only the typed walk binds a member, and it reaches a table's rows, a
+		// test's name and its body alike.
+		it("should rename a Record member every test reads", () => {
+			let renamed = rename(
+				source,
+				cursorAt(source, "scored: Integer"),
+				"goals",
+			)
+
+			expect(renamed).toBe(
+				source
+					.replace("{ scored: Integer,", "{ goals: Integer,")
+					.replaceAll("{ scored =", "{ goals =")
+					.replaceAll("row.scored", "row.goals"),
+			)
+		})
+
 		it("should rename a Constant the tests section declares", () => {
 			let renamed = rename(source, cursorAt(source, "rows", 1), "table")
 
