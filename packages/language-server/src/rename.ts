@@ -12,12 +12,13 @@ import {
 	patternBindings,
 } from "@essence-lang/compiler/helpers"
 import {
+	forEachParserChild,
 	forEachTypedChild,
+	type ParserNode,
 	type TypedNode,
 } from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { defineExpressions } from "./defineArmChildren"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains, isSmaller } from "./positions"
 import {
@@ -477,7 +478,7 @@ export function indexProgram(
 	// Scope after the whole implementation.
 	declareImports(program, topLevelScope, context)
 
-	walkSections(program, topLevelScope, context)
+	walkSections(program, { scope: topLevelScope, context })
 
 	referenceExports(program, topLevelScope, context)
 
@@ -870,37 +871,44 @@ function rangeOfBody(
 /* Walkers */
 /***********/
 
+// What the parser walk carries to every node: the Scope its names resolve
+// in, and the index it fills.
+type Walk = {
+	scope: Scope
+	context: WalkContext
+}
+
+function inScope(walk: Walk, scope: Scope): Walk {
+	return { scope, context: walk.context }
+}
+
 // Every body a Program holds, each in its own Scope. Sections arrive
 // outermost first, so a parent's Scope always exists. As in the Enricher, a
 // test's body binds in order and every other Section hoists.
-function walkSections(
-	program: parser.Program,
-	topLevelScope: Scope,
-	context: WalkContext,
-) {
-	let scopes = new Map<ParserSection, Scope>()
+function walkSections(program: parser.Program, topLevel: Walk) {
+	let walks = new Map<ParserSection, Walk>()
 
 	for (let section of programSections(program)) {
-		let parentScope =
+		let parent =
 			section.parent === null
-				? topLevelScope
-				: (scopes.get(section.parent) ?? topLevelScope)
-		let scope =
+				? topLevel
+				: (walks.get(section.parent) ?? topLevel)
+		let walk =
 			section.parent === null
-				? topLevelScope
-				: childScope(parentScope, section.position, context)
+				? topLevel
+				: childWalk(parent, section.position)
 
-		scopes.set(section, scope)
+		walks.set(section, walk)
 
 		// The head reads the enclosing Scope: a table's rows are written
 		// outside the body.
 		for (let node of section.head) {
-			walkNode(node, parentScope, context)
+			walkNode(node, parent)
 		}
 
-		declareTestParameters(section.parameters, scope, context)
+		declareTestParameters(section.parameters, walk)
 
-		walkBody(section.nodes, scope, context, {
+		walkBody(section.nodes, walk, {
 			hoist: section.kind !== "test",
 		})
 	}
@@ -911,14 +919,13 @@ function walkSections(
 // without labels, since nothing calls a test.
 function declareTestParameters(
 	parameters: Array<parser.ParameterNode>,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 ) {
 	for (let parameter of parameters) {
-		walkTypeDeclaration(parameter.type, scope, context)
+		walkTypeDeclaration(parameter.type, walk)
 
 		if (parameter.defaultValue !== null) {
-			walkNode(parameter.defaultValue, scope, context)
+			walkNode(parameter.defaultValue, walk)
 		}
 
 		if (parameter.internalName === null) {
@@ -926,7 +933,7 @@ function declareTestParameters(
 		}
 
 		if (parameter.internalName.nodeType === "Pattern") {
-			declarePattern(parameter.internalName, scope, context, "parameter")
+			declarePattern(parameter.internalName, walk, "parameter")
 
 			continue
 		}
@@ -934,44 +941,43 @@ function declareTestParameters(
 		// Visible throughout the Section: a table test's name, written before
 		// the body, reads the row.
 		declareInScope(
-			scope,
+			walk.scope,
 			"values",
 			parameter.internalName,
 			"parameter",
-			context,
+			walk.context,
 		)
 	}
 }
 
 function walkBody(
 	nodes: Array<parser.ImplementationNode>,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 	{ hoist }: { hoist: boolean },
 ) {
 	// Nested bodies bind in order, as in the Enricher.
 	if (hoist) {
-		hoistDeclarations(nodes, scope)
+		hoistDeclarations(nodes, walk.scope)
 	}
 
 	for (let node of nodes) {
-		walkNode(node, scope, context)
+		walkNode(node, walk)
 	}
 }
 
-function walkNode(
-	node: parser.ImplementationNode,
-	scope: Scope,
-	context: WalkContext,
-) {
+// The parser walk. A kind that opens a Scope or binds a name has a case of
+// its own, and every other kind descends through `forEachParserChild`.
+function walkNode(node: ParserNode, walk: Walk) {
+	let { scope, context } = walk
+
 	switch (node.nodeType) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement": {
 			if (node.type !== null) {
-				walkTypeDeclaration(node.type, scope, context)
+				walkTypeDeclaration(node.type, walk)
 			}
 
-			walkNode(node.value, scope, context)
+			walkNode(node.value, walk)
 
 			let kind =
 				node.nodeType === "ConstantDeclarationStatement"
@@ -983,8 +989,7 @@ function walkNode(
 			if (node.name.nodeType === "Pattern") {
 				declarePattern(
 					node.name,
-					scope,
-					context,
+					walk,
 					kind,
 					// Visible after the whole Statement, so the value cannot read
 					// a name it binds.
@@ -1020,7 +1025,7 @@ function walkNode(
 				"write",
 			)
 
-			walkNode(node.value, scope, context)
+			walkNode(node.value, walk)
 
 			if (
 				declaration !== null &&
@@ -1041,7 +1046,7 @@ function walkNode(
 			)
 
 			linkFunctionDefinition(declaration, node.value, context)
-			walkFunctionDefinition(node.value, scope, context, node.position)
+			walkFunctionDefinition(node.value, walk, node.position)
 			return
 		}
 		case "OverloadedFunctionStatement": {
@@ -1058,89 +1063,81 @@ function walkNode(
 			for (let method of node.methods) {
 				if (method.nodeType === "FunctionValue") {
 					linkFunctionDefinition(declaration, method.value, context)
-					walkFunctionDefinition(
-						method.value,
-						scope,
-						context,
-						method.position,
-					)
+					walkFunctionDefinition(method.value, walk, method.position)
 				} else {
-					walkNativeSignature(method, scope, context)
+					walkNativeSignature(method, walk)
 				}
 			}
 
 			return
 		}
 		case "NamespaceDefinitionStatement":
-			walkNamespaceDefinition(node, scope, context)
+			walkNamespaceDefinition(node, walk)
 			return
 		case "ProtocolDeclarationStatement":
-			walkProtocolDeclaration(node, scope, context)
+			walkProtocolDeclaration(node, walk)
 			return
 		case "ChoiceDeclarationStatement": {
 			declareInScope(scope, "types", node.name, "type", context)
 
 			// A generic Choice's Type Parameters bind across every Case's
 			// payload, as a Type Alias's do.
-			let choiceScope = scopeWithGenerics(node.generics, scope, context)
+			let choiceWalk = inScope(
+				walk,
+				scopeWithGenerics(node.generics, walk),
+			)
 
 			// A Case name resolves through its Choice; only the payload's Types
 			// hold references.
 			for (let choiceCase of node.cases) {
 				if (choiceCase.type !== null) {
-					walkTypeDeclaration(choiceCase.type, choiceScope, context)
+					walkTypeDeclaration(choiceCase.type, choiceWalk)
 				}
 			}
 
 			// A payload default names values in the enclosing Scope, since a
 			// Choice opens no frame for values.
 			for (let defaultValue of caseDefaults(node.cases)) {
-				walkNode(defaultValue, scope, context)
+				walkNode(defaultValue, walk)
 			}
 
 			return
 		}
 		case "TypeAliasStatement":
-			walkTypeAlias(node, scope, context)
+			walkTypeAlias(node, walk)
 			return
 		case "IfStatement": {
-			walkNode(node.condition, scope, context)
+			walkNode(node.condition, walk)
 
-			let bodyScope = childScope(
-				scope,
+			let bodyWalk = childWalk(
+				walk,
 				rangeOfBody(node.body, node.position),
-				context,
 			)
 
-			walkBody(node.body, bodyScope, context, { hoist: false })
+			walkBody(node.body, bodyWalk, { hoist: false })
 			return
 		}
 		case "IfElseStatement": {
-			walkNode(node.condition, scope, context)
+			walkNode(node.condition, walk)
 
-			let trueScope = childScope(
-				scope,
+			let trueWalk = childWalk(
+				walk,
 				rangeOfBody(node.trueBody, node.position),
-				context,
 			)
-			let falseScope = childScope(
-				scope,
+			let falseWalk = childWalk(
+				walk,
 				rangeOfBody(node.falseBody, node.position),
-				context,
 			)
 
-			walkBody(node.trueBody, trueScope, context, { hoist: false })
-			walkBody(node.falseBody, falseScope, context, { hoist: false })
+			walkBody(node.trueBody, trueWalk, { hoist: false })
+			walkBody(node.falseBody, falseWalk, { hoist: false })
 			return
 		}
-		case "ReturnStatement":
-			walkNode(node.expression, scope, context)
-			return
 		// `require MATCHER = EXPR` binds into the enclosing block, visible
 		// after the Statement, since a failed `require` ends the test.
 		case "ExpectStatement":
 		case "RequireStatement": {
-			walkNode(node.value, scope, context)
+			walkNode(node.value, walk)
 
 			if (node.matcher === null) {
 				return
@@ -1151,8 +1148,7 @@ function walkNode(
 			if (node.matcher.nodeType === "Pattern") {
 				declarePattern(
 					node.matcher,
-					scope,
-					context,
+					walk,
 					"constant",
 					node.position.end,
 				)
@@ -1164,8 +1160,7 @@ function walkNode(
 				if (node.matcher.binding?.nodeType === "Pattern") {
 					declarePattern(
 						node.matcher.binding,
-						scope,
-						context,
+						walk,
 						"constant",
 						node.position.end,
 					)
@@ -1183,7 +1178,7 @@ function walkNode(
 				node.matcher.nodeType !== "WildcardMatcher" &&
 				node.matcher.nodeType !== "LiteralMatcher"
 			) {
-				walkTypeDeclaration(node.matcher, scope, context)
+				walkTypeDeclaration(node.matcher, walk)
 			}
 
 			return
@@ -1191,22 +1186,13 @@ function walkNode(
 		case "Identifier":
 			reference(scope, "values", node, context)
 			return
-		case "MethodInvocation":
-			walkNode(node.base, scope, context)
-
-			if (node.namespaceSpecifier !== null) {
-				reference(scope, "values", node.namespaceSpecifier, context)
-			}
-
-			walkArguments(node.arguments, scope, context)
-			return
 		case "FunctionInvocation": {
 			let callee: Declaration | null = null
 
 			if (node.name.nodeType === "Identifier") {
 				callee = reference(scope, "values", node.name, context)
 			} else {
-				walkNode(node.name, scope, context)
+				walkNode(node.name, walk)
 			}
 
 			for (let argument of node.arguments) {
@@ -1217,46 +1203,14 @@ function walkNode(
 					})
 				}
 
-				walkNode(argument.value, scope, context)
+				walkNode(argument.value, walk)
 			}
 
 			return
 		}
-		case "Lookup":
-			// The member resolves through the base's Type, in the typed pass.
-			walkNode(node.base, scope, context)
-			return
-		case "Start":
-		case "Complete":
-			walkNode(node.expression, scope, context)
-			return
-		// The name inside `primes[0]` is an occurrence a rename must reach.
-		case "RefusedValue":
-			walkNode(node.base, scope, context)
-			return
-		case "CaseValue":
-			// The Case name resolves through the Choice. The Choice prefix and
-			// any Type Arguments are Type references.
-			if (node.choice !== null) {
-				reference(scope, "types", node.choice, context)
-			}
-
-			for (let argument of node.typeArguments ?? []) {
-				walkTypeDeclaration(argument, scope, context)
-			}
-
-			if (node.value !== null) {
-				walkNode(node.value, scope, context)
-			}
-
-			return
-		case "Combination":
-			walkNode(node.lhs, scope, context)
-			walkNode(node.rhs, scope, context)
-			return
 		case "Match":
-			walkNode(node.value, scope, context)
-			walkTypeDeclaration(node.returnType, scope, context)
+			walkNode(node.value, walk)
+			walkTypeDeclaration(node.returnType, walk)
 
 			for (let handler of node.handlers) {
 				if (handler.matcher.nodeType === "Pattern") {
@@ -1276,28 +1230,19 @@ function walkNode(
 					handler.matcher.nodeType !== "WildcardMatcher" &&
 					handler.matcher.nodeType !== "LiteralMatcher"
 				) {
-					walkTypeDeclaration(handler.matcher, scope, context)
+					walkTypeDeclaration(handler.matcher, walk)
 				}
 
 				// One Scope from the Matcher on, since a binding written in the
 				// Matcher is read in the Guard and the body alike.
-				let handlerScope = childScope(
-					scope,
-					{
-						start: handler.matcher.position.start,
-						end: rangeOfBody(handler.body, node.position).end,
-					},
-					context,
-				)
+				let handlerWalk = childWalk(walk, {
+					start: handler.matcher.position.start,
+					end: rangeOfBody(handler.body, node.position).end,
+				})
 
 				// Declared before the Guard and the body are walked.
 				if (handler.matcher.nodeType === "Pattern") {
-					declarePattern(
-						handler.matcher,
-						handlerScope,
-						context,
-						"constant",
-					)
+					declarePattern(handler.matcher, handlerWalk, "constant")
 				} else if (
 					handler.matcher.nodeType === "CaseMatcher" &&
 					handler.matcher.binding !== null
@@ -1305,13 +1250,12 @@ function walkNode(
 					if (handler.matcher.binding.nodeType === "Pattern") {
 						declarePattern(
 							handler.matcher.binding,
-							handlerScope,
-							context,
+							handlerWalk,
 							"constant",
 						)
 					} else {
 						declareInScope(
-							handlerScope,
+							handlerWalk.scope,
 							"values",
 							handler.matcher.binding,
 							"constant",
@@ -1321,28 +1265,16 @@ function walkNode(
 				}
 
 				if (handler.guard !== null) {
-					walkNode(handler.guard, handlerScope, context)
+					walkNode(handler.guard, handlerWalk)
 				}
 
-				walkBody(handler.body, handlerScope, context, {
-					hoist: false,
-				})
-			}
-
-			return
-		// No child Scope: a `define` binds nothing, so its arms read the
-		// Scope it stands in.
-		case "Define":
-			walkTypeDeclaration(node.returnType, scope, context)
-
-			for (let expression of defineExpressions(node)) {
-				walkNode(expression, scope, context)
+				walkBody(handler.body, handlerWalk, { hoist: false })
 			}
 
 			return
 		case "RecordValue":
 			if (node.type !== null) {
-				walkTypeDeclaration(node.type, scope, context)
+				walkTypeDeclaration(node.type, walk)
 			}
 
 			registerRecordSite(Object.values(node.members), context)
@@ -1367,84 +1299,69 @@ function walkNode(
 					continue
 				}
 
-				walkNode(memberExpression(member), scope, context)
-			}
-
-			return
-		case "ListValue":
-			for (let value of node.values) {
-				walkNode(value, scope, context)
-			}
-
-			return
-		case "DictionaryValue":
-			for (let entry of node.entries) {
-				walkNode(entry.key, scope, context)
-				walkNode(entry.value, scope, context)
-			}
-
-			return
-		case "InterpolatedStringValue":
-			for (let segment of node.segments) {
-				if (segment.kind === "expression") {
-					walkNode(segment.expression, scope, context)
-				}
+				walkNode(memberExpression(member), walk)
 			}
 
 			return
 		case "FunctionValue":
-			walkFunctionDefinition(node.value, scope, context, node.position)
+			walkFunctionDefinition(node.value, walk, node.position)
 			return
-		// A path's steps are member occurrences, which the typed pass records
-		// off the Lookups the Enricher synthesizes for them.
-		case "MemberPath":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
+		// Walked by hand until each Type kind descends as well.
+		case "IdentifierTypeDeclaration":
+		case "RecordTypeDeclaration":
+		case "UnionTypeDeclaration":
+		case "FunctionTypeDeclaration":
+		case "GenericTypeDeclaration":
+			walkTypeDeclaration(node, walk)
 			return
+	}
+
+	forEachParserChild(node, walkChild, walk)
+}
+
+// The fields whose Identifier names a Type: the Choice of `Choice#Case`.
+const typeNameFields = new Set(["choice"])
+
+// The fields whose Identifier names no Declaration a Scope holds. The typed
+// pass resolves a member or a path step. A Case resolves through its Choice,
+// and a Method call's label through the Method.
+const unscopedNameFields = new Set(["member", "steps", "caseName", "name"])
+
+// A child reached through `forEachParserChild`. An Identifier there names a
+// value, unless the field holding it says otherwise.
+function walkChild(child: ParserNode, walk: Walk, field: string) {
+	if (child.nodeType !== "Identifier") {
+		walkNode(child, walk)
+	} else if (typeNameFields.has(field)) {
+		reference(walk.scope, "types", child, walk.context)
+	} else if (!unscopedNameFields.has(field)) {
+		reference(walk.scope, "values", child, walk.context)
 	}
 }
 
-function walkArguments(
-	nodeArguments: Array<parser.ArgumentNode>,
-	scope: Scope,
-	context: WalkContext,
-) {
-	// The labels of a Method call resolve through Types.
-	for (let argument of nodeArguments) {
-		walkNode(argument.value, scope, context)
-	}
-}
+function childWalk(walk: Walk, range: common.Position): Walk {
+	let scope = createScope(walk.scope)
 
-function childScope(
-	parent: Scope,
-	range: common.Position,
-	context: WalkContext,
-): Scope {
-	let scope = createScope(parent)
+	walk.context.scopes.push({ range, scope })
 
-	context.scopes.push({ range, scope })
-
-	return scope
+	return inScope(walk, scope)
 }
 
 function scopeWithGenerics(
 	generics: Array<parser.GenericDeclarationNode>,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 	// The enclosing Namespace's Type Parameters. A Method's `<…>` entry naming
 	// one bounds it for that Method, so it is a use, not a declaration.
 	enclosing: Set<string> = new Set(),
 ): Scope {
+	let { scope, context } = walk
 	let genericScope = createScope(scope)
 
 	for (let generic of generics) {
 		// Defaults and bounds resolve in the outer Scope, as in the Enricher's
 		// `resolveGenericDeclarations`.
 		if (generic.defaultType !== null) {
-			walkTypeDeclaration(generic.defaultType, scope, context)
+			walkTypeDeclaration(generic.defaultType, walk)
 		}
 
 		if (generic.constraint !== null) {
@@ -1472,20 +1389,16 @@ function scopeWithGenerics(
 
 function walkFunctionDefinition(
 	definition: parser.FunctionDefinitionNode,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 	// The wrapping node's Position, which spans the braces. The body's
 	// Statements may be empty, or dropped by error recovery mid-edit.
 	range: common.Position,
 	// A Namespace Method's enclosing Type Parameters; see `scopeWithGenerics`.
 	enclosing: Set<string> = new Set(),
 ) {
-	let functionScope = scopeWithGenerics(
-		definition.generics,
-		scope,
-		context,
-		enclosing,
-	)
+	let { context } = walk
+	let functionScope = scopeWithGenerics(definition.generics, walk, enclosing)
+	let functionWalk = inScope(walk, functionScope)
 
 	context.scopes.push({
 		range,
@@ -1497,12 +1410,12 @@ function walkFunctionDefinition(
 	context.labels.set(definition, labels)
 
 	for (let parameter of definition.parameters) {
-		walkTypeDeclaration(parameter.type, functionScope, context)
+		walkTypeDeclaration(parameter.type, functionWalk)
 
 		// Walked before its Parameter is declared, as the Enricher scopes it: a
 		// default sees `@`, the Parameters to its left and the enclosing Scope.
 		if (parameter.defaultValue !== null) {
-			walkNode(parameter.defaultValue, functionScope, context)
+			walkNode(parameter.defaultValue, functionWalk)
 		}
 
 		// `_: Type` declares neither a name nor a label.
@@ -1513,12 +1426,7 @@ function walkFunctionDefinition(
 		// A Pattern binds names, none of them the Parameter's, so a label has
 		// no symbol to share. An explicit label is still recorded.
 		if (parameter.internalName.nodeType === "Pattern") {
-			declarePattern(
-				parameter.internalName,
-				functionScope,
-				context,
-				"parameter",
-			)
+			declarePattern(parameter.internalName, functionWalk, "parameter")
 
 			if (parameter.externalName !== null) {
 				let labelDeclaration: Declaration = {
@@ -1596,15 +1504,15 @@ function walkFunctionDefinition(
 		}
 	}
 
-	walkTypeDeclaration(definition.returnType, functionScope, context)
-	walkBody(definition.body, functionScope, context, { hoist: false })
+	walkTypeDeclaration(definition.returnType, functionWalk)
+	walkBody(definition.body, functionWalk, { hoist: false })
 }
 
 function walkProtocolDeclaration(
 	node: parser.ProtocolDeclarationStatementNode,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 ) {
+	let { scope, context } = walk
 	let key = siteKeyOf(
 		node.name.content,
 		declareInScope(scope, "types", node.name, "protocol", context),
@@ -1636,6 +1544,8 @@ function walkProtocolDeclaration(
 		visibleFrom: null,
 		occurrences: [],
 	})
+
+	let selfWalk = inScope(walk, selfScope)
 
 	// The table a call the Protocol resolved binds to. A call on a conformer
 	// binds to its own Method, which joins this one through `conformances`.
@@ -1686,8 +1596,7 @@ function walkProtocolDeclaration(
 			if (signature.body !== null) {
 				walkFunctionDefinition(
 					signature.body.value,
-					selfScope,
-					context,
+					selfWalk,
 					signature.body.position,
 				)
 
@@ -1695,19 +1604,19 @@ function walkProtocolDeclaration(
 			}
 
 			for (let parameter of signature.parameters) {
-				walkTypeDeclaration(parameter.type, selfScope, context)
+				walkTypeDeclaration(parameter.type, selfWalk)
 			}
 
-			walkTypeDeclaration(signature.returnType, selfScope, context)
+			walkTypeDeclaration(signature.returnType, selfWalk)
 		}
 	}
 }
 
 function walkNamespaceDefinition(
 	node: parser.NamespaceDefinitionStatementNode,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 ) {
+	let { scope, context } = walk
 	let key = siteKeyOf(
 		node.name.content,
 		declareInScope(scope, "values", node.name, "namespace", context),
@@ -1722,7 +1631,8 @@ function walkNamespaceDefinition(
 
 	// Built first, so `Item` in `where Item is Comparable` binds to the
 	// Namespace's Type Parameter.
-	let genericScope = scopeWithGenerics(node.generics, scope, context)
+	let genericScope = scopeWithGenerics(node.generics, walk)
+	let genericWalk = inScope(walk, genericScope)
 	// The names a Method's `<…>` may not re-declare; see `scopeWithGenerics`.
 	let declared = new Set(node.generics.map((generic) => generic.name.content))
 
@@ -1801,19 +1711,19 @@ function walkNamespaceDefinition(
 	}
 
 	if (node.targetType !== null) {
-		walkTypeDeclaration(node.targetType, genericScope, context)
+		walkTypeDeclaration(node.targetType, genericWalk)
 	}
 
 	// Properties resolve in the outer Scope: as in the Enricher, the
 	// Namespace's Type Parameters reach only the target Type and the Methods.
 	for (let property of Object.values(node.properties)) {
 		if (property.type !== null) {
-			walkTypeDeclaration(property.type, scope, context)
+			walkTypeDeclaration(property.type, walk)
 		}
 
 		// A native static Property has no value to walk.
 		if (property.value !== null) {
-			walkNode(property.value, scope, context)
+			walkNode(property.value, walk)
 		}
 	}
 
@@ -1821,14 +1731,13 @@ function walkNamespaceDefinition(
 		// A native signature writes Type and Parameter names, indexed for
 		// Semantic Tokens, highlighting and go-to-definition.
 		for (let signature of nativeSignaturesOf(member)) {
-			walkNativeSignature(signature, genericScope, context, declared)
+			walkNativeSignature(signature, genericWalk, declared)
 		}
 
 		for (let method of methodsOf(member)) {
 			walkFunctionDefinition(
 				method.value,
-				genericScope,
-				context,
+				genericWalk,
 				method.position,
 				declared,
 			)
@@ -1838,22 +1747,20 @@ function walkNamespaceDefinition(
 
 function walkNativeSignature(
 	signature: parser.NativeMethodSignatureNode,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 	enclosing: Set<string> = new Set(),
 ) {
-	let signatureScope = scopeWithGenerics(
-		signature.generics,
-		scope,
-		context,
-		enclosing,
+	let { context } = walk
+	let signatureWalk = inScope(
+		walk,
+		scopeWithGenerics(signature.generics, walk, enclosing),
 	)
 
 	for (let parameter of signature.parameters) {
-		walkTypeDeclaration(parameter.type, signatureScope, context)
+		walkTypeDeclaration(parameter.type, signatureWalk)
 
 		if (parameter.defaultValue !== null) {
-			walkNode(parameter.defaultValue, signatureScope, context)
+			walkNode(parameter.defaultValue, signatureWalk)
 		}
 
 		// Without a body nothing reads the Parameter, so it is a standalone
@@ -1881,36 +1788,33 @@ function walkNativeSignature(
 		}
 	}
 
-	walkTypeDeclaration(signature.returnType, signatureScope, context)
+	walkTypeDeclaration(signature.returnType, signatureWalk)
 }
 
 // A refinement's predicate reads names as any Expression does, so the
 // Constant a predicate's Argument names keeps that read.
-function walkTypeAlias(
-	node: parser.TypeAliasStatementNode,
-	scope: Scope,
-	context: WalkContext,
-) {
-	declareInScope(scope, "types", node.name, "type", context)
+function walkTypeAlias(node: parser.TypeAliasStatementNode, walk: Walk) {
+	declareInScope(walk.scope, "types", node.name, "type", walk.context)
 
-	let aliasScope = scopeWithGenerics(node.generics, scope, context)
+	let aliasWalk = inScope(walk, scopeWithGenerics(node.generics, walk))
 
-	walkTypeDeclaration(node.type, aliasScope, context)
+	walkTypeDeclaration(node.type, aliasWalk)
 
 	if (node.predicate !== null) {
-		walkNode(node.predicate, aliasScope, context)
+		walkNode(node.predicate, aliasWalk)
 	}
 }
 
 // Null where a contextually typed Function literal omitted an annotation.
 function walkTypeDeclaration(
 	node: parser.TypeDeclarationNode | null,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 ) {
 	if (node === null) {
 		return
 	}
+
+	let { scope, context } = walk
 
 	switch (node.nodeType) {
 		case "IdentifierTypeDeclaration":
@@ -1920,28 +1824,28 @@ function walkTypeDeclaration(
 			registerRecordSite(Object.values(node.members), context)
 
 			for (let member of Object.values(node.members)) {
-				walkTypeDeclaration(member.type, scope, context)
+				walkTypeDeclaration(member.type, walk)
 			}
 
 			return
 		case "UnionTypeDeclaration":
 			for (let type of node.types) {
-				walkTypeDeclaration(type, scope, context)
+				walkTypeDeclaration(type, walk)
 			}
 
 			return
 		case "FunctionTypeDeclaration":
 			for (let parameter of node.parameterTypes) {
-				walkTypeDeclaration(parameter.type, scope, context)
+				walkTypeDeclaration(parameter.type, walk)
 			}
 
-			walkTypeDeclaration(node.returnType, scope, context)
+			walkTypeDeclaration(node.returnType, walk)
 			return
 		case "GenericTypeDeclaration":
-			walkTypeDeclaration(node.baseType, scope, context)
+			walkTypeDeclaration(node.baseType, walk)
 
 			for (let generic of node.generics) {
-				walkTypeDeclaration(generic, scope, context)
+				walkTypeDeclaration(generic, walk)
 			}
 
 			return
@@ -2170,23 +2074,22 @@ function binderRenameEdits(
 // decides the names, for the Enricher too.
 function declarePattern(
 	pattern: parser.PatternNode,
-	scope: Scope,
-	context: WalkContext,
+	walk: Walk,
 	kind: DeclarationKind,
 	// The end of a declaring Statement. Null for a Matcher's or a Parameter's
 	// bindings, visible throughout their Scope.
 	visibleFrom: common.Cursor | null = null,
 ) {
-	registerPatternSite(pattern, context)
-	walkPatternTypes(pattern, scope, context)
+	registerPatternSite(pattern, walk.context)
+	walkPatternTypes(pattern, walk)
 
 	for (let binding of patternBindings(pattern)) {
 		declareInScope(
-			scope,
+			walk.scope,
 			"values",
 			binding.name,
 			kind,
-			context,
+			walk.context,
 			visibleFrom,
 			editsForBinding(pattern, binding.name),
 		)
@@ -2194,22 +2097,18 @@ function declarePattern(
 }
 
 // Every Type a Pattern names, nested Patterns included.
-function walkPatternTypes(
-	pattern: parser.PatternNode,
-	scope: Scope,
-	context: WalkContext,
-) {
+function walkPatternTypes(pattern: parser.PatternNode, walk: Walk) {
 	for (let member of Object.values(pattern.members)) {
 		if (member.kind !== "Type") {
 			continue
 		}
 
 		if (member.type !== null) {
-			walkTypeDeclaration(member.type, scope, context)
+			walkTypeDeclaration(member.type, walk)
 		}
 
 		if (member.binder?.nodeType === "Pattern") {
-			walkPatternTypes(member.binder, scope, context)
+			walkPatternTypes(member.binder, walk)
 		}
 	}
 }
