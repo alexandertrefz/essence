@@ -32,7 +32,7 @@ export function reportApplicationOverlap(
 	reaching: Array<common.Type>,
 	memberTypes: Array<common.Type>,
 	spell: Spelling,
-): boolean {
+): Array<common.Type> {
 	let crossings = reaching.flatMap((memberType) =>
 		crossingApplication(matcher, memberType) === null
 			? (crossingApplication(earlierMatcher, memberType) ?? [])
@@ -45,7 +45,7 @@ export function reportApplicationOverlap(
 		) ?? crossings[0]
 
 	if (first === undefined) {
-		return false
+		return []
 	}
 
 	let member = spellType(first.member, spell)
@@ -85,7 +85,7 @@ export function reportApplicationOverlap(
 		},
 	)
 
-	return true
+	return crossings.map((crossing) => crossing.member)
 }
 
 // The same overlap between two branches of a dispatched Method. Only some
@@ -138,7 +138,7 @@ export function reportNestedApplicationOverlap(
 	reaching: Array<common.Type>,
 	memberTypes: Array<common.Type>,
 	spell: Spelling,
-): boolean {
+): Array<common.Type> {
 	for (let memberType of reaching) {
 		let nested = nestedCrossing(earlierMatcher, matcher, memberType)
 
@@ -201,10 +201,10 @@ export function reportNestedApplicationOverlap(
 			},
 		)
 
-		return true
+		return [memberType]
 	}
 
-	return false
+	return []
 }
 
 // The first container a crossing path passes through the items of, or null.

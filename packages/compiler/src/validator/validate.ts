@@ -1291,6 +1291,8 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 		// The index of the Handler that claimed each Union member.
 		// See "Match" in DEVELOPMENT.md.
 		let claimedBy: Array<number | null> = memberTypes.map(() => null)
+		// The members an erasure Warning was given for, one Warning each.
+		let reported = new Set<number>()
 		let runtimeMatchers = node.handlers.map(runtimeMatcherOf)
 
 		for (
@@ -1424,6 +1426,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					memberTypes,
 					runtimeMatchers,
 					claimedBy,
+					reported,
 				)
 
 				if (claimsWhatItsTestAccepts(handler)) {
@@ -1621,8 +1624,17 @@ function reportErasedOverlap(
 	memberTypes: Array<common.Type>,
 	runtimeMatchers: Array<common.Type>,
 	claimedBy: Array<number | null>,
+	reported: Set<number>,
 ): void {
 	let handler = node.handlers[handlerIndex]
+	// A Case taking every value of the matched Type binds no member in place
+	// of the Cases. A crossing inside a member is not its to report.
+	let reports = acceptsAllAtRuntime(
+		runtimeMatchers[handlerIndex],
+		node.value.type,
+	)
+		? [reportApplicationOverlap]
+		: [reportApplicationOverlap, reportNestedApplicationOverlap]
 
 	for (let earlierIndex = 0; earlierIndex < handlerIndex; earlierIndex++) {
 		let earlierHandler = node.handlers[earlierIndex]
@@ -1632,9 +1644,11 @@ function reportErasedOverlap(
 			continue
 		}
 
-		// A member a Handler before `earlierHandler` claimed never reaches it.
+		// A member a Handler before `earlierHandler` claimed never reaches it,
+		// and one an earlier Case was told about is not told about again.
 		let reaching = matchedMemberIndices.filter(
 			(memberIndex) =>
+				!reported.has(memberIndex) &&
 				(claimedBy[memberIndex] ?? earlierIndex) >= earlierIndex,
 		)
 
@@ -1642,21 +1656,24 @@ function reportErasedOverlap(
 			(memberIndex) => memberTypes[memberIndex],
 		)
 
-		if (
-			[reportApplicationOverlap, reportNestedApplicationOverlap].some(
-				(report) =>
-					report(
-						handler,
-						runtimeMatchers[handlerIndex],
-						earlierHandler,
-						earlierMatcher,
-						reachingTypes,
-						memberTypes,
-						readerSpelling,
-					),
+		for (let report of reports) {
+			let crossed = report(
+				handler,
+				runtimeMatchers[handlerIndex],
+				earlierHandler,
+				earlierMatcher,
+				reachingTypes,
+				memberTypes,
+				readerSpelling,
 			)
-		) {
-			return
+
+			if (crossed.length > 0) {
+				for (let memberType of crossed) {
+					reported.add(memberTypes.indexOf(memberType))
+				}
+
+				return
+			}
 		}
 
 		for (let memberIndex of reaching) {
@@ -1675,6 +1692,7 @@ function reportErasedOverlap(
 					memberType,
 					crossover,
 				)
+				reported.add(memberIndex)
 
 				return
 			}

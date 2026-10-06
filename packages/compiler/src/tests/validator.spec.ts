@@ -1491,6 +1491,32 @@ describe("Validator", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// The `case _` sees the same member, and the Guard the Help asks for
+		// on the Cases above it settles both.
+		it("should report the member once, on the Case written for it", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Bag {
+					Items { items: List<Integer> | List<String> },
+					Nothing,
+				}
+
+				function describe(_ value: Bag) -> String {
+					<- match value -> String {
+						case #Items({ items: List<Integer> }) { <- "integers" }
+						case #Items({ items: List<String> }) { <- "strings" }
+						case _ { <- "other" }
+					}
+				}
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([["empty-list-overlap", 10]])
+		})
 	})
 
 	// Type Arguments erase, so `case Box<Integer>` takes a `Box<String>#Empty`,
@@ -1778,6 +1804,17 @@ describe("Validator", () => {
 						}`),
 					).map((diagnostic) => diagnostic.code),
 				).not.toContain("type-argument-overlap")
+			})
+
+			// The `case _` after the Cases sees the same member, and no Case
+			// can be bound in its place.
+			it("should report the member once, on the Case written for it", () => {
+				expect(
+					diagnosticsFor(
+						held(`case #Hold({ box: Box<Integer> }) { <- "integers" }
+							case #Hold({ box: Box<String> }) { <- "strings" }`),
+					).map((diagnostic) => diagnostic.position?.start.line),
+				).toEqual([15])
 			})
 		})
 	})
