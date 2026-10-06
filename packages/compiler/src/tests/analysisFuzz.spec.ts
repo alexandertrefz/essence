@@ -232,6 +232,7 @@ const VALIDATOR_ONLY_CODES = new Set([
 	"infinite-recursion",
 	"empty-list-overlap",
 	"empty-dictionary-overlap",
+	"type-argument-overlap",
 	"unused-future",
 	"unobserved-started",
 ])

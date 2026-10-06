@@ -403,6 +403,107 @@ describe("A Case an empty container crosses into", () => {
 	})
 })
 
+describe("A Case another application's Case crosses into", () => {
+	let box = `choice Box<Item> {
+		Full { item: Item },
+		Many { items: List<Item> },
+		Empty,
+	}`
+
+	// A Case Matcher takes its Case in every application, so written first
+	// it leaves no Case to cross.
+	it("should compile with the Cases of their own the Help spells", () => {
+		expect(
+			firstAnalysed(
+				`implementation {
+					${box}
+
+					function describe(_ value: Box<Integer> | Box<String>) -> String {
+						<- match value -> String {
+							case Box<Integer> { <- "integers" }
+							case Box<String> { <- "strings" }
+						}
+					}
+				}`,
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Write 'case Box#Many' and 'case Box#Empty' above the Case that runs first, so one Case answers for each in every application.",
+		])
+
+		let followed = `implementation {
+			${box}
+
+			function describe(_ value: Box<Integer> | Box<String>) -> String {
+				<- match value -> String {
+					case Box#Many { <- "many" }
+					case Box#Empty { <- "empty" }
+					case Box<Integer> { <- "integers" }
+					case Box<String> { <- "strings" }
+				}
+			}
+		}`
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	// A dispatch has no Case to write, so the Help asks for the Match.
+	it("should compile with the Match the dispatch Help spells", () => {
+		let namespaces = `namespace Integers for Box<Integer> {
+			describe() -> String {
+				<- "integers"
+			}
+		}
+
+		namespace Strings for Box<String> {
+			describe() -> String {
+				<- "strings"
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Many { items: List<Item> },
+					}
+
+					${namespaces}
+
+					function show(_ value: Box<Integer> | Box<String>) -> String {
+						<- value::describe()
+					}
+				}`,
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Match the receiver: write 'case Box#Many' first, then a Case for each application that calls the Method.",
+		])
+
+		let followed = `implementation {
+			choice Box<Item> {
+				Full { item: Item },
+				Many { items: List<Item> },
+			}
+
+			${namespaces}
+
+			function show(_ value: Box<Integer> | Box<String>) -> String {
+				<- match value -> String {
+					case Box#Many { <- "many" }
+					case Box<Integer> { <- @::describe() }
+					case Box<String> { <- @::describe() }
+				}
+			}
+		}`
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+})
+
 describe("A Case of a Match on values", () => {
 	let alreadyEnded = `implementation {
 		function describe(_ count: Integer) -> String {

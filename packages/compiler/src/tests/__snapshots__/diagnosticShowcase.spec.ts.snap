@@ -1943,11 +1943,28 @@ Warning: This Case never sees an empty List
     │ Note 2: Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is.
 ────╯
 
+[type-argument-overlap]
+Warning: This Case never sees Parcel<String>#Empty
+    ╭─┤ Match.es:70:8 │
+    │
+ 69 │        case Parcel<Integer> { <- "numbers" }
+    │             ───────┬───────  
+    │                    ╰───────── this Case runs first
+ 70 │        case Parcel<String>  { <- "words" }
+    │             ───────┬──────  
+    │                    ╰──────── Parcel<String>#Empty fits the Case above too
+    │ 
+    │ Help: Write 'case Parcel#Empty' above the Case that runs first, so one Case answers for it in every application.
+    │ 
+    │ Note 1: Cases are tried in order, and the first one that fits wins.
+    │ Note 2: Type Arguments do not survive to runtime, so Parcel<String>#Empty is told from Parcel<Integer>#Empty by its payload alone, and its payload holds nothing that tells them apart.
+────╯
+
 [literal-match-shape]
 Error: This Case names a value and can still decline it
-    ╭─┤ Match.es:64:8 │
+    ╭─┤ Match.es:80:8 │
     │
- 64 │        case 0 where count::isNot(1) { <- "zero" }
+ 80 │        case 0 where count::isNot(1) { <- "zero" }
     │             ▲       ───────┬───────  
     │             ╰──────────────│───────── this Case names the value
     │                            │         
@@ -1961,12 +1978,12 @@ Error: This Case names a value and can still decline it
 
 [literal-match-shape]
 Error: This Match has no Case for the rest of the values
-    ╭─┤ Match.es:70:21 │
+    ╭─┤ Match.es:86:21 │
     │
- 70 │     constant partial = match count -> String {
+ 86 │     constant partial = match count -> String {
     │                              ──┬──  
     │                                ╰──── this is an Integer
- 71 │        case 0 { <- "zero" }
+ 87 │        case 0 { <- "zero" }
     │             ▲  
     │             ╰── this Case names a value, not the rest of them
     │ 
@@ -1976,7 +1993,7 @@ Error: This Match has no Case for the rest of the values
     │ Note 2: There are more values of Integer than a Match can write down, so the last Case is what makes it answer for all of them.
 ────╯
 
-─── 4 errors, 2 warnings
+─── 4 errors, 3 warnings
 "
 `;
 

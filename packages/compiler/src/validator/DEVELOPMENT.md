@@ -250,11 +250,13 @@ for.
 ### Runtime overlap
 
 Reachability is decided by what the emitted check does at runtime, which is a wider question than assignability.
-Three things erase before a Match runs:
+Four things erase before a Match runs:
 
 - A Generic Matcher, and the wildcard's `Unknown`, have no Type left to check, so they accept every value.
 - A Function's Signature: the check only asks whether the value is callable.
 - A refinement's predicate: the check asks only about the base.
+- A Case's Type Arguments: the check asks about the tag and the payload, so only a payload tells two applications
+  of one Case apart.
 
 `acceptsAllAtRuntime` answers whether a Matcher's check accepts every value of a Type. Records are structural and
 open, and a Case adds its tag. A List or Dictionary Matcher is answered by the items or entries a value holds.
@@ -270,8 +272,19 @@ A partial overlap through an empty container gets its own Warning, `empty-list-o
 its own. `emptyCrossoverKind` asks about a List first. Other partial overlaps are Matchers taking exactly the values
 they name, in order, and are not reported.
 
-Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same two
-conflicts between dispatch branches.
+A Case of another application crosses the same way. Assignability compares a Case's payload and not its Type
+Arguments, so `Box<String>#Empty` is a value of `Box<Integer>`, and `case Box<Integer>` claims it.
+`crossingApplication` finds a member Case that an earlier Matcher takes only through its Case of another
+application. `Box<String>#Empty` crosses whole, and `Box<String>#Many` crosses where its List is empty. Either is
+`type-argument-overlap`, asked before the empty containers, since `case Box<Integer>` has no `hasItems()` for a
+Guard to ask. A Case Matcher such as `case Box#Empty` names no Type Arguments and takes every application. So it
+never crosses, and the Help asks for it above the earlier Case. Two things narrow what counts. A member an earlier
+Handler claimed never reaches a later one, which holds for the empty containers too. And only a member the later
+Case takes as written is one it misses, since `case Box<Boolean>` also overlaps `Box<String>#Empty`.
+
+Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
+conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it
+never runs.
 
 ## Literal Matches
 

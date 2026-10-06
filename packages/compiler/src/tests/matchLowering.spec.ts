@@ -365,6 +365,72 @@ describe("Match Lowering", () => {
 		})
 	})
 
+	// Type Arguments erase, so a Case of a generic Choice is told from the same
+	// Case of another application by its payload alone. A Warning reports the
+	// Cases whose payload can not tell them apart.
+	describe("Cases of two applications", () => {
+		let boxes = (cases: string) => `implementation {
+			choice Box<Item> {
+				Full { item: Item },
+				Many { items: List<Item> },
+				Empty,
+			}
+
+			function describe(_ value: Box<Integer> | Box<String>) -> String {
+				<- match value -> String {
+					${cases}
+				}
+			}
+
+			constant none: List<String> = []
+
+			Terminal.inspect(describe(Box<String>#Empty))
+			Terminal.inspect(describe(Box<String>#Many({ items = none })))
+			Terminal.inspect(describe(Box<String>#Many({ items = ["a"] })))
+			Terminal.inspect(describe(Box<String>#Full({ item = "a" })))
+			Terminal.inspect(describe(Box<Integer>#Full({ item = 1 })))
+		}`
+		let byApplication = boxes(`case Box<Integer> { <- "integers" }
+			case Box<String> { <- "strings" }`)
+
+		it("reports the Case another application's Cases never reach, once", () => {
+			let diagnostics = diagnosticsOf(byApplication)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("type-argument-overlap")
+		})
+
+		// The empty `Many` holds no item, and `Empty` no payload at all. A
+		// `Full` holds the item that decides.
+		it("takes the first application's Case where the payload can not tell", async () => {
+			expect(await run(byApplication)).toEqual([
+				'"integers"',
+				'"integers"',
+				'"strings"',
+				'"strings"',
+				'"integers"',
+			])
+		})
+
+		// The Help's Cases, written first, answer for every application.
+		it("answers each value from its own Case once the Help is followed", async () => {
+			let followed = boxes(`case Box#Many { <- "many" }
+				case Box#Empty { <- "empty" }
+				case Box<Integer> { <- "integers" }
+				case Box<String> { <- "strings" }`)
+
+			expect(diagnosticsOf(followed)).toEqual([])
+			expect(await run(followed)).toEqual([
+				'"empty"',
+				'"many"',
+				'"many"',
+				'"strings"',
+				'"integers"',
+			])
+		})
+	})
+
 	// A Match on an Integer or a String is a chain of value comparisons, ending
 	// in the Case for the rest. That Case proves the value is none of the named
 	// ones, which a refinement's `isNot` reads. The evidence erases before the

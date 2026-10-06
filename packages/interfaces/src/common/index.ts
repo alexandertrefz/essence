@@ -394,6 +394,7 @@ export type DiagnosticCode =
 	| "erased-case-conflict"
 	| "empty-list-overlap"
 	| "empty-dictionary-overlap"
+	| "type-argument-overlap"
 	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"

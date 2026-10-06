@@ -3763,6 +3763,39 @@ Quick Fix: **Guard it with 'where @::hasEntries()'**, on the case that runs firs
 
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
 
+### `type-argument-overlap`
+
+**Warning.** An earlier `case` for another application of a generic choice also matches some of this one's values. Type arguments erase before a `match` runs, so a case is told from the same case of another application by its payload alone. A case with no payload fits every application, and so does a payload with nothing in it to tell them apart, such as an empty list.
+
+<div class="error-output">
+
+```
+[type-argument-overlap]
+Warning: This Case never sees Parcel<String>#Empty
+    ╭─┤ Match.es:70:8 │
+    │
+ 69 │        case Parcel<Integer> { <- "numbers" }
+    │             ───────┬───────  
+    │                    ╰───────── this Case runs first
+ 70 │        case Parcel<String>  { <- "words" }
+    │             ───────┬──────  
+    │                    ╰──────── Parcel<String>#Empty fits the Case above too
+    │ 
+    │ Help: Write 'case Parcel#Empty' above the Case that runs first, so one Case answers for it in every application.
+    │ 
+    │ Note 1: Cases are tried in order, and the first one that fits wins.
+    │ Note 2: Type Arguments do not survive to runtime, so Parcel<String>#Empty is told from Parcel<Integer>#Empty by its payload alone, and its payload holds nothing that tells them apart.
+────╯
+```
+
+</div>
+
+Write the case the Help names above the case that runs first. A case matcher such as `case Parcel#Empty` takes its case in every application, so it answers for all of them. The cases for each application then see only the values their payloads tell apart. The Help names every case the earlier one takes.
+
+A method call's **dispatch branches** over two applications report it too, where a payload such as an empty list holds nothing to tell them apart. There is no `match` to add a case to yet, so the Help asks for one: the case of its own first, then a case for each application that calls the method. A branch that takes every value of another is [`erased-case-conflict`](#erased-case-conflict) instead.
+
+Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
+
 ### `refinement-as-matcher`
 
 **Error.** A `case` tests for a checked refinement, such as `case NonZeroInteger`. The predicate erases before the program runs, so the case could only test the base type.

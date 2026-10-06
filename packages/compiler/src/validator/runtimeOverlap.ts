@@ -225,6 +225,82 @@ export function emptyCrossoverKind(
 	return null
 }
 
+// A Case of one application whose values a Matcher's Case of another
+// application of the same Choice accepts.
+export type ApplicationCrossing = {
+	member: common.CaseType
+	matcher: common.CaseType
+}
+
+// The first Case of `memberType` that reaches `matcher` only through a Case of
+// another application, or null. A Matcher arm that takes the Case as written
+// leaves nothing to cross. See "Runtime overlap" in DEVELOPMENT.md.
+export function crossingApplication(
+	matcher: common.Type,
+	memberType: common.Type,
+): ApplicationCrossing | null {
+	if (memberType.type === "UnionType") {
+		for (let armType of flattenUnionMembers(memberType)) {
+			let crossing = crossingApplication(matcher, armType)
+
+			if (crossing !== null) {
+				return crossing
+			}
+		}
+
+		return null
+	}
+
+	if (memberType.type !== "Case" || memberType.typeArguments === undefined) {
+		return null
+	}
+
+	let arms =
+		matcher.type === "UnionType" ? flattenUnionMembers(matcher) : [matcher]
+	let crossing: ApplicationCrossing | null = null
+
+	for (let arm of arms) {
+		if (
+			arm.type === "Case" &&
+			arm.choice === memberType.choice &&
+			arm.name === memberType.name &&
+			!namesApplication(arm, memberType)
+		) {
+			if (crossing === null && overlapsAtRuntime(arm, memberType)) {
+				crossing = { member: memberType, matcher: arm }
+			}
+		} else if (acceptsAllAtRuntime(arm, memberType)) {
+			return null
+		}
+	}
+
+	return crossing
+}
+
+// Whether a Case Matcher's Type Arguments take the member's. A written Case
+// Matcher carries none, and takes every application. Refinements erase, as
+// everywhere at runtime.
+function namesApplication(
+	matcher: common.CaseType,
+	member: common.CaseType,
+): boolean {
+	let matcherArguments = matcher.typeArguments
+	let memberArguments = member.typeArguments
+
+	if (matcherArguments === undefined || memberArguments === undefined) {
+		return true
+	}
+
+	return matcherArguments.every(
+		(argument, index) =>
+			index < memberArguments.length &&
+			matchesType(
+				eraseRefinements(argument),
+				eraseRefinements(memberArguments[index]),
+			),
+	)
+}
+
 function membersAcceptAllAtRuntime(
 	matcherMembers: Record<string, common.Type>,
 	memberTypes: Record<string, common.Type>,

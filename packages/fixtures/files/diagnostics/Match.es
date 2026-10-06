@@ -54,6 +54,22 @@ implementation {
 		case List<String>  { <- "words" }
 	}
 
+	§ type-argument-overlap — the same erasure one level up. Type Arguments
+	§ erase before the Match runs, so a Case of a generic Choice is told from the
+	§ same Case of another application by its payload alone, and `#Empty`
+	§ carries none.
+	choice Parcel<Item> {
+		Packed { item: Item },
+		Empty,
+	}
+
+	constant parcel: Parcel<Integer> | Parcel<String> = Parcel<String>#Empty
+
+	constant packed = match parcel -> String {
+		case Parcel<Integer> { <- "numbers" }
+		case Parcel<String>  { <- "words" }
+	}
+
 	§ literal-match-shape — a Match on an Integer DOES name a value, so its Cases
 	§ are written values and the last one answers for the rest. This one's first
 	§ Case names a value and can still decline it, which would let the value it

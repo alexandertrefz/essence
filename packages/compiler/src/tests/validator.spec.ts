@@ -1467,6 +1467,147 @@ describe("Validator", () => {
 		})
 	})
 
+	// Type Arguments erase, so `case Box<Integer>` takes a `Box<String>#Empty`,
+	// whose payload holds nothing to tell the two applications apart.
+	describe("Type Argument Overlap", () => {
+		let match = (cases: string, payloads: string) => `implementation {
+			choice Box<Item> {
+				${payloads}
+			}
+
+			function describe(_ value: Box<Integer> | Box<String>) -> String {
+				<- match value -> String {
+					${cases}
+				}
+			}
+		}`
+		let byApplication = `case Box<Integer> { <- "integers" }
+			case Box<String> { <- "strings" }`
+
+		it("should warn about the Case a payload-free Case reaches first", () => {
+			let diagnostics = diagnosticsFor(
+				match(byApplication, "Full { item: Item }, Empty,"),
+			)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("type-argument-overlap")
+			expect(diagnostics[0].message).toBe(
+				"This Case never sees Box<String>#Empty",
+			)
+			// On `case Box<String>`, pointing back at the Case that takes it.
+			expect(diagnostics[0].position?.start.line).toBe(9)
+			expect(diagnostics[0].labels[1]?.position.start.line).toBe(8)
+			// Every other `Box<String>` still reaches it.
+			expect(diagnostics[0].tags).toBeUndefined()
+		})
+
+		it("should warn about a payload that names no Type Parameter", () => {
+			let diagnostics = diagnosticsFor(
+				match(
+					byApplication,
+					"Full { item: Item }, Count { n: Integer },",
+				),
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["This Case never sees Box<String>#Count"],
+			)
+		})
+
+		// The empty List is the payload's, and `case Box<Integer>` has no
+		// `hasItems()` for a Guard to ask, so the Help asks about the Case.
+		it("should warn about a payload whose List can be empty", () => {
+			let diagnostics = diagnosticsFor(
+				match(
+					byApplication,
+					"Full { item: Item }, Many { items: List<Item> },",
+				),
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"type-argument-overlap",
+			])
+			expect(diagnostics[0].message).toBe(
+				"This Case never sees some Box<String>#Many values",
+			)
+		})
+
+		it("should name every Case the earlier one takes in its Help", () => {
+			let diagnostics = diagnosticsFor(
+				match(
+					byApplication,
+					"Full { item: Item }, Count { n: Integer }, Empty,",
+				),
+			)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'case Box#Count' and 'case Box#Empty' above the Case that runs first, so one Case answers for each in every application.",
+			])
+		})
+
+		// The message names a Case every value of which crosses, wherever it
+		// stands among the Cases.
+		it("should name a Case that crosses whole before one that crosses in part", () => {
+			let diagnostics = diagnosticsFor(
+				match(
+					byApplication,
+					"Full { item: Item }, Many { items: List<Item> }, Empty,",
+				),
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				["This Case never sees Box<String>#Empty"],
+			)
+		})
+
+		it("should stay silent where the payload tells the applications apart", () => {
+			expect(
+				diagnosticsFor(match(byApplication, "Full { item: Item },")),
+			).toEqual([])
+		})
+
+		// A Case Matcher names its Case in every application, so the Case
+		// the Help asks for leaves nothing to cross.
+		it("should stay silent once the Case has a Case of its own", () => {
+			expect(
+				diagnosticsFor(
+					match(
+						`case Box#Empty { <- "empty" }
+						${byApplication}`,
+						"Full { item: Item }, Empty,",
+					),
+				),
+			).toEqual([])
+		})
+
+		// `case Box<Boolean>` also overlaps `Box<String>#Empty`, but it is
+		// not a Case it names.
+		it("should name the member the later Case is written for", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				function describe(_ value: Box<Integer> | Box<String> | Box<Boolean>) -> String {
+					<- match value -> String {
+						case Box<Integer> { <- "integers" }
+						case Box<String> { <- "strings" }
+						case Box<Boolean> { <- "booleans" }
+					}
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.message)).toEqual(
+				[
+					"This Case never sees Box<String>#Empty",
+					"This Case never sees Box<Boolean>#Empty",
+				],
+			)
+		})
+	})
+
 	// A Match on an Integer or a String has no Union to be exhaustive over, so
 	// its shape stands in. The last Case is where a refinement's evidence is
 	// read.
@@ -1679,6 +1820,40 @@ describe("Validator", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].severity).toBe("warning")
 			expect(diagnostics[0].code).toBe("empty-list-overlap")
+		})
+
+		// The empty List is a payload's, so the branch misses a Case of its
+		// own application. A `Bag` has no `hasItems()` for a Guard to ask.
+		it("should warn about the branch another application's Case reaches first", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Bag<Item> {
+					Full { item: Item },
+					Many { items: List<Item> },
+				}
+
+				namespace IntegerBag for Bag<Integer> {
+					describe() -> String {
+						<- "integers"
+					}
+				}
+
+				namespace StringBag for Bag<String> {
+					describe() -> String {
+						<- "strings"
+					}
+				}
+
+				constant bag: Bag<Integer> | Bag<String> = Bag<String>#Many({ items = ["a"] })
+
+				Terminal.inspect(bag::describe())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("type-argument-overlap")
+			expect(diagnostics[0].message).toBe(
+				"The branch for Bag<String>#Many never sees some of its values",
+			)
 		})
 
 		it("should stay silent for branches a runtime check tells apart", () => {

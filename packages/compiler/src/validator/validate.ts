@@ -61,6 +61,10 @@ import {
 	typeContainsError,
 	typeContainsUnknown,
 } from "../helpers/types"
+import {
+	reportApplicationOverlap,
+	reportDispatchApplicationOverlap,
+} from "./applicationOverlap"
 import { type Claim, claimedCaseReport } from "./claimedCases"
 import { reportConditionNotBoolean } from "./conditions"
 import {
@@ -77,6 +81,7 @@ import {
 } from "./refusedValues"
 import {
 	acceptsAllAtRuntime,
+	crossingApplication,
 	emptyCrossoverKind,
 	overlapsAtRuntime,
 } from "./runtimeOverlap"
@@ -868,6 +873,21 @@ function validateDispatchCases(
 				return
 			}
 
+			let crossing = crossingApplication(earlierType, laterType)
+
+			if (crossing !== null) {
+				reportDispatchApplicationOverlap(
+					node,
+					crossing,
+					dispatchCases.map(
+						(dispatchCase) => dispatchCase.memberType,
+					),
+					readerSpelling,
+				)
+
+				return
+			}
+
 			if (overlapsAtRuntime(earlierType, laterType)) {
 				// The List wording, unless a Dictionary is what crosses.
 				let dictionary =
@@ -1396,12 +1416,13 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 					)
 				}
 			} else {
-				reportEmptyContainerOverlap(
+				reportErasedOverlap(
 					node,
 					handlerIndex,
 					matchedMemberIndices,
 					memberTypes,
 					runtimeMatchers,
+					claimedBy,
 				)
 
 				if (claimsWhatItsTestAccepts(handler)) {
@@ -1589,14 +1610,16 @@ function checkDefineAnswer(
 	)
 }
 
-// A Case whose empty container values an earlier Case takes. One Diagnostic
-// per Handler. See "Runtime overlap" in DEVELOPMENT.md.
-function reportEmptyContainerOverlap(
+// A Case whose values an earlier Case takes through erasure: a Case of
+// another application, or an empty container. One Diagnostic per Handler.
+// See "Runtime overlap" in DEVELOPMENT.md.
+function reportErasedOverlap(
 	node: common.typed.MatchNode,
 	handlerIndex: number,
 	matchedMemberIndices: Array<number>,
 	memberTypes: Array<common.Type>,
 	runtimeMatchers: Array<common.Type>,
+	claimedBy: Array<number | null>,
 ): void {
 	let handler = node.handlers[handlerIndex]
 
@@ -1608,7 +1631,27 @@ function reportEmptyContainerOverlap(
 			continue
 		}
 
-		for (let memberIndex of matchedMemberIndices) {
+		// A member a Handler before `earlierHandler` claimed never reaches it.
+		let reaching = matchedMemberIndices.filter(
+			(memberIndex) =>
+				(claimedBy[memberIndex] ?? earlierIndex) >= earlierIndex,
+		)
+
+		if (
+			reportApplicationOverlap(
+				handler,
+				runtimeMatchers[handlerIndex],
+				earlierHandler,
+				earlierMatcher,
+				reaching.map((memberIndex) => memberTypes[memberIndex]),
+				memberTypes,
+				readerSpelling,
+			)
+		) {
+			return
+		}
+
+		for (let memberIndex of reaching) {
 			let memberType = memberTypes[memberIndex]
 
 			let crossover =

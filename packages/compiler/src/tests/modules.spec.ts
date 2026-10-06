@@ -12949,6 +12949,38 @@ ${printed}`,
 		).toEqual([])
 	})
 
+	it("names the Case a Match takes from another application as imported", () => {
+		let describe = (
+			cases: string,
+		) => `	function describe(_ box: Carton<Integer> | Carton<String>) -> String {
+		<- match box -> String {
+${cases}
+		}
+	}`
+		let byApplication = `			case Carton<Integer> { <- "integers" }
+			case Carton<String> { <- "strings" }`
+		let warning = reportedIn(
+			importing("Box as Carton", describe(byApplication)),
+			"type-argument-overlap",
+		)
+
+		expect(warning?.message).toBe(
+			"This Case never sees Carton<String>#Empty",
+		)
+		expect(warning?.helps).toEqual([
+			"Write 'case Carton#Empty' above the Case that runs first, so one Case answers for it in every application.",
+		])
+		expect(
+			codesIn(
+				importing(
+					"Box as Carton",
+					describe(`			case Carton#Empty { <- "empty" }
+${byApplication}`),
+				),
+			),
+		).toEqual([])
+	})
+
 	let renamingModule = `implementation {
 	choice Pair<A, B> { Both { first: A, second: B }, Neither }
 	choice Either<First, Second> { Left { value: First }, Right { value: Second } }

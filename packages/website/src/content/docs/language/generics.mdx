@@ -591,6 +591,33 @@ Warning: This Case never sees an empty List
 
 The fix is the one the Help names, and `kind` above has it. Both arms carry a `where` guard of `@::hasItems()`, and the empty list gets an arm of its own. [`empty-dictionary-overlap`](/docs/reference/diagnostics#empty-dictionary-overlap) is the same Warning for dictionaries, and its guard asks [`hasEntries()`](/docs/library/dictionary#hasEntries): `where @::hasEntries()`.
 
+Erasure hides a choice's type arguments too. `case Box<Integer>` checks a value's case and the payload it carries, and `#Empty` carries none, so `Box<String>#Empty` fits `case Box<Integer>` as well. Written above `case Box<String>`, it takes every empty `Box<String>`, which is the Warning [`type-argument-overlap`](/docs/reference/diagnostics#type-argument-overlap). Its Help asks for `case Box#Empty` above it. A case matcher names no type arguments, so it takes the empty box of every application:
+
+```essence
+implementation {
+	choice Box<Value> {
+		Full { value: Value },
+		Empty,
+	}
+
+	function kind(of box: Box<Integer> | Box<String>) -> String {
+		<- match box -> String {
+			case Box#Empty    { <- "nothing" }
+			case Box<Integer> { <- "a number" }
+			case Box<String>  { <- "a word" }
+		}
+	}
+
+	constant crate: Box<String> = #Empty
+
+	Terminal.print(kind(of Box<Integer>#Full(1))) § a number
+	Terminal.print(kind(of Box<String>#Full("a"))) § a word
+	Terminal.print(kind(of crate)) § nothing
+}
+```
+
+A `Full` box carries its value, and the value tells `Box<Integer>` from `Box<String>`, so those two cases need no help.
+
 <SeeAlso
 	links={[
 		{ label: "Protocols", href: "/docs/language/protocols" },

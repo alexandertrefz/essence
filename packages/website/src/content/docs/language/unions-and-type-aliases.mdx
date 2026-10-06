@@ -318,7 +318,7 @@ A record matcher matches by the members it names, without naming a type. `x = 0`
 
 A `match` on a bare `Integer` or `String` takes the value apart instead of the type: `case 0`, `case "yes"`, then a last `case _`. Choices and match teaches that form, which is held to [`literal-match-shape`](/docs/reference/diagnostics#literal-match-shape). A `match` on one type that names no written value has one outcome, and is [`match-on-non-union`](/docs/reference/diagnostics#match-on-non-union).
 
-Types erase before a match runs. So `case List<Integer>` above `case List<String>` also takes an empty `List<String>`, a warning called [`empty-list-overlap`](/docs/reference/diagnostics#empty-list-overlap). A case that names a function's own type parameter must come last, or the match is [`erased-case-conflict`](/docs/reference/diagnostics#erased-case-conflict). Generics explains both.
+Types erase before a match runs. So `case List<Integer>` above `case List<String>` also takes an empty `List<String>`, a warning called [`empty-list-overlap`](/docs/reference/diagnostics#empty-list-overlap). In the same way, `case Box<Integer>` above `case Box<String>` takes a `Box<String>#Empty`, which carries nothing to tell the two apart: [`type-argument-overlap`](/docs/reference/diagnostics#type-argument-overlap). A case that names a function's own type parameter must come last, or the match is [`erased-case-conflict`](/docs/reference/diagnostics#erased-case-conflict). Generics explains all three.
 
 ## Union or choice
 
