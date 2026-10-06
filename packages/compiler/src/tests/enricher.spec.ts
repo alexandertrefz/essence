@@ -808,6 +808,24 @@ describe("Enricher", () => {
 
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("path-key-outside-combination")
+				expect(diagnostics[0].helps).toEqual([
+					"Write the whole member: 'server = { … }'.",
+					"Or update a value that already has it: '{ original with server.port = … }'.",
+				])
+			})
+
+			it("should compile either way its Helps are followed", () => {
+				expect(
+					compiles(`implementation {
+					constant blank = { server = { port = 8080 } }
+				}`),
+				).toBe(true)
+				expect(
+					compiles(`implementation {
+					constant original = { server = { port = 80 } }
+					constant blank = { original with server.port = 8080 }
+				}`),
+				).toBe(true)
 			})
 
 			// A Record annotation is no value under the Literal, which writes
@@ -4649,6 +4667,22 @@ describe("Enricher", () => {
 				["uninferred-type-parameter", ["Write 'infer Item'."]],
 				["uninferred-type-parameter", ["Write 'infer Other'."]],
 			])
+			expect(
+				compiles(`implementation {
+				function plain<infer Item>(_ item: Item) -> Item {
+					<- item
+				}
+
+				namespace Boxes<infer Item> for List<Item> {
+					paired<infer Other>(_ other: Other) -> List<Item> {
+						<- @
+					}
+				}
+
+				Terminal.inspect(plain(5))
+				Terminal.inspect([1]::paired("a"))
+			}`),
+			).toBe(true)
 		})
 
 		// A default decides the Parameter, and a Method's entry naming the
@@ -5796,6 +5830,17 @@ describe("Enricher", () => {
 			expect(diagnostics[0].helps).toEqual([
 				"Name it at the call, e.g. 'value::<NonEmptyList>firstItem(…)'.",
 			])
+			expect(
+				compiles(`implementation {
+				namespace IntegerTally for List<Integer> {
+					firstItem() -> Integer {
+						<- 0
+					}
+				}
+
+				constant first = [1, 2, 3]::<NonEmptyList>firstItem()
+			}`),
+			).toBe(true)
 		})
 
 		// The Help leads with one specifier, and the `data` carries every
@@ -5917,6 +5962,17 @@ describe("Enricher", () => {
 				constant tagged = []::tag()
 			}`).map((diagnostic) => diagnostic.code),
 				).toEqual(["undecided-receiver-type"])
+			})
+
+			it("should compile once the receiver is annotated", () => {
+				expect(
+					compiles(`implementation {
+				${overlappingNamespaces}
+
+				constant items: List<Integer> = []
+				constant tagged = items::tag()
+			}`),
+				).toBe(true)
 			})
 
 			it("should point at the receiver and name what matched it", () => {
@@ -6574,6 +6630,43 @@ describe("Enricher", () => {
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("static-method-on-value")
 			expect(diagnostics[0].message).toBe("'make' is a static Method")
+			expect(diagnostics[0].helps).toEqual([
+				"Write 'Maker.make(…)' without the value — the signature takes no receiver.",
+			])
+		})
+
+		// The arity decides whether the value goes among the Arguments, and
+		// each reading the Help spells compiles.
+		it("should compile the call each arity's Help writes", () => {
+			let maker = (signature: string, call: string) => `implementation {
+				namespace Maker for Integer {
+					static ${signature} -> Integer {
+						<- 1
+					}
+				}
+
+				constant made = ${call}
+			}`
+
+			for (let [signature, written, help, followed] of [
+				[
+					"origin()",
+					"5::origin()",
+					"Write 'Maker.origin(…)' without the value — the signature takes no receiver.",
+					"Maker.origin()",
+				],
+				[
+					"moved(_ base: Integer, by amount: Integer)",
+					"5::moved(by 2)",
+					"Write 'Maker.moved(…)', passing the value as its first Argument.",
+					"Maker.moved(5, by 2)",
+				],
+			]) {
+				expect(
+					diagnosticsFor(maker(signature, written))[0]?.helps,
+				).toEqual([help])
+				expect(compiles(maker(signature, followed))).toBe(true)
+			}
 		})
 
 		// A static is reached only through its Namespace, which the Help names
@@ -10601,6 +10694,26 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
+			it("should compile with the arrow or the annotation its Help names", () => {
+				let typed = ARMS.replace(
+					"define {",
+					"define -> Optional<Integer> {",
+				)
+
+				for (let source of [
+					`constant fetched = ${typed}`,
+					`constant fetched: Optional<Integer> = ${ARMS}`,
+				]) {
+					expect(
+						compiles(`implementation {
+					constant flag = true
+
+					${source}
+				}`),
+					).toBe(true)
+				}
+			})
+
 			// A call picks its Overload by the Arguments, so an Argument hands
 			// nothing down. The Diagnostic suggests the arrow.
 			it("should not reach an Argument, and say what to write instead", () => {
@@ -11962,6 +12075,15 @@ describe("Enricher", () => {
 				kind: "holding-case",
 				caseNames: ["Value"],
 			})
+
+			// Either reading, once written, is the one call there is.
+			for (let followed of [
+				"constant answer = nested::is(#Value(#Empty))",
+				"constant answer = nested::is(outer)",
+			]) {
+				expect(compiles(programWith(followed))).toBe(true)
+				expect(diagnosticsFor(programWith(followed))).toEqual([])
+			}
 		})
 
 		// The Argument alone, which both Helps rewrite. The Method name carries

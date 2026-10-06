@@ -5799,6 +5799,17 @@ describe("A path key merged into a default", () => {
 			"path-key-without-default",
 		])
 		expect(underlinedBy(source, diagnostics[0].labels?.[0])).toBe("server")
+		expect(diagnostics[0].helps).toEqual([
+			"Write the whole member: 'server = { … }'.",
+		])
+		expect(
+			compiles(
+				source.replace(
+					"{ server.port = 1 }",
+					'{ server = { host = "db", port = 1 } }',
+				),
+			),
+		).toBe(true)
 	})
 
 	it("should refuse a path into a member the default only names", () => {
@@ -5815,6 +5826,34 @@ describe("A path key merged into a default", () => {
 		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
 			"path-key-without-default",
 		])
+		expect(diagnostics[0].helps).toEqual([
+			"Write the whole member: 'server = { … }'.",
+			"Or write the default's 'server' out as a Record Literal, member by member.",
+		])
+
+		// The whole member, or the default written out so the path merges.
+		for (let [defaultValue, argument] of [
+			[
+				"{ retries = 3, server = fallback }",
+				'{ server = { host = "db", port = 1 } }',
+			],
+			[
+				'{ retries = 3, server = { host = "d", port = 80 } }',
+				"{ server.port = 1 }",
+			],
+		]) {
+			expect(
+				compiles(`implementation {
+			${server}
+
+			constant fallback: Server = { host = "d", port = 80 }
+
+			${connect(defaultValue)}
+
+			constant a = connect(using ${argument})
+		}`),
+			).toBe(true)
+		}
 	})
 
 	// The default writes `server` out but leaves `tls` to a name, so the

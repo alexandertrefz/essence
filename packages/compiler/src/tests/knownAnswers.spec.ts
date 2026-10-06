@@ -466,6 +466,13 @@ describe("A near miss that could not have been this call", () => {
 		)
 
 		expect(diagnostic.helps).toEqual(["Did you mean 'length'?"])
+		expect(
+			compiles(`implementation {
+				constant primes = [2, 3, 5]
+
+				Terminal.print(primes::length()::toString())
+			}`),
+		).toBe(true)
 	})
 
 	// Nothing fitting `(of …)` is near `lenght`. A call that wrote a label
