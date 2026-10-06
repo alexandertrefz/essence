@@ -1394,7 +1394,9 @@ describe("A Protocol pick of a requirement", () => {
 	})
 
 	// A Union has no covering Namespace for 'is', but each member answers
-	// it, and a Choice's derived conformance does.
+	// it, and a Choice's derived conformance does. Each member's 'is' takes
+	// its own Type, so dropping the pick from the Union's call does not
+	// compile.
 	it("should report a pick on a Union or a Choice receiver as a pick", () => {
 		let source = `implementation {
 			choice Light {
@@ -1414,7 +1416,12 @@ describe("A Protocol pick of a requirement", () => {
 		expect(
 			reported.map((diagnostic) => [diagnostic.code, diagnostic.helps]),
 		).toEqual([
-			["picked-requirement", ["Drop the pick."]],
+			[
+				"picked-requirement",
+				[
+					"Match on the value, and call 'is' on '@' in each arm, with Arguments of that arm's Type.",
+				],
+			],
 			["picked-requirement", ["Drop the pick."]],
 		])
 		expect(
@@ -1423,9 +1430,63 @@ describe("A Protocol pick of a requirement", () => {
 					Red, Green
 				}
 
+				function same(_ x: Integer | String) -> Boolean {
+					<- match x -> Boolean {
+						case Integer { <- @::is(@) }
+						case String  { <- @::is(@) }
+					}
+				}
+
 				constant light: Light = #Red
 
 				Terminal.print(light::is(#Red))
+			}`),
+		).toBe(true)
+	})
+
+	// The probe for the Help enriches the Arguments too, and must leave their
+	// own Diagnostics to the call. An Argument that is an Error still fits.
+	it("should report an Argument's own mistake beside the pick", () => {
+		let reported = enrich(
+			parse(`implementation {
+				Terminal.print(5::<Equatable>is(nowhere))
+				Terminal.print(5::<Equatable>is([1, 2]::map((n) { <- n::add(missing) })::count()))
+			}`),
+		).diagnostics
+
+		expect(
+			reported.map((diagnostic) => [
+				diagnostic.code,
+				diagnostic.position?.start.line,
+			]),
+		).toEqual([
+			["unknown-name", 2],
+			["picked-requirement", 2],
+			["unknown-name", 3],
+			["no-matching-overload", 3],
+			["picked-requirement", 3],
+		])
+		expect(reported[1]?.helps).toEqual([
+			"Drop the pick, or pick the Namespace that writes 'is': '::<Integer>is(…)'.",
+		])
+	})
+
+	// Dropping the pick would leave `is` refusing the String, so the Help
+	// says what the Argument has to be instead.
+	it("should offer to drop a pick only where the call then compiles", () => {
+		expect(
+			firstOf(
+				`implementation {
+				Terminal.print(5::<Equatable>is("a"))
+			}`,
+				"picked-requirement",
+			).helps,
+		).toEqual([
+			"Drop the pick, and pass 'is' the Arguments 'Integer::is' takes.",
+		])
+		expect(
+			compiles(`implementation {
+				Terminal.print(5::is(5))
 			}`),
 		).toBe(true)
 	})

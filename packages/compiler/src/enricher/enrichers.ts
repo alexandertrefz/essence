@@ -12344,7 +12344,7 @@ function isUnwrittenTypeParameter(
 	return true
 }
 
-function resolveMethodInvocation(
+export function resolveMethodInvocation(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	scope: enricher.Scope,
@@ -12385,7 +12385,7 @@ function resolveMethodInvocation(
 		]
 
 		// A pick of a requirement is refused before a Union dispatches it.
-		if (reportPickedRequirement(node, baseType, scope, helps)) {
+		if (reportPickedRequirement(node, baseType, scope, typer, helps)) {
 			return resolveFailedMethodInvocation()
 		}
 
@@ -15529,7 +15529,7 @@ function recordedCaseValueContext(
 	return contextualCaseValueTypes.get(node)
 }
 
-function probeContextualFunctionTypes<Result>(probe: () => Result): {
+export function probeContextualFunctionTypes<Result>(probe: () => Result): {
 	result: Result
 	recording: ContextualFunctionTypeRecording
 } {
@@ -15606,7 +15606,7 @@ function needsContext(node: parser.FunctionDefinitionNode): boolean {
 // call's own refusal is the one to report.
 let refusedCallDepth = 0
 
-function underRefusedCall<T>(refused: boolean, work: () => T): T {
+export function underRefusedCall<T>(refused: boolean, work: () => T): T {
 	if (!refused) {
 		return work()
 	}

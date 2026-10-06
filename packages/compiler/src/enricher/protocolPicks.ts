@@ -1,8 +1,20 @@
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
-import { primary, reportError, secondary } from "../diagnostics/index"
+import {
+	collectDiagnostics,
+	containsErrors,
+	primary,
+	reportError,
+	secondary,
+} from "../diagnostics/index"
 import { providedMethodProtocol } from "../helpers/conformance"
 import { flattenUnionMembers } from "../helpers/types"
+import {
+	type ArgumentTyper,
+	probeContextualFunctionTypes,
+	resolveMethodInvocation,
+	underRefusedCall,
+} from "./enrichers"
 import {
 	conformanceSourcesFor,
 	namespacesDeclaringMethod,
@@ -95,6 +107,7 @@ export function reportPickedRequirement(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	scope: enricher.Scope,
+	typer: ArgumentTyper,
 	helps: () => Array<string>,
 ): boolean {
 	let specifier = node.namespaceSpecifier
@@ -143,6 +156,9 @@ export function reportPickedRequirement(
 					.size > 0,
 		)
 	let call = node.arguments.length === 0 ? "()" : "(…)"
+	let drops =
+		(pickable.length > 0 || written.length > 0 || dispatched) &&
+		compilesWithoutPick(node, baseType, scope, typer)
 
 	reportError(
 		`'${picked}' has no body for '${methodName}'`,
@@ -160,17 +176,83 @@ export function reportPickedRequirement(
 				`A pick through a Protocol calls a body the Protocol provides, and '${declaring}' declares '${methodName}' without one: each conforming Namespace writes its own.`,
 			],
 			helps: [
-				pickable.length > 0
-					? `Drop the pick, or pick the Namespace that writes '${methodName}': '::<${pickable[0]}>${methodName}${call}'.`
-					: written.length > 0 || dispatched
-						? "Drop the pick."
-						: `Drop the pick, and call '${methodName}' on a value whose Namespace writes it.`,
+				pickedRequirementHelp(methodName, {
+					pickable: pickable[0] ?? null,
+					call,
+					drops,
+					dispatched,
+					writer: written[0] ?? null,
+				}),
 				...helps(),
 			],
 		},
 	)
 
 	return true
+}
+
+// What the pick of a requirement leaves to write. Dropping the pick is
+// offered only where the call then compiles. Otherwise its Arguments do not
+// fit, and a Union receiver needs a single member to call the Method on.
+function pickedRequirementHelp(
+	methodName: string,
+	{
+		pickable,
+		call,
+		drops,
+		dispatched,
+		writer,
+	}: {
+		pickable: string | null
+		call: string
+		drops: boolean
+		dispatched: boolean
+		writer: string | null
+	},
+): string {
+	if (drops) {
+		return pickable === null
+			? "Drop the pick."
+			: `Drop the pick, or pick the Namespace that writes '${methodName}': '::<${pickable}>${methodName}${call}'.`
+	}
+
+	if (writer !== null) {
+		return `Drop the pick, and pass '${methodName}' the Arguments '${writer}::${methodName}' takes.`
+	}
+
+	return dispatched
+		? `Match on the value, and call '${methodName}' on '@' in each arm, with Arguments of that arm's Type.`
+		: `Drop the pick, and call '${methodName}' on a value whose Namespace writes it.`
+}
+
+// Whether the call compiles once its pick is dropped, asked silently. The
+// Arguments are enriched first, as the refused call enriches them, so their
+// own Diagnostics are reported and the probe judges the call alone.
+function compilesWithoutPick(
+	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+): boolean {
+	underRefusedCall(true, () =>
+		node.arguments.map((argument) => typer.enrichArgumentNode(argument)),
+	)
+
+	let { result } = probeContextualFunctionTypes(() =>
+		collectDiagnostics(() =>
+			resolveMethodInvocation(
+				{ ...node, namespaceSpecifier: null },
+				baseType,
+				scope,
+				typer,
+			),
+		),
+	)
+
+	return (
+		result.result.type.type !== "Error" &&
+		!containsErrors(result.diagnostics)
+	)
 }
 
 // The Protocol among those a pick reaches that declares the requirement
