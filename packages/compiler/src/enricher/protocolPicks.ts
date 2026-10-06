@@ -1,11 +1,16 @@
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError, secondary } from "../diagnostics/index"
+import { providedMethodProtocol } from "../helpers/conformance"
 import { flattenUnionMembers } from "../helpers/types"
 import {
+	conformanceSourcesFor,
 	namespacesDeclaringMethod,
 	partitionInstanceMethodNamespaces,
+	protocolOf,
+	providedMethodNamespaceFor,
 	resolveMethodLookupNamespacesForReceiverType,
+	resolveWrittenProtocol,
 } from "./resolvers"
 import { protocolRegistryOf } from "./scope"
 import { namespaceNamesIn, nearestEntry } from "./specifiers"
@@ -28,6 +33,58 @@ export function answeringNamespaces(
 			position,
 		),
 	).instanceNamespaces
+}
+
+// `value::<Name>method()` naming a Protocol, which settles two Protocols
+// providing one name. It calls the body the Protocol sees, its own or one it
+// inherits, through every source of the receiver's conformance to it. So
+// `5::<Orderable>isBetween(1, and 3/2)` still falls to Number's. A requirement
+// is reached through the Namespace that writes it.
+export function providedMethodNamespacesNamed(
+	specifier: parser.IdentifierNode,
+	methodName: string,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	position: common.Position,
+): Map<string, common.NamespaceType> {
+	let named = new Map<string, common.NamespaceType>()
+	let protocol = resolveWrittenProtocol(specifier, scope)
+	let seen =
+		protocol === null ? null : providedMethodProtocol(protocol, methodName)
+
+	if (protocol === null || seen === null) {
+		return named
+	}
+
+	let namespaces = resolveMethodLookupNamespacesForReceiverType(
+		baseType,
+		null,
+		scope,
+	)
+
+	for (let source of conformanceSourcesFor(
+		protocol,
+		baseType,
+		[...namespaces.values()],
+		scope,
+		position,
+	)) {
+		// Solved through the picked Protocol, whose conformance the source
+		// declares, though an ancestor may write the body.
+		let namespace = providedMethodNamespaceFor(
+			protocolOf(seen, scope),
+			methodName,
+			source,
+			protocol,
+		)
+
+		// A Namespace writing the name replaces the body for its own source.
+		if (namespace !== null && !source.writes.has(methodName)) {
+			named.set(source.name, namespace)
+		}
+	}
+
+	return named
 }
 
 // `value::<Protocol>method()` where the Protocol declares the Method without a

@@ -7776,6 +7776,64 @@ export {
 		)
 	})
 
+	// `Big` extends `Sized` in another Module and provides nothing itself, so
+	// the pick reaches the body `Sized` provides.
+	it("picks a body a Protocol of another Module inherits", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Sizes.es" { Big }
+}
+
+implementation {
+	type Box = { v: Integer }
+
+	namespace Boxes for Box is Big {
+		size() -> Integer {
+			<- @.v
+		}
+
+		extra() -> Integer {
+			<- 1
+		}
+	}
+
+	constant box: Box = { v = 3 }
+
+	Terminal.print(box::<Big>describe())
+}
+`,
+				"Sizes.es": `implementation {
+	protocol Sized {
+		size() -> Integer
+
+		describe() -> String {
+			<- "size {@::size()}"
+		}
+	}
+
+	protocol Big is Sized {
+		extra() -> Integer
+	}
+}
+
+export {
+	Big
+	Sized
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["size 3"])
+			},
+		)
+	})
+
 	it("reaches a `constructor` a Protocol of another Module provides through a bound", async () => {
 		await withBuiltProject(
 			{

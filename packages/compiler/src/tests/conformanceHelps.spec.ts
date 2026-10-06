@@ -1447,3 +1447,54 @@ describe("A Protocol pick of a requirement", () => {
 		])
 	})
 })
+
+// A pick reaches every body its Protocol has, its own and those it inherits.
+// A name the Protocol has not got, or a value that does not conform to it, is
+// a lookup the pick narrowed to nothing.
+describe("A Protocol pick of a name its Protocol inherits", () => {
+	it("should compile a pick of a body an ancestor provides", () => {
+		expect(
+			compiles(`implementation {
+				Terminal.print(5::<Orderable>isLessThan(3))
+				Terminal.print(5::<Orderable>isGreaterThanOrEqualTo(3))
+			}`),
+		).toBe(true)
+	})
+
+	it("should refuse a name the Protocol has not got, and compile without the pick", () => {
+		let reported = firstOf(
+			`implementation {
+				Terminal.print(5::<Orderable>is(3))
+			}`,
+			"no-namespace-for-value",
+		)
+
+		expect(reported.notes).toEqual([
+			"The specifier limits the lookup to 'Orderable', which provides no 'is' for PositiveInteger.",
+		])
+		expect(reported.helps).toEqual(["Drop the Namespace specifier."])
+		expect(
+			compiles(`implementation {
+				Terminal.print(5::is(3))
+			}`),
+		).toBe(true)
+	})
+
+	// `String` is `Comparable` but not `Orderable`, so the body `Orderable`
+	// inherits is not offered for it.
+	it("should refuse a value that does not conform to the picked Protocol", () => {
+		let reported = firstOf(
+			`implementation {
+				Terminal.print("abc"::<Orderable>isLessThan("b"))
+			}`,
+			"no-namespace-for-value",
+		)
+
+		expect(reported.helps).toEqual(["Drop the Namespace specifier."])
+		expect(
+			compiles(`implementation {
+				Terminal.print("abc"::isLessThan("b"))
+			}`),
+		).toBe(true)
+	})
+})

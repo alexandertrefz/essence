@@ -87,6 +87,7 @@ import {
 } from "../helpers/types"
 import { printType } from "../printType"
 import { recordAnnotation } from "./annotations"
+import { providedMethodNamespacesNamed } from "./protocolPicks"
 import {
 	bodyCanWait,
 	childScope,
@@ -4831,7 +4832,7 @@ function specializedTargetFor(
 // The sources of a receiver's conformance to one Protocol: each Namespace
 // declaring it, or else a derive. The derive is asked silently; the call site
 // solves the witness again and reports.
-function conformanceSourcesFor(
+export function conformanceSourcesFor(
 	protocol: common.ProtocolType,
 	baseType: common.Type,
 	namespaces: ReadonlyArray<common.NamespaceType>,
@@ -4896,12 +4897,14 @@ function conformanceSourcesFor(
 }
 
 // The pseudo Namespace one provided Method is reached through for one
-// source, with `Self` pinned to the source's target. See "Provided Methods at
-// a call" in DEVELOPMENT.md.
-function providedMethodNamespaceFor(
+// source, with `Self` pinned to the source's target. A pick solves the witness
+// through the Protocol it names. See "Provided Methods at a call" in
+// DEVELOPMENT.md.
+export function providedMethodNamespaceFor(
 	protocol: common.ProtocolType,
 	methodName: string,
 	source: ConformanceSourceNamespace,
+	witnessed: common.ProtocolType = protocol,
 ): common.NamespaceType | null {
 	let method = protocol.methods[methodName]
 
@@ -4932,7 +4935,7 @@ function providedMethodNamespaceFor(
 						name: "Self",
 						infer: false,
 						defaultType: source.witnessType ?? source.selfType,
-						constraint: protocol.identity,
+						constraint: witnessed.identity,
 					},
 				],
 			},
@@ -9328,43 +9331,6 @@ export function partitionInstanceMethodNamespaces(
 	}
 
 	return { instanceNamespaces, staticNamespaces }
-}
-
-// `value::<Name>method()` naming a Protocol, which settles two Protocols
-// providing one name. Every candidate of that Protocol is kept, so
-// `5::<Orderable>isBetween(1, and 3/2)` still falls to Number's. A requirement
-// is reached through the Namespace that writes it.
-function providedMethodNamespacesNamed(
-	specifier: parser.IdentifierNode,
-	methodName: string,
-	baseType: common.Type,
-	scope: enricher.Scope,
-	position: common.Position,
-): Map<string, common.NamespaceType> {
-	let named = new Map<string, common.NamespaceType>()
-	let protocol = resolveWrittenProtocol(specifier, scope)
-
-	if (protocol === null) {
-		return named
-	}
-
-	for (let [name, namespace] of providedMethodNamespaces(
-		methodName,
-		baseType,
-		resolveMethodLookupNamespacesForReceiverType(
-			baseType,
-			null,
-			scope,
-		).values(),
-		scope,
-		position,
-	)) {
-		if (namespace.providedBy === protocol.identity) {
-			named.set(name, namespace)
-		}
-	}
-
-	return named
 }
 
 // Which of the Namespaces found for a receiver declare the Method. These are

@@ -553,6 +553,123 @@ describe("Protocol-provided Methods", () => {
 				),
 			).toEqual(["true", "true"])
 		})
+
+		// `Orderable` provides neither, and reaches both through `Comparable`.
+		it("should answer a pick of a body its Protocol inherits", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tTerminal.inspect(5::<Orderable>isLessThan(3))",
+						"\tTerminal.inspect(5::<Orderable>isGreaterThanOrEqualTo(3))",
+						"\tTerminal.inspect(5::<Orderable>isBetween(1, and 3/2))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["false", "true", "false"])
+		})
+
+		// `Big` provides `describe` again. A call without a pick takes the more
+		// derived body, and a pick takes the body its Protocol sees.
+		it("should answer a pick with the body the picked Protocol sees", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "sized {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Big is Sized {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "big {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { v: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Big {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.v",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant box: Box = { v = 3 }",
+						"",
+						"\tTerminal.inspect(box::describe())",
+						"\tTerminal.inspect(box::<Big>describe())",
+						"\tTerminal.inspect(box::<Sized>describe())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"big 3"', '"big 3"', '"sized 3"'])
+		})
+
+		// `Box` conforms to `Base` through two Namespaces, each by a Protocol of
+		// its own. The pick solves the witness through the Protocol it names,
+		// so each runs `Base`'s body with its own `size`.
+		it("should answer a pick through the Protocol that tells two Namespaces apart", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Base {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "base {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Left is Base {}",
+						"",
+						"\tprotocol Right is Base {}",
+						"",
+						"\ttype Box = { v: Integer }",
+						"",
+						"\tnamespace LeftBoxes for Box is Left {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.v",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tnamespace RightBoxes for Box is Right {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.v::multiply(with 10)",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant box: Box = { v = 3 }",
+						"",
+						"\tTerminal.inspect(box::<Left>describe())",
+						"\tTerminal.inspect(box::<Right>describe())",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"base 3"', '"base 30"'])
+		})
+
+		// The bound passes the conformance in, which fulfils the requirement
+		// `Orderable` takes from `Comparable`.
+		it("should answer a pick of an inherited requirement through a bound", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tfunction order<infer Item is Orderable>(_ left: Item, _ right: Item) -> Ordering {",
+						"\t\t<- left::<Orderable>compare(to right)",
+						"\t}",
+						"",
+						"\tTerminal.inspect(order(5, 3))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(["Ordering#Greater"])
+		})
 	})
 
 	// A provided body calls its own Protocol's Methods. So a bound's witness

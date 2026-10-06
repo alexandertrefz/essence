@@ -170,6 +170,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"missing-documentation-separator",
 		"namespace-as-value",
 		"nested-example",
+		"no-namespace-for-value",
 		"nonconforming-namespace",
 		"not-exported",
 		"operator-not-supported",

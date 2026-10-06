@@ -367,10 +367,13 @@ implementation {
 	Terminal.print(3::isLessThan(Number.Pi)) § true
 	Terminal.print(5::isBetween(1, and 3/2)) § false
 	Terminal.print(5::isLessThan(3)) § false
+	Terminal.print(5::<Orderable>isLessThan(3)) § false
 }
 ```
 
 `Equatable` provides `isNot`, and the first three lines call it three ways: on a value, on a namespace and through a pick. `String.isNot("pear", "plum")` names the namespace whose conformance offers it and passes the receiver first. `"pear"::<Equatable>isNot("plum")` names the protocol at the call, with the protocol pick `::<Equatable>`. On a value of a known type, the pick reaches provided methods only, and a pick of a requirement is [`picked-requirement`](/docs/reference/diagnostics#picked-requirement). For a requirement, name the namespace instead: `String.is("pear", "plum")`. On a value of a type parameter bounded by the protocol, `item::<Equatable>is(other)` reaches the requirement too, through the conformance the bound passes in. `Integer` writes its own `isNot`, so on an `Integer` only the pick reaches the provided body.
+
+A pick reaches the bodies its protocol inherits as well. `Orderable` extends `Comparable`, so `5::<Orderable>isLessThan(3)` runs the `isLessThan` that `Comparable` provides. The value has to conform to the picked protocol: a `String` is `Comparable` but not `Orderable`, so `"a"::<Orderable>isLessThan("b")` is [`no-namespace-for-value`](/docs/reference/diagnostics#no-namespace-for-value). Where a protocol that extends the picked one provides the name again, a call without the pick runs that more derived body, and the pick runs the body the picked protocol sees.
 
 `Self` in a provided body is the target type of the conforming namespace, not the receiver's type. `Integer` declares its own `isLessThan`, for an `Integer` or a `Rational`. π is neither. So `3::isLessThan(Number.Pi)` runs the `isLessThan` that `Comparable` provides through the [`Number`](/docs/library/number) namespace, which covers every numeric type. There `Self` is `Number`, and the two are compared as numbers. `5::isBetween(1, and 3/2)` runs there too, because `3/2` is not an `Integer`. `5::isLessThan(3)` runs `Integer`'s own method.
 

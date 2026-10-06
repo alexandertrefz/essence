@@ -1191,6 +1191,12 @@ witness from it. A Namespace that writes the name replaces the provided Method f
 Protocols provide one name through one source, the more derived one answers, and two unrelated ones are
 `ambiguous-namespace`.
 
+A pick, `value::<P>m()`, calls the body `P` sees: its own, or the one it inherits (`providedMethodProtocol`).
+`providedMethodNamespacesNamed` in `protocolPicks.ts` offers it once per source of the receiver's conformance to `P`,
+so a value that does not conform to `P` gets none. A descendant of `P` that provides the name again does not replace
+the body there. The witness is solved through `P` even where an ancestor writes the body. Two Namespaces may give
+the ancestor, each through a Protocol of its own, and only `P` tells them apart.
+
 The standard library's `Record` Namespace conforms for the top Record, conditionally on the receiver's members. So
 its witness is solved for the receiver itself (`witnessType`). A derive's `Self` is the whole Choice, so a sibling
 Case still fits the Parameter. `providedNamespaceMember` answers the `Number.isLessThan(a, b)` spelling the same
