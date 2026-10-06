@@ -585,8 +585,10 @@ literal's Parameter or the call's answer, as a Type Parameter nothing decided. E
 
 A noted Generic binds the `Error` only where nothing else binds it. `settleErrorBindings` runs once a call's
 Arguments are matched, and once a receiver has bound a Namespace's Generics. So in `pair(zz, 1)` the `1` decides
-`T`, in either order, and a mistake about `T` after it is still reported. A callback matched before then is typed
-as if the `Error` had bound what it met (`bindingsWithErrorFallback`), without binding it.
+`T`, in either order, and a mistake about `T` after it is still reported. A callback whose Parameters read such a
+Generic is matched after the Arguments still to come (`callbackWaitsOnError`). So in `apply(zz, (x) { … }, 1)` the
+`1` decides `x`, and a mistake in the body is reported against it. A callback still matched before the Generic
+binds is typed as if the `Error` had bound what it met (`bindingsWithErrorFallback`), without binding it.
 
 `isOpenBindable` is the occurs check. A Generic stops being open once its binding mentions itself, directly as
 `ItemType := ItemType` or through other bindings as `Key := List<Value>` beside `Value := List<Key>`, which

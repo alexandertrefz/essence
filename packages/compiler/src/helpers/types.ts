@@ -3271,6 +3271,28 @@ function callbackWaitsOnUnboundGeneric(
 	return false
 }
 
+// Whether a callback's Parameters read a Type Parameter that only an Error has
+// met so far. See "Type Parameters" in DEVELOPMENT.md.
+function callbackWaitsOnError(
+	callback: common.Type,
+	context: GenericInferenceContext | null,
+): boolean {
+	if (callback.type !== "Function" || context?.metError === undefined) {
+		return false
+	}
+
+	let needed = new Set<common.GenericName>()
+
+	for (let parameter of callback.parameterTypes) {
+		collectBindableGenerics(parameter.type, context, needed)
+	}
+
+	return [...needed].some(
+		(name) =>
+			context.metError?.has(name) === true && !context.bindings.has(name),
+	)
+}
+
 // Whether a Parameter Type mentions an unbound Type Parameter of this call.
 function parameterWaitsOnUnboundGeneric(
 	parameterType: common.Type,
@@ -3462,8 +3484,15 @@ export function matchArguments(
 		pairing,
 	)
 
-	for (let position = 0; position < parameters.length; position++) {
-		let i = order === null ? position : order[position]
+	// A callback waiting on a Type Parameter only an Error has met goes to the
+	// back once, since a later Argument may still bind it.
+	let queue = parameters.map((_, position) =>
+		order === null ? position : order[position],
+	)
+	let postponed = new Set<number>()
+
+	for (let step = 0; step < queue.length; step++) {
+		let i = queue[step]
 		let parameter = parameters[i]
 		let argumentIndex = pairing.forParameter[i]
 
@@ -3473,6 +3502,17 @@ export function matchArguments(
 			continue
 		}
 
+		if (
+			!postponed.has(i) &&
+			callbackWaitsOnError(parameter.type, inferenceContext)
+		) {
+			postponed.add(i)
+			queue.push(i)
+
+			continue
+		}
+
+		let position = step - postponed.size
 		let argument = matchableArguments[argumentIndex]
 
 		// Substituting the bindings so far gives a deferred callback its real Types.

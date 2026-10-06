@@ -3185,6 +3185,38 @@ describe("Enricher", () => {
 			])
 		})
 
+		// The callback waits for the `1`, which binds `T` past the Error. Its
+		// body is read with `x` an Integer, so its own mistake is reported.
+		it("should type a callback by what a later Argument binds past an Error", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function apply<infer T>(_ f: T, _ cb: (_: T) -> T, _ v: T) -> T {
+					<- cb(v)
+				}
+
+				function over<infer T>(_ f: List<T>, _ cb: (_: T) -> T, _ v: T) -> T {
+					<- cb(v)
+				}
+
+				Terminal.print(apply(zz, (x) { <- x::add("s") }, 1))
+				Terminal.print(over(zz, (x) { <- x::add("s") }, 1))
+				Terminal.print(apply(zz, (x) { <- x::add(1) }, 1))
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-name", 10],
+				["no-matching-overload", 10],
+				["unknown-name", 11],
+				["no-matching-overload", 11],
+				["unknown-name", 12],
+			])
+			expect(diagnostics[1].labels[0]?.message).toBe("this is a String")
+		})
+
 		// A Type Parameter an Error meets binds it. A Function literal's
 		// Parameter typed from it, and an answer read later, are then holes
 		// that report nothing more.
