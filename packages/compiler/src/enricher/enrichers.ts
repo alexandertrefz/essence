@@ -514,7 +514,7 @@ function enrichCaseValue(
 	// candidate. The payload only chooses among instantiations the context
 	// decided; it never decides one.
 	let payload = makePayloadReadings(node, scope)
-	let type = resolveCaseValueType(node, scope, context, payload.typeUnder)
+	let type = resolveCaseValueType(node, scope, context, payload.valueUnder)
 
 	if (context !== null) {
 		reportUncarriedTypeArgumentDisagreement(
@@ -713,10 +713,10 @@ type PayloadReading = {
 }
 
 type PayloadReadings = {
-	typeUnder: PayloadReader
+	typeUnder: (under: common.Type) => common.Type | null
 	// The reading, still unreported, for a probe that needs the typed Node.
 	// `commit` reports the reading's Diagnostics and is called once.
-	valueUnder: (under: common.Type) => common.typed.ExpressionNode | null
+	valueUnder: PayloadReader
 	commit: (under: common.Type) => common.typed.ExpressionNode | null
 }
 
@@ -9629,7 +9629,7 @@ function makeArgumentTyper(
 	): common.Type {
 		let payload = makePayloadReadings(node, scope)
 		let { result } = collectDiagnostics(() =>
-			resolveCaseValueType(node, scope, expectedType, payload.typeUnder),
+			resolveCaseValueType(node, scope, expectedType, payload.valueUnder),
 		)
 		let payloadDecides = node.choice === null && node.value !== null
 
@@ -14180,15 +14180,15 @@ function resolveCaseInExpectedType(
 	return candidates[0]
 }
 
-// The payload's Type is asked per candidate Case rather than handed over. It is
-// kept per candidate, so the winner is committed without a second reading.
-type PayloadReader = (under: common.Type) => common.Type | null
+// The payload is read per candidate Case rather than handed over. It is kept
+// per candidate, so the winner is committed without a second reading.
+type PayloadReader = (under: common.Type) => common.typed.ExpressionNode | null
 
 function resolveCaseValueType(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
-	payloadTypeUnder: PayloadReader = () => null,
+	payloadUnder: PayloadReader = () => null,
 ): common.CaseType | common.ErrorType {
 	if (node.choice === null) {
 		let refused = positionWasRefused(expectedType)
@@ -14242,7 +14242,7 @@ function resolveCaseValueType(
 		node.choice,
 		scope,
 		expectedType,
-		payloadTypeUnder,
+		payloadUnder,
 	)
 }
 
@@ -14253,7 +14253,7 @@ function resolvePrefixedCaseValueType(
 	choice: parser.IdentifierNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null,
-	payloadTypeUnder: PayloadReader,
+	payloadUnder: PayloadReader,
 ): common.CaseType | common.ErrorType {
 	let declaredCase = resolveCaseReference(choice, node.caseName, scope)
 
@@ -14278,7 +14278,7 @@ function resolvePrefixedCaseValueType(
 		let decided = decideCaseFromExpectedType(
 			declaredCase,
 			expectedType,
-			payloadTypeUnder,
+			payloadUnder,
 		)
 
 		if (decided !== null) {
@@ -14411,7 +14411,7 @@ function resolveAppliedCase(
 function decideCaseFromExpectedType(
 	declaredCase: common.CaseType,
 	expectedType: common.Type,
-	payloadTypeUnder: PayloadReader,
+	payloadUnder: PayloadReader,
 ): common.CaseType | null {
 	let candidates = unionArmsOf(expectedType).filter(
 		(member): member is common.CaseType =>
@@ -14426,17 +14426,17 @@ function decideCaseFromExpectedType(
 
 	return (
 		candidates.find((candidate) => {
-			let payloadType = payloadTypeUnder(candidate)
+			let payload = payloadUnder(candidate)
 
-			if (payloadType === null) {
+			if (payload === null) {
 				return true
 			}
 
 			// A payload that could not be read under a candidate does not fit
 			// it, although an Error matches everything elsewhere.
 			return (
-				!typeContainsError(payloadType) &&
-				payloadFitsCase(candidate, payloadType)
+				!typeContainsError(payload.type) &&
+				payloadFitsCase(candidate, payload.type, payload)
 			)
 		}) ?? candidates[0]
 	)
@@ -14447,10 +14447,9 @@ function decideCaseFromExpectedType(
 function payloadFitsCase(
 	caseType: common.CaseType,
 	payloadType: common.Type,
-	// The payload as written, so path keys are measured by the merge. Absent
-	// only for the caller choosing among generic instantiations, and a
-	// defaulting Case is never generic.
-	payloadValue: common.typed.ExpressionNode | null = null,
+	// The payload as written, so path keys are measured by the merge and a
+	// written member answers a refinement.
+	payloadValue: common.typed.ExpressionNode | null,
 ): boolean {
 	let recordShape: common.RecordType = {
 		type: "Record",
@@ -14463,7 +14462,11 @@ function payloadFitsCase(
 			admittedMergeValue(recordShape, payloadValue, false),
 		) ?? payloadType
 
-	if (matchesType(recordShape, effectiveType)) {
+	let admits = (shape: common.Type) =>
+		payloadValue !== null &&
+		admittedTypeOf(shape, payloadValue, false) !== null
+
+	if (matchesType(recordShape, effectiveType) || admits(recordShape)) {
 		return true
 	}
 
@@ -14484,10 +14487,12 @@ function payloadFitsCase(
 		return false
 	}
 
-	return matchesType(recordShape, {
-		type: "Record",
-		members: { [memberNames[0]]: payloadType },
-	})
+	return (
+		matchesType(recordShape, {
+			type: "Record",
+			members: { [memberNames[0]]: payloadType },
+		}) || admits(caseType.members[memberNames[0]]!)
+	)
 }
 
 // What a Type offers as its arms, nested Unions spelled out. A Type that is no

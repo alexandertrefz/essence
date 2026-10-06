@@ -11008,6 +11008,27 @@ describe("Enricher", () => {
 			expect(entryFor("listed({ rows = [1] })")).toBe(0)
 			expect(entryFor("listed({ rows = [] })")).toBe(1)
 		})
+
+		// A written payload answers for the instantiation it stands in, so the
+		// refined entry takes it too.
+		it("should admit a written payload into the refined entry", () => {
+			let entryFor = (payload: string) =>
+				lastConstantMethodInvocation(`implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+
+					namespace Taker for Integer {
+						overload boxed {
+							(_ b: Box<PositiveInteger>) -> String { <- "positive" }
+							(_ b: Box<Integer>) -> String { <- "integer" }
+						}
+					}
+
+					constant answer = 1::boxed(${payload})
+				}`).overloadedMethodIndex
+
+			expect(entryFor("#Full(3)")).toBe(0)
+			expect(entryFor("#Full(-3)")).toBe(1)
+		})
 	})
 
 	// No position asks a receiver a question, so a written receiver asks every

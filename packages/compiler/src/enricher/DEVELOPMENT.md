@@ -17,7 +17,9 @@ one reads its Type Arguments from there.
 
 A position may offer several instantiations of one Case, as `Box<Integer> | Box<String>` does.
 `decideCaseFromExpectedType` then reads the payload once per candidate and takes the first it fits. The payload
-chooses among the instantiations the context decided; it never decides a Type Argument by itself.
+chooses among the instantiations the context decided; it never decides a Type Argument by itself. A written payload
+fits where it proves a refinement (`payloadFitsCase`), so `Box#Full(3)` fits `Box<PositiveInteger>`, at a
+Parameter as anywhere else.
 
 `makePayloadReadings` keeps each reading under the candidate Case it was read for, together with the Diagnostics it
 raised. The chosen candidate is the same object as its key, so the commit reuses the winning reading instead of

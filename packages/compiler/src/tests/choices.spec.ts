@@ -1644,6 +1644,33 @@ describe("Choices", () => {
 			])
 		})
 
+		// A written payload is evidence for a refined Type Argument, both where
+		// it chooses among instantiations and where an Argument's Parameter
+		// decides one.
+		it("lets a written payload prove the instantiation it stands in", async () => {
+			let source = (value: string) => `implementation { ${box}
+				function take(_ boxed: Box<PositiveInteger>) -> String {
+					<- "positive"
+				}
+
+				constant boxed: Box<String> | Box<PositiveInteger> = Box#Full(${value})
+				constant record: Box<String> | Box<PositiveInteger> = Box#Full({ value = ${value} })
+
+				Terminal.inspect(take(#Full(${value})))
+				Terminal.inspect([boxed, record])
+			}`
+
+			expect(await run(source("3"))).toEqual([
+				'"positive"',
+				"[ Box#Full(3), Box#Full(3) ]",
+			])
+			expect(codesOf(source("0"))).toEqual([
+				"payload-type-mismatch",
+				"payload-type-mismatch",
+				"argument-type-mismatch",
+			])
+		})
+
 		// Instantiations of one Choice are no ambiguity, since a prefix could
 		// not tell them apart either.
 		it("takes a bare Matcher for the instantiations of one Choice", async () => {
