@@ -1600,11 +1600,7 @@ function describeDeclarations(
 			}
 		}
 
-		forEachTypedChild(definition, (child, _state, field) => {
-			if (field === "body") {
-				visitNode(child)
-			}
-		})
+		forEachTypedChild(definition, visitNode)
 	}
 
 	function visitNode(node: TypedNode) {
@@ -1631,12 +1627,7 @@ function describeDeclarations(
 					type: node.type,
 					documentation: describe(node.documentation) || null,
 				})
-				forEachTypedChild(node, (child, _state, field) => {
-					if (field !== "nativeShims") {
-						visitNode(child)
-					}
-				})
-				return
+				break
 			// Each Method's own `§§` block documents its Parameters.
 			case "SimpleMethod":
 			case "StaticMethod":
@@ -1656,7 +1647,7 @@ function describeDeclarations(
 					type: node.type,
 					documentation: describe(node.documentation) || null,
 				})
-				return
+				break
 			case "ProtocolDeclarationStatement":
 				describeAt(node.name.position, {
 					type: null,

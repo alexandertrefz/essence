@@ -4299,6 +4299,44 @@ describe("Completion inside each kind of node", () => {
 					"\t}",
 				],
 			],
+			[
+				"a Function literal in a Parameter default",
+				[
+					"\tfunction apply(",
+					"\t\t_ step: (_: Integer) -> Integer = (_ count: Integer) -> Integer {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- inner‸",
+					"\t\t},",
+					"\t) -> Integer {",
+					"\t\t<- step(1)",
+					"\t}",
+				],
+			],
+			// The Compiler refuses both, but they are read as they are typed.
+			[
+				"a Function literal in a Case payload default",
+				[
+					"\tchoice Job {",
+					"\t\tRun { step: (_: Integer) -> Integer } = {",
+					"\t\t\tstep = (_ count: Integer) -> Integer {",
+					"\t\t\t\tconstant inner = 1",
+					"\t\t\t\t<- inner‸",
+					"\t\t\t},",
+					"\t\t},",
+					"\t}",
+				],
+			],
+			[
+				"a Function literal in a refinement's predicate",
+				[
+					"\ttype Small = List<Integer> where @::hasOnlyItems(",
+					"\t\twhere (_ count: Integer) -> Boolean {",
+					"\t\t\tconstant inner = 1",
+					"\t\t\t<- count::isLessThan(inner‸)",
+					"\t\t},",
+					"\t)",
+				],
+			],
 		])("should carry the Types of the names %s declares", (_, lines) => {
 			let { source, cursor } = atMarker([
 				"implementation {",
