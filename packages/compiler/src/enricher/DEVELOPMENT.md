@@ -1139,6 +1139,13 @@ offered only where it brings the derive, which a Scope binding those Choices ans
 Integer` or `(_: Light) -> Integer` derives nothing even then, so its Help declares a Namespace as well. The names
 that question reaches are no uses of the file's, so an import only it reaches is still reported as `unused-import`.
 
+A bare Case lists no Cases of its own, so importing its Choice brings it no `Enumerable`. Where no name binds a bare
+Case's Choice, the Choice is read off its own Module, private or not (`foreignChoiceTypeOf`), and asked for the
+conformance as a bound one is, a derive counting once the import binds it. Where the Choice conforms, the Help asks
+for the import and the value's annotation together (`annotateAtChoiceRemedy`), spelled with the Case's Type
+Arguments, as `Switch<Integer>`. A Quick Fix writes the import. Where the Choice does not conform, the Help is the
+Choice's own remedy, which needs no annotation, since a Namespace for the Choice answers its Cases too.
+
 ### Derived equality for a generic Choice
 
 For a generic Choice, the derived `is` and `isNot` are conditional. They take the Type Parameters some payload

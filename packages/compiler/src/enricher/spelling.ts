@@ -10,7 +10,6 @@ import {
 	displayChoiceName,
 	isDeclaration,
 	spellCaseChoice,
-	spellChoiceName,
 	type Spelling,
 	spellType,
 } from "../helpers/describe"
@@ -205,6 +204,32 @@ function exportedChoiceName(
 	return declared
 }
 
+// The declaration of a Choice no name here binds, read off its own Module,
+// where it may be private. Null where no link answers.
+export function foreignChoiceDeclaration(
+	foreign: ForeignChoice,
+	scope: enricher.Scope,
+): common.Type | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		if (current.moduleTypes !== undefined) {
+			let declared = current.moduleTypes(foreign.modulePath)?.[
+				foreign.name
+			]
+
+			return declared !== undefined &&
+				choiceCarried(declared) === foreign.identity
+				? declared
+				: null
+		}
+	}
+
+	return null
+}
+
 // What to say of a Choice no name here binds: import it under the name its
 // Module exports it as, or export it first. A Choice its Type Arguments name
 // is imported too, since its derive is found the same way. Printing also needs
@@ -259,45 +284,25 @@ export function foreignChoiceRemedy(
 }
 
 // The Types the imports of these Choices would bind, under the names their
-// Modules export them as. Null where one is kept private, which no import
-// reaches until it is exported.
+// Modules export them as. A private one is bound under its declared name, as
+// once exported. Null where no link answers.
 export function importedChoiceTypes(
 	foreigns: Array<ForeignChoice>,
 	scope: enricher.Scope,
 ): Record<string, common.Type> | null {
 	let types: Record<string, common.Type> = {}
 
-	for (let { exportedAs, modulePath } of foreigns) {
-		let exported =
-			exportedAs === null
-				? undefined
-				: exportedTypesIn(modulePath, scope)?.[exportedAs]
+	for (let foreign of foreigns) {
+		let declared = foreignChoiceDeclaration(foreign, scope)
 
-		if (exportedAs === null || exported === undefined) {
+		if (declared === null) {
 			return null
 		}
 
-		types[exportedAs] = exported
+		types[foreign.exportedAs ?? foreign.name] = declared
 	}
 
 	return types
-}
-
-function exportedTypesIn(
-	modulePath: string,
-	scope: enricher.Scope,
-): Record<string, common.Type> | null {
-	for (
-		let current: enricher.Scope | null = scope;
-		current !== null;
-		current = current.parent
-	) {
-		if (current.exportedTypes !== undefined) {
-			return current.exportedTypes(modulePath)
-		}
-	}
-
-	return null
 }
 
 // Every Choice of another Module that a Type's spelling names and no name here
@@ -378,9 +383,8 @@ export function annotateAtChoiceHelp(
 	// none conforms it.
 	conforming: string | null = null,
 ): string {
-	let foreign = unboundForeignChoice(caseType, scope)
-	let foreigns = foreign === null ? [] : [foreign]
-	let choice = spellChoiceName(caseType, spellingAfterImport(scope, foreigns))
+	let foreigns = choicesToImport(caseType, scope)
+	let choice = spellCaseChoice(caseType, spellingAfterImport(scope, foreigns))
 	let declaring =
 		conforming === null
 			? ""
@@ -391,6 +395,42 @@ export function annotateAtChoiceHelp(
 	)
 
 	return continues ? `or ${help[0].toLowerCase()}${help.slice(1)}` : help
+}
+
+// `annotateAtChoiceHelp` for a refused conformance, with the import a Quick Fix
+// writes first where no name here binds the Choice. The annotation is the
+// second edit, so the import is `partial`.
+export function annotateAtChoiceRemedy(
+	caseType: common.CaseType,
+	scope: enricher.Scope,
+): { helps: Array<string>; data?: common.DiagnosticData } {
+	let [foreign] = choicesToImport(caseType, scope)
+
+	return {
+		helps: [annotateAtChoiceHelp(caseType, scope, ":")],
+		...(foreign === undefined || foreign.exportedAs === null
+			? {}
+			: {
+					data: {
+						kind: "import-declaration" as const,
+						name: foreign.exportedAs,
+						modulePath: foreign.modulePath,
+						partial: true as const,
+					},
+				}),
+	}
+}
+
+// The Choices a bare Case's annotation names that no name here binds: its own,
+// and any its Type Arguments name, as `Box<Light>` does.
+function choicesToImport(
+	caseType: common.CaseType,
+	scope: enricher.Scope,
+): Array<ForeignChoice> {
+	return foreignChoicesSpelled(
+		(spell) => spellCaseChoice(caseType, spell),
+		scope,
+	)
 }
 
 // The Choices of other Modules that a spelling names and no name here binds,

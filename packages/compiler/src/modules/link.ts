@@ -66,6 +66,9 @@ export type ExportSurface = {
 	// `declarations` is one in that Module's file. A Position carries no file,
 	// so a match against this Module's own declarations skips them.
 	forwarded: Set<string>
+	// Every Type the Module binds at its top level, private ones included. No
+	// import reaches them. A Help about a Choice it keeps private reads them.
+	moduleTypes: Record<string, common.Type>
 }
 
 export type LinkedModule = {
@@ -111,6 +114,7 @@ function emptySurface(): ExportSurface {
 		constants: new Set(),
 		kinds: {},
 		forwarded: new Set(),
+		moduleTypes: {},
 	}
 }
 
@@ -724,7 +728,7 @@ function linkGroup(
 		state.scope.protocolRegistry = protocols
 		state.scope.programTop = true
 		state.scope.unimportedNamespaces = () =>
-			unimportedNamespacesFor(state, surfaces)
+			unimportedNamespacesFor(state, surfaces, dependencies)
 		state.scope.protocolDeclarations = (name) =>
 			protocolDeclarationsFor(
 				state,
@@ -736,6 +740,9 @@ function linkGroup(
 			)
 		state.scope.exportedTypes = (modulePath) =>
 			surfaceOf(modulePath, states, surfaces, new Set())?.types ?? null
+		state.scope.moduleTypes = (modulePath) =>
+			surfaceOf(modulePath, states, surfaces, new Set())?.moduleTypes ??
+			null
 
 		for (let entry of [...(module.program.imports?.entries ?? [])].sort(
 			compareEntries,
@@ -987,6 +994,7 @@ function surfaceOf(
 	}
 
 	visiting.delete(filePath)
+	surface.moduleTypes = state.scope.types
 
 	return surface
 }
@@ -1859,16 +1867,40 @@ function reportCyclicSideEffects(
 	)
 }
 
-// Namespaces that dependencies the Module already names export, and that no
-// name here reaches. An unknown Method's Help offers to import one.
+// Namespaces that the Modules this one reaches export, and that no name here
+// reaches. A Module the import block names comes first, under the specifier it
+// wrote. One reached only through another, as a re-export's source is, follows
+// in path order. An unknown Method's Help offers to import one.
 function unimportedNamespacesFor(
 	state: ModuleState,
 	surfaces: Map<string, ExportSurface>,
+	dependencies: Map<string, Array<string>>,
 ): Array<enricher.UnimportedNamespace> {
 	let candidates: Array<enricher.UnimportedNamespace> = []
-	let seen = new Set<string>()
+	let seen = new Set<string>([state.module.filePath])
+	let reached = [...state.module.resolutions.values()]
+	let transitive: Array<string> = []
 
-	for (let [specifier, dependencyPath] of state.module.resolutions) {
+	while (reached.length > 0) {
+		for (let next of dependencies.get(reached.pop()!) ?? []) {
+			if (!transitive.includes(next)) {
+				transitive.push(next)
+				reached.push(next)
+			}
+		}
+	}
+
+	let modules: Array<[string, string]> = [
+		...state.module.resolutions,
+		...transitive
+			.sort()
+			.map((modulePath): [string, string] => [
+				specifierTo(state.module.filePath, modulePath),
+				modulePath,
+			]),
+	]
+
+	for (let [specifier, dependencyPath] of modules) {
 		let surface = surfaces.get(dependencyPath)
 
 		if (surface === undefined || seen.has(dependencyPath)) {

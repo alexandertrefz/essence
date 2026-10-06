@@ -7,8 +7,8 @@ import { type ForeignChoice, importedChoiceTypes } from "./spelling"
 
 // Whether a culprit conforms once each Choice its spelling names is imported,
 // asked of a Scope that binds them as the imports would. `Light | Integer`
-// derives no equality even then, where `List<Light>` does. A Choice no import
-// can bind yet is taken to bring its derive. The names the question
+// derives no equality even then, where `List<Light>` does. Where no link
+// answers, the import is taken to bring the derive. The names the question
 // reaches are kept from the unused-import check, since the file reaches none.
 export function derivesWithImports(
 	culprit: common.Type,

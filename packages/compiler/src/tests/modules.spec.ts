@@ -12038,11 +12038,11 @@ export {
 		expect(reports("pair\n\t\tPair\n\t\tFnEq\n\t\tLight")).toEqual([])
 	})
 
-	// `red` holds a bare Case of `Colour`, which `Main.es` has no name for, so
-	// the annotation the Help asks for needs the import first. Followed, it
-	// leaves the true refusal: `Colour` itself is not Comparable.
-	it("leads the annotation a bare Case needs with the import of its Choice", () => {
-		let compared = (entries: string, body: string) =>
+	// `red` holds a bare Case of `Colour`, which `Main.es` has no name for. No
+	// annotation helps while `Colour` is not Comparable. So the Help is the
+	// Choice's own: a Namespace for it, or the import of one that exists.
+	it("offers a bare Case of an unimported Choice the Choice's own remedy", () => {
+		let compared = (colours: string, entries: string, body: string) =>
 			withProject(
 				{
 					"Main.es": `import {
@@ -12054,6 +12054,261 @@ export {
 implementation {
 	function less<infer T is Comparable>(_ a: T, _ b: T) -> Boolean {
 		<- a::isLessThan(b)
+	}
+${body}
+}
+`,
+					"Colours.es": `implementation {
+	choice Colour { Red, Green }
+${colours}
+	constant red = Colour#Red
+}
+
+export {
+	Colour
+	red${colours === "" ? "" : "\n\tColourOrder"}
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let order = `
+	namespace ColourOrder for Colour is Comparable {
+		compare(to other: Colour) -> Ordering {
+			<- Ordering#Equal
+		}
+	}
+`
+		let call = "\tTerminal.inspect(less(red, red))"
+		let helpsOf = (colours: string) =>
+			compared(colours, "red", call).map((diagnostic) => diagnostic.helps)
+
+		expect(helpsOf("")).toEqual([
+			[
+				"'Colour' is declared in Colours.es — import it here, and declare a Namespace 'for Colour is Comparable'.",
+			],
+		])
+		expect(
+			codesOf(compared("", "Colour\n\t\tred", `${order}\n${call}`)),
+		).toEqual([])
+		expect(helpsOf(order)).toEqual([
+			[
+				"'ColourOrder' in ./Colours.es makes Colour conform to 'Comparable' — import it.",
+			],
+		])
+		expect(codesOf(compared(order, "ColourOrder\n\t\tred", call))).toEqual(
+			[],
+		)
+	})
+
+	// `Colours.es` keeps `Secret` private, so the import needs an export first.
+	// The Choice is read off its own Module all the same, and it is not
+	// Comparable, so no annotation is offered.
+	it("offers a bare Case of a private Choice the Choice's own remedy", () => {
+		let compared = (exports: string, entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Colours.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function less<infer T is Comparable>(_ a: T, _ b: T) -> Boolean {
+		<- a::isLessThan(b)
+	}
+${body}
+}
+`,
+					"Colours.es": `implementation {
+	choice Secret { Hidden, Shown }
+
+	constant hidden = Secret#Hidden
+}
+
+export {
+	hidden${exports}
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			compared(
+				"",
+				"hidden",
+				"\tTerminal.inspect(less(hidden, hidden))",
+			).map((diagnostic) => diagnostic.helps),
+		).toEqual([
+			[
+				"'Secret' is declared in Colours.es, which does not export it — export it there and import it here, and declare a Namespace 'for Secret is Comparable'.",
+			],
+		])
+		expect(
+			codesOf(
+				compared(
+					"\n\tSecret",
+					"hidden\n\t\tSecret",
+					`
+	namespace SecretOrder for Secret is Comparable {
+		compare(to other: Secret) -> Ordering {
+			<- Ordering#Equal
+		}
+	}
+
+	Terminal.inspect(less(hidden, hidden))`,
+				),
+			),
+		).toEqual([])
+	})
+
+	// A private Choice is bound from its own Module to ask whether importing
+	// it brings the derive. `Box<Integer>` derives equality then, and a Union
+	// of `Secret` and an Integer does not, so it needs a Namespace as well.
+	it("asks whether importing a private Choice brings the derive", () => {
+		let compared = (exports: string, entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lib.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function same<infer T is Equatable>(_ a: T, _ b: T) -> Boolean {
+		<- a::is(b)
+	}
+${body}
+}
+`,
+					"Lib.es": `implementation {
+	choice Secret { Hidden, Shown }
+
+	function either() -> Secret | Integer {
+		<- 1
+	}
+}
+
+export {
+	either${exports}
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let call = "\tconstant v = either()\n\tTerminal.inspect(same(v, v))"
+
+		expect(
+			compared("", "either", call).map((diagnostic) => diagnostic.helps),
+		).toEqual([
+			[
+				"'Secret' is declared in Lib.es, which does not export it — export it there and import it here, and declare a Namespace 'for Secret | Integer is Equatable'.",
+			],
+		])
+		expect(
+			codesOf(
+				compared(
+					"\n\tSecret",
+					"either\n\t\tSecret",
+					`
+	namespace Equality for Secret | Integer is Equatable {
+		is(_ other: Secret | Integer) -> Boolean {
+			<- true
+		}
+	}
+
+${call}`,
+				),
+			),
+		).toEqual([])
+	})
+
+	// `Main.es` reaches `Shades.es` only through `Mid.es`, which forwards
+	// `dark` and not `ShadeOrder`. The Namespace is offered from the Module
+	// that exports it, under a specifier written from `Main.es`.
+	it("offers a Namespace a re-exported value's own Module exports", () => {
+		let compared = (entries: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+${entries}
+}
+
+implementation {
+	function less<infer T is Comparable>(_ a: T, _ b: T) -> Boolean {
+		<- a::isLessThan(b)
+	}
+
+	Terminal.inspect(less(dark, dark))
+}
+`,
+					"Mid.es": `implementation {
+	constant one = 1
+}
+
+export {
+	from "./Shades.es" { dark }
+}
+`,
+					"Shades.es": `implementation {
+	choice Shade { Dark, Light }
+
+	namespace ShadeOrder for Shade is Comparable {
+		compare(to other: Shade) -> Ordering {
+			<- Ordering#Equal
+		}
+	}
+
+	constant dark = Shade#Dark
+}
+
+export {
+	dark
+	Shade
+	ShadeOrder
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			compared('\tfrom "./Mid.es" { dark }').map(
+				(diagnostic) => diagnostic.helps,
+			),
+		).toEqual([
+			[
+				"'ShadeOrder' in ./Shades.es makes Shade conform to 'Comparable' — import it.",
+			],
+		])
+		expect(
+			codesOf(
+				compared(
+					'\tfrom "./Mid.es" { dark }\n\tfrom "./Shades.es" { ShadeOrder }',
+				),
+			),
+		).toEqual([])
+	})
+
+	// Importing `Colour` brings its derived listing, but `red` holds a bare
+	// Case, which lists nothing of its own. One Help asks for both edits, and
+	// the import is the first edit a Quick Fix writes.
+	it("asks a bare Case of an unimported Choice for the import and the annotation at once", () => {
+		let counted = (entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Colours.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function countOf<infer T is Enumerable>(_ example: T) -> Integer {
+		<- T.cases()::length()
 	}
 ${body}
 }
@@ -12072,36 +12327,77 @@ export {
 				},
 				(directory) => analysedAt(directory, "Main.es", "Main.es"),
 			)
-		let annotated = `
-	constant colour: Colour = red
+		let [refusal] = counted(
+			"red",
+			"\tTerminal.print(countOf(red)::toString())",
+		)
 
-	Terminal.inspect(less(colour, colour))`
+		expect(refusal?.code).toBe("unsatisfied-bound")
+		expect(refusal?.helps).toEqual([
+			"'Colour' is declared in Colours.es — import it here, and annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
+		])
+		expect(refusal?.data).toMatchObject({
+			kind: "import-declaration",
+			name: "Colour",
+			partial: true,
+		})
+		expect(
+			codesOf(
+				counted(
+					"Colour\n\t\tred",
+					"\tconstant colour: Colour = red\n\n\tTerminal.print(countOf(colour)::toString())",
+				),
+			),
+		).toEqual([])
+	})
+
+	// A generic Choice is annotated at its application, as the Case holds it.
+	it("writes the annotation a bare Case needs with its Choice's Type Arguments", () => {
+		let counted = (entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Lamps.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function countOf<infer T is Enumerable>(_ example: T) -> Integer {
+		<- T.cases()::length()
+	}
+${body}
+}
+`,
+					"Lamps.es": `implementation {
+	choice Switch<Item> { On, Off }
+
+	constant on = Switch<Integer>#On
+}
+
+export {
+	Switch
+	on
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
 
 		expect(
-			compared("red", "\tTerminal.inspect(less(red, red))").map(
+			counted("on", "\tTerminal.print(countOf(on)::toString())").map(
 				(diagnostic) => diagnostic.helps,
 			),
 		).toEqual([
 			[
-				"'Colour' is declared in Colours.es — import it here, and annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
+				"'Switch' is declared in Lamps.es — import it here, and annotate the value at 'Switch<Integer>': a bare Case binds the Case, not the Choice.",
 			],
 		])
 		expect(
-			compared("Colour\n\t\tred", annotated).map(
-				(diagnostic) => diagnostic.helps,
-			),
-		).toEqual([["Declare a Namespace 'for Colour is Comparable'."]])
-		expect(
 			codesOf(
-				compared(
-					"Colour\n\t\tred",
-					`
-	namespace ColourOrder for Colour is Comparable {
-		compare(to other: Colour) -> Ordering {
-			<- Ordering#Equal
-		}
-	}
-${annotated}`,
+				counted(
+					"on\n\t\tSwitch",
+					"\tconstant switch: Switch<Integer> = on\n\n\tTerminal.print(countOf(switch)::toString())",
 				),
 			),
 		).toEqual([])

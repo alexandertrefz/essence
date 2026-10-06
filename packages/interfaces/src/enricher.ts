@@ -77,6 +77,10 @@ export type Scope = {
 	// Module the link has no surface for. Asked by a Help that offers an
 	// import. Absent for a Program that is no Module.
 	exportedTypes?: (modulePath: string) => Record<string, common.Type> | null
+	// The Types a Module of the graph binds at its top level, private ones
+	// included. Null for a Module the link has no surface for. Asked by a Help
+	// about a Choice no name here binds. Absent for a Program that is no Module.
+	moduleTypes?: (modulePath: string) => Record<string, common.Type> | null
 	// The Type a `<-` here is expected to produce, which a bare Case such as
 	// `<- #Less` resolves against first. `null` is a barrier. See "Barriers" in
 	// DEVELOPMENT.md.

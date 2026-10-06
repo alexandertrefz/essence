@@ -107,7 +107,10 @@ import {
 } from "./specifiers"
 import {
 	annotateAtChoiceHelp,
+	annotateAtChoiceRemedy,
 	choiceBindingIn,
+	foreignChoiceDeclaration,
+	type ForeignChoice,
 	choiceNameIn,
 	foreignChoiceRemedy,
 	foreignChoicesOf,
@@ -116,6 +119,7 @@ import {
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
+	unboundForeignChoice,
 	unknownTypeRemedy,
 	withImportOf,
 } from "./spelling"
@@ -2912,6 +2916,21 @@ function instantiateChoiceAlias(
 	}
 
 	return applied
+}
+
+// The Choice of a bare Case no name here binds, read off its own Module. It is
+// applied to the Case's Type Arguments, as `choiceTypeOf` applies a bound one.
+function foreignChoiceTypeOf(
+	caseType: common.CaseType,
+	foreign: ForeignChoice | null,
+	scope: enricher.Scope,
+): common.Type | null {
+	let declared =
+		foreign === null ? null : foreignChoiceDeclaration(foreign, scope)
+
+	return declared?.type === "GenericAlias"
+		? instantiateChoiceAlias(declared, choiceTypeArgumentsOf(caseType))
+		: declared
 }
 
 // The Generic Alias a generic Choice's name resolves to, confirmed to hold
@@ -6224,18 +6243,20 @@ function conformanceRemedy(
 	// the Choice conforms, it is an annotation. Otherwise it is the Choice's own
 	// remedy, since a Namespace `for Door` answers a `Door#Open` too.
 	if (culprit.type === "Case" && foreign === null) {
-		let choice = choiceTypeOf(culprit, scope)
+		let unbound = unboundForeignChoice(culprit, scope)
+		let choice =
+			choiceTypeOf(culprit, scope) ??
+			foreignChoiceTypeOf(culprit, unbound, scope)
+		// A Choice no name binds derives nothing until the import binds it.
 		let conforms =
 			choice !== null &&
-			collectDiagnostics(() =>
-				solveConformance(choice, protocolName, scope, position),
-			).result.ok
+			((unbound !== null && derivesOnceImported(choice, protocolName)) ||
+				collectDiagnostics(() =>
+					solveConformance(choice, protocolName, scope, position),
+				).result.ok)
 
 		if (choice === null || conforms) {
-			return {
-				notes: [],
-				helps: [annotateAtChoiceHelp(culprit, scope, ":")],
-			}
+			return { notes: [], ...annotateAtChoiceRemedy(culprit, scope) }
 		}
 
 		return conformanceRemedy(choice, protocolName, scope, position)
@@ -6522,14 +6543,17 @@ function preludeProtocolsOf(scope: enricher.Scope): ReadonlySet<string> | null {
 }
 
 // Whether importing a Choice brings it a derived conformance: equality
-// always, and listing where its Cases carry no payload.
+// always, and listing where its Cases carry no payload. A bare Case lists no
+// Cases of its own, so it needs its annotation widened as well.
 function derivesOnceImported(
 	culprit: common.Type,
 	protocolName: string,
 ): boolean {
 	return (
 		protocolName === equatableProtocolName ||
-		(protocolName === enumerableProtocolName && carriesNoPayload(culprit))
+		(protocolName === enumerableProtocolName &&
+			culprit.type !== "Case" &&
+			carriesNoPayload(culprit))
 	)
 }
 
