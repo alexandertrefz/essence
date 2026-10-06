@@ -4444,7 +4444,7 @@ describe("Validator", () => {
 		// The value has items already, so the other Argument's `T` is what
 		// it does not fit, and no check would change that.
 		it("should not ask a value that proves the refinement to check it", () => {
-			let diagnostics = diagnosticsFor(`implementation {
+			let program = (call: string): string => `implementation {
 				type Filled<Item> = List<Item> where @::hasItems()
 
 				function pair<infer T>(_ a: Filled<T>, _ b: Filled<T>) -> Integer {
@@ -4453,12 +4453,67 @@ describe("Validator", () => {
 
 				constant words: NonEmptyList<String> = ["a"]
 
-				Terminal.inspect(pair([1], words))
-			}`)
+				Terminal.inspect(${call})
+			}`
+			let diagnostics = diagnosticsFor(program("pair([1], words)"))
 
 			expect(diagnostics.map((diagnostic) => diagnostic.helps)).toEqual([
-				["Pass a value that already has Type 'Filled<T>'."],
+				["Pass a value that already has Type 'Filled<Integer>'."],
 			])
+			expect(compiles(program("pair([1], [2])"))).toBe(true)
+		})
+
+		// The other Argument binds `T` to Integer, so no check of the Strings
+		// could make them fit.
+		it("should not ask an Argument to check the predicate where the other Argument binds its Type Parameter apart", () => {
+			let program = (call: string): string => `implementation {
+				function pair<infer T>(_ a: NonEmptyList<T>, _ b: List<T>) -> Integer {
+					<- 1
+				}
+
+				constant strings: List<String> = ["a"]
+
+				Terminal.inspect(${call})
+			}`
+			let [diagnostic] = diagnosticsFor(program("pair(strings, [1])"))
+
+			expect(diagnostic?.notes).toEqual([
+				"Parameter 1 is NonEmptyList<T>.",
+				"This call binds 'T' to Integer.",
+				"'NonEmptyList<Integer>' refines List<Integer>, so a value has to be a List<Integer> before '@::hasItems()' is asked.",
+			])
+			expect(diagnostic?.helps).toEqual([
+				"Pass a value that already has Type 'NonEmptyList<Integer>'.",
+			])
+			expect(compiles(program("pair([2], [1])"))).toBe(true)
+		})
+
+		// The other Argument binds `T` to String, which the value's items are,
+		// so checking it is what makes it fit.
+		it("should ask an Argument to check the predicate where the other Argument binds its Type Parameter alike", () => {
+			let program = (call: string): string => `implementation {
+				function pair<infer T>(_ a: NonEmptyList<T>, _ b: List<T>) -> Integer {
+					<- 1
+				}
+
+				constant strings: List<String> = ["a"]
+
+				${call}
+			}`
+			let [diagnostic] = diagnosticsFor(
+				program("Terminal.inspect(pair(strings, strings))"),
+			)
+
+			expect(diagnostic?.helps).toEqual([
+				"Check '@::hasItems()' on the value in an 'if' or a 'match', or pass a value that already has Type 'NonEmptyList<String>'.",
+			])
+			expect(
+				compiles(
+					program(`if strings::hasItems() {
+						Terminal.inspect(pair(strings, strings))
+					}`),
+				),
+			).toBe(true)
 		})
 
 		it("should name the predicate where a returned value is refused", () => {

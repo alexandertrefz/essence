@@ -45,11 +45,12 @@ import {
 	isMergedLevel,
 	isPartialOf,
 	isUnitType,
-	matchArguments,
+	matchFreshened,
 	matchesType,
 	matchesTypeWithBindings,
 	returnedTypeOf,
 	type ArgumentMatchResult,
+	type ArgumentMismatch,
 	type GenericBindings,
 	mergedRecordType,
 	missingRecordMembers,
@@ -1033,8 +1034,9 @@ function validateFunctionInvocation(
 				for (let i of matchResult.mismatchedArgumentIndices) {
 					reportArgumentMismatch(
 						functionType,
-						matchResult.parameterForArgument[i],
-						node.arguments[i],
+						matchResult,
+						i,
+						node.arguments,
 					)
 				}
 			}
@@ -3271,12 +3273,9 @@ function matchCommittedArguments(
 	recordedType: common.Type,
 	collectAllMismatches: boolean,
 ): ArgumentMatchResult {
-	let matchableArguments = matchableArgumentsFromTypedNodes(argumentNodes)
+	let matchable = matchableArgumentsFromTypedNodes(argumentNodes)
 	let first = createFreshenedInference(signature)
-	let matched = matchArguments(first.parameterTypes, matchableArguments, {
-		collectAllMismatches,
-		inference: first.context,
-	})
+	let matched = matchFreshened(first, matchable, collectAllMismatches)
 
 	if (
 		matched.type === "Match" ||
@@ -3301,10 +3300,7 @@ function matchCommittedArguments(
 		second.context,
 	)
 
-	let seeded = matchArguments(second.parameterTypes, matchableArguments, {
-		collectAllMismatches,
-		inference: second.context,
-	})
+	let seeded = matchFreshened(second, matchable, collectAllMismatches)
 
 	return seeded.type === "Match" ? seeded : matched
 }
@@ -3575,9 +3571,12 @@ function reportUnmergedPayloadPathKey(
 
 function reportArgumentMismatch(
 	callee: common.BaseFunction,
-	index: number,
-	argumentNode: common.typed.ArgumentNode,
+	mismatch: ArgumentMismatch,
+	argumentIndex: number,
+	argumentNodes: Array<common.typed.ArgumentNode>,
 ): void {
+	let index = mismatch.parameterForArgument[argumentIndex]
+	let argumentNode = argumentNodes[argumentIndex]
 	let parameter = callee.parameterTypes[index]
 
 	if (parameter !== undefined && parameter.name !== argumentNode.name) {
@@ -3627,7 +3626,7 @@ function reportArgumentMismatch(
 		}
 	}
 
-	let evidence = argumentEvidence(parameter, argumentNode, callee)
+	let evidence = argumentEvidence(parameter, argumentNode, callee, mismatch)
 	let spelling = partialSpellingEvidence(parameter, argumentNode)
 	// The members the default fills in are not missing from the Argument.
 	let record =
@@ -3755,11 +3754,7 @@ function validateSimpleFunctionInvocation(
 
 	if (matchResult.type === "ArgumentMismatch") {
 		for (let i of matchResult.mismatchedArgumentIndices) {
-			reportArgumentMismatch(
-				functionType,
-				matchResult.parameterForArgument[i],
-				argumentNodes[i],
-			)
+			reportArgumentMismatch(functionType, matchResult, i, argumentNodes)
 		}
 	}
 }

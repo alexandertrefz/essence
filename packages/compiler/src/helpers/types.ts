@@ -238,6 +238,41 @@ export function createFreshenedInference(signature: common.BaseFunction): {
 	}
 }
 
+// `matchArguments` over a freshened signature. A refusal carries what the
+// inference bound, under the signature's own names. A report then judges a
+// refused Argument against the Type Parameters the others decided.
+export function matchFreshened(
+	inference: ReturnType<typeof createFreshenedInference>,
+	matchableArguments: Array<MatchableArgument>,
+	collectAllMismatches: boolean,
+): ArgumentMatchResult {
+	let result = matchArguments(inference.parameterTypes, matchableArguments, {
+		collectAllMismatches,
+		inference: inference.context,
+	})
+
+	if (result.type !== "ArgumentMismatch") {
+		return result
+	}
+
+	let rename: GenericBindings = new Map()
+	let decided: GenericBindings = new Map()
+
+	for (let [fresh, original] of inference.freshToOriginal) {
+		rename.set(fresh, { type: "GenericUse", name: original })
+	}
+
+	for (let [fresh, bound] of inference.context.bindings) {
+		let original = inference.freshToOriginal.get(fresh)
+
+		if (original !== undefined) {
+			decided.set(original, applyGenericBindings(bound, rename))
+		}
+	}
+
+	return { ...result, decided }
+}
+
 // A Choice's Type Parameters renamed fresh for the payload match that binds
 // them. An unbound one keeps its fresh name. See "Freshened Type Parameters" in
 // DEVELOPMENT.md.
@@ -3141,12 +3176,16 @@ export type ArgumentMismatchDetail = {
 export type ArgumentMatchResult =
 	| { type: "Match"; omittedParameterIndices: Array<number> }
 	| { type: "ArityMismatch" }
-	| {
-			type: "ArgumentMismatch"
-			mismatchedArgumentIndices: Array<number>
-			// For Argument `i`, the Parameter it was paired with, for the Validator.
-			parameterForArgument: Array<number>
-	  }
+	| ArgumentMismatch
+
+export type ArgumentMismatch = {
+	type: "ArgumentMismatch"
+	mismatchedArgumentIndices: Array<number>
+	// For Argument `i`, the Parameter it was paired with, for the Validator.
+	parameterForArgument: Array<number>
+	// Set by `matchFreshened`.
+	decided?: GenericBindings
+}
 
 // Collects every Type Parameter of this call that `type` mentions. Opaque
 // Generics of an enclosing definition are not collected.

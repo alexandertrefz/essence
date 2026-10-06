@@ -8,6 +8,8 @@ import {
 	unadmittedWrittenItem,
 } from "../helpers/predicateEval"
 import {
+	applyGenericBindings,
+	type ArgumentMismatch,
 	genericNamesMentioned,
 	matchesType,
 	matchesTypeWithBindings,
@@ -92,19 +94,53 @@ export function refinementEvidence(
 }
 
 // The evidence for an Argument, whose callee's own `infer` Type Parameters
-// the call may still bind. An enclosing Declaration's are opaque.
+// the call may still bind, unless the other Arguments decided one already. An
+// enclosing Declaration's are opaque.
 export function argumentEvidence(
 	parameter: common.Parameter | undefined,
 	argument: common.typed.ArgumentNode,
 	callee: common.BaseFunction,
+	mismatch: ArgumentMismatch,
 ): Evidence {
-	let inferred = callee.generics.filter((generic) => generic.infer)
-
-	return refinementEvidence(
-		parameter?.type,
+	let decided = mismatch.decided ?? new Map<common.GenericName, common.Type>()
+	let inferred = callee.generics.filter(
+		(generic) => generic.infer && !decided.has(generic.name),
+	)
+	let expected = parameter && applyGenericBindings(parameter.type, decided)
+	let evidence = refinementEvidence(
+		expected,
 		argument.value,
 		new Set(inferred.map((generic) => generic.name)),
 	)
+
+	if (parameter === undefined || evidence.notes.length === 0) {
+		return evidence
+	}
+
+	// The evidence spells the refinement with what the call bound, which the
+	// Parameter's own Type leaves unsaid.
+	let bound = [...genericNamesMentioned(parameter.type)].filter((name) =>
+		decided.has(name),
+	)
+
+	return bound.length === 0
+		? evidence
+		: {
+				...evidence,
+				notes: [
+					...bound.map(
+						(name) =>
+							`This call binds '${name}' to ${describeType(decided.get(name)!)}.`,
+					),
+					...evidence.notes,
+				],
+				helps:
+					evidence.helps.length > 0
+						? evidence.helps
+						: [
+								`Pass a value that already has Type '${describeType(expected!)}'.`,
+							],
+			}
 }
 
 // Whether checking the predicate could make a value fit: its base fits, and it
