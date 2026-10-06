@@ -109,6 +109,7 @@ import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
+import { bindsLastStep, reportBarePathKeys } from "./pathKeyShorthand"
 import {
 	isOneShapeMatch,
 	isUnknownMember,
@@ -1041,6 +1042,8 @@ export function enrichCombination(
 	let keys = node.rhs
 
 	if (keys.nodeType === "RecordValue" && hasPathKeys(keys)) {
+		reportBarePathKeys(keys, scope)
+
 		if (updatableThroughPaths(node.lhs, lhs)) {
 			return enrichPathCombination(node, lhs, keys, scope)
 		}
@@ -1969,6 +1972,11 @@ function enrichRecordValue(
 	let expectedMembers = expectedRecordMembers(
 		resolvedAnnotation ?? expectedType,
 	)
+
+	if (hasPathKeys(node) && mergeable) {
+		reportBarePathKeys(node, scope)
+	}
+
 	let level =
 		hasPathKeys(node) && mergeable
 			? mergedLevel(pathKeyEntries(node), scope, expectedMembers)
@@ -7986,8 +7994,8 @@ function declareProtocolInScope(
 }
 
 // A path key outside a merged position reaches into nothing, so it is reported
-// and dropped. A shorthand path key was already refused by the Parser. Called
-// only where `hasPathKeys` found one. See "Path keys" in DEVELOPMENT.md.
+// and dropped, with or without a value. Called only where `hasPathKeys` found
+// one. See "Path keys" in DEVELOPMENT.md.
 function refusePathKeys(
 	members: Record<string, parser.RecordValueMemberNode>,
 ): Record<string, parser.RecordValueMemberNode> {
@@ -7997,10 +8005,6 @@ function refusePathKeys(
 		if (member.steps === undefined) {
 			plain[key] = member
 
-			continue
-		}
-
-		if (member.shorthand === true) {
 			continue
 		}
 
@@ -8054,6 +8058,20 @@ function enrichMember(
 	// A member without a value is a braced descend, which `pathUpdate` reaches
 	// through `stepInto` and never asks for here.
 	let value = member.value!
+
+	// A bare path key, reported where its key list was read, reads a binding
+	// only where the Scope holds one. Otherwise it is a refused value, so the
+	// name is not reported again.
+	if (
+		member.steps !== undefined &&
+		member.shorthand === true &&
+		!bindsLastStep(member, scope)
+	) {
+		return enrichRefusedValue(
+			{ nodeType: "RefusedValue", base: value, position: value.position },
+			scope,
+		)
+	}
 
 	if (member.shorthand === true && value.nodeType === "Identifier") {
 		return asValue(

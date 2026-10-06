@@ -2739,6 +2739,20 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("shorthand-on-path-key")
 		})
 
+		// Without a binding of the last step's name the fix would write an
+		// undeclared name, so the reader writes the value.
+		it("should offer nothing where the last step names no binding", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant config = { server = { port = 1 }, name = 2 }",
+				"\tconstant updated = { config with server.port, name = 5 }",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["shorthand-on-path-key"])
+			expect(quickFixes(lines)).toEqual([])
+		})
+
 		it("should stay silent where the span no longer reads as a path", () => {
 			let lines = [
 				"implementation {",

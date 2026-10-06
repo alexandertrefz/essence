@@ -642,38 +642,34 @@ describe("Parser", () => {
 				expect(combination.rhs.nodeType).toBe("Lookup")
 			})
 
-			it("should refuse a path key written with no value", () => {
+			// Whether the last step names a binding is the Scope's to say, so
+			// the Enricher reports it. See "Path keys" in
+			// packages/compiler/src/enricher/DEVELOPMENT.md.
+			it("should keep a path key written with no value for the Enricher", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					"implementation { constant value = { config with server.port, name = 'a' } }",
 				)
+				let member = (
+					combinationOf("{ config with server.port, name = 'a' }")
+						.rhs as parser.RecordValueNode
+				).members["server.port"]!
 
-				expect(diagnostics).toHaveLength(1)
-				expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
-				expect(diagnostics[0]!.helps).toEqual([
-					"Write 'server.port = port'.",
+				expect(diagnostics).toEqual([])
+				expect(member.shorthand).toBe(true)
+				expect(member.steps?.map((step) => step.content)).toEqual([
+					"server",
+					"port",
 				])
 			})
 
-			// The Help reads the last step as the name of a value in scope, as
-			// a bare key's shorthand does.
-			it("should compile the path key the Help writes", () => {
-				expect(
-					compiles(`implementation {
-						constant config = { server = { port = 80 }, name = "db" }
-						constant port = 8080
-						constant value = { config with server.port = port, name = "a" }
-					}`),
-				).toBe(true)
-			})
-
-			it("should refuse a bare path rather than a bare name", () => {
+			it("should refuse a bare name beside a bare path", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					"implementation { constant value = { config with server.port, host } }",
 				)
 
 				expect(
 					diagnostics.map((diagnostic) => diagnostic.code),
-				).toEqual(["shorthand-on-path-key", "shorthand-in-combination"])
+				).toEqual(["shorthand-in-combination"])
 			})
 
 			it("should refuse a key that a path already writes", () => {
@@ -778,13 +774,12 @@ describe("Parser", () => {
 				expect(diagnostics[0]!.code).toBe("duplicate-member")
 			})
 
-			it("should refuse a bare path inside a descend", () => {
+			it("should keep a bare path inside a descend", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					"implementation { constant value = { config with server.{ tls.enabled } } }",
 				)
 
-				expect(diagnostics).toHaveLength(1)
-				expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+				expect(diagnostics).toEqual([])
 			})
 
 			// The boundary is the dot, so `serverPort` is no part of `server`.
@@ -799,13 +794,12 @@ describe("Parser", () => {
 			// A path key is read the same in every key position, so a key
 			// list's refusals hold for a Literal merged into a default too.
 			describe("in a Literal merged into a default", () => {
-				it("should refuse a path key written with no value", () => {
+				it("should keep a path key written with no value", () => {
 					let { diagnostics } = parseWithDiagnostics(
 						"implementation { constant value = connect(using { server.port }) }",
 					)
 
-					expect(diagnostics).toHaveLength(1)
-					expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+					expect(diagnostics).toEqual([])
 				})
 
 				it("should refuse a descend with nothing in it", () => {
@@ -836,13 +830,12 @@ describe("Parser", () => {
 					expect(diagnostics).toEqual([])
 				})
 
-				it("should refuse a path key with no value in a payload", () => {
+				it("should keep a path key with no value in a payload", () => {
 					let { diagnostics } = parseWithDiagnostics(
 						"implementation { constant value = #Get({ limits.calls }) }",
 					)
 
-					expect(diagnostics).toHaveLength(1)
-					expect(diagnostics[0]!.code).toBe("shorthand-on-path-key")
+					expect(diagnostics).toEqual([])
 				})
 			})
 		})

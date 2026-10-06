@@ -730,9 +730,9 @@ Error: A path key names no binding
 
 </div>
 
-Write the value: `{ config with server.port = port, name = "cache" }`.
+Write the value: `{ config with server.port = port, name = "cache" }`. The help writes `port` only where a `port` is in scope. Where none is, it asks for the value instead, `Write the value it sets in place of '…': 'server.port = …'.`, and the report is the only one: the name is not reported again as [`unknown-name`](/docs/reference/diagnostics#unknown-name).
 
-Quick Fix: **Write 'server.port = port'**.
+Quick Fix: **Write 'server.port = port'**, where `port` is in scope.
 
 ### `empty-path-group`
 
@@ -2139,7 +2139,7 @@ Error: A path key reaches into nothing here
 
 </div>
 
-Write the whole member, `{ server = { host = "db", port = 8080 } }`, or update a value that has it: `{ config with server.port = 8080 }`.
+Write the whole member, `{ server = { host = "db", port = 8080 } }`, or update a value that has it: `{ config with server.port = 8080 }`. A dotted key written with no value in such a literal, `{ server.port }`, is reported the same way, since it reaches into nothing either.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
 

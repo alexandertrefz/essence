@@ -5673,9 +5673,10 @@ class DescentParser {
 		})
 	}
 
-	// A path key always spells its value. A bare path is reported and kept
-	// under its last step's name. Otherwise the `=` is expected, and its
-	// failure lets `{ config.server with … }` read as an update.
+	// A path key always spells its value. A bare path is kept under its last
+	// step's name for the Enricher to report, since only the Scope knows that
+	// name. Otherwise the `=` is expected, and its failure lets
+	// `{ config.server with … }` read as an update.
 	protected parsePathKeyValue(
 		name: parser.IdentifierNode,
 		steps: Array<parser.IdentifierNode>,
@@ -5689,8 +5690,6 @@ class DescentParser {
 			(following === TokenType.SymbolComma ||
 				following === TokenType.SymbolRightBrace)
 		) {
-			this.reportShorthandOnPathKey(steps)
-
 			return generators.keyValuePair(
 				name,
 				generators.identifier(last.content, last.position),
@@ -5711,30 +5710,6 @@ class DescentParser {
 			false,
 			steps,
 		)
-	}
-
-	protected reportShorthandOnPathKey(
-		steps: Array<parser.IdentifierNode>,
-	): void {
-		if (this.suppressDiagnostics) {
-			return
-		}
-
-		let last = steps[steps.length - 1]
-		let position = {
-			start: steps[0].position.start,
-			end: last.position.end,
-		}
-		let spelling = steps.map((step) => step.content).join(".")
-
-		reportError("A path key names no binding", position, {
-			code: "shorthand-on-path-key",
-			labels: [primary(position, "this reaches into a value to set")],
-			notes: [
-				"A bare name is a member and its own value; a path is neither, because the value it would set is not the name it reaches through.",
-			],
-			helps: [`Write '${spelling} = ${last.content}'.`],
-		})
 	}
 
 	// Two keys clash when they are the same, or one is a prefix of the other

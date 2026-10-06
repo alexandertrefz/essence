@@ -1710,6 +1710,7 @@ export class Printer {
 		items: Array<ListItem>,
 		loose: Array<Comment>,
 		separator: Doc = line,
+		keepLastComma = false,
 	): { interior: Doc; commented: boolean } {
 		let parts: Array<Doc> = []
 		let commented = loose.length > 0
@@ -1723,7 +1724,9 @@ export class Printer {
 			}
 
 			parts.push(item.doc)
-			parts.push(last ? ifBreak(text(","), EMPTY) : text(","))
+			parts.push(
+				last && !keepLastComma ? ifBreak(text(","), EMPTY) : text(","),
+			)
 
 			if (item.trailing !== null) {
 				commented = true
@@ -2194,6 +2197,9 @@ export class Printer {
 							? this.dictionaryInterior(node.rhs).interior
 							: this.recordInterior(
 									node.rhs as parser.RecordValueNode,
+									onlyKeyIsBare(
+										node.rhs as parser.RecordValueNode,
+									),
 								).interior,
 					]),
 				)
@@ -2746,7 +2752,11 @@ export class Printer {
 
 	// Members keep their spelling: `a = a` never becomes `a` or the other way,
 	// and the path keys `a.b = 1, a.c = 2` are never gathered up.
-	private recordInterior(node: parser.RecordValueNode): {
+	private recordInterior(
+		node: parser.RecordValueNode,
+		// Whether the last comma stays where the list fits on one line.
+		keepLastComma = false,
+	): {
 		interior: Doc
 		commented: boolean
 	} {
@@ -2762,6 +2772,8 @@ export class Printer {
 		return this.listInterior(
 			items,
 			this.trivia.takeBefore(node.position.end.line),
+			line,
+			keepLastComma,
 		)
 	}
 
@@ -3514,4 +3526,12 @@ function handlerEndLine(handler: parser.MatchNode["handlers"][number]): number {
 	return last === undefined
 		? handler.matcher.position.end.line
 		: last.position.end.line
+}
+
+// An update whose only key is bare, as `{ base with port, }`, keeps its comma,
+// which is what tells it from `{ base with port }`, the value `port` merged in.
+function onlyKeyIsBare(keys: parser.RecordValueNode): boolean {
+	let members = Object.values(keys.members)
+
+	return members.length === 1 && members[0]?.shorthand === true
 }

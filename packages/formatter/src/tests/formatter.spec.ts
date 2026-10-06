@@ -1039,6 +1039,26 @@ describe("formatter", () => {
 			roundTrips(block("\tconstant server = { base with other }"))
 		})
 
+		// Without its comma an update's only key, bare, would read as the
+		// whole value merged in, so the comma stays where the list fits.
+		it("keeps the comma after an update's only bare path key", () => {
+			roundTrips(block("\tconstant moved = { config with server.port, }"))
+
+			let broken = block(
+				"\tconstant moved = {",
+				"\t\tconfig with",
+				"\t\t\tserver.port,",
+				"\t}",
+			)
+			let once = format(broken)
+
+			expect(once.refusal).toBeNull()
+			expect(once.text).toBe(
+				block("\tconstant moved = { config with server.port, }"),
+			)
+			expect(format(once.text).text).toBe(once.text)
+		})
+
 		it("breaks a long member list one bare name to a line", () => {
 			roundTrips(
 				block(

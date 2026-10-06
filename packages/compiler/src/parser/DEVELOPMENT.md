@@ -427,8 +427,10 @@ A Dictionary's key list has no shorthand: in `["a" = 1]` the key is a value.
 
 Every key position reads a path, such as `server.port`, since one key list serves literals, updates and defaults.
 The enricher refuses a path key outside an update with `path-key-outside-combination`, where the whole Record is in
-hand. After a step's dot, a `{` opens a braced descend, `server.{ port = 1, host }`, which ends the key. Shorthand
-is allowed inside a descend, because no whole value can be merged there.
+hand. A path key written with no value, as in `{ config with server.port, name = "a" }`, is kept under its last
+step's name, and the enricher reports it as `shorthand-on-path-key`. Only the Scope says whether that name is a
+binding, which decides the Help. After a step's dot, a `{` opens a braced descend, `server.{ port = 1, host }`,
+which ends the key. Shorthand is allowed inside a descend, because no whole value can be merged there.
 
 ## Argument labels
 

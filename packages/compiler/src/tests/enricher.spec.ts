@@ -12,7 +12,7 @@ import {
 import { computeConformanceMethodMap } from "../helpers/conformance"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
-import { compiles } from "./followedHelps"
+import { codesOfSource, compiles, helpsOfCode } from "./followedHelps"
 
 function enrichSource(source: string): {
 	program: common.typed.Program
@@ -549,6 +549,118 @@ describe("Enricher", () => {
 					},
 				}`
 
+			// Only the Scope says whether the last step names a binding. The
+			// value is spelled from one where it is there, and nothing else is
+			// reported where it is not.
+			describe("written with no value", () => {
+				let written = (keys: string, port = "") => `implementation {
+						${config}
+						${port}
+						constant moved = { config with ${keys} }
+					}`
+
+				it("should write the binding the last step names", () => {
+					let source = written(
+						'server.port, name = "a"',
+						"constant port = 8080",
+					)
+
+					expect(codesOfSource(source)).toEqual([
+						"shorthand-on-path-key",
+					])
+					expect(
+						helpsOfCode(source, "shorthand-on-path-key"),
+					).toEqual(["Write 'server.port = port'."])
+					expect(
+						compiles(
+							written(
+								'server.port = port, name = "a"',
+								"constant port = 8080",
+							),
+						),
+					).toBe(true)
+				})
+
+				it("should report once, and ask for the value, where nothing is bound", () => {
+					let source = written('server.port, name = "a"')
+
+					expect(codesOfSource(source)).toEqual([
+						"shorthand-on-path-key",
+					])
+					expect(
+						helpsOfCode(source, "shorthand-on-path-key"),
+					).toEqual([
+						"Write the value it sets in place of '…': 'server.port = …'.",
+					])
+					expect(
+						compiles(written('server.port = 8080, name = "a"')),
+					).toBe(true)
+				})
+
+				it("should report a bare path in a descend and beside a bare name", () => {
+					expect(
+						codesOfSource(written("server.{ tls.enabled }")),
+					).toEqual(["shorthand-on-path-key"])
+					expect(
+						codesOfSource(
+							written("server.port, name", 'constant name = "b"'),
+						),
+					).toEqual([
+						"shorthand-on-path-key",
+						"shorthand-in-combination",
+					])
+				})
+
+				// A plain Literal updates nothing, so the key reaches into
+				// nothing, with or without a value, and its own Help says so.
+				it("should report a plain Record Literal's as a key outside an update", () => {
+					let source = `implementation {
+						constant blank = { server.port }
+					}`
+
+					expect(codesOfSource(source)).toEqual([
+						"path-key-outside-combination",
+					])
+					expect(
+						compiles(`implementation {
+						constant blank = { server = { port = 1 } }
+					}`),
+					).toBe(true)
+				})
+
+				// The report is made where the key list is read, so a walk that
+				// stops before the leaf loses it to nothing.
+				it("should report a bare path key wherever the walk stops", () => {
+					for (let [keys, other] of [
+						['srever.port, name = "a"', "unknown-member"],
+						[
+							'server.port.deep, name = "a"',
+							"path-step-not-a-record",
+						],
+					]) {
+						expect(
+							codesOfSource(
+								written(keys as string),
+							) as Array<string>,
+						).toEqual(["shorthand-on-path-key", other])
+					}
+
+					for (let [declarations, other] of [
+						["constant base = 5", "uncombinable-types"],
+						["", "unknown-name"],
+					]) {
+						expect(
+							codesOfSource(`implementation {
+						${declarations}
+						constant moved = { base with server.port, name = 5 }
+					}`).sort() as Array<string>,
+						).toEqual(
+							[other as string, "shorthand-on-path-key"].sort(),
+						)
+					}
+				})
+			})
+
 			it("should accept a key that reaches one level in", () => {
 				expect(
 					diagnosticsFor(`implementation {
@@ -860,6 +972,25 @@ describe("Enricher", () => {
 				) -> String {
 					<- options.server.host
 				}`
+
+			it("should report a path key with no value once, as an Argument or a payload", () => {
+				expect(
+					codesOfSource(`implementation {
+						${options}
+
+						constant a = connect(using { server.port })
+					}`),
+				).toEqual(["shorthand-on-path-key"])
+				expect(
+					codesOfSource(`implementation {
+						choice Fetch {
+							Get { limits: { calls: Integer } } = { limits = { calls = 1 } },
+						}
+
+						constant value: Fetch = #Get({ limits.calls })
+					}`),
+				).toEqual(["shorthand-on-path-key"])
+			})
 
 			it("should admit a path key in a partial Argument", () => {
 				expect(

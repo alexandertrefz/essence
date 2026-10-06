@@ -89,6 +89,12 @@ export function expandShorthandPathAction(
 
 	let last = written.slice(written.lastIndexOf(".") + 1)
 
+	// The Help names the binding only where the Scope holds one, and the fix
+	// writes what the Help names.
+	if (!diagnostic.helps.includes(`Write '${written} = ${last}'.`)) {
+		return null
+	}
+
 	return {
 		title: `Write '${written} = ${last}'`,
 		kind: "quickfix",

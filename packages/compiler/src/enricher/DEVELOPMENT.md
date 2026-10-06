@@ -168,7 +168,14 @@ A path key reaches into a value that is already there, so outside a `with` it ne
 A Record Literal merged into a default may carry path keys. It is merged as an Argument for a Record Parameter, or
 as a Case payload. `mergedLevel` writes `{ server.port = 1 }` as `{ server = { port = 1 } }`. The inner list is a
 partial of the member, and the default fills in what it leaves out. The position decides whether a Literal is
-merged. Anywhere else `refusePathKeys` reports `path-key-outside-combination` and drops the path members.
+merged. Anywhere else `refusePathKeys` reports `path-key-outside-combination` and drops the path members, with or
+without a value.
+
+In an update or a merged Literal, a path key written with no value is `shorthand-on-path-key`. `reportBarePathKeys`
+reports it where the key list is first read, so a walk that stops before the leaf, at a misspelled step or a base
+that is no Record, still reports it. Its Help writes the binding the last step names where the Scope holds one,
+`server.port = port`, and asks for the value otherwise. `enrichMember` then reads the key as that binding, or as a
+refused value, so the name is not reported a second time as `unknown-name`.
 
 ## Member paths
 

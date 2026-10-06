@@ -1,5 +1,5 @@
-§ Deliberately broken: dotted keys the Parser itself turns away — one written
-§ with no value at all, and two that write the same member twice.
+§ Deliberately broken: dotted keys turned away as they are written — one with
+§ no value at all, and two that write the same member twice.
 
 implementation {
 	type Tls = { enabled: Boolean }

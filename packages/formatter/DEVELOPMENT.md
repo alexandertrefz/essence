@@ -260,7 +260,9 @@ A body with nothing in it keeps `{}` on the head's line, since there are no memb
 ## Bracketed lists
 
 Arguments, Parameters, List and Record members and the links of a chain are bracketed lists, laid out by `listItems`
-and `listInterior`. A list that does not fit breaks one item per line, with a trailing comma.
+and `listInterior`. A list that does not fit breaks one item per line, with a trailing comma. An update whose only key
+is bare, as `{ base with port, }` or `{ config with server.port, }`, keeps its comma on one line too. Without it the
+key reads as the whole value merged in, which the safety gate would refuse.
 
 Each item's Comments are claimed before the item prints, in source order: the own-line Comments before it, and the
 one trailing it. So a Comment that trails an item is not taken by something inside it. An item claims the Comment at
