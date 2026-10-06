@@ -6,7 +6,11 @@ import type { common } from "@essence-lang/interfaces"
 
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
-import { relativeIdentityKey, testIdentityKey } from "../enricher/tests"
+import {
+	expectNotBooleanHelps,
+	relativeIdentityKey,
+	testIdentityKey,
+} from "../enricher/tests"
 import { optimise } from "../optimiser/index"
 import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -634,7 +638,7 @@ describe("Tests Section Semantics", () => {
 					}`,
 				)[0]?.helps,
 			).toEqual([
-				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Ask a question of it: '::is(…)', '::isGreaterThan(…)'.",
 			])
 		})
 
@@ -664,13 +668,13 @@ describe("Tests Section Semantics", () => {
 			expect(
 				helps("constant result = play()\n\t\t\t\t\t\t\texpect result"),
 			).toEqual([
-				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Ask a question of it: '::is(…)'.",
 				"Or take it apart instead: 'require #Won = result'.",
 			])
 
 			// No name was written, so the value is a schematic `…`.
 			expect(helps("expect play()")).toEqual([
-				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				"Ask a question of it: '::is(…)'.",
 				"Or take it apart instead: 'require #Won = …'.",
 			])
 		})
@@ -713,6 +717,98 @@ describe("Tests Section Semantics", () => {
 					{ tests: true },
 				),
 			).toBe(true)
+		})
+
+		// The Help offers only the questions the value's own Type answers, so
+		// each one it names compiles where it is asked.
+		describe("the questions offered of a value", () => {
+			let asserting = (
+				declared: string,
+				asked: string,
+			) => `implementation {
+						type Point = { x: Integer, y: Integer }
+
+						constant value${declared}
+					}
+
+					tests {
+						test "one" {
+							expect value${asked}
+						}
+					}`
+			let questionsFor = (declared: string) =>
+				helpsOf(asserting(declared, ""))[0]
+
+			for (let { declared, questions, followed } of [
+				{
+					declared: " = 1",
+					questions: "'::is(…)', '::isGreaterThan(…)'",
+					followed: ["::is(1)", "::isGreaterThan(0)"],
+				},
+				{
+					declared: " = [1, 2]",
+					questions:
+						"'::is(…)', '::isGreaterThan(…)', '::hasItems()'",
+					followed: [
+						"::is([1, 2])",
+						"::isGreaterThan([1])",
+						"::hasItems()",
+					],
+				},
+				{
+					declared: ": List<Point> = [{ x = 1, y = 2 }]",
+					questions: "'::is(…)', '::hasItems()'",
+					followed: ["::is([{ x = 1, y = 2 }])", "::hasItems()"],
+				},
+				{
+					declared: ": Point = { x = 1, y = 2 }",
+					questions: "'::is(…)'",
+					followed: ["::is({ x = 1, y = 2 })"],
+				},
+			]) {
+				it(`should ask what a value declared '${declared.trim()}' answers`, () => {
+					expect(questionsFor(declared)).toBe(
+						`Ask a question of it: ${questions}.`,
+					)
+
+					for (let asked of followed) {
+						expect(
+							compiles(asserting(declared, asked), {
+								tests: true,
+							}),
+						).toBe(true)
+					}
+				})
+			}
+
+			// A value no enricher asked, as a Program built by hand holds, is
+			// offered every question rather than told it answers none.
+			it("should offer every question of a value nobody asked", () => {
+				expect(
+					expectNotBooleanHelps({
+						nodeType: "IntegerValue",
+						value: "1",
+						position: {
+							start: { line: 1, column: 1 },
+							end: { line: 1, column: 2 },
+						},
+						type: { type: "Integer" },
+					}),
+				).toEqual([
+					"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
+				])
+			})
+
+			// A Function answers none of them, so none is offered.
+			it("should offer no question a Function does not answer", () => {
+				expect(
+					questionsFor(
+						": (_: Integer) -> Integer = (_ number: Integer) -> Integer { <- number }",
+					),
+				).toBe(
+					"Write a Boolean Expression in its place — what it holds answers none of '::is(…)', '::isGreaterThan(…)' and '::hasItems()'.",
+				)
+			})
 		})
 
 		it("should demand a Boolean of a require as well", () => {

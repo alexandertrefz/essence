@@ -103,6 +103,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
 import {
@@ -5271,17 +5272,14 @@ function enrichAssertionStatement(
 	}
 
 	// The Boolean form reads its Expression once and binds nothing. The
-	// validator refuses a value that is no Boolean with `expect-not-boolean`.
+	// validator refuses a value that is no Boolean with `expect-not-boolean`,
+	// offering the questions noted here.
 	if (node.matcher === null) {
-		return [
-			assertionNode(
-				node.nodeType,
-				enrichExpression(node.value, scope),
-				null,
-				null,
-				node.position,
-			),
-		]
+		let value = enrichExpression(node.value, scope)
+
+		askAssertionQuestions(value, scope)
+
+		return [assertionNode(node.nodeType, value, null, null, node.position)]
 	}
 
 	// From here on this is `require MATCHER = EXPR`. The Parser refuses a

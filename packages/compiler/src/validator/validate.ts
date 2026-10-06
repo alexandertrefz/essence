@@ -8,6 +8,7 @@ import {
 	reportWarning,
 	secondary,
 } from "../diagnostics/index"
+import { expectNotBooleanHelps } from "../enricher/tests"
 import { caseDefaults, parameterDefaults } from "../helpers/defaults"
 import {
 	asynchronyData,
@@ -3117,28 +3118,6 @@ function checkNamespaceIsDeclared(
 	)
 }
 
-// The `require` line that takes this value apart by its first Case, or null
-// where it holds none. A name is spelled back, anything else as `…`.
-function takingItApart(value: common.typed.ExpressionNode): string | null {
-	let members =
-		value.type.type === "UnionType"
-			? flattenUnionMembers(value.type)
-			: [value.type]
-	let first = members.find((member) => member.type === "Case")
-
-	if (first === undefined || first.type !== "Case") {
-		return null
-	}
-
-	let matcher =
-		Object.keys(first.members).length === 0
-			? `#${first.name}`
-			: `#${first.name}(…)`
-	let named = value.nodeType === "Identifier" ? value.content : "…"
-
-	return `Or take it apart instead: 'require ${matcher} = ${named}'.`
-}
-
 // An assertion without a Matcher or a snapshot must be a Boolean, as an `if`
 // Condition must. A Matcher was checked where it was resolved.
 function validateAssertion(
@@ -3152,9 +3131,6 @@ function validateAssertion(
 		node.value.type.type !== "Boolean" &&
 		node.value.type.type !== "Error"
 	) {
-		// Taking the value apart is offered only where it holds a Case.
-		let taking = takingItApart(node.value)
-
 		reportError("An assertion has to be a Boolean", node.value.position, {
 			code: "expect-not-boolean",
 			labels: [
@@ -3166,10 +3142,7 @@ function validateAssertion(
 			notes: [
 				"Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.",
 			],
-			helps: [
-				"Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.",
-				...(taking === null ? [] : [taking]),
-			],
+			helps: expectNotBooleanHelps(node.value),
 		})
 	}
 

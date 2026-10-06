@@ -2530,6 +2530,62 @@ export {
 		)
 	})
 
+	// The questions an asserted value is asked for its Help reach a Choice's
+	// derive, and nothing the file wrote did, so its import stays unused.
+	it("counts no use for the questions a refused assertion is asked", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Library.es" { Colour favourite }
+}
+
+implementation {
+	constant mine = favourite()
+}
+
+tests {
+	test "colour" {
+		expect mine
+	}
+}
+`,
+				"Library.es": `implementation {
+	choice Colour {
+		Red,
+		Green,
+	}
+
+	function favourite() -> Colour {
+		<- #Red
+	}
+}
+
+export {
+	Colour
+	favourite
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(
+						linkedAt(
+							directory,
+							linkModuleGraph(
+								loadModuleGraph(
+									path.join(directory, "Main.es"),
+									diskModuleHost,
+								),
+								{ tests: true },
+							),
+							"Main.es",
+						).diagnostics,
+					),
+				).toContain("unused-import")
+			},
+		)
+	})
+
 	// A Choice prints through the derive only where a Namespace declared it
 	// `is Printable`, and the call names neither.
 	it("counts the Namespace that lets a Choice print as a use", () => {

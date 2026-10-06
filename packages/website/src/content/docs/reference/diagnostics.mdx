@@ -5850,7 +5850,7 @@ Error: An assertion has to be a Boolean
    │               ────┬────  
    │                   ╰────── this is an Integer
    │ 
-   │ Help: Ask a question of it: '::is(…)', '::isGreaterThan(…)', '::hasItems()'.
+   │ Help: Ask a question of it: '::is(…)', '::isGreaterThan(…)'.
    │ 
    │ Note: Essence has no truthiness — an assertion is a Boolean Expression, and the standard library's own Methods are the vocabulary it is written in.
 ───╯
@@ -5858,7 +5858,7 @@ Error: An assertion has to be a Boolean
 
 </div>
 
-Ask a question of the value, `expect double(2)::is(4)`, or take it apart with `require #Value(item) = value`.
+Ask a question of the value, `expect double(2)::is(4)`, or take it apart with `require #Value(item) = value`. The help names only the questions the value's own type answers, among `::is`, `::isGreaterThan` and `::hasItems`, so an `Integer` is not offered `::hasItems()`. A value that answers none of them, such as a function, is asked for a Boolean expression in its place.
 
 Taught on: [Tests › `expect` and `require`](/docs/language/tests#expect-and-require)
 

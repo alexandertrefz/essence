@@ -2,6 +2,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError, secondary } from "../diagnostics/index"
 import { closestMatch } from "../helpers/suggest"
+import { flattenUnionMembers } from "../helpers/types"
 
 // The Modifiers of a `test` and a `suite`, and what each means. The parser
 // reads any Modifier as a name and its arguments; this file is the vocabulary.
@@ -579,6 +580,81 @@ export function refuseDuplicateNames(nodes: Array<parser.TestsNode>): void {
 			},
 		)
 	}
+}
+
+// #endregion
+
+// #region Assertions
+
+// The questions `expect-not-boolean` offers, each a Method an assertion asks
+// of a value, with whether it takes a second value of the same Type. Only the
+// enricher can tell which ones the value's Type answers, so it notes them here
+// for the validator, which reports the refusal.
+export const ASSERTION_QUESTIONS = [
+	{ method: "is", comparing: true, spelling: "'::is(…)'" },
+	{
+		method: "isGreaterThan",
+		comparing: true,
+		spelling: "'::isGreaterThan(…)'",
+	},
+	{ method: "hasItems", comparing: false, spelling: "'::hasItems()'" },
+]
+
+let answeredQuestions = new WeakMap<
+	common.typed.ExpressionNode,
+	Array<string>
+>()
+
+export function noteAssertionQuestions(
+	value: common.typed.ExpressionNode,
+	answered: Array<string>,
+): void {
+	answeredQuestions.set(value, answered)
+}
+
+// The questions the value answers, and the `require` line that takes it apart
+// by its first Case where it holds one. A value the enricher never asked is
+// offered every question.
+export function expectNotBooleanHelps(
+	value: common.typed.ExpressionNode,
+): Array<string> {
+	let questions =
+		answeredQuestions.get(value) ??
+		ASSERTION_QUESTIONS.map((question) => question.spelling)
+	let taking = takingItApart(value)
+
+	return [
+		questions.length === 0
+			? `Write a Boolean Expression in its place — what it holds answers none of ${ASSERTION_QUESTIONS.slice(
+					0,
+					-1,
+				)
+					.map((question) => question.spelling)
+					.join(", ")} and ${ASSERTION_QUESTIONS.at(-1)?.spelling}.`
+			: `Ask a question of it: ${questions.join(", ")}.`,
+		...(taking === null ? [] : [taking]),
+	]
+}
+
+// A name is spelled back, anything else as `…`.
+function takingItApart(value: common.typed.ExpressionNode): string | null {
+	let members =
+		value.type.type === "UnionType"
+			? flattenUnionMembers(value.type)
+			: [value.type]
+	let first = members.find((member) => member.type === "Case")
+
+	if (first === undefined || first.type !== "Case") {
+		return null
+	}
+
+	let matcher =
+		Object.keys(first.members).length === 0
+			? `#${first.name}`
+			: `#${first.name}(…)`
+	let named = value.nodeType === "Identifier" ? value.content : "…"
+
+	return `Or take it apart instead: 'require ${matcher} = ${named}'.`
 }
 
 // #endregion
