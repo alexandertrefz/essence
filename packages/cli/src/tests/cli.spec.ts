@@ -2768,4 +2768,83 @@ describe("a path that can not be read", () => {
 				expect(`${out}${err}`).toContain("src/*.es")
 			},
 		))
+
+	// Each Help names a path, and the command run again on that path reads it.
+	// The path is taken from the printed Help, so a Help that names the wrong
+	// one fails here.
+	describe("followed", () => {
+		let helpedPath = (printed: string): string => {
+			let quoted = /Help: [^']*'([^']+)'/.exec(printed)
+
+			if (quoted === null) {
+				throw new Error(`No path in: ${printed}`)
+			}
+
+			return quoted[1] as string
+		}
+
+		it("should check the file a near miss names", () =>
+			withFiles(
+				{ "src/Main.es": "implementation {}\n" },
+				async (directory) => {
+					let refused = await capture(() =>
+						run(
+							[
+								"check",
+								"--no-color",
+								path.join(directory, "src/Mian.es"),
+							],
+							PROGRAM,
+						),
+					)
+					let { code } = await capture(() =>
+						run(
+							[
+								"check",
+								"--no-color",
+								helpedPath(`${refused.out}${refused.err}`),
+							],
+							PROGRAM,
+						),
+					)
+
+					expect(code).toBe(EXIT_SUCCESS)
+				},
+			))
+
+		// The CLI expands the glob itself, so the Help's spelling is passed as
+		// written, as a shell that matched nothing would pass it.
+		it("should check the files the glob for a directory names", () =>
+			withFiles(
+				{
+					"src/Main.es": "implementation {}\n",
+					"src/Other.es": "implementation {}\n",
+				},
+				async (directory) => {
+					let refused = await capture(() =>
+						run(
+							[
+								"check",
+								"--no-color",
+								path.join(directory, "src"),
+							],
+							PROGRAM,
+						),
+					)
+					let { code, out, err } = await capture(() =>
+						run(
+							[
+								"check",
+								"--no-color",
+								helpedPath(`${refused.out}${refused.err}`),
+							],
+							PROGRAM,
+						),
+					)
+
+					expect(code).toBe(EXIT_SUCCESS)
+					expect(`${out}${err}`).toContain("2 files checked")
+				},
+			))
+	})
 })
