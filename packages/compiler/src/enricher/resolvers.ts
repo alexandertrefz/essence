@@ -68,6 +68,7 @@ import {
 	applyGenericBindings,
 	borrowedGenericName,
 	buildUnion,
+	buildWrittenUnion,
 	bindNamespaceTarget,
 	choiceArgumentBounds,
 	disagreeingTypeArguments,
@@ -83,6 +84,7 @@ import {
 	type NamespaceTarget,
 	typeContainsError,
 	typeMentionsGeneric,
+	withoutHoles,
 } from "../helpers/types"
 import { recordAnnotation } from "./annotations"
 import { derivesWithImports } from "./derivedImports"
@@ -8130,18 +8132,12 @@ function resolveIdentifierTypeDeclarationType(
 }
 
 // Members that subsume one another collapse and anonymous nested Unions
-// flatten in; a named one keeps its name. See `buildUnion`.
+// flatten in; a named one keeps its name. See `buildWrittenUnion`.
 function resolveUnionTypeDeclarationType(
 	node: parser.UnionTypeDeclarationNode,
 	scope: enricher.Scope,
 ): common.Type {
-	let resolvedTypes = []
-
-	for (let type of node.types) {
-		resolvedTypes.push(resolveType(type, scope))
-	}
-
-	return buildUnion(resolvedTypes)
+	return buildWrittenUnion(node.types.map((type) => resolveType(type, scope)))
 }
 
 function resolveRecordTypeDeclarationType(
@@ -9281,6 +9277,9 @@ export function resolveMethodLookupNamespacesForReceiverType(
 	scope: enricher.Scope,
 ): Map<string, common.NamespaceType> {
 	let matchingNamespaces: Map<string, common.NamespaceType> = new Map()
+
+	// A Union holding a hole is called by its known members.
+	baseType = withoutHoles(baseType)
 
 	// Read whatever the receiver, so a specifier naming no Namespace is
 	// refused where it is written.

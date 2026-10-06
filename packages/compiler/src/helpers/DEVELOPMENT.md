@@ -617,6 +617,14 @@ would bind an unbound Generic are tried last, and each failed member's bindings 
 `markBindings` and `restoreBindings`. Without the rollback, a member that bound `T := String` before failing
 would decide the members after it. A call would then compile or not by the order its Union was written in.
 
+An Error matches every Type both ways, so `buildUnion` would let it subsume a member, or a member subsume it, by the
+written order. A written Union with a member that did not resolve is built by `buildWrittenUnion` instead: the known
+members as `buildUnion` makes them, and the Error beside them. A Match over `Integer | Colr` is then no
+`match-on-non-union`. As the expected Type the hole accepts anything. As the actual Type the Union is its known
+members (`withoutHoles`): `matchTypes` measures it so, and a call on it finds its Namespaces so. It fits where an
+Integer is expected and not where a String is, and `value::add(1)` answers an Integer. A Type Parameter binds it
+whole, so `id(value)` still holds the hole.
+
 ### Cases, Records and Functions
 
 A Case matches only a Case of the same Choice identity and name, so two Modules' `choice Result` are two Types.

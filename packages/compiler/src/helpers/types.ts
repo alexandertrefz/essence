@@ -2590,6 +2590,44 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	return { type: "UnionType", types: distinct }
 }
 
+function isError(type: common.Type): boolean {
+	return type.type === "Error"
+}
+
+// A Type without the holes `buildWrittenUnion` left in a Union, which is what
+// the Union is measured and called by.
+export function withoutHoles(type: common.Type): common.Type {
+	return type.type === "UnionType" && type.types.some(isError)
+		? buildUnion(type.types.filter((member) => !isError(member)))
+		: type
+}
+
+function measuredWithoutHoles(lhs: common.Type, rhs: common.Type): common.Type {
+	return lhs.type === "GenericUse" ? rhs : withoutHoles(rhs)
+}
+
+// A written Union. A member that did not resolve stays beside the known ones
+// as a hole, since `buildUnion` would keep or drop it by the written order.
+export function buildWrittenUnion(members: Array<common.Type>): common.Type {
+	let known = members.filter((member) => member.type !== "Error")
+
+	if (known.length === members.length || known.length === 0) {
+		return known.length === 0 ? { type: "Error" } : buildUnion(known)
+	}
+
+	let union = buildUnion(known)
+
+	return {
+		type: "UnionType",
+		types: [
+			...(union.type === "UnionType" ? union.types : [union]),
+			{
+				type: "Error",
+			},
+		],
+	}
+}
+
 // The deduped member list `buildUnion` would make, for a caller that finishes
 // the Union itself.
 export function mergeUnionMembers(
@@ -2782,6 +2820,10 @@ function matchTypes(
 
 		return true
 	}
+
+	// A written Union holding a hole fits where its known members fit. A Type
+	// Parameter binds it whole. See "Unions" in DEVELOPMENT.md.
+	rhs = measuredWithoutHoles(lhs, rhs)
 
 	// An actual refinement flows into whatever its base does, before Generic
 	// binding, so an outermost Type Parameter binds the base. Skipped nested, against

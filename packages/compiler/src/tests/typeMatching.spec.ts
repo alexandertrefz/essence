@@ -66,6 +66,112 @@ describe("Type matching", () => {
 				}`),
 			).toEqual([])
 		})
+
+		// An Error matches every member, so a written Union keeping or dropping
+		// it would depend on the order. A Match over it is then no second
+		// mistake.
+		it("should leave a written Union with an undeclared member a hole", () => {
+			let source = (union: string) => `implementation {
+				type Pair = ${union}
+
+				function describe(_ value: ${union}) -> String {
+					<- match value -> String {
+						case Integer { <- "number" }
+						case _       { <- "other" }
+					}
+				}
+
+				constant paired: Pair = 1
+
+				constant described = match paired -> String {
+					case Integer { <- "number" }
+					case _       { <- "other" }
+				}
+			}`
+
+			// Sorted, since the hoist may report the Function's first.
+			for (let union of ["Integer | Colr", "Colr | Integer"]) {
+				let reports = diagnosticsFor(source(union)).map(
+					(diagnostic) =>
+						`${diagnostic.code}@${diagnostic.position?.start.line}`,
+				)
+
+				expect(reports.sort()).toEqual([
+					"unknown-type@2",
+					"unknown-type@4",
+				])
+			}
+		})
+
+		// The hole stands beside the members that resolved, so what is done
+		// with an Integer is still measured.
+		it("should keep a written Union's known members beside its hole", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Pair = Integer | Colr
+
+					function describe(_ value: Pair) -> String {
+						<- match value -> String {
+							case Integer { <- value::add("a") }
+							case _       { <- "other" }
+						}
+					}
+
+					function other(_ value: Integer | Colr) -> Integer {
+						<- value::add("x")
+					}
+				}`)
+					.map(
+						(diagnostic) =>
+							`${diagnostic.code}@${diagnostic.position?.start.line}`,
+					)
+					.sort(),
+			).toEqual([
+				"no-matching-overload@12",
+				"no-matching-overload@6",
+				"unknown-type@11",
+				"unknown-type@2",
+			])
+		})
+
+		// Measured or called, the Union is its known members: an Integer fits
+		// where an Integer is expected, and a String still does not.
+		it("should let a Union holding a hole fit where its known members fit", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Pair = Integer | Colr
+					type Boxed = { n: Integer }
+
+					function id<infer T>(_ v: T) -> T {
+						<- v
+					}
+
+					function fits(_ value: Pair, _ values: List<Pair>) -> Integer {
+						constant n: Integer = value
+						constant listed: List<Integer> = [value]
+						constant boxed: Boxed = { n = value }
+						constant kept: List<Integer> = values
+						constant same: Integer = id(value)
+						variable v: Integer = 0
+						v = value
+						constant matched = match id(value) -> Integer {
+							case Integer { <- @ }
+							case _       { <- 0 }
+						}
+						<- value::add(1)
+					}
+
+					function refused(_ value: Pair) -> String {
+						<- value
+					}
+				}`)
+					.map(
+						(diagnostic) =>
+							`${diagnostic.code}@${diagnostic.position?.start.line}`,
+					)
+					.sort(),
+			).toEqual(["return-type-mismatch@25", "unknown-type@2"])
+		})
 	})
 
 	// A bare `List` accepts every List, but does not satisfy `List<String>`,
