@@ -802,8 +802,16 @@ describe("Dictionary literals", () => {
 				"Type Parameters 'KeyType' and 'ValueType' could not be inferred",
 			)
 			expect(diagnostics[0].helps).toEqual([
-				"Annotate the declaration — 'constant d: Dictionary<String, Integer> = [=]'.",
+				"Annotate the declaration — 'constant d: Dictionary<…, …> = [=]', with the Type you mean in place of each '…'.",
 			])
+			expect(
+				compiles(
+					block(
+						"\tconstant d: Dictionary<String, Integer> = [=]",
+						"\tconstant count = d::length()",
+					),
+				),
+			).toBe(true)
 		})
 
 		// An empty Dictionary is a value of every Dictionary Type, as an empty

@@ -27,6 +27,7 @@ import {
 	displayGenericName,
 	displayProtocolName,
 	namespaceHead,
+	receiverAnnotationHelp,
 	specifierTo,
 	spellChoiceName,
 	spellType,
@@ -37,6 +38,7 @@ import {
 	undecidedSlotEvidence,
 	unwaitedWorkReport,
 	withArticle,
+	writtenValueHelps,
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { parameterInternalName, synthesizedName } from "../helpers/names"
@@ -10579,6 +10581,8 @@ function unannotatedLiteralArgument(
 // explains the call.
 function reportUnboundGenerics(
 	unboundGenerics: Array<string>,
+	// What the call answers, each unbound Type Parameter in it an Error.
+	answer: common.Type,
 	position: common.Position,
 	typer: ArgumentTyper,
 	receiver: parser.ExpressionNode | null = null,
@@ -10625,7 +10629,7 @@ function reportUnboundGenerics(
 					primary(position, "nothing here determines what it holds"),
 				],
 				helps: [
-					"Annotate the declaration — 'constant d: Dictionary<String, Integer> = [=]'.",
+					"Annotate the declaration — 'constant d: Dictionary<…, …> = [=]', with the Type you mean in place of each '…'.",
 				],
 			},
 		)
@@ -10674,7 +10678,7 @@ function reportUnboundGenerics(
 						]
 					: [
 							"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-							"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+							...writtenValueHelps(answer),
 						],
 			},
 		)
@@ -12266,9 +12270,7 @@ function reportUndecidedReceiverType(
 				),
 				`${describeType(undecidedType)} is matched by all of them, so which one runs would be decided by a Type nothing has decided.`,
 			],
-			helps: [
-				"Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.",
-			],
+			helps: [receiverAnnotationHelp(baseType)],
 		},
 	)
 }
@@ -12510,6 +12512,7 @@ export function resolveMethodInvocation(
 		// Namespaces leak nothing.
 		reportUnboundGenerics(
 			resolvedMethod.unboundGenerics,
+			resolvedMethod.type,
 			node.position,
 			typer,
 			node.base,
@@ -12813,6 +12816,7 @@ function resolveUnionMethodDispatch(
 		if (memberIndex === 0) {
 			reportUnboundGenerics(
 				resolvedMethod.unboundGenerics,
+				resolvedMethod.returnType,
 				node.position,
 				typer,
 				node.base,
@@ -13075,6 +13079,7 @@ function resolveFunctionInvocation(
 		if (selected !== undefined) {
 			reportUnboundGenerics(
 				selected.inferred.unboundGenerics,
+				selected.inferred.returnType,
 				node.position,
 				typer,
 				null,
@@ -13148,6 +13153,7 @@ function resolveFunctionInvocation(
 		if (selected !== undefined) {
 			reportUnboundGenerics(
 				selected.inferred.unboundGenerics,
+				selected.inferred.returnType,
 				node.position,
 				typer,
 				null,

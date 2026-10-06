@@ -1073,6 +1073,49 @@ export function undecidedSlotAnnotation(
 	}
 }
 
+// A Type with each blank an empty Literal left filled in. A Type that had to be
+// made up is reported, so a Help offers the spelling as an example.
+export function decidedSlots(type: common.Type): {
+	spelling: string
+	invented: boolean
+} {
+	let invented = { any: false }
+
+	return {
+		spelling: describeType(spelledWithDecidedSlots(type, null, invented)),
+		invented: invented.any,
+	}
+}
+
+// The Help for a receiver whose Type an empty Literal left undecided, spelled
+// from that Type.
+export function receiverAnnotationHelp(type: common.Type): string {
+	let { spelling, invented } = decidedSlots(type)
+
+	return `Annotate what the receiver comes from with '${spelling}'${invented ? ", for instance," : ""} so its Type is decided before the call.`
+}
+
+// The Help that writes a call's value out where no Argument decides its Type,
+// with each undecided Type as '…'. Only a Type with an empty Literal has one.
+export function writtenValueHelps(answer: common.Type): Array<string> {
+	let literal =
+		answer.type === "List"
+			? "[]"
+			: answer.type === "Dictionary"
+				? "[=]"
+				: answer.type === "UnionType" &&
+					  (answer.name === "Optional" ||
+							answer.alias?.name === "Optional")
+					? "#Empty"
+					: null
+
+	return literal === null
+		? []
+		: [
+				`Or write the value itself, with the Type it answers written out — 'constant value: ${describeType(answer)} = ${literal}', with the Type you mean in place of each '…'.`,
+			]
+}
+
 // #region Record mismatches
 
 // What a mismatch between two Records says instead of printing both: the

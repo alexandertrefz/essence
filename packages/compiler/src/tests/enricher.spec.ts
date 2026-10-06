@@ -5964,6 +5964,40 @@ describe("Enricher", () => {
 				).toEqual(["undecided-receiver-type"])
 			})
 
+			// The annotation is spelled from the receiver's own Type, so an
+			// empty Dictionary is told of a Dictionary.
+			it("should spell the annotation from the receiver's Type", () => {
+				let tags = (receiver: string) => `implementation {
+				namespace Counts for Dictionary<String, Integer> {
+					tag() -> String {
+						<- "counts"
+					}
+				}
+
+				namespace Words for Dictionary<String, String> {
+					tag() -> String {
+						<- "words"
+					}
+				}
+
+				${receiver}
+			}`
+
+				expect(
+					diagnosticsFor(tags("constant tagged = [=]::tag()"))[0]
+						?.helps,
+				).toEqual([
+					"Annotate what the receiver comes from with 'Dictionary<String, Integer>', for instance, so its Type is decided before the call.",
+				])
+				expect(
+					compiles(
+						tags(
+							"constant entries: Dictionary<String, Integer> = [=]\n\t\t\t\tconstant tagged = entries::tag()",
+						),
+					),
+				).toBe(true)
+			})
+
 			it("should compile once the receiver is annotated", () => {
 				expect(
 					compiles(`implementation {
@@ -6001,7 +6035,7 @@ describe("Enricher", () => {
 				// The annotated Type is made up, so the Help says it is an
 				// example.
 				expect(diagnostic.helps).toEqual([
-					"Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.",
+					"Annotate what the receiver comes from with 'List<Integer>', for instance, so its Type is decided before the call.",
 				])
 			})
 
@@ -7300,7 +7334,7 @@ describe("Enricher", () => {
 				])
 				expect(diagnostics[0]!.helps).toEqual([
 					"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-					"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+					"Or write the value itself, with the Type it answers written out — 'constant value: List<…> = []', with the Type you mean in place of each '…'.",
 				])
 			})
 		})

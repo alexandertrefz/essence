@@ -177,7 +177,7 @@ describe("A Type Parameter nothing bound", () => {
 
 		expect(helpsOfCode(elsewhere, "uninferable-type-parameter")).toEqual([
 			"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-			"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+			"Or write the value itself, with the Type it answers written out — 'constant value: Dictionary<String, …> = [=]', with the Type you mean in place of each '…'.",
 		])
 	})
 
@@ -194,7 +194,42 @@ describe("A Type Parameter nothing bound", () => {
 
 		expect(helpsOfCode(unbindable, "uninferable-type-parameter")).toEqual([
 			"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
-			"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
+			"Or write the value itself, with the Type it answers written out — 'constant value: List<…> = []', with the Type you mean in place of each '…'.",
+		])
+	})
+
+	// The value is spelled from what the call answers. An Optional is told of
+	// an Optional, and a bare Type Parameter has no empty Literal to offer.
+	it("spells the value from what the call answers", () => {
+		let answering = (answer: string, body: string) => `implementation {
+		function nothing<infer Item>() -> ${answer} {
+			<- ${body}
+		}
+
+		constant found = nothing()
+	}`
+
+		expect(
+			helpsOfCode(
+				answering("Optional<Item>", "#Empty"),
+				"uninferable-type-parameter",
+			),
+		).toEqual([
+			"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
+			"Or write the value itself, with the Type it answers written out — 'constant value: Optional<…> = #Empty', with the Type you mean in place of each '…'.",
+		])
+		expect(
+			compiles(`implementation {
+		constant found: Optional<Integer> = #Empty
+	}`),
+		).toBe(true)
+		expect(
+			helpsOfCode(
+				answering("Item", "nothing()"),
+				"uninferable-type-parameter",
+			),
+		).toEqual([
+			"Give the Type Parameter a place among the Parameters, so that an Argument binds it.",
 		])
 	})
 

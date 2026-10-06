@@ -2641,7 +2641,7 @@ Error: 'tag' is called on a value whose Type is not fully known here
     │                         │   
     │                         ╰─── 'tag' is looked up in its Namespaces
     │ 
-    │ Help: Annotate what the receiver comes from — 'constant items: List<Integer> = []', for instance — so its Type is decided before the call.
+    │ Help: Annotate what the receiver comes from with 'List<Integer>', for instance, so its Type is decided before the call.
     │ 
     │ Note 1: 'Numbers' declares 'tag'.
     │ Note 2: 'Words' declares 'tag'.
@@ -2651,7 +2651,7 @@ Error: 'tag' is called on a value whose Type is not fully known here
 
 </div>
 
-Annotate the value first, `constant numbers: List<Integer> = []`, and call the method on it: `numbers::tag()`.
+Annotate the value first, `constant numbers: List<Integer> = []`, and call the method on it: `numbers::tag()`. The help spells the annotation from the receiver's own type, so `[=]::tag()` is told of a `Dictionary`. A slot nothing decided is filled with an example type, which the help says.
 
 ### `unknown-method`
 
@@ -4088,13 +4088,13 @@ Error: Type Parameter 'Item' could not be inferred
    │                         ╰───── nothing here determines what it binds to
    │ 
    │ Help 1: Give the Type Parameter a place among the Parameters, so that an Argument binds it.
-   │ Help 2: Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.
+   │ Help 2: Or write the value itself, with the Type it answers written out — 'constant value: List<…> = []', with the Type you mean in place of each '…'.
 ───╯
 ```
 
 </div>
 
-The two helps are the only ways out, because no syntax pins a type argument at a call: `empty<Integer>()` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`.
+The two helps are the only ways out, because no syntax pins a type argument at a call: `empty<Integer>()` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax). Annotating the constant does not help either. Give the function a parameter whose type mentions the type parameter, so that the compiler infers it from the argument: `emptyLike<infer Item>(_ sample: List<Item>)`. Or write the value the call would have returned, with its type spelled out: the second help is spelled from what the call returns, `[]` for a list, `[=]` for a dictionary and `#Empty` for an optional, and it is left out where the type has no empty value to write.
 
 A call that passes a function literal with no `-> Type` gets a different help, because neither of those two is the reader's to make: the type parameter already has its place among the parameters — `loop`'s `Answer` is written in the step's own answer type — and the signature it has that place in belongs to the standard library.
 
