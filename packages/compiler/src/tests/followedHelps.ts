@@ -145,6 +145,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"table-parameters",
 		"unbraced-unicode-escape",
 		"undocumented-parameter",
+		"ungeneratable-type",
 		"unicode-escape-out-of-range",
 		"uninferable-item-type",
 		"uninferable-property-type",
@@ -154,6 +155,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"unsatisfied-bound",
 		"unsatisfied-conformance-condition",
 		"unwritable-provided-method",
+		"value-comment-outside-tests",
 		"where-on-protocol-extension",
 		"wrong-type-argument-count",
 	]

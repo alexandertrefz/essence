@@ -15,6 +15,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { analysedDiagnosticsFor, compiles } from "./followedHelps"
 
 // What a `tests { … }` block emits, and what it does when it runs.
 
@@ -1501,6 +1502,44 @@ tests {
 				diagnostic.severity,
 			]),
 		).toEqual([["value-comment-outside-tests", "warning"]])
+	})
+
+	// Either half of the Help: the question moves into a test, or the Comment
+	// asks nothing. A Warning does not stop a compile, so each is also asked to
+	// report nothing.
+	it("reports nothing once the Help is followed either way", () => {
+		let asked = (implementation: string, test: string) => `implementation {
+	${implementation}
+}
+
+tests {
+	test "rate" {
+		${test}
+	}
+}`
+		let followed = [
+			asked(
+				"constant rate = 3",
+				"constant doubled = rate::multiply(with 2) §?",
+			),
+			asked("constant rate = 3::multiply(with 2) §", "expect true"),
+		]
+
+		expect(
+			analysedDiagnosticsFor(
+				asked("constant rate = 3::multiply(with 2) §?", "expect true"),
+				{ tests: true },
+			).map((diagnostic) => diagnostic.helps),
+		).toEqual([
+			[
+				"Ask it of a Statement inside the 'tests { … }' block, or write '§' for a Comment that asks nothing.",
+			],
+		])
+
+		for (let source of followed) {
+			expect(compiles(source, { tests: true })).toBe(true)
+			expect(analysedDiagnosticsFor(source, { tests: true })).toEqual([])
+		}
 	})
 
 	it("says nothing about one in a build, where it is an ordinary Comment", () => {

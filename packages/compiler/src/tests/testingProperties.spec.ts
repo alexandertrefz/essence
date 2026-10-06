@@ -803,6 +803,56 @@ describe("Property tests", () => {
 			])
 		})
 
+		// The conformance the Help asks for, with the `shrink` its second Help
+		// asks for, written for the Function Type and for a Record holding one.
+		it("compiles once a Generatable conformance builds the value", () => {
+			expect(
+				analyse(sectionOf("read: (_: String) -> Integer"))
+					.diagnostics[0]?.helps,
+			).toEqual([
+				"Write a Type a value can be built of, or declare a 'Generatable' conformance for this one.",
+				"Write 'shrink' in the conformance as well: 'Generatable' provides one that answers no candidates, and a counterexample is otherwise reported as it was drawn.",
+			])
+			expect(
+				compiles(
+					`implementation {
+						namespace Readers for (_: String) -> Integer is Generatable {
+							static generate(from source: Randomness) -> (_: String) -> Integer {
+								<- (_ text: String) -> Integer { <- 1 }
+							}
+
+							shrink() -> List<(_: String) -> Integer> {
+								<- []
+							}
+						}
+					}
+
+					${sectionOf("read: (_: String) -> Integer", 'expect read("a")::is(1)')}`,
+					{ tests: true },
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					`implementation {
+						type Reader = { read: (_: String) -> Integer, name: String }
+
+						namespace Readers for Reader is Generatable {
+							static generate(from source: Randomness) -> Reader {
+								<- { read = (_ text: String) -> Integer { <- 1 }, name = "one" }
+							}
+
+							shrink() -> List<Reader> {
+								<- []
+							}
+						}
+					}
+
+					${sectionOf("reader: Reader", "expect reader.name::is(reader.name)")}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
 		// The language refuses a Type that names itself before any generator
 		// is derived. The derivation still guards against one.
 		it("leaves a Choice that names itself to the language", () => {
