@@ -42,6 +42,7 @@ import {
 import { simplify } from "../simplifier/index"
 import { renderNativesModule } from "../tools/generateNatives"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // A Protocol Method written with a block is provided: every conformer answers
 // it, and one const answers for all of them. It is a Function over
@@ -3648,6 +3649,89 @@ describe("Protocol-provided Methods", () => {
 			])
 		})
 
+		// Each refused reach moves into a requirement, as its Help says, and
+		// the conforming Namespace reaches the name instead.
+		it("should compile once a requirement carries what the body reached", () => {
+			let read = [
+				"implementation {",
+				'\tconstant unit = " unit"',
+				"",
+				"\tprotocol Measured {",
+				"\t\tamount() -> Integer",
+				"\t\tsuffix() -> String",
+				"",
+				"\t\tspell() -> String {",
+				'\t\t\t<- "{@::amount()}{@::suffix()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Lengths for Integer is Measured {",
+				"\t\tamount() -> Integer { <- @ }",
+				"\t\tsuffix() -> String { <- unit }",
+				"\t}",
+				"",
+				"\tTerminal.print(3::spell())",
+				"}",
+			].join("\n")
+			let called = [
+				"implementation {",
+				"\tnamespace Helpers for Integer {",
+				'\t\tshout() -> String { <- "H{@}" }',
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t\tshoutedSize() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::shoutedSize()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Lists for List<Integer> is Sized {",
+				"\t\tsize() -> Integer { <- @::length() }",
+				"\t\tshoutedSize() -> String { <- @::size()::shout() }",
+				"\t}",
+				"",
+				"\tTerminal.print([1]::describe())",
+				"}",
+			].join("\n")
+			let witnessed = [
+				"implementation {",
+				"\ttype Box = { n: Integer }",
+				"",
+				"\tnamespace Boxes for Box is Printable {",
+				'\t\ttoString() -> String { <- "box" }',
+				"\t}",
+				"",
+				"\tprotocol Sized {",
+				"\t\tsize() -> Integer",
+				"\t\theld() -> String",
+				"",
+				"\t\tdescribe() -> String {",
+				"\t\t\t<- @::held()",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Counts for Integer is Sized {",
+				"\t\tsize() -> Integer { <- @ }",
+				"",
+				"\t\theld() -> String {",
+				"\t\t\tconstant box: Box = { n = @::size() }",
+				"",
+				'\t\t\t<- "held {box}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.print(3::describe())",
+				"}",
+			].join("\n")
+
+			expect(compiles(read)).toBe(true)
+			expect(compiles(called)).toBe(true)
+			expect(compiles(witnessed)).toBe(true)
+		})
+
 		it("should refuse its own Protocol's conformance for a written value", () => {
 			let source = [
 				"implementation {",
@@ -3943,6 +4027,52 @@ describe("Protocol-provided Methods", () => {
 					].join("\n"),
 				),
 			).toEqual(["unwritable-provided-method"])
+		})
+
+		// The body moves out of the Protocol and into each conformer, which
+		// the Help names.
+		it("should compile once a static or an overloaded body is a requirement", () => {
+			let creatable = (requirement: string) =>
+				[
+					"implementation {",
+					"\tprotocol Creatable {",
+					`\t\t${requirement}`,
+					"\t}",
+					"",
+					"\tnamespace Counters for Integer is Creatable {",
+					"\t\tstatic create() -> Integer { <- 0 }",
+					"\t}",
+					"",
+					"\tTerminal.print(Counters.create())",
+					"}",
+				].join("\n")
+			let sized = [
+				"implementation {",
+				"\tprotocol Sized {",
+				"\t\toverload size {",
+				"\t\t\t() -> Integer",
+				"\t\t\t(_ scale: Integer) -> Integer",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace Lists for List<Integer> is Sized {",
+				"\t\toverload size {",
+				"\t\t\t() -> Integer { <- @::length() }",
+				"\t\t\t(_ scale: Integer) -> Integer { <- @::length()::multiply(with scale) }",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tTerminal.print([1]::size(2))",
+				"}",
+			].join("\n")
+
+			expect(
+				helpsOf(creatable("static create() -> Self { <- @ }")),
+			).toEqual([
+				"Write 'create' as a requirement, and give each conforming Namespace a body of its own.",
+			])
+			expect(compiles(creatable("static create() -> Self"))).toBe(true)
+			expect(compiles(sized)).toBe(true)
 		})
 	})
 
@@ -5407,6 +5537,26 @@ describe("Protocol-provided Methods", () => {
 					].join("\n"),
 				),
 			).toEqual(["where-on-protocol-extension"])
+		})
+
+		it("should compile once the extension is written on its own", () => {
+			let ordered = (extension: string) =>
+				[
+					"implementation {",
+					`\tprotocol Ordered ${extension} {`,
+					"\t\tisBefore(_ other: Self) -> Boolean {",
+					"\t\t\t<- @::compare(to other)::is(Ordering#Less)",
+					"\t\t}",
+					"\t}",
+					"}",
+				].join("\n")
+
+			expect(
+				helpsOf(ordered("is Comparable where Item is Comparable")),
+			).toEqual([
+				"Write 'is Comparable' on its own, and bound the Type Parameter where the conforming Namespace is declared.",
+			])
+			expect(compiles(ordered("is Comparable"))).toBe(true)
 		})
 
 		it("should refuse an extension naming no Protocol", () => {

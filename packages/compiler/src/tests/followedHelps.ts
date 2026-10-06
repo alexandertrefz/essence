@@ -130,6 +130,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"path-without-context",
 		"picked-requirement",
 		"protocol-bound-namespace-generic",
+		"provided-method-out-of-reach",
 		"redundant-interpolation-to-string",
 		"redundant-pattern-binder",
 		"restated-inferred-parameter",
@@ -144,5 +145,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"unknown-where-generic",
 		"unsatisfied-bound",
 		"unsatisfied-conformance-condition",
+		"unwritable-provided-method",
+		"where-on-protocol-extension",
 		"wrong-type-argument-count",
 	]
