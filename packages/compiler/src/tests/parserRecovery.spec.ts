@@ -347,6 +347,24 @@ describe("Parser Recovery", () => {
 		expect(compiles(`${source}\n}`)).toBe(true)
 	})
 
+	// One report stands for every block the input ends inside, so one `}`
+	// would only meet it again.
+	it("should count the blocks a file ends inside", () => {
+		let source = `implementation {
+	function double(_ value: Integer) -> String {
+		<- "{value}{value}"`
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+			"unclosed-block",
+		])
+		expect(diagnostics[0].helps).toEqual([
+			"Add a '}' for each of the 2 blocks still open.",
+		])
+		expect(compiles(`${source}\n}`)).toBe(false)
+		expect(compiles(`${source}\n\t}\n}`)).toBe(true)
+	})
+
 	it("should report an unterminated String Literal once", () => {
 		let { diagnostics } = parseWithDiagnostics(
 			'implementation { constant x = "abc }',

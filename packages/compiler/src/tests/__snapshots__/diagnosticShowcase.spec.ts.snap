@@ -3201,7 +3201,7 @@ Error: This block is never closed
     │               │ 
     │               ╰─ the input ends here
     │ 
-    │ Help: Add the missing '}'.
+    │ Help: Add a '}' for each of the 2 blocks still open.
 ────╯
 
 ─── 9 errors

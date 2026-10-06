@@ -2098,7 +2098,7 @@ class DescentParser {
 						? []
 						: [secondary(openingPosition, "opened here")]),
 				],
-				helps: ["Add the missing '}'."],
+				helps: [this.tokens.missingBracesHelp()],
 			})
 
 			return

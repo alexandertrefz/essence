@@ -287,7 +287,7 @@ Error: This block is never closed
 
 Here the function has no `}` of its own, so the file's last `}` closes the function, and `implementation` is the block left open. Write a `}` after `<- name`.
 
-Where no `}` stands further out than its opener — a file that simply ends one brace short — there is no second brace to point at, so the report names the outermost open block and the end of the input:
+Where no `}` stands further out than its opener — a file that simply ends short of its braces — there is no second brace to point at, so the report names the innermost open block and the end of the input:
 
 <div class="error-output">
 
@@ -309,7 +309,7 @@ Error: This block is never closed
 
 </div>
 
-Close every open block.
+Close every open block. Where more than one is open, the help counts them: `Add a '}' for each of the 2 blocks still open.`
 
 ### `invalid-number`
 

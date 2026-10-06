@@ -842,6 +842,24 @@ export class TokenStream {
 		return null
 	}
 
+	// The Help for a file that ends with blocks open. Every one of them needs
+	// its `}`, so a count above one is named rather than met one report at a time.
+	missingBracesHelp(): string {
+		let open = 0
+
+		for (let token of this.tokens) {
+			if (token.type === TokenType.SymbolLeftBrace) {
+				open++
+			} else if (token.type === TokenType.SymbolRightBrace) {
+				open--
+			}
+		}
+
+		return open > 1
+			? `Add a '}' for each of the ${open} blocks still open.`
+			: "Add the missing '}'."
+	}
+
 	// Where end-of-input Diagnostics stand: the end of the last Token, or
 	// the start of a file that has none.
 	endPosition(): common.Position {

@@ -142,8 +142,9 @@ block it took the brace from never got its own. The first such pair is the answe
 braces is short of the innermost one first. `reportUnclosedBlock` asks it only where a block really is unclosed.
 
 Where `outdentedClose` answers, `unclosed-block` stands on that block's `{`, with the outdented `}` as the second
-Label. Where it does not, the report stands at the end of the input about the outermost block. Only the innermost
-torn-open block reports, since one missing `}` tears open every enclosing block too.
+Label. Where it does not, the report stands at the end of the input about the innermost open block. Only that block
+reports, since one missing `}` tears open every enclosing block too. Its Help counts the blocks still open
+(`missingBracesHelp`), since one `}` for a file several blocks short would only meet the same report again.
 
 ### Text after the Program
 
