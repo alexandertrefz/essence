@@ -5446,13 +5446,15 @@ Two shapes get a different Help, because adding the name would be the wrong edit
 <div class="error-output">
 
 ```
-   │ Help: ./Geometry.es exports it as 'squareArea' — import that name instead.
+   │ Help: ./Geometry.es exports it as 'squareArea' — import that name instead: 'squareArea as area'.
    │ 
    │ Note 1: A name is private unless the Module's 'export { … }' block lists it.
    │ Note 2: An 'as' on an export entry renames the declaration for everyone, so a name the block lists under another one stays private under this one.
 ```
 
 </div>
+
+The entry it spells keeps the name this file reads, `squareArea as area`, so no use of `area` below the import has to change.
 
 A module with no export block at all — or an empty one — has nothing to add to, so the Help asks for the block: **Open an 'export \{ … \}' block in ./Geometry.es and list 'area' in it.**
 

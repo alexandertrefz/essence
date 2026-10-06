@@ -1235,7 +1235,12 @@ ${exports}`
 		expect(
 			helpsFor("\nexport {\n\tarea as squareArea\n}\n", "area"),
 		).toEqual([
-			"./Library.es exports it as 'squareArea' — import that name instead.",
+			"./Library.es exports it as 'squareArea' — import that name instead: 'squareArea as area'.",
+		])
+		expect(
+			helpsFor("\nexport {\n\tarea as squareArea\n}\n", "area as tile"),
+		).toEqual([
+			"./Library.es exports it as 'squareArea' — import that name instead: 'squareArea as tile'.",
 		])
 
 		expect(helpsFor("\nexport {}\n", "area")).toEqual([
@@ -1284,6 +1289,38 @@ implementation {
 			compiles({
 				"Main.es": main,
 				"Library.es": library("\nexport {\n\tarea\n}\n"),
+			}),
+		).toBe(true)
+	})
+
+	// The entry keeps the name this file reads, so no use of it changes.
+	it("compiles once a renamed export is imported under the file's name", () => {
+		let library = `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+
+export {
+	area as squareArea
+}
+`
+		let main = (entry: string) => `import {
+	from "./Library.es" { ${entry} }
+}
+
+implementation {
+	Terminal.print(area(2))
+}
+`
+
+		expect(
+			compiles({ "Main.es": main("area"), "Library.es": library }),
+		).toBe(false)
+		expect(
+			compiles({
+				"Main.es": main("squareArea as area"),
+				"Library.es": library,
 			}),
 		).toBe(true)
 	})

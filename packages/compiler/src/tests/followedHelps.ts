@@ -171,6 +171,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"namespace-as-value",
 		"nested-example",
 		"nonconforming-namespace",
+		"not-exported",
 		"operator-not-supported",
 		"path-without-context",
 		"picked-requirement",

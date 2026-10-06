@@ -467,13 +467,17 @@ function exportedAs(
 }
 
 function reportMissingExport(
-	source: parser.IdentifierNode,
+	entry: parser.ImportNode | parser.ExportNode,
 	specifier: string,
 	declaration: Declaration | null,
 	surface: ExportSurface,
 ): void {
+	let source = entry.name
+
 	if (declaration !== null) {
 		let alias = exportedAs(surface, declaration)
+		// The entry keeps the name this file binds, so no use of it changes.
+		let local = entry.alias?.content ?? source.content
 		let publishes = Object.keys(surface.kinds).length !== 0
 
 		reportError(
@@ -501,7 +505,7 @@ function reportMissingExport(
 				// that name, since adding this one would publish it twice.
 				helps: [
 					alias !== null
-						? `${specifier} exports it as '${alias}' — import that name instead.`
+						? `${specifier} exports it as '${alias}' — import that name instead: '${alias === local ? alias : `${alias} as ${local}`}'.`
 						: publishes
 							? `Add '${source.content}' to the 'export { … }' block of ${specifier}.`
 							: `Open an 'export { … }' block in ${specifier} and list '${source.content}' in it.`,
@@ -1047,7 +1051,7 @@ function seedImports(
 			}
 
 			reportMissingExport(
-				entry.name,
+				entry,
 				entry.source.path,
 				declares(dependencyPath, exportedName),
 				surface,
@@ -1170,7 +1174,7 @@ function reportExportProblems(
 				surface.kinds[entry.name.content] === undefined
 			) {
 				reportMissingExport(
-					entry.name,
+					entry,
 					entry.source.path,
 					declares(dependencyPath, entry.name.content),
 					surface,
