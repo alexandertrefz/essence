@@ -323,6 +323,13 @@ export function describeType(type: common.Type): string {
 	return spellType(type, declaredSpelling)
 }
 
+// The conjunction a written receiver proves where no declared refinement
+// covers it, named as its declaration would read, `String where …`. See
+// "Written receivers" in packages/compiler/src/enricher/DEVELOPMENT.md.
+function isReceiverConjunction(type: common.RefinementType): boolean {
+	return type.receiverConjunction === true
+}
+
 // `describeType`, with every declared name as `spell` writes it.
 export function spellType(type: common.Type, spell: Spelling): string {
 	let described = (inner: common.Type) => spellType(inner, spell)
@@ -344,8 +351,13 @@ export function spellType(type: common.Type, spell: Spelling): string {
 			return `${spellCaseChoice(type, spell)}#${type.name}`
 		// A refinement is named, not spelled out, and an applied one with all
 		// its Arguments, even Type Parameters. A bare `NonEmptyList` is not a
-		// Type a reader can write.
+		// Type a reader can write. No reader declared a written receiver's
+		// conjunction, so it is named by the base the reader wrote.
 		case "Refinement":
+			if (isReceiverConjunction(type)) {
+				return described(type.base)
+			}
+
 			return type.typeArguments === undefined
 				? written(spell, type.name, type)
 				: `${written(spell, type.name, type)}<${type.typeArguments

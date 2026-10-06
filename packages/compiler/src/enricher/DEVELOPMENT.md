@@ -504,9 +504,10 @@ each named refinement by the ordinary conjunct-subset rule, so it reaches every 
 shows the answer at the receiver, and the rewriter sees the plain value once refinements are erased.
 
 The conjunction is displayed as a declared refinement that proves all of it, counted through what its leaves imply:
-`3` prints as `PositiveInteger`. Where no declared name says the whole of it, the Type prints as the declaration a
-reader would write, such as `Integer where @::isEven()::and(@::isGreaterThan(10))`. A tie between two refinements
-proving the same conjunction falls to the order `refinementsFor` walks, as in narrowing.
+`3` prints as `PositiveInteger`. Where no declared name says the whole of it, the hover prints the Type as the
+declaration a reader would write, such as `Integer where @::isEven()::and(@::isGreaterThan(10))`. A Diagnostic names
+it by its base, `Integer`, since that is what the reader wrote and no reader declared the rest. A tie between two
+refinements proving the same conjunction falls to the order `refinementsFor` walks, as in narrowing.
 
 A refinement whose predicate is still pending is no candidate. Predicates, Parameter defaults and bodied static
 Properties are enriched while declarations hoist, and a written receiver may stand in any of them.

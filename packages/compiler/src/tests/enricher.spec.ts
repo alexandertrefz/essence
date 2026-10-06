@@ -11879,6 +11879,20 @@ describe("Enricher", () => {
 			)
 		})
 
+		// The hover shows the conjunction, but no reader declared it, so a
+		// report names the Type the reader wrote.
+		it("should describe a conjunction no declared name covers as the written Type", () => {
+			let [refusal] = diagnosticsFor(`implementation {
+				Terminal.print("a"::frobnicate())
+			}`)
+
+			expect(refusal.code).toBe("unknown-method")
+			expect(refusal.labels.map((label) => label.message)).toEqual([
+				"no Method of this name",
+				"this is a String",
+			])
+		})
+
 		// A written Rational answers for itself the way a written Integer
 		// does, and prints under the Alias whose conjuncts are exactly what it
 		// proved. A zero is not above zero and is not below it either, so it

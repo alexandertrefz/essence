@@ -9251,6 +9251,7 @@ function provenLiteralReceiverType(
 		name,
 		base: base.type,
 		conjuncts,
+		receiverConjunction: true,
 	}
 
 	// Remembered only where the base's spelling identifies it, since the key is

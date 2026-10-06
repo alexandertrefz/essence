@@ -840,6 +840,9 @@ export type RefinementType = {
 	base: Type
 	conjuncts: Array<PredicateConjunct> | null
 	typeArguments?: Array<Type>
+	// Set on the conjunction a written receiver proves where no declared
+	// refinement covers it. No reader declared it, so a report names its base.
+	receiverConjunction?: true
 }
 
 // How a generic Choice's derived `is` compares each payload member, per Case
