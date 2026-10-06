@@ -4354,6 +4354,40 @@ describe("Completion inside each kind of node", () => {
 					"\t}",
 				],
 			],
+			[
+				"a Function literal's body",
+				[
+					"\tconstant greet = () -> String {",
+					...namespace("\t\t"),
+					"\t\t<- Thing.‸",
+					"\t}",
+				],
+			],
+			[
+				"a Namespace Method's body",
+				[
+					"\tnamespace Greetings {",
+					"\t\tstatic greet() -> String {",
+					...namespace("\t\t\t"),
+					"\t\t\t<- Thing.‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a match arm's body",
+				[
+					"\tconstant greeting = match true -> String {",
+					"\t\tcase true {",
+					...namespace("\t\t\t"),
+					"\t\t\t<- Thing.‸",
+					"\t\t}",
+					"\t\tcase false {",
+					'\t\t\t<- ""',
+					"\t\t}",
+					"\t}",
+				],
+			],
 		])(
 			"should carry the description of a Property %s declares",
 			(_, lines) => {
@@ -4365,6 +4399,40 @@ describe("Completion inside each kind of node", () => {
 
 				expect(entryFor(source, cursor, "label")?.documentation).toBe(
 					"What to greet with.",
+				)
+			},
+		)
+
+		// A Namespace of the same name in a body is another Namespace, whose
+		// descriptions are not the top level one's.
+		it.each([
+			["a Function's body", "\tfunction greet() -> String {"],
+			["a Function literal's body", "\tconstant greet = () -> String {"],
+		])(
+			"should read the Namespace the dot names when %s declares its name too",
+			(_, opener) => {
+				let { source, cursor } = atMarker([
+					"implementation {",
+					"\tnamespace Thing {",
+					"\t\t§§ Top level.",
+					'\t\tstatic label = "hi"',
+					"\t}",
+					"",
+					opener,
+					"\t\tnamespace Thing {",
+					"\t\t\t§§ Inner.",
+					'\t\t\tstatic label = "inner"',
+					"\t\t}",
+					"",
+					"\t\t<- Thing.label",
+					"\t}",
+					"",
+					"\tconstant shown = Thing.‸",
+					"}",
+				])
+
+				expect(entryFor(source, cursor, "label")?.documentation).toBe(
+					"Top level.",
 				)
 			},
 		)

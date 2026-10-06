@@ -803,7 +803,7 @@ function memberCompletions(
 	}
 
 	if (baseType.type === "Namespace") {
-		let documented = namespacePropertyDocumentation(program, baseType.name)
+		let documented = namespacePropertyDocumentation(program, baseType)
 		let entries: Array<CompletionEntry> = []
 
 		for (let [name, type] of Object.entries(baseType.properties)) {
@@ -871,17 +871,18 @@ function memberCompletions(
 }
 
 // The `§§` block of each Property by name, read off the declaration Node,
-// since a Namespace Type keeps only the Property's Type.
+// since a Namespace Type keeps only the Property's Type. A Namespace may stand
+// in any body, and is told from another of its name by its Type.
 function namespacePropertyDocumentation(
 	program: common.typed.Program,
-	name: string,
+	namespace: common.NamespaceType,
 ): Map<string, string> {
 	let documented = new Map<string, string>()
 
 	function visit(node: TypedNode) {
 		if (
 			node.nodeType === "NamespaceDefinitionStatement" &&
-			node.name.content === name
+			node.type === namespace
 		) {
 			for (let [propertyName, property] of Object.entries(
 				node.properties,
@@ -894,14 +895,7 @@ function namespacePropertyDocumentation(
 			}
 		}
 
-		if (
-			node.nodeType === "FunctionStatement" ||
-			node.nodeType === "FunctionDefinition" ||
-			node.nodeType === "IfStatement" ||
-			node.nodeType === "IfElseStatement"
-		) {
-			forEachTypedChild(node, visit)
-		}
+		forEachTypedChild(node, visit)
 	}
 
 	for (let body of typedProgramBodies(program)) {
