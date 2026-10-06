@@ -4163,6 +4163,36 @@ describe("Completion inside each kind of node", () => {
 					"\t}",
 				],
 			],
+			[
+				"a match arm under a wider return",
+				[
+					"\tfunction flip(_ size: Size) -> Edge | Size {",
+					"\t\t<- match size -> Edge {",
+					"\t\t\tcase #Small {",
+					"\t\t\t\t<- #‸",
+					"\t\t\t}",
+					"\t\t\tcase #Large {",
+					"\t\t\t\t<- #Back",
+					"\t\t\t}",
+					"\t\t}",
+					"\t}",
+				],
+			],
+			[
+				"a match arm in a Method call's Argument",
+				[
+					"\tconstant edges: List<Edge> = [#Front]",
+					"\tconstant size: Size = #Small",
+					"\tconstant more = edges::append(match size -> Edge {",
+					"\t\tcase #Small {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"\t\tcase #Large {",
+					"\t\t\t<- #Back",
+					"\t\t}",
+					"\t})",
+				],
+			],
 		])("should offer the expected Choice's Cases in %s", (_, lines) => {
 			expect(casesAt(lines)).toEqual(["Front (preselected)", "Back"])
 		})

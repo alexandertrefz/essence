@@ -420,8 +420,9 @@ the visitor learns with no edit here. A walk names only the kinds it has somethi
   key written in a Function call's Arguments, an update or a Case payload. `findProbeKeyInMerged` follows a path key
   down the Record Type it reaches into, so it descends only the levels a path key built.
 - `analyseCaseProbe` threads the expected Type down to the made-up Case. It names the kinds that hand a child an
-  expected Type, such as a Parameter its default, a call its Arguments, and a Function or an `if` its `<-`. Every
-  other child is read against nothing.
+  expected Type, such as a Parameter its default, a call its Arguments, and a Function or an `if` its `<-`. A
+  `match` hands its arms the Type written after its `->`, as the Enricher does. Every other child is read against
+  nothing.
 - `describeDeclarations` keys each Constant, Variable, Function, Namespace, Choice, Type Alias and Protocol of the
   document's Program by its name's Position, for the detail and documentation of a name in Scope. So does each
   Parameter of a Function, a Method or a Function literal, to which a callable hands its `§§` block. A Type

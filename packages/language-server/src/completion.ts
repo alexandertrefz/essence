@@ -1344,10 +1344,11 @@ function analyseCaseProbe(program: common.typed.Program): {
 				})
 				return
 			}
-			// A Handler's body answers the whole `match`. A Guard and a Matcher's
-			// literals are read against nothing.
+			// A Handler's body answers the Type the `match` declares after its `->`, as
+			// the Enricher reads it. A Guard and a Matcher's literals are read against
+			// nothing.
 			case "Match":
-				visitExpecting(node, "body", expectedType)
+				visitExpecting(node, "body", node.type)
 				return
 			// Every arm answers the whole `define`, so each is read against the
 			// expected Type. A Condition, like a Guard, is a Boolean and is read
