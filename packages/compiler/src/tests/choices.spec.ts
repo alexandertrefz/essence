@@ -1191,6 +1191,44 @@ describe("Choices", () => {
 				).toBe(true)
 			})
 
+			// An Argument stands in no Declaration, so no annotation there
+			// decides the construction. A `define` arm passes its Declaration's
+			// annotation on, so the Help stands there.
+			it("offers the annotation only where a Declaration takes the value", () => {
+				let holder = "choice Holder<Item> { Full { item: Item }, Bare }"
+
+				expect(
+					helpsOf(`implementation { ${holder}
+					Terminal.inspect(Holder#Bare)
+				}`),
+				).toEqual([
+					"Apply the Type Arguments here — 'Holder<…>#Bare', with the Type you mean in place of each '…'.",
+				])
+				expect(
+					compiles(`implementation { ${holder}
+					Terminal.inspect(Holder<Integer>#Bare)
+				}`),
+				).toBe(true)
+
+				for (let value of [
+					"Holder#Bare",
+					"define { as Holder#Bare if true as Holder#Bare otherwise }",
+				]) {
+					expect(
+						helpsOf(`implementation { ${holder}
+					constant held = ${value}
+				}`)[0],
+					).toBe(
+						"Annotate the Declaration this is written into with 'Holder<…>', which is what decides them.",
+					)
+					expect(
+						compiles(`implementation { ${holder}
+					constant held: Holder<Integer> = ${value}
+				}`),
+					).toBe(true)
+				}
+			})
+
 			// A payload that mentions no Type Parameter decides nothing.
 			it("reports one whose payload decides nothing at all", () => {
 				let source = `implementation {

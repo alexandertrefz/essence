@@ -219,6 +219,10 @@ import {
 	refuseDuplicateTypeParameters,
 	refuseUndecidedTypeParameters,
 } from "./typeParameters"
+import {
+	markDeclaredValue,
+	reportUndecidedTypeArguments,
+} from "./undecidedCases"
 import { dividedUnionNotes, reportNarrowedUnionMember } from "./unionDispatch"
 
 // Hoisting resolves each order-independent declaration's Type up front, keyed
@@ -887,7 +891,7 @@ function reportUndecidedPayloadTypeArguments(
 		spellChoiceName(caseType, spellingIn(scope)),
 		node.caseName.content,
 		choiceGenerics,
-		node.position,
+		node,
 		true,
 		choiceGenerics.map((_, index) => caseType.typeArguments?.[index]),
 	)
@@ -5592,6 +5596,8 @@ function enrichDeclarationStatement(
 	if (node.name.nodeType === "Pattern") {
 		return enrichPatternDeclarationStatement(node, node.name, scope)
 	}
+
+	markDeclaredValue(node.value)
 
 	return [
 		node.nodeType === "ConstantDeclarationStatement"
@@ -14160,7 +14166,7 @@ function resolveCaseValueType(
 				spellChoiceName(bareCase, spellingIn(scope)),
 				node.caseName.content,
 				bareCase.choiceGenerics,
-				node.position,
+				node,
 				false,
 			)
 		}
@@ -14222,93 +14228,9 @@ function resolvePrefixedCaseValueType(
 		choice.content,
 		node.caseName.content,
 		declaredCase.choiceGenerics,
-		node.position,
+		node,
 		Object.keys(declaredCase.members).length > 0,
 	)
-}
-
-// The one report for every undecided construction, spelled as the source wrote
-// it. See "Resolving a Case" in DEVELOPMENT.md. `takesPayload` keeps the
-// parentheses where the Case carries members.
-function reportUndecidedTypeArguments(
-	construction: string,
-	choiceName: string,
-	caseName: string,
-	choiceGenerics: Array<common.GenericDeclaration>,
-	position: common.Position,
-	takesPayload: boolean,
-	// What the payload bound each Type Parameter to, so the Helps spell the
-	// decided half and the label names the missing one. Absent without a
-	// payload.
-	payloadArguments?: Array<common.Type | undefined>,
-): common.ErrorType {
-	let parameterNames = choiceGenerics.map((generic) => generic.name)
-	let spellings = parameterNames.map((_, index) => {
-		let typeArgument = payloadArguments?.[index]
-
-		return typeArgument === undefined ||
-			mentionsUnsolvedTypeParameter(typeArgument)
-			? null
-			: describeType(typeArgument)
-	})
-	let undecided =
-		payloadArguments === undefined
-			? undefined
-			: parameterNames.filter(
-					(_, index) =>
-						payloadArguments[index] !== undefined &&
-						spellings[index] === null,
-				)
-	let application = `${choiceName}<${spellings
-		.map((spelling) => spelling ?? "…")
-		.join(", ")}>`
-	let payloadSuffix = takesPayload ? "(…)" : ""
-
-	reportError(
-		`Nothing decides the Type Arguments of '${construction}'`,
-		position,
-		{
-			code: "undecided-type-arguments",
-			labels: [
-				primary(position, undecidedLabel(parameterNames, undecided)),
-			],
-			notes: [
-				`'${choiceName}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${quotedNames(parameterNames)}.`,
-				undecided === undefined
-					? "A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them."
-					: "A payload binds only the Type Parameters its own members mention — the rest are applied, at the construction or by the position around it.",
-			],
-			helps: [
-				`Annotate the Declaration this is written into with '${application}', which is what decides them.`,
-				`Or apply the Type Arguments here — '${application}#${caseName}${payloadSuffix}', with the Type you mean in place of each '…'.`,
-			],
-		},
-	)
-
-	return { type: "Error" }
-}
-
-// The primary label. With a payload it says which Type Parameters the payload
-// decided beside those it left open.
-function undecidedLabel(
-	parameterNames: Array<common.GenericName>,
-	undecided: Array<common.GenericName> | undefined,
-): string {
-	if (undecided === undefined) {
-		return "no Type Arguments here, and nothing around it decides them"
-	}
-
-	let decided = parameterNames.filter((name) => !undecided.includes(name))
-
-	if (decided.length === 0) {
-		return "its payload decides none of them"
-	}
-
-	return `its payload decides ${quotedNames(decided)}, and nothing decides ${quotedNames(undecided)}`
-}
-
-function quotedNames(names: Array<common.GenericName>): string {
-	return names.map((name) => `'${name}'`).join(", ")
 }
 
 // `Holder<Integer>#Full(…)`: Type Arguments written at the value, applied as an

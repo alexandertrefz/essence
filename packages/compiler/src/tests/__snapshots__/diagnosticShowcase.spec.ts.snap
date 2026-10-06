@@ -751,8 +751,7 @@ Error: Nothing decides the Type Arguments of '#Empty'
     │           ───┬──  
     │              ╰──── no Type Arguments here, and nothing around it decides them
     │ 
-    │ Help 1: Annotate the Declaration this is written into with 'Optional<…>', which is what decides them.
-    │ Help 2: Or apply the Type Arguments here — 'Optional<…>#Empty', with the Type you mean in place of each '…'.
+    │ Help: Apply the Type Arguments here — 'Optional<…>#Empty', with the Type you mean in place of each '…'.
     │ 
     │ Note 1: 'Optional' takes 1 Type Parameter: 'ItemType'.
     │ Note 2: A Choice's Type Parameters are applied, never inferred — the payload is checked against them, it does not choose them.

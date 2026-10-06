@@ -3474,7 +3474,7 @@ Error: Nothing decides the Type Arguments of 'Holder#Bare'
 
 </div>
 
-Write the type arguments at the case, `Holder<Integer>#Bare`, or annotate the constant: `constant empty: Holder<Integer> = Holder#Bare`. The helps show the application with a blank per argument, and the notes name the choice's own parameters — those names belong to the declaration and are in scope nowhere else, so writing one back is [`unknown-type`](/docs/reference/diagnostics#unknown-type).
+Write the type arguments at the case, `Holder<Integer>#Bare`, or annotate the constant: `constant empty: Holder<Integer> = Holder#Bare`. The help to annotate stands only where a constant or a variable takes the case as its value, directly or as an arm of its `define`: an annotation anywhere else, such as around an argument, does not reach the case. The helps show the application with a blank per argument, and the notes name the choice's own parameters — those names belong to the declaration and are in scope nowhere else, so writing one back is [`unknown-type`](/docs/reference/diagnostics#unknown-type).
 
 Where a payload already decided some of the arguments, those are spelled and only the undecided ones are blank: a `#Stopped({ value = "x" })` of a `Progress<State, Result>` reads `Progress<…, String>`. The parentheses stay on wherever the case carries a payload, so the spelling in the help is one that compiles.
 

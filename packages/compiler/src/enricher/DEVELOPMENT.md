@@ -56,9 +56,11 @@ A prefixed `Holder#Case` is decided by the Type Arguments it writes, then by its
 validator checks it. So `Holder#Full({ value = 1 })` where nothing expects a Holder is undecided too. A Choice
 without Type Parameters has nothing to decide.
 
-`reportUndecidedTypeArguments` is the one report for every undecided construction, spelled the way the source wrote
-it. Its notes name the Choice's own Type Parameters. Those names are not in scope at the construction, so the Helps
-spell an application instead. Each Argument the payload decided is written out, with `…` for the rest.
+`reportUndecidedTypeArguments` in `undecidedCases.ts` is the one report for every undecided construction, spelled
+the way the source wrote it. Its notes name the Choice's own Type Parameters. Those names are not in scope at the
+construction, so the Helps spell an application instead. Each Argument the payload decided is written out, with `…`
+for the rest. The Help to annotate the Declaration stands only where one takes the construction as its value, or as
+an arm of the `define` it is declared with (`markDeclaredValue`). An annotation anywhere else does not reach it.
 
 A bare Case that fails to resolve as an Argument is probed once per candidate, and the probes keep nothing.
 `noteExpectedChoice` remembers every Type it was measured against, so `unknown-case` can name the Choices the
