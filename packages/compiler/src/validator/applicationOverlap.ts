@@ -14,6 +14,7 @@ import {
 	acceptsAllAtRuntime,
 	type ApplicationCrossing,
 	crossingApplication,
+	ITEM_STEPS,
 	nestedCrossing,
 } from "./runtimeOverlap"
 
@@ -150,7 +151,13 @@ export function reportNestedApplicationOverlap(
 			crossings.find((crossing) =>
 				acceptsAllAtRuntime(crossing.matcher, crossing.member),
 			) ?? crossings[0]
-		let values = `${spellType(memberType, spell)} values whose ${path.join(".")} is ${spellType(first.member, spell)}`
+		// A container holding only crossing Cases crosses with them, and no
+		// Case can be written for it, so its Type has to change.
+		let container = containerAlong(path)
+		let values =
+			container === null
+				? `${spellType(memberType, spell)} values whose ${path.join(".")} is ${spellType(first.member, spell)}`
+				: `some ${spellType(memberType, spell)} values`
 
 		reportWarning(
 			`This Case never sees ${values}`,
@@ -174,15 +181,22 @@ export function reportNestedApplicationOverlap(
 						acceptsAllAtRuntime(first.matcher, first.member),
 						spell,
 					),
+					...(container === null
+						? []
+						: [
+								`A ${container} is placed by the ${container === "List" ? "items" : "entries"} it holds, so one holding only such Cases fits both Cases.`,
+							]),
 				],
 				helps: [
-					bindingHelp(
-						memberType,
-						path,
-						crossings,
-						memberTypes,
-						spell,
-					),
+					container === null
+						? bindingHelp(
+								memberType,
+								path,
+								crossings,
+								memberTypes,
+								spell,
+							)
+						: oneApplicationHelp(first, "matched value", spell),
 				],
 			},
 		)
@@ -191,6 +205,17 @@ export function reportNestedApplicationOverlap(
 	}
 
 	return false
+}
+
+// The first container a crossing path passes through the items of, or null.
+function containerAlong(path: Array<string>): "List" | "Dictionary" | null {
+	let step = path.find((name) => ITEM_STEPS.includes(name))
+
+	if (step === undefined) {
+		return null
+	}
+
+	return step === "[item]" ? "List" : "Dictionary"
 }
 
 // One Case binding the member's first step, whose Match answers for the

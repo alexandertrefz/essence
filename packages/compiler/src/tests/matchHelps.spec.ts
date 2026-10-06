@@ -762,6 +762,38 @@ describe("A Case another application's Case crosses into at a member", () => {
 		expect(analysedDiagnosticsFor(followed)).toEqual([])
 	})
 
+	// No Case can be written for a List holding only crossing Cases, so the
+	// Type changes. One application leaves nothing to Match on.
+	it("should compile once a List's items are one application", () => {
+		let boxes = (parameter: string, body: string) => `implementation {
+			${box}
+
+			function describe(_ value: ${parameter}) -> String {
+				${body}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				boxes(
+					"List<Box<Integer>> | List<Box<String>>",
+					`<- match value -> String {
+						case List<Box<Integer>> { <- "integers" }
+						case List<Box<String>> { <- "strings" }
+					}`,
+				),
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Write the matched value's Type as one application of 'Box'.",
+		])
+
+		let followed = boxes("List<Box<String>>", `<- "strings"`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
 	it("should compile with the member bound in one Record Case", () => {
 		let records = (cases: string) => `implementation {
 			${box}

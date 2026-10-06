@@ -320,29 +320,22 @@ export function nestedCrossing(
 		)
 	}
 
-	if (memberType.type !== "Record" && memberType.type !== "Case") {
-		return null
-	}
-
 	let earlierArms = armsShaped(earlier, memberType)
 	let laterArms = armsShaped(later, memberType)
 
-	for (let [name, memberAt] of Object.entries(memberType.members)) {
+	for (let [step, memberAt] of slotsOf(memberType)) {
 		for (let earlierArm of earlierArms) {
 			for (let laterArm of laterArms) {
+				let earlierAt = slotOf(earlierArm, step)
+				let laterAt = slotOf(laterArm, step)
 				let found =
-					Object.hasOwn(earlierArm.members, name) &&
-					Object.hasOwn(laterArm.members, name)
-						? crossingAt(
-								earlierArm.members[name],
-								laterArm.members[name],
-								memberAt,
-							)
-						: null
+					earlierAt === null || laterAt === null
+						? null
+						: crossingAt(earlierAt, laterAt, memberAt)
 
 				if (found !== null) {
 					return {
-						path: [name, ...found.path],
+						path: [step, ...found.path],
 						crossings: found.crossings,
 					}
 				}
@@ -351,6 +344,36 @@ export function nestedCrossing(
 	}
 
 	return null
+}
+
+// A path steps into a Record's or a Case's members by name. It steps into a
+// List's items or a Dictionary's keys and values by these, which no member can
+// be named.
+export const ITEM_STEPS = ["[item]", "[key]", "[value]"]
+
+function slotsOf(type: common.Type): Array<[string, common.Type]> {
+	if (type.type === "Record" || type.type === "Case") {
+		return Object.entries(type.members)
+	}
+
+	if (isRuntimeList(type)) {
+		return [["[item]", runtimeItemType(type)]]
+	}
+
+	if (isRuntimeDictionary(type)) {
+		return [
+			["[key]", runtimeKeyType(type)],
+			["[value]", runtimeValueType(type)],
+		]
+	}
+
+	return []
+}
+
+function slotOf(type: common.Type, step: string): common.Type | null {
+	let slot = slotsOf(type).find(([name]) => name === step)
+
+	return slot === undefined ? null : slot[1]
 }
 
 // At one member: the Cases `later` takes as written and `earlier` through
@@ -381,24 +404,37 @@ function crossingAt(
 	)
 }
 
-// The arms of a Matcher that ask about values shaped like `memberType`, a
-// Record or a Case of one tag, and accept some of them.
+// The arms of a Matcher that accept some values of `memberType` and share its
+// shape. A shape is a Record, a Case of one tag, a List or a Dictionary.
 function armsShaped(
 	matcher: common.Type,
-	memberType: common.RecordType | common.CaseType,
-): Array<common.RecordType | common.CaseType> {
+	memberType: common.Type,
+): Array<common.Type> {
 	let arms =
 		matcher.type === "UnionType" ? flattenUnionMembers(matcher) : [matcher]
 
 	return arms.filter(
-		(arm): arm is common.RecordType | common.CaseType =>
-			(memberType.type === "Record"
-				? arm.type === "Record"
-				: arm.type === "Case" &&
-					arm.choice === memberType.choice &&
-					arm.name === memberType.name) &&
-			overlapsAtRuntime(arm, memberType),
+		(arm) =>
+			sameShape(arm, memberType) && overlapsAtRuntime(arm, memberType),
 	)
+}
+
+function sameShape(arm: common.Type, memberType: common.Type): boolean {
+	switch (memberType.type) {
+		case "Record":
+			return arm.type === "Record"
+		case "Case":
+			return (
+				arm.type === "Case" &&
+				arm.choice === memberType.choice &&
+				arm.name === memberType.name
+			)
+		default:
+			return (
+				(isRuntimeList(arm) && isRuntimeList(memberType)) ||
+				(isRuntimeDictionary(arm) && isRuntimeDictionary(memberType))
+			)
+	}
 }
 
 function firstNested(

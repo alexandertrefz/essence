@@ -289,6 +289,10 @@ The same Case crosses inside a member, as with `case #Hold({ box: Box<Integer> }
 the later one that shares the member's shape. At a Case it asks what `crossingApplication` asks, with the later arm
 in place of the later Case. No Matcher can name a Case of every application inside a Pattern, so the Help binds the
 member in one Case and matches it there, Case Matchers first. A crossing deeper down is that Match's own to report.
+The walk also enters a List's items and a Dictionary's keys and values, since a List holding only crossing Cases
+crosses with them. No Case can be written for such a List, and a `hasItems()` Guard leaves it crossing, so the Help
+asks for one application of the Choice, and the Match goes with it. A Guard on the earlier Case still claims
+nothing, so a guarded `case List<Box<Integer>>` is not blamed.
 
 Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
 conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it

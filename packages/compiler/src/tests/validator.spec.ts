@@ -1665,6 +1665,72 @@ describe("Validator", () => {
 				])
 			})
 
+			// A List of crossing Cases crosses with them, so a `hasItems()`
+			// Guard would leave it crossing.
+			it("should warn about a List whose items another application's Case reaches first", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					function describe(_ value: List<Box<Integer>> | List<Box<String>>) -> String {
+						<- match value -> String {
+							case List<Box<Integer>> { <- "integers" }
+							case List<Box<String>> { <- "strings" }
+						}
+					}
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.message,
+						diagnostic.helps,
+					]),
+				).toEqual([
+					[
+						"type-argument-overlap",
+						"This Case never sees some List<Box<String>> values",
+						[
+							"Write the matched value's Type as one application of 'Box'.",
+						],
+					],
+				])
+			})
+
+			it("should warn about a Dictionary whose values another application's Case reaches first", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					function describe(_ value: Dictionary<String, Box<Integer>> | Dictionary<String, Box<String>>) -> String {
+						<- match value -> String {
+							case Dictionary<String, Box<Integer>> { <- "integers" }
+							case Dictionary<String, Box<String>> { <- "strings" }
+						}
+					}
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.message,
+						diagnostic.helps,
+					]),
+				).toEqual([
+					[
+						"type-argument-overlap",
+						"This Case never sees some Dictionary<String, Box<String>> values",
+						[
+							"Write the matched value's Type as one application of 'Box'.",
+						],
+					],
+				])
+			})
+
 			it("should stay silent where the payload tells the applications apart", () => {
 				expect(
 					diagnosticsFor(
