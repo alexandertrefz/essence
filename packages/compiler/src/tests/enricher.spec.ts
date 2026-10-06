@@ -1668,6 +1668,34 @@ describe("Enricher", () => {
 			expect(compiles(program("variable"))).toBe(true)
 		})
 
+		// A Namespace or a Function can be no Variable, so the assignment is
+		// the one mistake and its value is judged against nothing. A written
+		// Constant may become a Variable, which leaves a value of the wrong
+		// Type a mistake of its own.
+		it("should judge no value against a name that can be no Variable", () => {
+			let codes = (declaration: string) =>
+				codesOfSource(`implementation {
+				${declaration}
+
+				Clock = 5
+			}`)
+
+			expect(
+				codes(
+					"namespace Clock {\n\t\t\t\t\tstatic now() -> Integer {\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}\n\t\t\t\t}",
+				),
+			).toEqual(["constant-reassignment"])
+			expect(
+				codes(
+					'function Clock() -> String {\n\t\t\t\t\t<- "hi"\n\t\t\t\t}',
+				),
+			).toEqual(["constant-reassignment"])
+			expect(codes('constant Clock = "twelve"')).toEqual([
+				"constant-reassignment",
+				"assignment-type-mismatch",
+			])
+		})
+
 		it("should allow reassigning outer Variables from inner scopes", () => {
 			expect(
 				diagnosticsFor(`implementation {

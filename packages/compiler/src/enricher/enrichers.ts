@@ -5901,9 +5901,10 @@ function enrichVariableAssignmentStatement(
 	let declarationPosition =
 		declaringScope?.declarations[node.name.content] ?? null
 
-	if (declaringScope?.constants.has(node.name.content)) {
+	// A name that can be no Variable at all has no Type to judge the value by.
+	let refused =
+		declaringScope?.constants.has(node.name.content) === true &&
 		reportConstantReassignment(node.name, declaringScope)
-	}
 
 	let name = enrichIdentifier(node.name, scope)
 
@@ -5924,6 +5925,7 @@ function enrichVariableAssignmentStatement(
 		name: pinned === null ? name : { ...name, type: pinned },
 		value,
 		declarationPosition,
+		...(refused ? { refused: true as const } : {}),
 		position: node.position,
 	}
 }

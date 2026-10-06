@@ -15,11 +15,11 @@ export function recordWrittenConstant(
 // An assignment to a name `declaringScope` holds as a Constant. Only a name a
 // `constant` Declaration wrote can be declared with `variable` instead. A
 // Function, a Namespace, a Parameter or an import takes the new value under a
-// name of its own.
+// name of its own, and the answer says so.
 export function reportConstantReassignment(
 	name: parser.IdentifierNode,
 	declaringScope: enricher.Scope,
-): void {
+): boolean {
 	let declarationPosition = declaringScope.declarations[name.content] ?? null
 	let written = declaringScope.writtenConstants?.has(name.content) === true
 	let isNamespace = declaringScope.members[name.content]?.type === "Namespace"
@@ -52,4 +52,6 @@ export function reportConstantReassignment(
 				: "Declare the new value under a name of its own, with 'constant' or 'variable'.",
 		],
 	})
+
+	return !written
 }

@@ -657,6 +657,10 @@ export interface VariableAssignmentStatementNode {
 	// Where the Variable was declared, for the validator, which has no Scope.
 	// Null for a builtin or an undeclared name.
 	declarationPosition: Position | null
+	// Set where the name can be no Variable at all, as a Function or a
+	// Namespace, which the enricher reported. The validator then judges no
+	// value against it. A written Constant's value is still judged.
+	refused?: true
 	position: Position
 }
 

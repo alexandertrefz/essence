@@ -2644,7 +2644,7 @@ function validateVariableAssignmentStatement(
 ): common.typed.VariableAssignmentStatementNode {
 	let assigned = measuredValue(node.value)
 
-	if (!fitsExpectedType(node.name.type, assigned)) {
+	if (node.refused !== true && !fitsExpectedType(node.name.type, assigned)) {
 		let declaredType = describeType(node.name.type)
 		let evidence = refinementEvidence(node.name.type, assigned)
 		// A Variable declared from an empty Literal can be undecided, as in
