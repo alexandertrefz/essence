@@ -147,6 +147,11 @@ counts the walk for a spec that holds it linear.
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its
 first sure suspension may run at the next top-level `complete`, even where the work it waits for takes longer.
+The walk does not order the parts of one Statement, so a `complete` anywhere in the Statement that starts the work
+releases its later part, even one run before the `start`, as in `both(complete pause(), start later())`. Telling
+the two apart would need the order a Statement runs in, which is not its written order: a `define` asks a condition
+before the value written to its left. The Asynchrony page gives the accepted spelling, the `complete` in a Statement
+of its own above.
 
 A Namespace's static Properties run while it is declared. Its own Methods name the class through the class's own
 binding, which is bound by then. A body written outside it names the top-level binding, which is not. So a Property

@@ -3109,6 +3109,54 @@ describe("Validator", () => {
 				},
 			)
 
+			// The parts of one Statement are not ordered, so a `complete` run before
+			// the `start` releases the work there too. See "Use before declaration"
+			// in packages/compiler/src/validator/DEVELOPMENT.md.
+			it("reports work started in a Statement that completes something before it", () => {
+				let program = (statements: string) => `implementation {
+					function pause() -> Future<Integer> {
+						complete Async.sleep(milliseconds 1)
+
+						<- 1
+					}
+
+					function later() -> Future<Boolean> {
+						complete Async.sleep(milliseconds 1)
+
+						<- 4::isEvenly()
+					}
+
+					function both(_ a: Integer, _ b: Started<Boolean>) -> Started<Boolean> {
+						<- b
+					}
+
+					${statements}
+
+					${parity}
+
+					Terminal.inspect(complete running)
+				}`
+				let source = program(
+					"constant running = both(complete pause(), start later())",
+				)
+				let diagnostics = diagnosticsFor(source)
+
+				let starts = diagnostics[0]?.labels.find(
+					(label) =>
+						label.message ===
+						"this starts work that later reaches it",
+				)
+
+				expect(diagnostics).toHaveLength(1)
+				expect(underlinedBy(source, starts)).toBe("start later()")
+				expect(
+					diagnosticsFor(
+						program(`constant paused = complete pause()
+					constant running = both(paused, start later())`),
+					),
+				).toEqual([])
+			})
+
 			// A completing Function's call builds its Future and runs the
 			// default then, before anything starts it.
 			it("reports a completing Function's default that runs where its Future is built", () => {

@@ -229,6 +229,45 @@ implementation {
 
 `first` and `second` take about forty milliseconds together, because the second wait does not begin until the first is over. `third` and `fourth` take about twenty, because both waits were already running when the first `complete` was written. Nothing about the answers changes: they arrive in the order the program asks for them.
 
+## Started work and what comes below
+
+Work you start runs up to its first `complete` at once. The rest goes on when the top level next waits, at the first statement from the starting one on that holds a `complete`. Until then that rest may use something declared below the `start`, such as a namespace:
+
+```essence
+implementation {
+	function pause() -> Future<Integer> {
+		complete Async.sleep(milliseconds 1)
+
+		<- 1
+	}
+
+	function later() -> Future<Boolean> {
+		complete Async.sleep(milliseconds 1)
+
+		<- 4::isEvenly()
+	}
+
+	function both(_ a: Integer, _ b: Started<Boolean>) -> Started<Boolean> {
+		<- b
+	}
+
+	constant paused  = complete pause()
+	constant running = both(paused, start later())
+
+	namespace Parity for Integer {
+		isEvenly() -> Boolean {
+			<- @::remainder(dividingBy 2)::is(0)
+		}
+	}
+
+	Terminal.print(complete running) § true
+}
+```
+
+`later` uses `Parity` after its sleep, and nothing waits between the `start` and `Parity`. A `complete` written between them would be [`use-before-declaration`](/docs/reference/diagnostics#use-before-declaration), "this starts work that later reaches it", because `later` could go on while that statement waits.
+
+The compiler judges the statement that starts the work as a whole. A `complete` anywhere in it counts, even one written to the left of the `start`. So `both(complete pause(), start later())` in place of the two constants is refused too, although `pause` is over before `later` begins. A statement is not always run in its written order: a [`define`](/docs/language/conditions#choosing-a-value-with-define) asks a condition before the value written to its left. So the compiler takes every `complete` in the statement to come after the `start`. Write the `complete` in a statement of its own above the one that starts the work, as `paused` does.
+
 ## A list of futures
 
 ```essence
