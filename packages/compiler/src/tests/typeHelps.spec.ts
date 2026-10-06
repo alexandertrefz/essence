@@ -197,6 +197,23 @@ describe("A Type Parameter nothing bound", () => {
 			"Or write the value itself, where what it answers is already known — 'constant items: List<Integer> = []'.",
 		])
 	})
+
+	it("compiles either way the general pair is followed", () => {
+		expect(
+			compiles(`implementation {
+		function blank<infer Item>(_ sample: List<Item>) -> List<Item> {
+			<- []
+		}
+
+		constant items = blank([1])
+	}`),
+		).toBe(true)
+		expect(
+			compiles(`implementation {
+		constant items: List<Integer> = []
+	}`),
+		).toBe(true)
+	})
 })
 
 describe("A return Type nothing could read off the body", () => {
@@ -768,6 +785,21 @@ describe("Reports that knew the fix and said nothing", () => {
 		).toBe(true)
 	})
 
+	it("names the question a String answers in a 'define'", () => {
+		let arms = (condition: string) => `implementation {
+		constant name = "Ada"
+		constant label = define {
+			as "named" if ${condition}
+			as "anonymous" otherwise
+		}
+	}`
+
+		expect(helpsOfCode(arms("name"), "condition-not-boolean")).toEqual([
+			"Ask a question that answers a Boolean — '::hasCharacters()' reads a String.",
+		])
+		expect(compiles(arms("name::hasCharacters()"))).toBe(true)
+	})
+
 	it("names the brackets to take off a call that is not one", () => {
 		let source = `implementation {
 		constant total = 1
@@ -779,6 +811,14 @@ describe("Reports that knew the fix and said nothing", () => {
 			"Remove the '()' — the name already reads the value.",
 			"Or call a Method on it with '::', which is how a Method is reached.",
 		])
+		expect(
+			compiles(`implementation {
+		constant total = 1
+
+		Terminal.print(total)
+		Terminal.print(total::add(1))
+	}`),
+		).toBe(true)
 	})
 
 	// A Namespace is never called, and without the `()` it is a Namespace read
@@ -884,6 +924,16 @@ describe("Reports that knew the fix and said nothing", () => {
 			"Drop the '<-' and write the value on its own, or as a 'constant'.",
 			"Or move the Statement into a Function, which is the only thing a '<-' answers for.",
 		])
+
+		for (let followed of [
+			"42",
+			"constant answer = 42",
+			"function answer() -> Integer {\n\t\t\t<- 42\n\t\t}",
+		]) {
+			expect(compiles(`implementation {\n\t\t${followed}\n\t}`)).toBe(
+				true,
+			)
+		}
 	})
 
 	it("spells the application a bare generic Type wants", () => {
