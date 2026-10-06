@@ -109,6 +109,12 @@ import { aliasTypeParameters, offeredCases } from "./aliasCases"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
+import {
+	branchNamespaces,
+	resolveBranch,
+	takesWitnesses,
+	unboundToReport,
+} from "./dispatchReceivers"
 import { namespaceCallHelps, valueOf } from "./namespaceValues"
 import {
 	bindsLastStep,
@@ -12619,24 +12625,11 @@ function resolveUnionMethodDispatch(
 	let dispatchCases: Array<common.DispatchCase> = []
 	let caseReturnTypes: Array<common.Type> = []
 
-	for (let [memberIndex, memberType] of members.entries()) {
-		let namespaces = resolveMethodLookupNamespacesForReceiverType(
-			memberType,
-			node.namespaceSpecifier,
-			scope,
-		)
-
+	for (let memberType of members) {
 		let { instanceNamespaces: matchingNamespaces, staticNamespaces } =
 			partitionInstanceMethodNamespaces(
 				node.member.content,
-				namespacesDeclaringMethod(
-					node.member.content,
-					namespaces,
-					memberType,
-					scope,
-					node.position,
-					node.namespaceSpecifier,
-				),
+				branchNamespaces(node, memberType, scope),
 			)
 
 		if (matchingNamespaces.size === 0) {
@@ -12741,13 +12734,19 @@ function resolveUnionMethodDispatch(
 		for (let [namespaceName, namespaceType] of matchingNamespaces) {
 			let { result: resolvedMethod, recording } =
 				probeContextualFunctionTypes(() =>
-					resolveInvokedMethodInNamespace(
-						node,
-						namespaceType,
-						unionType,
-						scope,
-						typer,
+					resolveBranch(
 						memberType,
+						namespaceType,
+						scope,
+						(receiver) =>
+							resolveInvokedMethodInNamespace(
+								node,
+								namespaceType,
+								unionType,
+								scope,
+								typer,
+								receiver,
+							),
 					),
 				)
 
@@ -12832,18 +12831,16 @@ function resolveUnionMethodDispatch(
 		// own copy of the Arguments that read their position.
 		commitContextualFunctionTypes(resolvedMethod.recording)
 
-		// The shared Arguments decide unbound Type Parameters, so only the
-		// first member reports them.
-		if (memberIndex === 0) {
-			reportUnboundGenerics(
-				resolvedMethod.unboundGenerics,
-				resolvedMethod.returnType,
-				node.position,
-				typer,
-				node.base,
-				node.arguments,
-			)
-		}
+		// The shared Arguments decide unbound Type Parameters, so the first
+		// member reports them. A later one reports those its witnesses need.
+		reportUnboundGenerics(
+			unboundToReport(resolvedMethod, node, memberType === members[0]),
+			resolvedMethod.returnType,
+			node.position,
+			typer,
+			node.base,
+			node.arguments,
+		)
 
 		// The branch's selection Diagnostics, replayed now that its Namespace
 		// is settled. A failure every branch shares deduplicates.
@@ -12860,6 +12857,7 @@ function resolveUnionMethodDispatch(
 			providedBy: resolvedMethod.namespaceType.providedBy,
 			overloadedMethodIndex: resolvedMethod.overloadedMethodIndex,
 			conformances: resolvedMethod.conformances,
+			takesWitnesses: takesWitnesses(resolvedMethod, node),
 			omittedParameterIndices: resolvedMethod.omittedParameterIndices,
 			contextualArguments: contextualArgumentsForBranch(
 				node,

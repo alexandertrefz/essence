@@ -959,6 +959,10 @@ export type DispatchCase = {
 	namespaceName: string
 	overloadedMethodIndex: number | null
 	conformances: Array<Conformance>
+	// Whether the branch's Method takes a witness Parameter, whatever the call
+	// passes, so the validator never treats two such branches as one call. A
+	// call that passes too few is refused already, so this is a second guard.
+	takesWitnesses: boolean
 	// Per branch, since the branches' Methods need not agree on what may be
 	// left out.
 	omittedParameterIndices: Array<number>

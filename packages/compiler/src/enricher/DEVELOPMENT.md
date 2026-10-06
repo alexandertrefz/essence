@@ -749,11 +749,31 @@ failure reports the Arguments against the receiver as written. Naming one member
 name a Case the author never wrote.
 
 Each branch commits its own recordings as it settles. The Invocation's shared Argument Nodes end up typed by the
-last branch. An Argument that reads its position, an unannotated Function literal or a member path, also gets a
-copy per branch (`contextualArgumentsForBranch`). The emitted dispatch hands each branch its own copy, so
+last branch. An Argument that reads its position, an unannotated Function literal or a member path, also gets a copy
+per branch (`contextualArgumentsForBranch`). The emitted dispatch hands each branch its own copy, so
 `(item) { <- item::label() }` calls each member's own `label`. A body that does not compile against one member's
 Method is an error about the call. A fault every branch shares is reported once, because Diagnostics deduplicate.
-Unbound Type Parameters depend on the shared Arguments, so they are reported for the first member only.
+Unbound Type Parameters depend on the shared Arguments, so the first member reports them all. A later member reports
+only those its Method takes a witness for, since its branch would run without one.
+
+A member that is a Case of a generic Choice, such as `Box<String>#Empty`, binds no Type Parameter its payload leaves
+out, so `namespace Boxes<infer Item> for Box<Item>` would leave `Item` and its witness unbound. Where the Case's
+resolution is refused or leaves a Type Parameter unbound, it is resolved again against the Case's application
+(`resolveBranch`). The application is the Namespace's own target, its Case of the same tag matched against the
+Case's Type Arguments, so the calling Module needs no name for the Choice. It counts only where every Type Parameter
+gets one binding and the applied Case takes the Case's Type Arguments, so `Pair<Item, Item>` binds nothing from a
+`Pair<Integer, String>`. Where that leaves a Type Parameter unbound, the Choice is looked up by its name instead. A
+lookup that is refused is asked again for the application too (`branchNamespaces`). A Protocol's provided Method is
+built for the receiver it was looked up for, so it is always looked up again. Each attempt's Diagnostics are
+reported only once it is taken.
+
+A Case's Type Arguments never decide a match, so a Namespace `for Box<Integer>` is found for `Box<String>#Empty`
+too. The lookup drops a Namespace whose target's Case of the same tag names another application, and keeps one whose
+Type Arguments name Type Parameters. Resolving every branch against its application instead would refuse a call
+whose Cases bind a Namespace's Type Parameters differently, such as `flatten()` on a
+`Result<Result<Integer, String>, Integer>`, which each Case answers on its own. The Notes of an `unknown-method` on
+a Union read each member the same way (`answersFor`). The member stays the branch's runtime test, and each branch
+records whether its Method takes a witness (`takesWitnesses`), for the validator's comparison of branches.
 
 At runtime `dispatchMethod` takes the first branch whose member Type the receiver matches. That match is open, so
 `{ width: Integer }` accepts a `{ width: Integer, height: Integer }`, and each branch must come before the branches

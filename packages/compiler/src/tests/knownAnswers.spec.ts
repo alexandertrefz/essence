@@ -230,6 +230,40 @@ describe("A Method of what the value holds", () => {
 				"'uppercase' answers for String, and not for Integer.",
 			])
 		})
+
+		// A Namespace for another application answers none of the Cases, as
+		// the dispatch reads them.
+		it("should not count a Namespace for another application", () => {
+			let diagnostic = firstOf(
+				`implementation {
+					choice Tag<Item> {
+						On,
+						Off,
+					}
+
+					namespace Lists for Tag<List<Integer>> {
+						describe() -> String {
+							<- "list tag"
+						}
+					}
+
+					namespace Flags for Boolean {
+						describe() -> String {
+							<- "flag"
+						}
+					}
+
+					function show(_ value: Tag<Integer> | Boolean) -> String {
+						<- value::describe()
+					}
+				}`,
+				"unknown-method",
+			)
+
+			expect(diagnostic.notes).toContain(
+				"'describe' answers for Boolean, and not for Tag<Integer>#On and Tag<Integer>#Off.",
+			)
+		})
 	})
 
 	describe("a Future", () => {

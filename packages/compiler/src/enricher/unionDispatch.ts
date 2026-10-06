@@ -2,11 +2,8 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { describeType } from "../helpers/describe"
 import { flattenUnionMembers } from "../helpers/types"
-import {
-	type ArgumentTyper,
-	joinedWithAnd,
-	methodAnswersFor,
-} from "./enrichers"
+import { answersFor } from "./dispatchReceivers"
+import { type ArgumentTyper, joinedWithAnd } from "./enrichers"
 import { compilesWithoutPick } from "./protocolPicks"
 import { reportEmptyLookup } from "./specifiers"
 
@@ -21,14 +18,9 @@ export function dividedUnionNotes(
 	let lacking: Array<string> = []
 
 	for (let member of flattenUnionMembers(unionType)) {
-		let answers = methodAnswersFor(
-			node.member.content,
-			member,
-			scope,
-			node.position,
+		;(answersFor(node, member, scope) ? providing : lacking).push(
+			describeType(member),
 		)
-
-		;(answers ? providing : lacking).push(describeType(member))
 	}
 
 	return providing.length === 0 || lacking.length === 0

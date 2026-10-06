@@ -931,6 +931,303 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
+	// A Case of a generic Choice binds no Type Parameter its payload leaves
+	// out, so a branch for one resolves as its whole application. See "Union
+	// receivers" in packages/compiler/src/enricher/DEVELOPMENT.md.
+	describe("Cases of generic Choices in a dispatch", () => {
+		let defaults = `protocol Defaultable {
+			static default() -> Self
+		}
+
+		namespace IntegerDefaults for Integer is Defaultable {
+			static default() -> Integer {
+				<- 0
+			}
+		}
+
+		namespace StringDefaults for String is Defaultable {
+			static default() -> String {
+				<- "none"
+			}
+		}`
+		let slots = `choice Slot<Item is Defaultable> {
+			Full { item: Item },
+			Empty,
+		}
+
+		namespace Slots<infer Item> for Slot<Item> {
+			value() -> Item {
+				<- match @ -> Item {
+					case #Full { <- @.item }
+					case #Empty { <- Item.default() }
+				}
+			}
+		}`
+		let boxes = `choice Box<Item> {
+			Full { item: Item },
+			Count { n: Integer },
+			Empty,
+		}
+
+		namespace Boxes<infer Item> for Box<Item> {
+			fallback<Item is Defaultable>() -> Item {
+				<- Item.default()
+			}
+		}`
+		let codesOf = (source: string) => {
+			let { program, diagnostics } = enrich(parse(source))
+
+			return [...diagnostics, ...validate(program)].map(
+				(diagnostic) => diagnostic.code,
+			)
+		}
+
+		it("passes the witness of the application a payload-free Case belongs to", async () => {
+			expect(
+				await run(`implementation {
+					${defaults}
+					${slots}
+
+					namespace Numbers for Integer {
+						value() -> Integer {
+							<- @
+						}
+					}
+
+					function show(_ slot: Slot<String> | Integer) -> String | Integer {
+						<- slot::value()
+					}
+
+					constant empty: Slot<String> = #Empty
+
+					Terminal.inspect(show(empty))
+					Terminal.inspect(show(3))
+				}`),
+			).toEqual(['"none"', "3"])
+		})
+
+		it("passes it for a Case whose payload names no Type Parameter", async () => {
+			expect(
+				await run(`implementation {
+					${defaults}
+					${boxes}
+
+					namespace Numbers for Integer {
+						fallback() -> Integer {
+							<- @
+						}
+					}
+
+					function show(_ box: Box<String> | Integer) -> String | Integer {
+						<- box::fallback()
+					}
+
+					constant counted: Box<String> = #Count({ n = 1 })
+
+					Terminal.inspect(show(counted))
+				}`),
+			).toEqual(['"none"'])
+		})
+
+		// Each application's Empty takes its own witness, and no runtime check
+		// tells the two Cases apart, so either would get the other's.
+		it("refuses two applications whose witnesses no runtime check tells apart", () => {
+			expect(
+				codesOf(`implementation {
+					${defaults}
+					${slots}
+
+					function show(_ slot: Slot<Integer> | Slot<String>) -> Integer | String {
+						<- slot::value()
+					}
+				}`),
+			).toEqual(["erased-case-conflict"])
+			expect(
+				codesOf(`implementation {
+					${defaults}
+					${boxes}
+
+					function show(_ box: Box<Integer> | Box<String>) -> Integer | String {
+						<- box::fallback()
+					}
+				}`),
+			).toEqual(["erased-case-conflict"])
+		})
+
+		// A provided Method's conformance condition is asked of the
+		// application, which binds the Type Parameter it names.
+		it("refuses a provided Method's branches for the same reason, not for a condition", () => {
+			let named = (parameter: string) => `implementation {
+				protocol Named {
+					static label() -> String
+				}
+
+				namespace IntegerNames for Integer is Named {
+					static label() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace StringNames for String is Named {
+					static label() -> String {
+						<- "string"
+					}
+				}
+
+				protocol Describable {
+					name() -> String
+
+					describe() -> String {
+						<- "a box of {@::name()}"
+					}
+				}
+
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				namespace Boxes<infer Item> for Box<Item> is Describable where Item is Named {
+					name() -> String {
+						<- Item.label()
+					}
+				}
+
+				function show(_ value: ${parameter}) -> String {
+					<- value::describe()
+				}
+
+				Terminal.inspect(show(Box<String>#Empty))
+			}`
+
+			expect(codesOf(named("Box<Integer> | Box<String>"))).toEqual([
+				"erased-case-conflict",
+			])
+		})
+
+		// A Namespace for `Box<Integer>` is found for `Box<String>#Empty` too,
+		// since a Case's Type Arguments never decide a match. It is not the
+		// Case's Namespace.
+		it("runs the Namespace of the Case's own application", async () => {
+			let boxes = (namespace: string) => `implementation {
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				namespace IntBoxes for Box<Integer> {
+					describe() -> String {
+						<- "integer boxes"
+					}
+				}
+
+				${namespace}
+
+				namespace Flags for Boolean {
+					describe() -> String {
+						<- "flag"
+					}
+				}
+
+				function show(_ value: Box<String> | Boolean) -> String {
+					<- value::describe()
+				}
+
+				Terminal.inspect(show(Box<String>#Empty))
+				Terminal.inspect(show(Box<String>#Full({ item = "a" })))
+			}`
+
+			expect(
+				await run(
+					boxes(`namespace Boxes<infer Item> for Box<Item> {
+						describe() -> String {
+							<- "any boxes"
+						}
+					}`),
+				),
+			).toEqual(['"any boxes"', '"any boxes"'])
+			expect(
+				await run(
+					boxes(`namespace StringBoxes for Box<String> {
+						describe() -> String {
+							<- "string boxes"
+						}
+					}`),
+				),
+			).toEqual(['"string boxes"', '"string boxes"'])
+		})
+
+		// `Pair<Item, Item>` binds `Item` twice from `Pair<Integer, String>`,
+		// which no one binding fits, so the branch binds it as a direct call
+		// does, from the Choice's application.
+		it("binds a repeated Type Parameter as a direct call does", async () => {
+			let pairs = (call: string) => `implementation {
+				protocol Named {
+					static label() -> String
+				}
+
+				namespace IntegerNames for Integer is Named {
+					static label() -> String {
+						<- "integer"
+					}
+				}
+
+				namespace StringNames for String is Named {
+					static label() -> String {
+						<- "string"
+					}
+				}
+
+				choice Pair<A, B> {
+					Left { a: A },
+					Neither,
+				}
+
+				namespace Sames<infer Item> for Pair<Item, Item> {
+					label<Item is Named>() -> String {
+						<- Item.label()
+					}
+				}
+
+				namespace Flags for Boolean {
+					label() -> String {
+						<- "flag"
+					}
+				}
+
+				function show(_ value: Pair<Integer, String> | Boolean) -> String {
+					<- value::label()
+				}
+
+				constant none: Pair<Integer, String> = #Neither
+
+				Terminal.inspect(${call})
+			}`
+
+			expect(await run(pairs("none::label()"))).toEqual(['"integer"'])
+			expect(await run(pairs("show(none)"))).toEqual(['"integer"'])
+		})
+
+		// The Help the refusal gives: the receiver as one application.
+		it("runs the Method once the receiver is one application", async () => {
+			expect(
+				await run(`implementation {
+					${defaults}
+					${slots}
+
+					function show(_ slot: Slot<String>) -> String {
+						<- slot::value()
+					}
+
+					constant empty: Slot<String> = #Empty
+
+					Terminal.inspect(show(empty))
+					Terminal.inspect(show(Slot<String>#Full({ item = "a" })))
+				}`),
+			).toEqual(['"none"', '"a"'])
+		})
+	})
+
 	describe("Static Method bodies", () => {
 		// A static Method has no `_self` Parameter for `@` to lower to. The
 		// Enricher refuses `@` there, so the Simplifier's own guard is reached by

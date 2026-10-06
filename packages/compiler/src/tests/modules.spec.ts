@@ -4772,6 +4772,253 @@ implementation {
 		)
 	})
 
+	// The Case's Type Arguments bind the Namespace's `Item` through the
+	// Namespace's own target, so `Main.es` needs no name for `Slot`.
+	it("dispatches a Case of a Choice the calling Module never imported", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Slot.es" {
+		Slots
+		StringDefaults
+		StringSlot
+		empty
+	}
+}
+
+implementation {
+	namespace Numbers for Integer {
+		value() -> Integer {
+			<- @
+		}
+	}
+
+	function show(_ slot: StringSlot | Integer) -> String | Integer {
+		<- slot::value()
+	}
+
+	Terminal.inspect(show(empty))
+	Terminal.inspect(show(3))
+}
+`,
+				"Slot.es": `implementation {
+	protocol Defaultable {
+		static default() -> Self
+	}
+
+	namespace StringDefaults for String is Defaultable {
+		static default() -> String {
+			<- "none"
+		}
+	}
+
+	choice Slot<Item is Defaultable> {
+		Full { item: Item },
+		Empty,
+	}
+
+	namespace Slots<infer Item> for Slot<Item> {
+		value() -> Item {
+			<- match @ -> Item {
+				case #Full { <- @.item }
+				case #Empty { <- Item.default() }
+			}
+		}
+	}
+
+	type StringSlot = Slot<String>
+
+	constant empty: StringSlot = #Empty
+}
+
+export {
+	Slots
+	StringDefaults
+	StringSlot
+	empty
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"none"', "3"])
+			},
+		)
+	})
+
+	// The applied target `Pair<Integer, String>` takes the Case's
+	// `Pair<PositiveInteger, String>`, though not the other way round.
+	it("dispatches a Case whose Type Argument the Namespace's target widens", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Lib.es" {
+		StringNames
+		Targets
+		Value
+		value
+	}
+}
+
+implementation {
+	namespace Flags for Boolean {
+		label() -> String {
+			<- "flag"
+		}
+	}
+
+	function show(_ input: Value | Boolean) -> String {
+		<- input::label()
+	}
+
+	Terminal.print(show(value))
+	Terminal.print(value::label())
+}
+`,
+				"Lib.es": `implementation {
+	protocol Named {
+		static label() -> String
+	}
+
+	namespace StringNames for String is Named {
+		static label() -> String {
+			<- "string"
+		}
+	}
+
+	choice Pair<A, B> { Both { a: A, b: B }, Neither }
+
+	namespace Targets<infer Item> for Pair<Integer, Item> {
+		label<Item is Named>() -> String {
+			<- Item.label()
+		}
+	}
+
+	type Value = Pair<PositiveInteger, String>
+
+	constant value: Value = #Neither
+}
+
+export {
+	StringNames
+	Targets
+	Value
+	value
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["string", "string"])
+			},
+		)
+	})
+
+	// The Type Parameter sits inside the target's Type Argument, as in
+	// `Box<List<Item>>`, and binds there.
+	it("dispatches a Case whose Namespace nests its Type Parameter", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Box.es" {
+		Boxes
+		Options
+		StringDefaults
+		StringListBox
+		StringOptionBox
+		empty
+		emptyOption
+	}
+}
+
+implementation {
+	namespace Numbers for Integer {
+		fallback() -> Integer {
+			<- @
+		}
+
+		other() -> Integer {
+			<- @
+		}
+	}
+
+	function show(_ box: StringListBox | Integer) -> String | Integer {
+		<- box::fallback()
+	}
+
+	function option(_ box: StringOptionBox | Integer) -> String | Integer {
+		<- box::other()
+	}
+
+	Terminal.inspect(show(empty))
+	Terminal.inspect(option(emptyOption))
+}
+`,
+				"Box.es": `implementation {
+	protocol Defaultable {
+		static default() -> Self
+	}
+
+	namespace StringDefaults for String is Defaultable {
+		static default() -> String {
+			<- "none"
+		}
+	}
+
+	choice Box<Item> {
+		Full { item: Item },
+		Empty,
+	}
+
+	namespace Boxes<infer Item> for Box<List<Item>> {
+		fallback<Item is Defaultable>() -> Item {
+			<- Item.default()
+		}
+	}
+
+	namespace Options<infer Item> for Box<Optional<Item>> {
+		other<Item is Defaultable>() -> Item {
+			<- Item.default()
+		}
+	}
+
+	type StringListBox = Box<List<String>>
+	type StringOptionBox = Box<Optional<String>>
+
+	constant empty: StringListBox = #Empty
+	constant emptyOption: StringOptionBox = #Empty
+}
+
+export {
+	Boxes
+	Options
+	StringDefaults
+	StringListBox
+	StringOptionBox
+	empty
+	emptyOption
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"none"', '"none"'])
+			},
+		)
+	})
+
 	// The body is emitted once, where the Protocol is declared, and binds the
 	// Pattern there.
 	it("runs a provided Method that takes its Parameter apart from another Module", async () => {
