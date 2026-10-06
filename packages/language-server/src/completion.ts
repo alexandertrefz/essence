@@ -1298,6 +1298,17 @@ function analyseCaseProbe(program: common.typed.Program): {
 			case "FunctionDefinition":
 				visitExpecting(node, "body", node.returnType)
 				return
+			// A `<-` in either branch returns what the body around the `if` returns.
+			// The Condition, like a Guard, is read against nothing.
+			case "IfStatement":
+			case "IfElseStatement":
+				forEachTypedChild(node, (child, _state, field) =>
+					visitNode(
+						child,
+						field === "condition" ? null : expectedType,
+					),
+				)
+				return
 			// An Argument is read against what its Parameter expects, and each half of
 			// an update against the whole.
 			case "ReturnStatement":

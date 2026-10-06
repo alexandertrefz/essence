@@ -4139,6 +4139,30 @@ describe("Completion inside each kind of node", () => {
 				"a refinement's predicate",
 				["\ttype Backward = Edge where place(#‸)::is(@)"],
 			],
+			[
+				"an if's body",
+				[
+					"\tfunction pick(_ flag: Boolean) -> Edge {",
+					"\t\tif flag {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"",
+					"\t\t<- #Back",
+					"\t}",
+				],
+			],
+			[
+				"an else body",
+				[
+					"\tfunction pick(_ flag: Boolean) -> Edge {",
+					"\t\tif flag {",
+					"\t\t\t<- #Back",
+					"\t\t} else {",
+					"\t\t\t<- #‸",
+					"\t\t}",
+					"\t}",
+				],
+			],
 		])("should offer the expected Choice's Cases in %s", (_, lines) => {
 			expect(casesAt(lines)).toEqual(["Front (preselected)", "Back"])
 		})
