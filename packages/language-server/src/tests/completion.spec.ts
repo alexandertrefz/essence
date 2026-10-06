@@ -4182,6 +4182,20 @@ describe("Completion inside each kind of node", () => {
 				"Packed",
 			])
 		})
+
+		// A call that leaves an Argument out pairs the rest with Parameters by
+		// label, as the Compiler does.
+		it("should offer the Choice of the Parameter a label names", () => {
+			expect(
+				casesAt([
+					"\tfunction lay(at edge: Edge = #Front, sized size: Size) -> Size {",
+					"\t\t<- size",
+					"\t}",
+					"",
+					"\tconstant laid = lay(sized #‸)",
+				]),
+			).toEqual(["Small (preselected)", "Large"])
+		})
 	})
 
 	describe("a declared name's detail", () => {

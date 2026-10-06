@@ -1322,11 +1322,19 @@ function analyseCaseProbe(program: common.typed.Program): {
 					calleeType.type === "Function"
 						? calleeType.parameterTypes
 						: null
+				// A call that leaves an Argument out pairs the rest by label.
+				let parameterForArgument = pairedParameters(
+					node.arguments,
+					parameterTypes,
+				)
 
 				forEachTypedChild(node, (child, _state, field, key) => {
+					let index = key as number
 					let parameterType =
 						field === "arguments"
-							? (parameterTypes?.[key as number]?.type ?? null)
+							? (parameterTypes?.[
+									parameterForArgument[index] ?? index
+								]?.type ?? null)
 							: null
 
 					visitNode(
