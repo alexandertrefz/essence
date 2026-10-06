@@ -961,6 +961,54 @@ describe("Dispatch and Resolution", () => {
 		})
 	})
 
+	// A value of both member Types takes the branch the dispatch orders first,
+	// which `dispatch-overlap` reports. A Match puts it where its Cases say.
+	describe("Member Types that share values", () => {
+		let sides = `type Left = { a: Integer | String }
+			type Right = { a: String | Boolean }
+
+			namespace Lefts for Left {
+				describe() -> String {
+					<- "left"
+				}
+			}
+
+			namespace Rights for Right {
+				describe() -> String {
+					<- "right"
+				}
+			}
+
+			constant shared: Right = { a = "x" }
+			constant either: Left | Right = shared`
+
+		it("takes the branch ordered first for a shared value", async () => {
+			expect(
+				await run(
+					`implementation {
+						${sides}
+
+						Terminal.inspect(either::describe())
+					}`,
+					["dispatch-overlap"],
+				),
+			).toEqual(['"left"'])
+		})
+
+		it("takes the Case written first once the receiver is matched", async () => {
+			expect(
+				await run(`implementation {
+					${sides}
+
+					Terminal.inspect(match either -> String {
+						case Right { <- @::describe() }
+						case Left { <- @::describe() }
+					})
+				}`),
+			).toEqual(['"right"'])
+		})
+	})
+
 	// A Case of a generic Choice binds no Type Parameter its payload leaves
 	// out, so a branch for one resolves as its whole application. See "Union
 	// receivers" in packages/compiler/src/enricher/DEVELOPMENT.md.

@@ -15,6 +15,7 @@ import {
 	type ApplicationCrossing,
 	crossingApplication,
 	ITEM_STEPS,
+	type NestedCrossing,
 	nestedCrossing,
 } from "./runtimeOverlap"
 
@@ -90,15 +91,21 @@ export function reportApplicationOverlap(
 
 // The same overlap between two branches of a dispatched Method. Only some
 // values cross, since a branch that takes every value of another is
-// `erased-case-conflict`.
+// `erased-case-conflict`. A crossing inside a member leaves no Case for a
+// Match to write, so its Help asks for one application.
 export function reportDispatchApplicationOverlap(
 	node: common.typed.MethodInvocationNode,
-	crossing: ApplicationCrossing,
+	branches: { earlier: common.Type; later: common.Type },
+	{ path, crossings }: NestedCrossing,
 	memberTypes: Array<common.Type>,
 	spell: Spelling,
 ): void {
-	let member = spellType(crossing.member, spell)
-	let matchers = spelledMatchers([crossing], memberTypes, spell)
+	let [crossing] = crossings
+	let member = spellType(branches.later, spell)
+	let matchers =
+		path.length === 0
+			? spelledMatchers(crossings, memberTypes, spell)
+			: null
 
 	reportWarning(
 		`The branch for ${member} never sees some of its values`,
@@ -108,7 +115,7 @@ export function reportDispatchApplicationOverlap(
 			labels: [
 				primary(
 					node.member.position,
-					`some ${member} values fit ${spellType(crossing.matcher, spell)} too, and that branch is tried first`,
+					`some ${member} values fit ${spellType(branches.earlier, spell)} too, and that branch is tried first`,
 				),
 				secondary(
 					node.base.position,

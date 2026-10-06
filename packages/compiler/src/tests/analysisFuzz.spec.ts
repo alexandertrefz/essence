@@ -233,6 +233,7 @@ const VALIDATOR_ONLY_CODES = new Set([
 	"empty-list-overlap",
 	"empty-dictionary-overlap",
 	"type-argument-overlap",
+	"dispatch-overlap",
 	"unused-future",
 	"unobserved-started",
 ])

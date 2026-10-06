@@ -304,11 +304,21 @@ Choice, and the Match goes with it. A Guard on the earlier Case still claims not
 
 Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
 conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it
-never runs. A crossing inside a member is not reported there, since a Match that binds the member would have to
-rebuild the receiver in every arm to call the Method. Two branches that emit the same call are not compared at all
-(`sameBranchCode`): one Method that takes no witness, with no Function literal typed for its branch and no derived
-comparison. Whichever of them a value takes, the same code runs, as for `items::hasItems()` on a
-`List<Integer> | List<String>`.
+never runs. A crossing inside a member is reported there too. No Case can be written for it, and a Match that bound
+the member would have to rebuild the receiver in every arm, so the Help asks for the receiver's Type as one
+application. A partial overlap is erasure, `erased-case-conflict` as for a whole branch, where a refinement in the
+earlier branch's check would turn the later Type away at the slot where the two overlap, since the check sees only
+the base (`refinedOverlap`). A refinement both sides share, or one only the later side has, turns nothing away. Two
+refinements of an Integer are compared as ranges less the values `isNot` excludes, where every conjunct is one of
+the Integer Namespace's comparisons with one whole, unlabelled bound. So `isLessThan(5)` inside `isLessThan(10)`
+turns nothing away, while `isNot(5)` turns away all of `is(5)`. A comparison another Namespace answers may mean
+anything, so it decides nothing. Where no range decides, the overlap stays `dispatch-overlap`, worded with only what
+is known. A Matcher can not test a member Type that holds a refinement, so there the Help asks for a value of one
+member Type. Any other partial overlap between two branches is `dispatch-overlap`. A value of both member Types runs
+the branch ordered first, in an order nobody wrote, so the Help asks for a Match whose Cases state the order. Two
+branches that emit the same call are not compared at all (`sameBranchCode`): one Method that takes no witness, with
+no Function literal typed for its branch and no derived comparison. Whichever of them a value takes, the same code
+runs, as for `items::hasItems()` on a `List<Integer> | List<String>`.
 
 ## Literal Matches
 

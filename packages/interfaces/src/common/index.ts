@@ -395,6 +395,7 @@ export type DiagnosticCode =
 	| "empty-list-overlap"
 	| "empty-dictionary-overlap"
 	| "type-argument-overlap"
+	| "dispatch-overlap"
 	| "refinement-as-matcher"
 	| "match-on-non-union"
 	| "literal-match-shape"

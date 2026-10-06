@@ -1,7 +1,11 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { eraseRefinements } from "../helpers/eraseRefinements"
-import { flattenUnionMembers, matchesType } from "../helpers/types"
+import {
+	flattenUnionMembers,
+	matchesType,
+	refinableBaseTag,
+} from "../helpers/types"
 
 // Whether the check emitted for `matcher` accepts every value of
 // `memberType`. See "Runtime overlap" in DEVELOPMENT.md. Exported for the spec
@@ -259,6 +263,252 @@ export function emptyCrossover(
 	}
 
 	return null
+}
+
+// A refinement in an earlier branch's check and the Type it takes once its
+// predicate erases. `decided` says the refinement is known to turn it away.
+export type RefinedOverlap = {
+	matcher: common.Type
+	member: common.Type
+	decided: boolean
+}
+
+// The refinement found at a slot where the two branches share a value. Only a
+// refinement that would turn the Type away counts, which makes the overlap
+// erasure rather than shared values. One that may or may not is undecided, and
+// is answered only where nothing is decided. Null where none is found.
+export function refinedOverlap(
+	matcher: common.Type,
+	memberType: common.Type,
+): RefinedOverlap | null {
+	if (!overlapsAtRuntime(matcher, memberType)) {
+		return null
+	}
+
+	let arms =
+		memberType.type === "UnionType"
+			? flattenUnionMembers(memberType).map((arm) => [matcher, arm])
+			: matcher.type === "UnionType"
+				? flattenUnionMembers(matcher).map((arm) => [arm, memberType])
+				: []
+
+	if (arms.length > 0) {
+		return firstRefined(
+			arms.map(
+				([armMatcher, armMember]) =>
+					() =>
+						refinedOverlap(armMatcher, armMember),
+			),
+		)
+	}
+
+	if (matcher.type === "Refinement") {
+		let decided = refinementTurnsAway(matcher, memberType)
+
+		return decided === false
+			? null
+			: { matcher, member: memberType, decided: decided === true }
+	}
+
+	return firstRefined(
+		slotsOf(memberType).map(([step, memberAt]) => () => {
+			let matcherAt = sameShape(matcher, memberType)
+				? slotOf(matcher, step)
+				: null
+
+			return matcherAt === null
+				? null
+				: refinedOverlap(matcherAt, memberAt)
+		}),
+	)
+}
+
+// The first overlap that is decided, or else the first one at all.
+function firstRefined(
+	finds: Array<() => RefinedOverlap | null>,
+): RefinedOverlap | null {
+	let undecided: RefinedOverlap | null = null
+
+	for (let find of finds) {
+		let found = find()
+
+		if (found?.decided === true) {
+			return found
+		}
+
+		undecided ??= found
+	}
+
+	return undecided
+}
+
+// Whether a refinement turns away some value of `memberType` its erased check
+// takes: true, false, or null where that is not decided. Two refinements of an
+// Integer are read as ranges less the values they exclude (`integerSet`).
+function refinementTurnsAway(
+	refinement: common.RefinementType,
+	memberType: common.Type,
+): boolean | null {
+	if (matchesType(refinement, memberType)) {
+		return false
+	}
+
+	if (
+		memberType.type !== "Refinement" ||
+		refinableBaseTag(memberType) !== refinableBaseTag(refinement)
+	) {
+		return true
+	}
+
+	let taken = integerSet(refinement)
+	let held = integerSet(memberType)
+
+	if (taken === null || held === null) {
+		return null
+	}
+
+	// A held value outside the range taken, or one the range excludes.
+	let outside = [
+		taken.low === null ? null : { low: held.low, high: taken.low - 1n },
+		taken.high === null ? null : { low: taken.high + 1n, high: held.high },
+	]
+
+	return (
+		outside.some(
+			(segment) =>
+				segment !== null &&
+				holdsAnyOf(held, {
+					low: tighterBound(segment.low, held.low, "low"),
+					high: tighterBound(segment.high, held.high, "high"),
+				}),
+		) ||
+		[...taken.excluded].some(
+			(value) =>
+				!held.excluded.has(value) &&
+				(held.low === null || value >= held.low) &&
+				(held.high === null || value <= held.high),
+		)
+	)
+}
+
+type IntegerSet = {
+	low: bigint | null
+	high: bigint | null
+	excluded: Set<bigint>
+}
+
+// The tighter of two bounds on one side, an open one being no bound.
+function tighterBound(
+	first: bigint | null,
+	second: bigint | null,
+	side: "low" | "high",
+): bigint | null {
+	if (first === null || second === null) {
+		return first ?? second
+	}
+
+	return side === "low"
+		? first > second
+			? first
+			: second
+		: first < second
+			? first
+			: second
+}
+
+// Whether a set holds some Integer of a segment, open ends being unbounded.
+function holdsAnyOf(
+	set: IntegerSet,
+	segment: { low: bigint | null; high: bigint | null },
+): boolean {
+	if (segment.low === null || segment.high === null) {
+		return true
+	}
+
+	if (segment.high < segment.low) {
+		return false
+	}
+
+	let size = segment.high - segment.low + 1n
+
+	if (size > BigInt(set.excluded.size)) {
+		return true
+	}
+
+	for (let value = segment.low; value <= segment.high; value++) {
+		if (!set.excluded.has(value)) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// The Integers a refinement admits: bounds that are null where open, less the
+// values it excludes. Null where a conjunct is not one of the Integer
+// Namespace's comparisons with one whole, unlabelled bound.
+function integerSet(type: common.Type): IntegerSet | null {
+	let set: IntegerSet = { low: null, high: null, excluded: new Set() }
+	let current = type
+
+	while (current.type === "Refinement") {
+		for (let conjunct of current.conjuncts ?? [null]) {
+			let bound = conjunct === null ? null : wholeBound(conjunct)
+
+			if (bound === null || conjunct === null) {
+				return null
+			}
+
+			let key = `${conjunct.methodName} ${conjunct.negated}`
+
+			if (key === "is true") {
+				set.excluded.add(bound)
+
+				continue
+			}
+
+			let low =
+				key === "isGreaterThan false"
+					? bound + 1n
+					: key === "isLessThan true" || key === "is false"
+						? bound
+						: null
+			let high =
+				key === "isLessThan false"
+					? bound - 1n
+					: key === "isGreaterThan true" || key === "is false"
+						? bound
+						: null
+
+			if (low === null && high === null) {
+				return null
+			}
+
+			set.low = low === null ? set.low : tighterBound(set.low, low, "low")
+			set.high =
+				high === null ? set.high : tighterBound(set.high, high, "high")
+		}
+
+		current = current.base
+	}
+
+	return current.type === "Integer" ? set : null
+}
+
+// The one whole bound of a comparison the Integer Namespace answers, written
+// without a label, or null.
+function wholeBound(conjunct: common.PredicateConjunct): bigint | null {
+	let [argument] = conjunct.args
+
+	return conjunct.namespaceName === "Integer" &&
+		conjunct.args.length === 1 &&
+		typeof argument === "string" &&
+		/^-?\d+$/.test(argument) &&
+		(conjunct.spelling?.args ?? []).every(
+			(written) => typeof written !== "object",
+		)
+		? BigInt(argument)
+		: null
 }
 
 // A Case of one application whose values a Matcher's Case of another

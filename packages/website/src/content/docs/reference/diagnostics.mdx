@@ -3677,6 +3677,8 @@ Error: The branch for Logger can never run
 
 </div>
 
+A refinement's predicate erases too, so on `{ a: Small } | { a: Large }`, with `Small` and `Large` refinements of `Integer`, the branch for `Large` never runs. Where a refinement tells apart only some of the values, the branch never sees those. The help asks for a value of one member type, whose own namespace answers without a runtime check.
+
 Two applications of one case ask one erased question too. With `b: Box<Integer> | Box<String>`, `b::is(#Empty)` has a branch for each, and `Box<Integer>#Empty` and `Box<String>#Empty` differ only in their type arguments. The note says so, and the help names the edit that removes the overlap: `Write the receiver's Type as one application of 'Box'.`
 
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
@@ -3796,9 +3798,39 @@ Write the case the Help names above the case that runs first. A case matcher suc
 
 The case can cross inside a member too. With `choice Holder { Hold { box: Box<Integer> | Box<String> } }`, `case #Hold({ box: Box<Integer> })` above `case #Hold({ box: Box<String> })` takes every `Hold` whose `box` is `Box<String>#Empty`. No pattern can name a case of every application, so the Help binds the member in one case and matches it there: `case Holder#Hold({ box })`, whose `match box` starts with `case Box#Empty`. A record matcher such as `case { box: Box<Integer> }` gets the same Help, with `case { box }`. A list that holds only such cases crosses with them, so `case List<Box<Integer>>` above `case List<Box<String>>` takes every `[Box<String>#Empty]`. No case can be written for that list, and a `where @::hasItems()` guard leaves it crossing, so the Help asks for one application of `Box` in the matched value's type.
 
-A method call's **dispatch branches** over two applications report it too, where a payload such as an empty list holds nothing to tell them apart. There is no `match` to add a case to yet, so the Help asks for one: the case of its own first, then a case for each application that calls the method. A branch that takes every value of another is [`erased-case-conflict`](#erased-case-conflict) instead.
+A method call's **dispatch branches** over two applications report it too, where a payload such as an empty list holds nothing to tell them apart. There is no `match` to add a case to yet, so the Help asks for one: the case of its own first, then a case for each application that calls the method. Where the case crosses inside a member, as on a `{ box: Box<Integer> } | { box: Box<String> }` receiver, no case can be written for it, and the Help asks for the receiver's type as one application of `Box`. A branch that takes every value of another is [`erased-case-conflict`](#erased-case-conflict) instead.
 
 Taught on: [Generics › Types erase before a match](/docs/language/generics#types-erase-before-a-match)
+
+### `dispatch-overlap`
+
+**Warning.** Two branches of a method call on a union receiver have member types that share values, so a value of both runs the branch the compiler orders first. The values really are shared: `{ a = "x" }` is a `Left` and a `Right` at once. Where a refinement in the earlier branch would turn the value away, as `{ a: Small }` turns away a `{ a: Large }`, the check sees only two integers, and the call is [`erased-case-conflict`](#erased-case-conflict) instead. A refinement both branches share turns nothing away, so it is no erasure, and neither does `Integer where @::isLessThan(5)` against `isLessThan(10)`, since the compiler compares two refinements of an integer written as ranges, inclusive ones and `isNot` among them. Where no range decides, the warning says only what is known. A `case` cannot test a member type that holds a refinement, so there the help asks for a value of one member type instead of a `match`.
+
+<div class="error-output">
+
+```
+[dispatch-overlap]
+Warning: The branch for Right never sees the values Left shares with it
+    ╭─┤ Sides.es:18:13 │
+    │
+ 18 │        <- value::describe()
+    │           ──┬──  ────┬───  
+    │             ╰────────│───── this is a Left | Right
+    │                      │     
+    │                      ╰───── a value of both takes the branch for Left, which is tried first
+    │ 
+    │ Help: Match the receiver with a Case for each member Type, in the order their shared values should go, and call the Method inside each.
+    │ 
+    │ Note 1: A branch is picked by the receiver's Type at runtime, and the first one that fits wins.
+    │ Note 2: A value can be a Left and a Right at once, and fits both branches.
+────╯
+```
+
+</div>
+
+The order of the branches is the compiler's, not yours. A `match` tries its cases in the order they are written, so match the receiver, with a case for each member type in the order its shared values should go, and call the method inside each: `case Right { <- @::describe() }` above `case Left { <- @::describe() }` sends `{ a = "x" }` to `Rights`. Overlaps that erasure causes have codes of their own: [`empty-list-overlap`](#empty-list-overlap), [`empty-dictionary-overlap`](#empty-dictionary-overlap) and [`type-argument-overlap`](#type-argument-overlap).
+
+Taught on: [Namespaces and methods › Choosing between namespaces](/docs/language/namespaces-and-methods#choosing-between-namespaces)
 
 ### `refinement-as-matcher`
 

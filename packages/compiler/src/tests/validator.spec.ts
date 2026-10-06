@@ -2113,6 +2113,320 @@ describe("Validator", () => {
 			)
 		})
 
+		// No Case can be written for the `box` a member holds, so the Help
+		// asks for one application.
+		it("should warn about a branch another application's Case reaches inside a member", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				namespace IntegerHeld for { box: Box<Integer> } {
+					describe() -> String {
+						<- "integers"
+					}
+				}
+
+				namespace StringHeld for { box: Box<String> } {
+					describe() -> String {
+						<- "strings"
+					}
+				}
+
+				constant held: { box: Box<Integer> } | { box: Box<String> } = { box = Box<String>#Empty }
+
+				Terminal.inspect(held::describe())
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps,
+				]),
+			).toEqual([
+				[
+					"type-argument-overlap",
+					["Write the receiver's Type as one application of 'Box'."],
+				],
+			])
+		})
+
+		it("should warn about branches whose member Types share values", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Left = { a: Integer | String }
+				type Right = { a: String | Boolean }
+
+				namespace Lefts for Left {
+					describe() -> String {
+						<- "left"
+					}
+				}
+
+				namespace Rights for Right {
+					describe() -> String {
+						<- "right"
+					}
+				}
+
+				constant either: Left | Right = { a = "x" }
+
+				Terminal.inspect(either::describe())
+			}`)
+
+			expect(diagnostics).toHaveLength(1)
+			expect(diagnostics[0].severity).toBe("warning")
+			expect(diagnostics[0].code).toBe("dispatch-overlap")
+			expect(diagnostics[0].message).toBe(
+				"The branch for Right never sees the values Left shares with it",
+			)
+		})
+
+		// `Small` and `Large` share no value, but the check sees two Integers.
+		describe("told apart by a refinement", () => {
+			let sides = (left: string, right: string) => `implementation {
+				type Small = Integer where @::isLessThan(10)
+				type Large = Integer where @::isGreaterThan(100)
+				type Left = { a: ${left} }
+				type Right = { a: ${right} }
+
+				namespace Lefts for Left {
+					describe() -> String {
+						<- "left"
+					}
+				}
+
+				namespace Rights for Right {
+					describe() -> String {
+						<- "right"
+					}
+				}
+
+				function show(_ value: Left | Right) -> String {
+					<- value::describe()
+				}
+			}`
+			let erasureNote =
+				"A refinement's predicate does not survive to runtime, so the check for Small asks only for an Integer, which a Large is too."
+			let help =
+				"Call the Method on a value of one member Type, such as 'Right', so its own Namespace answers without a runtime check."
+
+			it("should refuse a branch only some of whose values a refinement tells apart", () => {
+				let diagnostics = diagnosticsFor(
+					sides("Small | String", "Large | Boolean"),
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => [
+						diagnostic.severity,
+						diagnostic.code,
+						diagnostic.message,
+					]),
+				).toEqual([
+					[
+						"error",
+						"erased-case-conflict",
+						"The branch for Right never sees some of its values",
+					],
+				])
+				expect(diagnostics[0].notes).toContain(erasureNote)
+				expect(diagnostics[0].helps).toEqual([help])
+			})
+
+			it("should name the refinement where it erases a whole branch", () => {
+				let diagnostics = diagnosticsFor(sides("Small", "Large"))
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["erased-case-conflict"])
+				expect(diagnostics[0].notes).toContain(erasureNote)
+				expect(diagnostics[0].helps).toEqual([help])
+			})
+
+			// Values with a String `a` are shared. Where `n` is the same Type on
+			// both sides, or only the later one refines it, the refinement turns
+			// none of them away.
+			let shared = (left: string, right: string) => `implementation {
+				type Small = Integer where @::isLessThan(10)
+				type Left = { a: Integer | String, n: ${left} }
+				type Right = { a: String | Boolean, n: ${right} }
+
+				namespace Lefts for Left {
+					describe() -> String {
+						<- "left"
+					}
+				}
+
+				namespace Rights for Right {
+					describe() -> String {
+						<- "right"
+					}
+				}
+
+				function show(_ value: Left | Right) -> String {
+					<- value::describe()
+				}
+			}`
+
+			it("should warn about shared values where the refinement turns none away", () => {
+				expect(
+					diagnosticsFor(shared("Small", "Small")).map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toEqual(["dispatch-overlap"])
+				expect(
+					diagnosticsFor(shared("Integer", "Small")).map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toEqual(["dispatch-overlap"])
+			})
+
+			// Every `Tiny` is a `Small`, read off the two ranges, so a value
+			// with a String `a` really is of both member Types.
+			let ranged = (right: string) => `implementation {
+				type Small = Integer where @::isLessThan(10)
+				type Tiny = Integer where @::isLessThan(5)
+				type Odd = Integer where @::isOdd()
+				type Left = { a: Integer | String, n: Small }
+				type Right = { a: String | Boolean, n: ${right} }
+
+				namespace Lefts for Left {
+					describe() -> String {
+						<- "left"
+					}
+				}
+
+				namespace Rights for Right {
+					describe() -> String {
+						<- "right"
+					}
+				}
+
+				function show(_ value: Left | Right) -> String {
+					<- value::describe()
+				}
+			}`
+
+			it("should warn about shared values where one range holds the other", () => {
+				let diagnostics = diagnosticsFor(ranged("Tiny"))
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["dispatch-overlap"])
+				expect(diagnostics[0].notes).toContain(
+					"A value can be a Left and a Right at once, and fits both branches.",
+				)
+				expect(diagnostics[0].helps).toEqual([help])
+			})
+
+			// `isOdd()` is no range, so whether every Odd is a Small is open.
+			it("should say only what is known where no range decides", () => {
+				let diagnostics = diagnosticsFor(ranged("Odd"))
+
+				expect(
+					diagnostics.map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.message,
+					]),
+				).toEqual([
+					[
+						"dispatch-overlap",
+						"The branch for Right never sees the values the branch for Left takes too",
+					],
+				])
+				expect(diagnostics[0].notes).toContain(
+					"Small and Odd are both checked as an Integer, and the compiler does not decide whether every Odd is a Small.",
+				)
+				expect(diagnostics[0].helps).toEqual([help])
+			})
+
+			// Each `n` refines an Integer, and the earlier one is read off its
+			// conjuncts where the Integer Namespace answers them.
+			let bounded = (
+				prefix: string,
+				left: string,
+				right: string,
+			) => `implementation {
+				${prefix}
+				type L = Integer where ${left}
+				type R = Integer where ${right}
+				type Left = { n: L, a: Integer | String }
+				type Right = { n: R, a: String | Boolean }
+
+				namespace Lefts for Left {
+					describe() -> String {
+						<- "left"
+					}
+				}
+
+				namespace Rights for Right {
+					describe() -> String {
+						<- "right"
+					}
+				}
+
+				function show(_ value: Left | Right) -> String {
+					<- value::describe()
+				}
+			}`
+
+			// Every R below 6 is turned away by L.
+			it("should read an inclusive bound as a range", () => {
+				expect(
+					diagnosticsFor(
+						bounded(
+							"",
+							"@::isGreaterThanOrEqualTo(6)",
+							"@::isGreaterThanOrEqualTo(0)",
+						),
+					).map((diagnostic) => diagnostic.code),
+				).toEqual(["erased-case-conflict"])
+			})
+
+			it("should decide a value against its exclusion", () => {
+				expect(
+					diagnosticsFor(bounded("", "@::isNot(5)", "@::is(5)")).map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toEqual(["erased-case-conflict"])
+			})
+
+			// `isLessThan(than:)` is the Program's own, and may mean anything.
+			it("should not read a comparison another Namespace answers", () => {
+				let diagnostics = diagnosticsFor(
+					bounded(
+						`namespace Weird for Integer {
+							overload isLessThan {
+								(than other: Integer) -> Boolean {
+									<- true
+								}
+							}
+						}`,
+						"@::isLessThan(6)",
+						"@::isLessThan(than 5)",
+					),
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["dispatch-overlap"])
+				expect(diagnostics[0].notes).toContain(
+					"L and R are both checked as an Integer, and the compiler does not decide whether every R is an L.",
+				)
+			})
+
+			it("should refuse the branch where the earlier check's refinement erases", () => {
+				let diagnostics = diagnosticsFor(shared("Small", "Integer"))
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["erased-case-conflict"])
+				expect(diagnostics[0].notes).toContain(
+					"A refinement's predicate does not survive to runtime, so the check for Small asks only for an Integer, and every Integer passes it.",
+				)
+			})
+		})
+
 		it("should stay silent for branches a runtime check tells apart", () => {
 			expect(
 				diagnosticsFor(`implementation {

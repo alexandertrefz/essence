@@ -709,6 +709,130 @@ describe("A Case another application's Case crosses into", () => {
 	})
 })
 
+describe("Dispatch branches that share values", () => {
+	// The receiver as one application leaves one branch to call.
+	it("should compile once a member's Choice is one application", () => {
+		let held = (receiver: string) => `implementation {
+			choice Box<Item> {
+				Full { item: Item },
+				Empty,
+			}
+
+			namespace IntegerHeld for { box: Box<Integer> } {
+				describe() -> String {
+					<- "integers"
+				}
+			}
+
+			namespace StringHeld for { box: Box<String> } {
+				describe() -> String {
+					<- "strings"
+				}
+			}
+
+			constant held: ${receiver} = { box = Box<String>#Empty }
+
+			Terminal.print(held::describe())
+		}`
+
+		expect(
+			firstAnalysed(
+				held("{ box: Box<Integer> } | { box: Box<String> }"),
+				"type-argument-overlap",
+			).helps,
+		).toEqual(["Write the receiver's Type as one application of 'Box'."])
+
+		let followed = held("{ box: Box<String> }")
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	// A Match tries its Cases in the order they are written, so the reader
+	// says where the shared values go.
+	it("should compile with the Match the overlap asks for", () => {
+		let sides = `type Left = { a: Integer | String }
+		type Right = { a: String | Boolean }
+
+		namespace Lefts for Left {
+			describe() -> String {
+				<- "left"
+			}
+		}
+
+		namespace Rights for Right {
+			describe() -> String {
+				<- "right"
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				`implementation {
+					${sides}
+
+					function describe(_ value: Left | Right) -> String {
+						<- value::describe()
+					}
+				}`,
+				"dispatch-overlap",
+			).helps,
+		).toEqual([
+			"Match the receiver with a Case for each member Type, in the order their shared values should go, and call the Method inside each.",
+		])
+
+		let followed = `implementation {
+			${sides}
+
+			function describe(_ value: Left | Right) -> String {
+				<- match value -> String {
+					case Right { <- @::describe() }
+					case Left { <- @::describe() }
+				}
+			}
+		}`
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+})
+
+describe("Dispatch branches a refinement tells apart", () => {
+	// A value of one member Type leaves one Namespace to call.
+	it("should compile once the receiver is one member Type", () => {
+		let show = (receiver: string) => `implementation {
+			type Small = Integer where @::isLessThan(10)
+			type Large = Integer where @::isGreaterThan(100)
+			type Left = { a: Small | String }
+			type Right = { a: Large | Boolean }
+
+			namespace Lefts for Left {
+				describe() -> String {
+					<- "left"
+				}
+			}
+
+			namespace Rights for Right {
+				describe() -> String {
+					<- "right"
+				}
+			}
+
+			function show(_ value: ${receiver}) -> String {
+				<- value::describe()
+			}
+		}`
+
+		expect(
+			firstAnalysed(show("Left | Right"), "erased-case-conflict").helps,
+		).toEqual([
+			"Call the Method on a value of one member Type, such as 'Right', so its own Namespace answers without a runtime check.",
+		])
+		expect(compiles(show("Right"))).toBe(true)
+		expect(analysedDiagnosticsFor(show("Right"))).toEqual([])
+	})
+})
+
 describe("A Match missing the rest of an application", () => {
 	let boxes = (cases: string) => `implementation {
 		choice Box<Item> {

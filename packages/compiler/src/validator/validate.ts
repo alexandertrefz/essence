@@ -59,6 +59,7 @@ import {
 	refusedFunctionsAsHoles,
 	withoutUndeclaredMembers,
 	typeContainsError,
+	typeContainsRefinement,
 	typeContainsUnknown,
 } from "../helpers/types"
 import {
@@ -88,7 +89,10 @@ import {
 	acceptsAllAtRuntime,
 	crossingApplication,
 	emptyCrossover,
+	nestedCrossing,
 	overlapsAtRuntime,
+	type RefinedOverlap,
+	refinedOverlap,
 } from "./runtimeOverlap"
 import { reportUntypedReads } from "./untypedReads"
 
@@ -847,12 +851,17 @@ function validateDispatchCases(
 				continue
 			}
 
+			let refined = refinedOverlap(earlierType, laterType)
+
 			if (acceptsAllAtRuntime(earlierType, laterType)) {
-				let erased = erasedDispatchEvidence(
-					earlierType,
-					laterType,
-					readerSpelling,
-				)
+				let erased =
+					refined === null
+						? erasedDispatchEvidence(
+								earlierType,
+								laterType,
+								readerSpelling,
+							)
+						: refinedDispatchEvidence(refined, laterType)
 
 				reportError(
 					`The branch for ${describeType(laterType)} can never run`,
@@ -883,11 +892,16 @@ function validateDispatchCases(
 			}
 
 			let crossing = crossingApplication(earlierType, laterType)
+			let nested =
+				crossing === null
+					? nestedCrossing(earlierType, laterType, laterType)
+					: { path: [], crossings: [crossing] }
 
-			if (crossing !== null) {
+			if (nested !== null) {
 				reportDispatchApplicationOverlap(
 					node,
-					crossing,
+					{ earlier: earlierType, later: laterType },
+					nested,
 					dispatchCases.map(
 						(dispatchCase) => dispatchCase.memberType,
 					),
@@ -909,8 +923,127 @@ function validateDispatchCases(
 
 				return
 			}
+
+			if (refined?.decided === true) {
+				reportRefinedDispatchOverlap(
+					node,
+					earlierType,
+					laterType,
+					refined,
+				)
+
+				return
+			}
+
+			if (overlapsAtRuntime(earlierType, laterType)) {
+				reportDispatchOverlap(node, earlierType, laterType, refined)
+
+				return
+			}
 		}
 	}
+}
+
+// Two branches a refinement's predicate alone would tell apart. The check sees
+// only the bases, so a value the later branch is for runs the earlier one.
+function reportRefinedDispatchOverlap(
+	node: common.typed.MethodInvocationNode,
+	earlierType: common.Type,
+	laterType: common.Type,
+	refined: RefinedOverlap,
+): void {
+	let erased = refinedDispatchEvidence(refined, laterType)
+
+	reportError(
+		`The branch for ${describeType(laterType)} never sees some of its values`,
+		node.member.position,
+		{
+			code: "erased-case-conflict",
+			labels: [
+				primary(
+					node.member.position,
+					`a value only a refinement's predicate tells apart takes the branch for ${describeType(earlierType)}, which is tried first`,
+				),
+				secondary(
+					node.base.position,
+					`this is ${withArticle(describeType(node.base.type))}`,
+				),
+			],
+			notes: [
+				"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
+				erased.note,
+			],
+			helps: [erased.help],
+		},
+	)
+}
+
+// Why a refinement makes two branches one question, and the call that asks
+// none: a value of one member Type runs its own Namespace's Method.
+function refinedDispatchEvidence(
+	refined: RefinedOverlap,
+	laterType: common.Type,
+): { note: string; help: string } {
+	let base = describeType(eraseRefinements(refined.matcher))
+	let taken = describeType(refined.member)
+
+	return {
+		note: `A refinement's predicate does not survive to runtime, so the check for ${describeType(refined.matcher)} asks only for ${withArticle(base)}, ${taken === base ? `and every ${base} passes it` : `which ${withArticle(taken)} is too`}.`,
+		help: oneMemberHelp(laterType),
+	}
+}
+
+function oneMemberHelp(laterType: common.Type): string {
+	return `Call the Method on a value of one member Type, such as '${spellType(laterType, readerSpelling)}', so its own Namespace answers without a runtime check.`
+}
+
+// Two branches whose member Types share values, with no erasure to blame.
+// The first branch takes them, in an order the reader never wrote, so a Match
+// lets the reader write it. Where a refinement may or may not turn the values
+// away, the report says only what is known. Where a member Type holds a
+// refinement, no Matcher can test it, so the Help asks for one member Type.
+function reportDispatchOverlap(
+	node: common.typed.MethodInvocationNode,
+	earlierType: common.Type,
+	laterType: common.Type,
+	refined: RefinedOverlap | null,
+): void {
+	let earlier = describeType(earlierType)
+	let later = describeType(laterType)
+
+	reportWarning(
+		refined === null
+			? `The branch for ${later} never sees the values ${earlier} shares with it`
+			: `The branch for ${later} never sees the values the branch for ${earlier} takes too`,
+		node.member.position,
+		{
+			code: "dispatch-overlap",
+			labels: [
+				primary(
+					node.member.position,
+					refined === null
+						? `a value of both takes the branch for ${earlier}, which is tried first`
+						: `a value that passes the check for ${earlier} takes that branch, which is tried first`,
+				),
+				secondary(
+					node.base.position,
+					`this is ${withArticle(describeType(node.base.type))}`,
+				),
+			],
+			notes: [
+				"A branch is picked by the receiver's Type at runtime, and the first one that fits wins.",
+				refined === null
+					? `A value can be ${withArticle(earlier)} and ${withArticle(later)} at once, and fits both branches.`
+					: `${describeType(refined.matcher)} and ${describeType(refined.member)} are both checked as ${withArticle(describeType(eraseRefinements(refined.matcher)))}, and the compiler does not decide whether every ${describeType(refined.member)} is ${withArticle(describeType(refined.matcher))}.`,
+			],
+			helps: [
+				typeContainsRefinement(earlierType) ||
+				typeContainsRefinement(laterType)
+					? oneMemberHelp(laterType)
+					: "Match the receiver with a Case for each member Type, in the order their shared values should go, and call the Method inside each.",
+			],
+		},
+	)
 }
 
 // Whether two branches emit the same call: one Method, taking no witness, with
