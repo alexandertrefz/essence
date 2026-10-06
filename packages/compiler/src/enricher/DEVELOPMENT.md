@@ -405,7 +405,12 @@ A Namespace's own Type Parameters carry no bound (`protocol-bound-namespace-gene
 apply to every Method. A bound reaches Methods in two ways. A per-Method bound, `<Item is Comparable>` after a
 Method's name, bounds the Namespace's `Item` for that one form. A conditional conformance's `where` bounds it for
 every Method that fulfils the conformance. `splitMethodGenerics` takes a per-Method bound out of the Method's own
-Type Parameters, so later readers see the Namespace's Parameter.
+Type Parameters, so later readers see the Namespace's Parameter. A refused bound stays on the Namespace's Type
+Parameter, and every conformance check assumes it as the `where` its Help asks for (`assumeRefusedBounds`), so a
+fulfilling Method that needs it is not reported again as `nonconforming-namespace`. A bound the target Type
+implies sits in the same field, so `boundNamespaceGenerics` marks the written ones, and only those are assumed. A use
+site solves the refused bound against the binding as it would that `where` (`conformanceConditionsOf`), so a
+binding it does not hold for is still refused there.
 
 `refuseMalformedMethodBounds` refuses the two entries a Method may write against a Namespace Type Parameter that
 are no bound. `<infer Item>` restates what the Namespace already declares (`restated-inferred-parameter`). `<Item>`

@@ -208,6 +208,7 @@ import { reportStaticMethodOnValue } from "./staticMethods"
 import { settleProperty, typeBodiedProperties } from "./staticProperties"
 import { reportPropertyParameters } from "./tests"
 import {
+	boundNamespaceGenerics,
 	conformanceBoundHelps,
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
@@ -17204,13 +17205,9 @@ export function resolveNamespaceDefinitionStatementType(
 				? null
 				: resolveType(node.targetType, genericScope),
 		name: node.name.content,
-		generics: resolveGenericDeclarations(node.generics, scope).map(
-			(generic) => {
-				let constraint =
-					generic.constraint ?? impliedBounds.get(generic.name)
-
-				return constraint == null ? generic : { ...generic, constraint }
-			},
+		generics: boundNamespaceGenerics(
+			resolveGenericDeclarations(node.generics, scope),
+			impliedBounds,
 		),
 		properties,
 		methods,

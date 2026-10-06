@@ -117,7 +117,13 @@ import {
 	withImportOf,
 } from "./spelling"
 import { namespaceMemberType } from "./staticProperties"
-import { inferringRefused } from "./typeParameters"
+import {
+	assumeRefusedBounds,
+	conditionsOf,
+	conformanceConditionsOf,
+	inferringRefused,
+	orderConditions,
+} from "./typeParameters"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
 // Lookups and Literals from their enriched children, conformance solving, and
@@ -5194,10 +5200,7 @@ function solveNamespaceConformance(
 			continue
 		}
 
-		let orderedConditions = orderConditions(
-			namespace.conformanceConditions?.[protocolName] ?? [],
-			namespace.generics,
-		)
+		let orderedConditions = conformanceConditionsOf(namespace, protocolName)
 
 		let declaredTarget = {
 			targetType: namespace.targetType,
@@ -6191,20 +6194,6 @@ function witnessAnswer(
 	return Object.hasOwn(witness.providedMethods, entry)
 		? `body ${witness.providedMethods[entry]}`
 		: undefined
-}
-
-// INVARIANT: `where` conditions are ordered by the Namespace's Type Parameter
-// declaration order, the order the simplifier emits the hidden conformance
-// Parameters in.
-function orderConditions(
-	conditions: Array<{ generic: string; protocol: string }>,
-	generics: Array<common.GenericDeclaration>,
-): Array<{ generic: string; protocol: string }> {
-	let order = generics.map((generic) => generic.name)
-
-	return [...conditions].sort(
-		(a, b) => order.indexOf(a.generic) - order.indexOf(b.generic),
-	)
 }
 
 // What to say about a concrete Type with no conforming Namespace. A bare Case
@@ -7436,7 +7425,6 @@ export function silentCheckedConformances(
 			continue
 		}
 
-		let conditions: Array<{ generic: string; protocol: string }> = []
 		let assumptions = new Map<string, string>()
 
 		for (let condition of clause.conditions) {
@@ -7458,12 +7446,11 @@ export function silentCheckedConformances(
 			)!.identity
 
 			assumptions.set(condition.generic.content, conditionProtocol)
-			conditions.push({
-				generic: condition.generic.content,
-				protocol: conditionProtocol,
-			})
 		}
 
+		assumeRefusedBounds(namespaceType.generics, assumptions)
+
+		let conditions = conditionsOf(assumptions)
 		let result = computeConformanceMethodMap(
 			protocol,
 			namespaceType,
@@ -7536,7 +7523,6 @@ export function checkProtocolConformance(
 
 		// Each `where` condition must name one of this Namespace's Type
 		// Parameters and a real Protocol, binding no Type Parameter twice.
-		let conditions: Array<{ generic: string; protocol: string }> = []
 		let assumptions = new Map<string, string>()
 
 		for (let condition of clause.conditions) {
@@ -7627,12 +7613,11 @@ export function checkProtocolConformance(
 			)!.identity
 
 			assumptions.set(condition.generic.content, conditionProtocol)
-			conditions.push({
-				generic: condition.generic.content,
-				protocol: conditionProtocol,
-			})
 		}
 
+		assumeRefusedBounds(namespaceType.generics, assumptions)
+
+		let conditions = conditionsOf(assumptions)
 		// As in `silentCheckedConformances`.
 		let providers = clauseProvidersIn(
 			node,

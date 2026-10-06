@@ -195,6 +195,78 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		).toBe(true)
 	})
 
+	// The refused bound is the one mistake. Each conformance assumes it as the
+	// `where` its Help asks for. So the Method that needs it is reported again
+	// neither at the declaration nor at the call.
+	it("should report a refused Namespace bound once", () => {
+		expect(
+			codesOfSource(`implementation {
+			namespace Boxes<infer Item is Comparable> for { items: List<Item> } is Printable {
+				toString() -> String {
+					<- "{@.items::sort()::length()} items"
+				}
+			}
+
+			Terminal.print({ items = [3, 1] })
+		}`),
+		).toEqual(["protocol-bound-namespace-generic"])
+	})
+
+	// A use site solves the refused bound as the `where` its Help asks for. So
+	// a binding it does not hold for is still refused there.
+	it("should solve a refused Namespace bound where the Namespace is used", () => {
+		let source = `implementation {
+			type Bag<Item> = { items: List<Item> }
+
+			namespace Bags<infer Item is Comparable> for Bag<Item> is Printable {
+				toString() -> String {
+					<- "{@.items::sort()::length()} items"
+				}
+			}
+
+			constant bag: Bag<Integer> = { items = [3, 1] }
+
+			Terminal.print(bag)
+			Terminal.print({ items = [(n: Integer) -> Integer { <- n }] })
+		}`
+
+		expect(codesOfSource(source)).toEqual([
+			"protocol-bound-namespace-generic",
+			"unsatisfied-conformance-condition",
+		])
+		expect(
+			firstAnalysed(source, "unsatisfied-conformance-condition").position
+				?.start.line,
+		).toBe(13)
+	})
+
+	// Only a bound the reader wrote is refused and assumed. A bound the target
+	// implies, as a bounded Choice's does, is assumed by no conformance, so the
+	// `where` it needs is still asked for.
+	it("should assume no bound the target Type only implies", () => {
+		let boxes = (body: string) => `implementation {
+			choice SortedBox<Item is Comparable> {
+				Box { items: List<Item> },
+			}
+
+			namespace Boxes<infer Item> for SortedBox<Item> is Printable {
+				toString() -> String {
+					<- match @ -> String {
+						case #Box(items) { <- "{${body}::length()} items" }
+					}
+				}
+			}
+
+			Terminal.print(SortedBox<Integer>#Box({ items = [3, 1, 2] }))
+		}`
+
+		for (let body of ["items::sort()", "items"]) {
+			expect(codesOfSource(boxes(body))).toContain(
+				"nonconforming-namespace",
+			)
+		}
+	})
+
 	// A conformance that already carries a `where` takes the bound as one more
 	// condition, so the Help spells the whole clause it becomes.
 	it("should spell the condition beside a 'where' already written", () => {

@@ -188,3 +188,94 @@ export function refuseDuplicateTypeParameters(
 		)
 	}
 }
+
+// The Namespace Type Parameters whose bound the reader wrote, which is always
+// refused. A bound the target Type implies sits in the same field, so the
+// written ones are marked apart.
+let refusedBounds = new WeakSet<common.GenericDeclaration>()
+
+// A Namespace's Type Parameters, each with the bound the reader wrote or else
+// the one its target Type implies. See `impliedTargetBounds`.
+export function boundNamespaceGenerics(
+	generics: Array<common.GenericDeclaration>,
+	impliedBounds: Map<string, string>,
+): Array<common.GenericDeclaration> {
+	return generics.map((generic) => {
+		let constraint = generic.constraint ?? impliedBounds.get(generic.name)
+
+		if (constraint == null) {
+			return generic
+		}
+
+		let bounded = { ...generic, constraint }
+
+		if (generic.constraint != null) {
+			refusedBounds.add(bounded)
+		}
+
+		return bounded
+	})
+}
+
+// A refused bound's Help asks for the same bound as a `where`. Each conformance
+// assumes it, so a Method that needs it is not reported again. A `where` on
+// that Type Parameter wins. An implied bound is never assumed, since nothing
+// refused it.
+export function assumeRefusedBounds(
+	generics: Array<common.GenericDeclaration>,
+	assumptions: Map<string, string>,
+): void {
+	for (let generic of generics) {
+		if (
+			refusedBounds.has(generic) &&
+			generic.constraint != null &&
+			!assumptions.has(generic.name)
+		) {
+			assumptions.set(generic.name, generic.constraint)
+		}
+	}
+}
+
+// A Namespace's `where` conditions for one Protocol, with each refused bound
+// as one more where no `where` names its Type Parameter. A use site solves a
+// refused bound as the `where` its Help asks for. So a binding it does not
+// hold for is still refused there.
+export function conformanceConditionsOf(
+	namespace: common.NamespaceType,
+	protocolName: string,
+): Array<{ generic: string; protocol: string }> {
+	let written = namespace.conformanceConditions?.[protocolName] ?? []
+	let refused = namespace.generics.flatMap((generic) =>
+		refusedBounds.has(generic) &&
+		generic.constraint != null &&
+		!written.some((condition) => condition.generic === generic.name)
+			? [{ generic: generic.name, protocol: generic.constraint }]
+			: [],
+	)
+
+	return orderConditions([...written, ...refused], namespace.generics)
+}
+
+// INVARIANT: `where` conditions are ordered by the Namespace's Type Parameter
+// declaration order, the order the simplifier emits the hidden conformance
+// Parameters in.
+export function orderConditions(
+	conditions: Array<{ generic: string; protocol: string }>,
+	generics: Array<common.GenericDeclaration>,
+): Array<{ generic: string; protocol: string }> {
+	let order = generics.map((generic) => generic.name)
+
+	return [...conditions].sort(
+		(a, b) => order.indexOf(a.generic) - order.indexOf(b.generic),
+	)
+}
+
+// The conditions a conformance holds under, in the order they were assumed.
+export function conditionsOf(
+	assumptions: Map<string, string>,
+): Array<{ generic: string; protocol: string }> {
+	return [...assumptions].map(([generic, protocol]) => ({
+		generic,
+		protocol,
+	}))
+}
