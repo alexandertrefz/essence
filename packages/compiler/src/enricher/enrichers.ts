@@ -110,6 +110,14 @@ import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
+	enteringCall,
+	probingCandidate,
+	probingCandidates,
+	readingArgumentLiteral,
+	resolveContextualParameterTypes,
+	returnTypeHelpIn,
+} from "./contextualParameters"
+import {
 	branchNamespaces,
 	resolveBranch,
 	takesWitnesses,
@@ -180,7 +188,6 @@ import {
 	protocolSpelling,
 	providedNamespaceMember,
 	recordValueTypeOf,
-	parameterDocumentation,
 	reportDocumentationParameters,
 	reportProvidedBodyReaches,
 	resolvedDocumentation,
@@ -379,13 +386,13 @@ function enrichCalleeExpression(
 	writtenArguments = 0,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
-		// A call reads its own Arguments' positions; see `callRefused`.
+		// A call reads its own Arguments' positions; see `enteringCall`.
 		case "MethodInvocation":
-			return underRefusedCall(false, () =>
+			return enteringCall(() =>
 				enrichMethodInvocation(node, scope, expectedType),
 			)
 		case "FunctionInvocation":
-			return underRefusedCall(false, () =>
+			return enteringCall(() =>
 				enrichFunctionInvocation(node, scope, expectedType),
 			)
 		case "Combination":
@@ -9831,11 +9838,13 @@ function makeArgumentTyper(
 				needsContext(value.value)
 			) {
 				return noteErrors(
-					resolveFunctionValueType(
-						value,
-						scope,
-						expectedType,
-						bindings,
+					readingArgumentLiteral(value.value, () =>
+						resolveFunctionValueType(
+							value,
+							scope,
+							expectedType,
+							bindings,
+						),
 					),
 				)
 			}
@@ -9948,10 +9957,12 @@ function resolveFunctionDefinitionType(
 		return resolveFunctionSignatureType(node, scope)
 	}
 
+	// A reading where no Function was expected decides nothing, and what it
+	// reported may have been dropped with a probe, so it is read again.
 	if (expectedType === null) {
 		let recorded = recordedContextualFunctionType(node)
 
-		if (recorded !== undefined) {
+		if (recorded !== undefined && recorded.expectedType !== null) {
 			return decidedContextualFunctionType(node, scope, recorded)
 		}
 	}
@@ -10519,9 +10530,16 @@ function overloadProbeOrder(
 }
 
 // Selects an Overload, counting bounds and Error Arguments as part of fitting.
-// Falls back on the first candidate whose Arguments matched. See "Choosing an
+// Falls back on the first candidate whose Arguments matched. A literal's report
+// against a candidate it does not fit waits for the selection. See "Choosing an
 // Overload" in DEVELOPMENT.md.
 function selectOverload(
+	...args: Parameters<typeof selectFittingOverload>
+): SelectedOverload | undefined {
+	return probingCandidates(() => selectFittingOverload(...args))
+}
+
+function selectFittingOverload(
 	overloads: Array<common.BaseFunction>,
 	matchableArguments: Array<MatchableArgument>,
 	scope: enricher.Scope,
@@ -10545,13 +10563,15 @@ function selectOverload(
 		// records. Later probes are speculative, so their reports and
 		// recordings are held until one is committed.
 		let probe = () =>
-			probeOverload(
-				overload,
-				matchableArguments,
-				scope,
-				position,
-				typer,
-				atPrintingCall,
+			probingCandidate(index, () =>
+				probeOverload(
+					overload,
+					matchableArguments,
+					scope,
+					position,
+					typer,
+					atPrintingCall,
+				),
 			)
 		let held =
 			firstArgumentMatch === undefined
@@ -15197,7 +15217,7 @@ function contextualFunctionTypeOf(
 ): common.FunctionType | undefined {
 	let recorded = recordedContextualFunctionType(node)
 
-	if (recorded !== undefined) {
+	if (recorded !== undefined && recorded.expectedType !== null) {
 		return decidedContextualFunctionType(node, scope, recorded)
 	}
 
@@ -15489,77 +15509,6 @@ function needsContext(node: parser.FunctionDefinitionNode): boolean {
 	)
 }
 
-// An unannotated Parameter takes its Type and label from the expected signature
-// by position, so the Parser records no external name for it. Annotated and
-// unannotated Parameters may mix.
-function resolveContextualParameterTypes(
-	node: parser.FunctionDefinitionNode,
-	scope: enricher.Scope,
-	expectedFunction: common.FunctionType | null,
-): Array<common.Parameter> {
-	reportDocumentationParameters(node.documentation, [node.parameters])
-
-	return node.parameters.map((parameter, index) => {
-		let documentation = parameterDocumentation(
-			parameter,
-			node.documentation,
-			index,
-		)
-
-		if (parameter.type !== null) {
-			return {
-				name: parameter.externalName?.content ?? null,
-				type: resolveDeclaredType(parameter.type, scope),
-				documentation,
-			}
-		}
-
-		let expectedParameter = expectedFunction?.parameterTypes[index]
-
-		if (expectedParameter === undefined) {
-			// Silent inside a refused call; see `callRefused`.
-			if (insideRefusedCall()) {
-				return { name: null, type: { type: "Error" }, documentation }
-			}
-
-			reportError(
-				`The Type of Parameter '${parameterLabel(parameter)}' could not be inferred`,
-				parameter.position,
-				{
-					code: "uninferable-parameter-type",
-					labels: [
-						primary(
-							parameter.position,
-							"this Parameter has no Type",
-						),
-					],
-					notes: [
-						expectedFunction === null
-							? "Only a Function passed as an Argument takes its Types from the surrounding context."
-							: `The expected Function Type takes ${countOf(expectedFunction.parameterTypes.length, "Parameter")}, so there is nothing for Parameter ${index + 1} to infer from.`,
-					],
-					// A literal typed by nothing around it also lacks its
-					// return Type, which is asked only once every Parameter has
-					// one. Both are named here to save a round trip.
-					helps: [
-						node.returnType === null && expectedFunction === null
-							? "Write the Parameter's Type and the Function's return Type — a literal outside Argument position takes neither from around it."
-							: "Write the Parameter's Type explicitly.",
-					],
-				},
-			)
-
-			return { name: null, type: { type: "Error" }, documentation }
-		}
-
-		return {
-			name: expectedParameter.name,
-			type: expectedParameter.type,
-			documentation,
-		}
-	})
-}
-
 // The Function literals whose return Type could not be read off their body. The
 // call around one stays silent about the consequences, such as an unbound
 // `Other` of `Result::andThen`. Kept per parser Node in a WeakSet.
@@ -15599,13 +15548,17 @@ function endsInAnUnreturnedValue(
 
 // The annotation a literal outside Argument position has to write, spelled from
 // its body where it can be. A nested Function, an Unknown or a value already
-// reported can not be typed back in, so a schematic stands there.
+// reported can not be typed back in, so a schematic stands there. Inside
+// another literal's inference the report is dropped, so the body is not read.
 function returnTypeHelp(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
 	scope: enricher.Scope,
 ): string {
-	let inferred = inferReturnTypeFromBody(node, parameterTypes, scope)
+	let inferred =
+		inferReturnTypeFromBodyDepth > 0
+			? null
+			: inferReturnTypeFromBody(node, parameterTypes, scope)
 	let spelling =
 		inferred === null || isReportedValue(inferred)
 			? null
@@ -15653,7 +15606,12 @@ function resolveContextualReturnType(
 					notes: [
 						"Only a Function passed as an Argument takes its Types from the surrounding context.",
 					],
-					helps: [returnTypeHelp(node, parameterTypes, scope)],
+					// Read once in the Scope the literal stands in.
+					helps: [
+						returnTypeHelpIn(node, scope.parent ?? scope, () =>
+							returnTypeHelp(node, parameterTypes, scope),
+						),
+					],
 				},
 			)
 		}
@@ -15711,14 +15669,6 @@ function resolveContextualReturnType(
 	}
 
 	return expectedFunction.returnType
-}
-
-function parameterLabel(parameter: parser.ParameterNode): string {
-	return (
-		parameterInternalName(parameter)?.content ??
-		parameter.externalName?.content ??
-		"_"
-	)
 }
 
 // What a Type Alias means, `where` clause included. The predicate is enriched

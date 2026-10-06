@@ -197,6 +197,7 @@ Enricher, including `helpers/types.ts`:
 - Stacks and flags that the work setting them restores in `finally`. In `enricher/enrichers.ts`:
   `captureBoundaries`, `probeRecordings`, `inferReturnTypeFromBodyDepth`, `probingDeadFallback` and
   `erasingRefinementProof`. In `enricher/refusedCalls.ts`: `callRefused`, set by `underRefusedCall`. In
+  `enricher/contextualParameters.ts`: `heldReports`, opened by `probingCandidates` and `enteringCall`. In
   `enricher/resolvers.ts`: `reachedNames`, opened by `collectReachedNames`. In `enricher/annotations.ts`:
   `activeAnnotations`, opened by `collectAnnotations`.
 - `openHoists` and `pendingRefinementCopies` in `helpers/types.ts`: a hoist opens and closes them, and the
@@ -210,7 +211,8 @@ Enricher, including `helpers/types.ts`:
   `namespacesTargetingMemos`. In `helpers/types.ts`: `phantomTypeArgumentsMemo`, `renamedNamespaceTargets`,
   `bindingMentionsMemo` and `impliedKeyMemos`. In `enricher/tests.ts`: `answeredQuestions`, the questions an
   asserted value answers, which the validator reads when it refuses the assertion. In
-  `enricher/refusedCaptures.ts`: `undecidedByRefusals`.
+  `enricher/refusedCaptures.ts`: `undecidedByRefusals`. In `enricher/contextualParameters.ts`: `returnTypeHelps`,
+  keyed by the literal and by the Scope it stands in.
 - Values that only grow for the life of the process: `typeDeclarations` in `enricher/scope.ts`,
   `namespaceNames` in `resolvers.ts`, `freshGenericCounter` and the `identityPairings` cache in
   `helpers/types.ts`.

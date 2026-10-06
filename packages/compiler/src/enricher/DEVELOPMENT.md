@@ -571,11 +571,15 @@ reports on it again. An Error the pass raised, from a bare Case it could not res
 
 Only a literal in Argument position may omit its annotations, since its Types are written down elsewhere, in the
 signature it is passed to (`resolveContextualReturnType`). Anywhere else a missing `-> Type` is
-`missing-return-type`. The Help spells the Type the body would answer, read once for the Diagnostic alone, unless
-that spelling could not be typed back in. In Argument position, an expected return Type the call has not solved is
-read off the body, as `map`'s `Result` is. A Type Parameter of an enclosing Function or Namespace is a decision,
-not an open slot, so it is taken as it stands. `mentionsUnsolvedTypeParameter` tells the two apart by the fresh
-names only a call still matching produces.
+`missing-return-type`. The Help spells the Type the body would answer, unless that spelling could not be typed back
+in. The literal reports on every reading, so its body would be read again for each, and so would every literal
+nested in it, which multiplies with each level of nesting. Two rules keep the readings to a few per level. A literal
+read while another literal's body is inferred spells no Help, since that pass drops what it reports. Elsewhere the
+Help is read once per Scope the literal stands in (`returnTypeHelpIn`). The Scope is new for each reading of the
+literal around it, so each Overload entry spells its own Help. In Argument position, an expected return Type the
+call has not solved is read off the body, as `map`'s `Result` is. A Type Parameter of an enclosing Function or
+Namespace is a decision, not an open slot, so it is taken as it stands. `mentionsUnsolvedTypeParameter` tells the two
+apart by the fresh names only a call still matching produces.
 
 A literal whose return Type could not be read is remembered in `literalsAnsweringNothing`. The call around it then
 stays silent about its unbound Type Parameters, since they follow from that one mistake. Passed to a call that
@@ -632,7 +636,10 @@ Argument is matched before the Arguments after it bind anything: in `id(Box<Inte
 A record read once the call has finished therefore reads the position as the call decided it. For a Function
 literal, `decidedContextualFunctionType` resolves the literal again under the finished bindings, silently, where
 they close a position the match left open. A callback such as the `step` of `loop` is matched while its `Result` is
-still unbound. Reading its body alone would lose what the position decided.
+still unbound. Reading its body alone would lose what the position decided. A record made where no Function was
+expected decides nothing, and what that reading reported may have been dropped with a silent probe, as a payload's
+literal read under a candidate's Case is. So such a literal's signature is read again, and reports where it stands.
+Its body is read once per Scope, for its Help.
 
 Every candidate of an Invocation is probed. A losing candidate must not leave a recording behind, since the
 enrichment would then type a literal's body by it. `probeRecordings` is a stack of the recordings of the probes
@@ -704,6 +711,26 @@ Up to and including that first match, a probe reports and records where it stand
 once. Probes after it are speculative: an unannotated Function literal is re-resolved for each candidate and
 reports from inside its body. So their reports and recordings are held, and only the committed candidate hands them
 on.
+
+### Literals a candidate does not fit
+
+A Function literal read against a candidate it does not fit reports about the candidate: more Parameters than the
+candidate's Function takes, or a Parameter there that is no Function at all. So `probingCandidates` holds a literal's
+`uninferable-parameter-type` while `selectOverload` probes, with the candidate it was read against
+(`probingCandidate`). Only a literal that is itself one of the call's Arguments is held (`readingArgumentLiteral`),
+since only such a literal is read again for each candidate. Once a candidate is selected, what the literal reported
+against it stands, so `1::run(step (a, b) { … })` selects the Overload taking two Parameters and reports nothing. A
+literal that was never read against the selected candidate keeps its reports. Where no candidate is selected, a
+Parameter every resolution left without a Type is reported, with the closest candidate's count in its Note. The
+call's own refusal stands beside it. A lone signature's re-match reports from outside the hold, so the report there
+is the same one.
+
+A literal inside another Argument, as a Record member, a List item, a Case payload or a Match arm, is no Argument and
+takes no Types from the call. It reads the same against every candidate, so its report is never held, and it
+reports whichever candidate is selected. Its Help reads its body once per Scope it stands in.
+
+The hold belongs to the call probing. Every call is enriched inside `enteringCall`, which pushes a barrier, so a call
+nested in an Argument reports its own literals whatever the call around it selects.
 
 ### The no-matching-overload report
 

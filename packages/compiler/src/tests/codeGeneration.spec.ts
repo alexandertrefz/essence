@@ -2154,6 +2154,111 @@ describe("Code Generation", () => {
 
 			expect(await run(source)).toEqual(['"hello!"', '"hello world"'])
 		})
+
+		// Each callback runs the entry whose Function takes its Parameter count.
+		it("should run the Overload a callback's Parameter count selects", async () => {
+			expect(
+				await run(`implementation {
+					namespace Runner for Integer {
+						overload run {
+							(step advance: (_ a: Integer) -> Integer) -> Integer {
+								<- advance(@)
+							}
+							(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+								<- advance(@, 10)
+							}
+						}
+					}
+
+					Terminal.inspect(1::run(step (a, b) { <- a::add(b) }))
+					Terminal.inspect(1::run(step (a) { <- a::add(100) }))
+				}`),
+			).toEqual(["11", "101"])
+			expect(
+				await run(`implementation {
+					namespace Runner for Integer {
+						overload run {
+							<infer T>(step value: T) -> Integer {
+								<- 0
+							}
+							(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+								<- advance(@, 10)
+							}
+						}
+					}
+
+					Terminal.inspect(1::run(step (a, b) { <- a::add(b) }))
+				}`),
+			).toEqual(["11"])
+		})
+	})
+
+	// A literal inside an Argument is no Argument, so it takes no Types from
+	// the Overload selected, and its report stands whichever entry is.
+	describe("A literal inside an Argument of an Overload", () => {
+		let gen = (entries: string, call: string) => `implementation {
+			namespace Gen for Integer {
+				overload pick {
+					${entries}
+				}
+			}
+
+			Terminal.inspect(${call})
+		}`
+		let entries = (step: string, body: string) => `
+			(step c: ${step}, by n: String) -> Integer {
+				<- 0
+			}
+			(step c: ${step}, by n: Integer) -> Integer {
+				${body}
+			}
+		`
+		let record = entries("{ f: (_ a: Integer) -> Integer }", "<- c.f(n)")
+		let listed = entries("List<(_ a: Integer) -> Integer>", "<- n")
+		let optional = entries(
+			"Optional<(_ a: Integer) -> Integer>",
+			"<- match c -> Integer { case #Value(held) { <- held(n) } case #Empty { <- 0 } }",
+		)
+
+		it("reports it whichever entry is selected", () => {
+			for (let source of [
+				gen(record, "1::pick(step { f = (p) { <- p } }, by 2)"),
+				gen(listed, "1::pick(step [(p) { <- p }], by 2)"),
+				gen(
+					optional,
+					'1::pick(step #Value((p) { <- p::add("y") }), by 2)',
+				),
+				gen(
+					entries("Integer", "<- c"),
+					"1::pick(step match 1 -> Integer { case Integer { constant f = (p) { <- p } <- 1 } }, by 2)",
+				),
+			]) {
+				expect(
+					diagnosticsOf(source)
+						.filter((diagnostic) => diagnostic.severity === "error")
+						.map((diagnostic) => diagnostic.code),
+				).toContain("uninferable-parameter-type")
+			}
+		})
+
+		it("runs once the literal writes its Types", async () => {
+			expect(
+				await run(
+					gen(
+						record,
+						"1::pick(step { f = (_ p: Integer) -> Integer { <- p::add(1) } }, by 2)",
+					),
+				),
+			).toEqual(["3"])
+			expect(
+				await run(
+					gen(
+						optional,
+						"1::pick(step #Value((_ p: Integer) -> Integer { <- p::add(5) }), by 2)",
+					),
+				),
+			).toEqual(["7"])
+		})
 	})
 
 	describe("Union Method Dispatch", () => {

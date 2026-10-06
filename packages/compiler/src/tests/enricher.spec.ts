@@ -12,6 +12,7 @@ import {
 import { computeConformanceMethodMap } from "../helpers/conformance"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
+import { forEachParserChild, type ParserNode } from "../visitor/parser"
 import {
 	analysedDiagnosticsFor,
 	codesOfSource,
@@ -3260,6 +3261,108 @@ describe("Enricher", () => {
 			expect(underlinedText(source, unreadable!)).toBe("()")
 		})
 
+		// A literal outside Argument position reports on every reading, and its
+		// Help reads its body, which holds the next literal. So the Help is read
+		// once. Body reads are counted, since a timing ceiling would flake.
+		it("should not read a nested literal's body again for each reading around it", () => {
+			let shapes = [
+				[
+					"function one(_ c: { f: (_ a: Integer) -> Integer }) -> Integer { <- c.f(1) }",
+					(inner: string) =>
+						`one({ f = (p: Integer) { <- ${inner} } })`,
+				],
+				[
+					"function two(_ c: Integer) -> Integer { <- c }",
+					(inner: string) => `two((p: Integer) { <- ${inner} })`,
+				],
+			] as const
+
+			for (let [callee, wrap] of shapes) {
+				let program = parse(`implementation {
+					${callee}
+
+					constant x = ${Array.from({ length: 12 }).reduce<string>(wrap, "1")}
+				}`)
+				let reads: Array<number> = []
+				let count = (node: ParserNode): void => {
+					forEachParserChild(node, count)
+
+					if (
+						node.nodeType !== "FunctionDefinition" ||
+						node.returnType !== null
+					) {
+						return
+					}
+
+					let { body } = node
+					let index = reads.push(0) - 1
+
+					Object.defineProperty(node, "body", {
+						get: () => {
+							reads[index] += 1
+
+							return body
+						},
+					})
+				}
+
+				count(program)
+
+				expect(
+					enrich(program).diagnostics.map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toEqual(
+					Array.from({ length: 12 }, () => "missing-return-type"),
+				)
+				expect(reads).toHaveLength(12)
+				expect(Math.max(...reads)).toBeLessThanOrEqual(2 * 12)
+			}
+		})
+
+		// The Help spells what the body answers in the reading around it. Under
+		// the entry selected, `a` is a String. Inside the call refused for its
+		// labels, `a` has no Type, so a schematic stands there.
+		it("should spell a nested literal's Help from the reading around it", () => {
+			let source = `implementation {
+				namespace Gen for Integer {
+					overload gen {
+						<infer T>(step f: (_ a: Integer) -> T, by n: String) -> T {
+							<- f(@)
+						}
+						<infer T>(step f: (_ a: String) -> T, by n: Integer) -> T {
+							<- f("s")
+						}
+					}
+				}
+
+				Terminal.inspect(1::gen(step (a) {
+					constant g = (p: Integer) { <- a }
+					<- 1
+				}, by 2))
+				Terminal.inspect(1::gen(by 2, step (a) {
+					constant g = (p: Integer) { <- a }
+					<- 1
+				}))
+			}`
+
+			expect(
+				diagnosticsFor(source)
+					.filter(
+						(diagnostic) =>
+							diagnostic.code === "missing-return-type",
+					)
+					.map((diagnostic) => diagnostic.helps),
+			).toEqual([
+				[
+					"Write the return Type after the Parameter list — '-> String', which is what this body answers with.",
+				],
+				[
+					"Write the return Type after the Parameter list — '-> <Type>', naming what this body's '<-' answers with.",
+				],
+			])
+		})
+
 		it("should apply defaults for unbound plain Generics", () => {
 			expect(
 				typeOfFirstConstant(`implementation {
@@ -5347,6 +5450,106 @@ ${declared}
 					lastConstantFunctionInvocation(staticCall(boundedSecond))
 						.overloadedMethodIndex,
 				).toBe(0)
+			})
+
+			// A literal with more Parameters than one entry's Function does not
+			// fit that entry, which says nothing about the literal while another
+			// entry fits it.
+			describe("told apart by a callback's Parameter count", () => {
+				let runner = (call: string) => `implementation {
+					namespace Runner for Integer {
+						overload run {
+							(step advance: (_ a: Integer) -> Integer) -> Integer {
+								<- advance(@)
+							}
+							(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+								<- advance(@, 10)
+							}
+						}
+					}
+
+					constant ran = ${call}
+				}`
+
+				it("should select the entry whose callback takes as many Parameters", () => {
+					let two = runner("1::run(step (a, b) { <- a::add(b) })")
+					let one = runner("1::run(step (a) { <- a::add(100) })")
+
+					expect(diagnosticsFor(two)).toEqual([])
+					expect(
+						lastConstantMethodInvocation(two).overloadedMethodIndex,
+					).toBe(1)
+					expect(diagnosticsFor(one)).toEqual([])
+					expect(
+						lastConstantMethodInvocation(one).overloadedMethodIndex,
+					).toBe(0)
+				})
+
+				// An entry whose Parameter is no Function, or a Type Parameter,
+				// does not fit the literal either, and says nothing about it.
+				it("should select a later entry where an earlier takes no Function", () => {
+					let source = `implementation {
+						namespace Gen for Integer {
+							overload keep {
+								<infer T>(step value: T) -> Integer {
+									<- 0
+								}
+								(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+									<- advance(@, 10)
+								}
+							}
+							overload maybe {
+								(step advance: Optional<(_ a: Integer) -> Integer>) -> Integer {
+									<- 0
+								}
+								(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+									<- advance(@, 10)
+								}
+							}
+							overload count {
+								(step advance: Integer) -> Integer {
+									<- advance
+								}
+								(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+									<- advance(@, 10)
+								}
+							}
+						}
+
+						Terminal.inspect(1::keep(step (a, b) { <- a::add(b) }))
+						Terminal.inspect(1::maybe(step (a, b) { <- a::add(b) }))
+						Terminal.inspect(1::count(step (a, b) { <- a::add(b) }))
+					}`
+
+					expect(diagnosticsFor(source)).toEqual([])
+				})
+
+				// Only the Parameter no entry gives a Type is reported, with the
+				// closest entry's count.
+				it("should report a callback no entry fits beside the call", () => {
+					let diagnostics = diagnosticsFor(
+						runner("1::run(step (a, b, c) { <- a })"),
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.message,
+						]),
+					).toEqual([
+						[
+							"uninferable-parameter-type",
+							"The Type of Parameter 'c' could not be inferred",
+						],
+						[
+							"no-matching-overload",
+							"No overload of 'run' accepts these Arguments",
+						],
+					])
+					expect(diagnostics[0].notes).toEqual([
+						"The expected Function Type takes 2 Parameters, so there is nothing for Parameter 3 to infer from.",
+					])
+				})
 			})
 
 			// The call carries the conformances solved during selection, not a
