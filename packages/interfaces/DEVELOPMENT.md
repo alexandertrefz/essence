@@ -122,9 +122,12 @@ be answered with a near miss for a Method nobody meant.
 rename still reaches a name in it, but it drops the base's own Diagnostics. The refusal is the one report for
 the Expression. What stood inside the brackets is dropped too.
 
+The enricher leaves one too, where a Namespace is read as a value (`namespace-as-value`). Its `base` is the
+name, typed as the Namespace, so the hover and a rename still read the name as the Namespace it is.
+
 The typed tree keeps the node, so the validator and the language server meet it. A refused value only stands
-in a Program the Parser reported an error on, so it never reaches emitted code. The simplifier lowers it to
-its `base`.
+in a Program the Parser or the enricher reported an error on, so it never reaches emitted code. The simplifier
+lowers it to its `base`.
 
 ## Start and complete
 

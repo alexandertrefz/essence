@@ -267,8 +267,9 @@ export type ExpressionNode =
 	| CompleteNode
 	| RefusedValueNode
 
-// A value the Parser refused, such as `primes[0]`, typed as an Error so no
-// reader of it reports again. See "Refused values" in DEVELOPMENT.md.
+// A value the Parser refused, such as `primes[0]`, or a Namespace the enricher
+// refused as a value. It is typed as an Error, so no reader of it reports
+// again. See "Refused values" in DEVELOPMENT.md.
 export interface RefusedValueNode {
 	nodeType: "RefusedValue"
 	base: ExpressionNode

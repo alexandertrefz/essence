@@ -193,7 +193,7 @@ function simplifyExpression(
 				position: node.position,
 			}
 		// Never reached, since an Error Type stops code generation. The arm
-		// answers with the value before the refused brackets rather than throw.
+		// answers with what the refusal wraps rather than throw.
 		case "RefusedValue":
 			return simplifyExpression(node.base)
 	}

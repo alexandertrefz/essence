@@ -108,7 +108,7 @@ import { printSignature, printType, signaturesOf } from "../printType"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
-import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
+import { namespaceCallHelps, valueOf } from "./namespaceValues"
 import {
 	bindsLastStep,
 	refuseBareNames,
@@ -3180,7 +3180,9 @@ function enrichIdentifierExpression(
 	let alias = declaringScope?.selfMemberAliases?.[node.content]
 
 	if (declaringScope === null || alias === undefined) {
-		return enrichIdentifier(node, scope, valueTypeOf(node, scope, context))
+		let type = resolveIdentifierType(node, scope, context)
+
+		return valueOf(enrichIdentifier(node, scope, type), context)
 	}
 
 	return selfPathLookup(

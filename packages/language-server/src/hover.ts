@@ -599,7 +599,8 @@ function visitNode(node: TypedNode, state: State): void {
 		case "Self":
 			consider(state, node.position, node.type, "@")
 			return
-		// The refused value is an `Error`; what precedes the brackets still answers.
+		// The refused value is an `Error`. What it wraps still answers, the value
+		// before the brackets or the Namespace refused as a value.
 		case "RefusedValue":
 			break
 		case "CaseValue":

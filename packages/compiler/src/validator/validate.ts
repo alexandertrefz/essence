@@ -384,7 +384,7 @@ function validateImplementationNode(
 		case "CaseValue":
 		case "Start":
 		case "Complete":
-		// Only in a Program the parser already reported on.
+		// Only in a Program the Parser or the enricher already reported on.
 		case "RefusedValue":
 			// A Statement drops its Expression's value, which is a mistake for
 			// work. The same Expression inside another one is fine.

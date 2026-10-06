@@ -9,30 +9,34 @@ import {
 	matchArguments,
 	matchesType,
 } from "../helpers/types"
-import { type NameContext, resolveIdentifierType } from "./resolvers"
+import type { NameContext } from "./resolvers"
 
-// The Type of a name read as a value. A declaration's own name and an
-// assignment's target are resolved without this.
-export function valueTypeOf(
-	node: parser.IdentifierNode,
-	scope: enricher.Scope,
+// A name read as a value. A declaration's own name and an assignment's target
+// are resolved without this. A refused Namespace is an Error to every reader,
+// and the name inside keeps the Namespace's Type for the hover.
+export function valueOf(
+	identifier: common.typed.IdentifierNode,
 	context: NameContext,
-): common.Type {
-	let type = resolveIdentifierType(node, scope, context)
-
-	return reportedNamespaceValue(node, type, context)
-		? { type: "Error" }
-		: type
+): common.typed.ExpressionNode {
+	return reportedNamespaceValue(identifier, context)
+		? {
+				nodeType: "RefusedValue",
+				base: identifier,
+				position: identifier.position,
+				type: { type: "Error" },
+			}
+		: identifier
 }
 
 // A Namespace written where a value goes, as in `Terminal.inspect(Clock)`. No
 // Namespace is a value, whoever declared it. A Lookup base and a call are
 // answered elsewhere.
 function reportedNamespaceValue(
-	node: parser.IdentifierNode,
-	type: common.Type,
+	node: common.typed.IdentifierNode,
 	context: NameContext,
 ): boolean {
+	let type = node.type
+
 	if (
 		type.type !== "Namespace" ||
 		context.readMember !== undefined ||

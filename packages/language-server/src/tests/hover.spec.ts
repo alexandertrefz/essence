@@ -419,6 +419,25 @@ describe("Hover", () => {
 		)
 	})
 
+	// The refusal is an Error to every reader, but the name still names the
+	// Namespace, as it does where a Method is read off it.
+	it("should describe a Namespace refused as a value as the Namespace", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Clock {",
+			"\t\tstatic now() -> Integer {",
+			"\t\t\t<- 1",
+			"\t\t}",
+			"\t}",
+			"\tTerminal.inspect(Clock)",
+			"\tTerminal.inspect(Clock.now())",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 7, column: 20 })).toBe("Clock: Clock")
+		expect(hover(source, { line: 8, column: 20 })).toBe("Clock: Clock")
+	})
+
 	it("should describe a Static Method invocation", () => {
 		let source = [
 			"implementation {",
