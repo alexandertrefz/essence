@@ -843,6 +843,10 @@ function validateDispatchCases(
 			let earlierType = dispatchCases[index].memberType
 			let laterType = dispatchCases[later].memberType
 
+			if (sameBranchCode(dispatchCases[index], dispatchCases[later])) {
+				continue
+			}
+
 			if (acceptsAllAtRuntime(earlierType, laterType)) {
 				let erased = erasedDispatchEvidence(
 					earlierType,
@@ -907,6 +911,28 @@ function validateDispatchCases(
 			}
 		}
 	}
+}
+
+// Whether two branches emit the same call: one Method, taking no witness, with
+// no literal typed for the branch and no derived comparison. Which of them a
+// value takes then changes nothing.
+function sameBranchCode(
+	first: common.DispatchCase,
+	second: common.DispatchCase,
+): boolean {
+	return [first, second].every(
+		(branch) =>
+			branch.namespaceName === first.namespaceName &&
+			branch.overloadedMethodIndex === first.overloadedMethodIndex &&
+			branch.providedBy === first.providedBy &&
+			branch.omittedParameterIndices.join() ===
+				first.omittedParameterIndices.join() &&
+			!branch.takesWitnesses &&
+			branch.conformances.length === 0 &&
+			branch.contextualArguments.length === 0 &&
+			branch.derivedDescriptor === undefined &&
+			branch.derivedMembers === undefined,
+	)
 }
 
 function validateFunctionInvocation(

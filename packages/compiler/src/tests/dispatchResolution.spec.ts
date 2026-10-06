@@ -386,6 +386,36 @@ describe("Dispatch and Resolution", () => {
 				}`),
 			).toEqual(['"square"', '"flag"'])
 		})
+
+		// Two applications erase to one question, but where both branches
+		// call one Method with nothing of their own, the answer is the same
+		// whichever runs.
+		it("runs one generic Method for every application without a report", async () => {
+			expect(
+				await run(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					namespace Boxes<infer Item> for Box<Item> {
+						describe() -> String {
+							<- "a box"
+						}
+					}
+
+					function show(_ value: Box<Integer> | Box<String>) -> String {
+						<- value::describe()
+					}
+
+					constant items: List<Integer> | List<String> = []
+
+					Terminal.inspect(show(Box<String>#Empty))
+					Terminal.inspect(show(Box<Integer>#Full({ item = 1 })))
+					Terminal.inspect(items::hasItems())
+				}`),
+			).toEqual(['"a box"', '"a box"', "false"])
+		})
 	})
 
 	// Refined entries are probed first, so an appended refined entry can still

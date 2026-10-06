@@ -300,7 +300,10 @@ nothing, so a guarded `case List<Box<Integer>>` is not blamed.
 Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
 conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it
 never runs. A crossing inside a member is not reported there, since a Match that binds the member would have to
-rebuild the receiver in every arm to call the Method.
+rebuild the receiver in every arm to call the Method. Two branches that emit the same call are not compared at all
+(`sameBranchCode`): one Method that takes no witness, with no Function literal typed for its branch and no derived
+comparison. Whichever of them a value takes, the same code runs, as for `items::hasItems()` on a
+`List<Integer> | List<String>`.
 
 ## Literal Matches
 
