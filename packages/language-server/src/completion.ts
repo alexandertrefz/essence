@@ -23,7 +23,6 @@ import {
 	findArgumentContext,
 	pairedParameters,
 } from "./argumentContext"
-import { typedAssertionExpressions } from "./assertionChildren"
 import { type ImportEdit, insertImportEdit } from "./autoImport"
 import {
 	type CallSnippet,
@@ -31,13 +30,11 @@ import {
 	qualifiedCallSnippetsFor,
 } from "./callSnippets"
 import { parseDocument } from "./compilation"
-import { defineExpressions } from "./defineArmChildren"
 import { describe, documentationOf } from "./documentation"
 import {
 	moduleSectionCompletions,
 	moduleSectionCursor,
 } from "./importCompletion"
-import { typedHandlerExpressions } from "./matchHandlerChildren"
 import { documentAnalysisOf, enrichProbe, type ModuleView } from "./moduleLink"
 import { typeNamedAt } from "./namedTypes"
 import {
@@ -1603,22 +1600,14 @@ function describeDeclarations(
 			}
 		}
 
-		visitBody(definition.body)
+		forEachTypedChild(definition, (child, _state, field) => {
+			if (field === "body") {
+				visitNode(child)
+			}
+		})
 	}
 
-	function visitBody(nodes: Array<common.typed.ImplementationNode>) {
-		for (let node of nodes) {
-			visitNode(node)
-		}
-	}
-
-	function visitArguments(nodeArguments: Array<common.typed.ArgumentNode>) {
-		for (let argument of nodeArguments) {
-			visitNode(argument.value)
-		}
-	}
-
-	function visitNode(node: common.typed.ImplementationNode) {
+	function visitNode(node: TypedNode) {
 		switch (node.nodeType) {
 			case "ConstantDeclarationStatement":
 			case "VariableDeclarationStatement":
@@ -1626,8 +1615,7 @@ function describeDeclarations(
 					type: node.declaredType ?? node.type,
 					documentation: describe(node.documentation) || null,
 				})
-				visitNode(node.value)
-				return
+				break
 			case "FunctionStatement": {
 				let documentation = documentationOf(node.type)
 
@@ -1643,26 +1631,24 @@ function describeDeclarations(
 					type: node.type,
 					documentation: describe(node.documentation) || null,
 				})
-
-				for (let property of Object.values(node.properties)) {
-					visitNode(property.value)
-				}
-
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitFunction(
-							method.value,
-							documentationOf(method.type),
-						)
+				forEachTypedChild(node, (child, _state, field) => {
+					if (field !== "nativeShims") {
+						visitNode(child)
 					}
-				}
-
+				})
+				return
+			// Each Method's own `§§` block documents its Parameters.
+			case "SimpleMethod":
+			case "StaticMethod":
+			case "OverloadedMethod":
+			case "OverloadedStaticMethod":
+				forEachTypedChild(node, (child) => {
+					if (child.nodeType === "FunctionValue") {
+						visitFunction(child.value, documentationOf(child.type))
+					} else {
+						visitNode(child)
+					}
+				})
 				return
 			case "ChoiceDeclarationStatement":
 			case "TypeAliasStatement":
@@ -1678,133 +1664,19 @@ function describeDeclarations(
 						describe(node.protocolType.documentation ?? null) ||
 						null,
 				})
-
-				for (let member of Object.values(node.methods)) {
-					let methods =
-						member.nodeType === "OverloadedMethod" ||
-						member.nodeType === "OverloadedStaticMethod"
-							? member.methods
-							: [member.method]
-
-					for (let method of methods) {
-						visitFunction(
-							method.value,
-							documentationOf(method.type),
-						)
-					}
-				}
-
-				return
+				break
 			case "FunctionValue":
 				visitFunction(node.value, null)
 				return
-			case "VariableAssignmentStatement":
-				visitNode(node.value)
-				return
-			case "ReturnStatement":
-				visitNode(node.expression)
-				return
-			case "ExpectStatement":
-			case "RequireStatement":
-				for (let expression of typedAssertionExpressions(node)) {
-					visitNode(expression)
-				}
-
-				return
-			case "IfStatement":
-				visitNode(node.condition)
-				visitBody(node.body)
-				return
-			case "IfElseStatement":
-				visitNode(node.condition)
-				visitBody(node.trueBody)
-				visitBody(node.falseBody)
-				return
-			case "FunctionInvocation":
-				visitNode(node.name)
-				visitArguments(node.arguments)
-				return
-			case "MethodInvocation":
-				visitNode(node.base)
-				visitArguments(node.arguments)
-				return
-			case "Lookup":
-				visitNode(node.base)
-				return
-			case "Start":
-			case "Complete":
-				visitNode(node.expression)
-				return
-			case "RefusedValue":
-				visitNode(node.base)
-				return
-			case "Combination":
-				visitNode(node.lhs)
-				visitNode(node.rhs)
-				return
-			case "Match":
-				visitNode(node.value)
-
-				for (let handler of node.handlers) {
-					for (let expression of typedHandlerExpressions(handler)) {
-						visitNode(expression)
-					}
-
-					visitBody(handler.body)
-				}
-
-				return
-			case "Define":
-				for (let expression of defineExpressions(node)) {
-					visitNode(expression)
-				}
-
-				return
-			case "RecordValue":
-				for (let member of Object.values(node.members)) {
-					visitNode(member)
-				}
-
-				return
-			case "ListValue":
-				for (let value of node.values) {
-					visitNode(value)
-				}
-
-				return
-			case "DictionaryValue":
-				for (let entry of node.entries) {
-					visitNode(entry.key)
-					visitNode(entry.value)
-				}
-
-				return
-			case "InterpolatedStringValue":
-				for (let segment of node.segments) {
-					if (segment.kind === "expression") {
-						visitNode(segment.expression)
-					}
-				}
-
-				return
-			case "CaseValue":
-				if (node.value !== null) {
-					visitNode(node.value)
-				}
-
-				return
-			case "Identifier":
-			case "Self":
-			case "StringValue":
-			case "IntegerValue":
-			case "RationalValue":
-			case "BooleanValue":
-				return
 		}
+
+		forEachTypedChild(node, visitNode)
 	}
 
 	for (let body of typedProgramBodies(program)) {
-		visitBody(body)
+		for (let node of body) {
+			visitNode(node)
+		}
 	}
 
 	return described
