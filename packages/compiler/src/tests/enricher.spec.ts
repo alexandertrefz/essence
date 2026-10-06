@@ -1586,6 +1586,88 @@ describe("Enricher", () => {
 			expect(diagnostics[0].message).toBe("'name' can not be reassigned")
 		})
 
+		// Only a `constant` Declaration can be rewritten with `variable`. Any
+		// other name takes the new value under a name of its own.
+		let freshNameHelp =
+			"Declare the new value under a name of its own, with 'constant' or 'variable'."
+
+		function reassignmentOf(source: string): common.Diagnostic {
+			let found = diagnosticsFor(source).find(
+				(diagnostic) => diagnostic.code === "constant-reassignment",
+			)
+
+			if (found === undefined) {
+				throw new Error("No 'constant-reassignment' reported.")
+			}
+
+			return found
+		}
+
+		it("should ask a new value for a Namespace's name to take a name of its own", () => {
+			let program = (statement: string): string => `implementation {
+				namespace Clock {
+					static now() -> Integer {
+						<- 1
+					}
+				}
+
+				${statement}
+			}`
+			let diagnostic = reassignmentOf(program("Clock = 5"))
+
+			expect(diagnostic.helps).toEqual([freshNameHelp])
+			expect(diagnostic.notes).toEqual([
+				"'Clock' is a Namespace, which holds Methods and statics and is no value of its own.",
+			])
+			expect(compiles(program("constant clockValue = 5"))).toBe(true)
+		})
+
+		it("should ask a new value for a Function's name to take a name of its own", () => {
+			let program = (statement: string): string => `implementation {
+				function greet() -> String {
+					<- "hi"
+				}
+
+				${statement}
+			}`
+			let diagnostic = reassignmentOf(program("greet = 5"))
+
+			expect(diagnostic.helps).toEqual([freshNameHelp])
+			expect(diagnostic.notes).toEqual([
+				"Only a name declared with 'variable' can be given a new value.",
+			])
+			expect(compiles(program("constant greeting = 5"))).toBe(true)
+		})
+
+		it("should ask a new value for a Parameter's name to take a name of its own", () => {
+			let program = (statement: string): string => `implementation {
+				function greet(_ name: String) -> String {
+					${statement}
+					<- name
+				}
+			}`
+			let diagnostic = reassignmentOf(program(`name = "other"`))
+
+			expect(diagnostic.helps).toEqual([freshNameHelp])
+			expect(diagnostic.labels.map((label) => label.message)).toEqual([
+				"assigned to here",
+				"declared here",
+			])
+			expect(compiles(program(`constant other = "other"`))).toBe(true)
+		})
+
+		it("should offer 'variable' for a name a Pattern Constant binds", () => {
+			let program = (keyword: string): string => `implementation {
+				${keyword} { a } = { a = 1 }
+				a = 2
+			}`
+
+			expect(reassignmentOf(program("constant")).helps).toEqual([
+				"Declare it with 'variable' instead of 'constant' if it needs to change.",
+			])
+			expect(compiles(program("variable"))).toBe(true)
+		})
+
 		it("should allow reassigning outer Variables from inner scopes", () => {
 			expect(
 				diagnosticsFor(`implementation {

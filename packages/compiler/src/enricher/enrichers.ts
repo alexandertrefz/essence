@@ -124,6 +124,10 @@ import {
 	compilesWithoutPick,
 	reportPickedRequirement,
 } from "./protocolPicks"
+import {
+	recordWrittenConstant,
+	reportConstantReassignment,
+} from "./reassignment"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
@@ -5638,6 +5642,7 @@ function enrichConstantDeclarationStatement(
 	declareVariableInScope(name, declaredType ?? value.type, scope, true)
 
 	recordConstantValue(name.content, value, scope)
+	recordWrittenConstant(name.content, scope)
 
 	return {
 		nodeType: "ConstantDeclarationStatement",
@@ -5738,16 +5743,20 @@ function enrichPatternDeclarationStatement(
 
 	recordConstantValue(baseName, value, scope)
 
-	return [
-		base,
-		...declarePatternBindings(
-			pattern,
-			baseName,
-			subjectType,
-			scope,
-			node.nodeType === "ConstantDeclarationStatement",
-		),
-	]
+	let isConstant = node.nodeType === "ConstantDeclarationStatement"
+	let bindings = declarePatternBindings(
+		pattern,
+		baseName,
+		subjectType,
+		scope,
+		isConstant,
+	)
+
+	for (let binding of isConstant ? irrefutablePatternBindings(pattern) : []) {
+		recordWrittenConstant(binding.name.content, scope)
+	}
+
+	return [base, ...bindings]
 }
 
 // The Statements a Pattern in a Declaration or a Parameter desugars into, each
@@ -5890,27 +5899,7 @@ function enrichVariableAssignmentStatement(
 		declaringScope?.declarations[node.name.content] ?? null
 
 	if (declaringScope?.constants.has(node.name.content)) {
-		reportError(
-			`'${node.name.content}' can not be reassigned`,
-			node.name.position,
-			{
-				code: "constant-reassignment",
-				labels: [
-					primary(node.name.position, "assigned to here"),
-					...(declarationPosition === null
-						? []
-						: [
-								secondary(
-									declarationPosition,
-									"declared as a Constant here",
-								),
-							]),
-				],
-				helps: [
-					"Declare it with 'variable' instead of 'constant' if it needs to change.",
-				],
-			},
-		)
+		reportConstantReassignment(node.name, declaringScope)
 	}
 
 	let name = enrichIdentifier(node.name, scope)

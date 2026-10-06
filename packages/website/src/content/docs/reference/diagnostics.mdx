@@ -1894,7 +1894,7 @@ Taught on: [Conditions › The condition is a Boolean](/docs/language/conditions
 
 ### `constant-reassignment`
 
-**Error.** A name declared with `constant` is assigned a new value.
+**Error.** A name that is not a variable is assigned a new value: a constant, a function, a namespace, a parameter or an imported name.
 
 <div class="error-output">
 
@@ -1917,7 +1917,7 @@ Error: 'total' can not be reassigned
 
 </div>
 
-Declare it with `variable` if it needs to change, or bind the new value to a new constant.
+Declare it with `variable` if it needs to change, or bind the new value to a new constant. Only a name declared with `constant` can become a variable, so any other name is offered the second fix alone: `Help: Declare the new value under a name of its own, with 'constant' or 'variable'.`
 
 Quick Fix: **Declare 'total' as a Variable**.
 

@@ -44,6 +44,9 @@ export type Scope = {
 	declarations: Record<string, common.Position>
 	// The names in `members` that can not be reassigned.
 	constants: Set<string>
+	// The names in `constants` a `constant` Declaration wrote, the only ones a
+	// refused assignment may ask to be declared with `variable` instead.
+	writtenConstants?: Set<string>
 	// What each Constant of a Program's top level was given, read by Case
 	// payload defaults. Absent on every other Scope. See "Constant values" in
 	// DEVELOPMENT.md.
