@@ -1362,6 +1362,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 							: [
 									`Write this Case above 'case ${spellType(claimer.matcher, readerSpelling)}', which can only ever be the last one.`,
 								],
+					(matcher) => spellType(matcher, readerSpelling),
 				)
 
 				if (erased) {

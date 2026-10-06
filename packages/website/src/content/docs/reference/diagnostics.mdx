@@ -3610,6 +3610,10 @@ Error: This Case can never match
 
 Write the generic case last.
 
+A record matcher whose member names a type parameter, such as `case { a: Item }`, is reported the same way. It
+still checks that `a` is present, but not what type `a` holds, so the Help asks for the later case to be written
+above it: `Write this Case above 'case { a: Item }', which takes 'a' whatever Type it holds.`
+
 Two record types that differ only in a function member's **signature** report the
 same code with a different Help, because reordering cannot help there:
 

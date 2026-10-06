@@ -3,7 +3,11 @@ import type { common } from "@essence-lang/interfaces"
 import { primary, secondary } from "../diagnostics/index"
 import { describeType } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
-import { flattenUnionMembers, matchesType } from "../helpers/types"
+import {
+	flattenUnionMembers,
+	genericNamesMentioned,
+	matchesType,
+} from "../helpers/types"
 
 type MatchHandler = common.typed.MatchNode["handlers"][number]
 
@@ -24,6 +28,8 @@ export function claimedCaseReport(
 	runtimeMatcher: common.Type,
 	claims: Array<Claim>,
 	genericHelps: (claimer: MatchHandler) => Array<string>,
+	// How the reading file writes a Matcher.
+	spell: (matcher: common.Type) => string = describeType,
 ): {
 	erased: boolean
 	labels: [common.DiagnosticLabel, ...Array<common.DiagnosticLabel>]
@@ -38,8 +44,16 @@ export function claimedCaseReport(
 			namesTypeParameter(claim.handler.matcher) &&
 			!matchesType(claim.matcher, claim.member),
 	)
+	// A Record Matcher whose member names a Type Parameter, as `{ a: Item }`.
+	let record = claims.find(
+		(claim) =>
+			claim.handler.matcher.type === "Record" &&
+			genericNamesMentioned(claim.handler.matcher).size > 0 &&
+			!matchesType(claim.matcher, claim.member),
+	)
 	let erasing =
 		generic ??
+		record ??
 		claims.find((claim) => !matchesType(claim.matcher, claim.member))
 
 	let helps: Array<string> | null = null
@@ -49,6 +63,15 @@ export function claimedCaseReport(
 			`Types erase before a Match runs, so the Generic Case '${describeType(generic.handler.matcher)}' narrows nothing and accepts every value that reaches it.`,
 		)
 		helps = genericHelps(generic.handler)
+	} else if (record !== undefined) {
+		let open = openMembers(record.handler.matcher)
+
+		notes.push(
+			`A Record Matcher still checks that its members are present, but Types erase before a Match runs, so it can not test a member's Type against a Type Parameter — '${describeType(record.handler.matcher)}' takes ${open}.`,
+		)
+		helps = [
+			`Write this Case above 'case ${spell(record.handler.matcher)}', which takes ${open}.`,
+		]
 	} else if (erasing !== undefined) {
 		// A refinement's, where the bases reconcile the two, and otherwise a
 		// Function's Signature.
@@ -92,6 +115,23 @@ export function claimedCaseReport(
 		notes,
 		helps: helps ?? settledHelps(runtimeMatcher, claimers),
 	}
+}
+
+// What a Record Matcher takes whatever it holds: each member it types by a
+// Type Parameter, as "'a' whatever Type it holds".
+function openMembers(matcher: common.Type): string {
+	let names =
+		matcher.type === "Record"
+			? Object.keys(matcher.members).filter(
+					(name) =>
+						genericNamesMentioned(matcher.members[name]!).size > 0,
+				)
+			: []
+	let quoted = names.map((name) => `'${name}'`)
+
+	return names.length === 1
+		? `${quoted[0]} whatever Type it holds`
+		: `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)} whatever Types they hold`
 }
 
 function namesTypeParameter(matcher: common.Type): boolean {

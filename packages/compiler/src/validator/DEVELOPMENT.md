@@ -240,9 +240,12 @@ two.
 `claimedCaseReport` judges each claim against the member it claims, not against the dead Matcher. Several Handlers
 often cover a Case together, as `case #Red` and `case #Green` cover a trailing `case _`, and none of them covers it
 alone. A claim is erased only where its Handler does not match its member as a Type. A Generic Case, or a Union
-Matcher naming a Type Parameter, claims its own member as a Type and any other by erasure. A Case covered
-together is labelled at every claiming Handler, and only removal is offered. Removing it leaves every value to the
-Case that answers it now, while moving it above them would hand it members they answer for.
+Matcher naming a Type Parameter, claims its own member as a Type and any other by erasure. A Record Matcher whose
+member names a Type Parameter, `{ a: Item }`, checks that `a` is present and nothing of its Type, so its Note says
+that rather than blaming a Function's Signature. Its Help writes the later Case above it, which takes `a` whatever
+Type it holds. A Case covered together is labelled at every claiming Handler, and only removal is offered. Removing
+it leaves every value to the Case that answers it now, while moving it above them would hand it members they answer
+for.
 
 ### Runtime overlap
 

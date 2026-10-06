@@ -1121,6 +1121,38 @@ describe("Validator", () => {
 			).toEqual([])
 		})
 
+		// `{ a: Item }` still checks that `a` is there, but not what Type it
+		// holds, so it takes every Record with an `a`. No Function is involved.
+		it("should reject a Case shadowed by a Record Matcher naming a Type Parameter", () => {
+			let program = (handlers: string): string => `implementation {
+				function pick<infer Item>(_ value: { a: Item } | { a: Integer }) -> String {
+					<- match value -> String {
+						${handlers}
+					}
+				}
+
+				Terminal.print(pick({ a = "x" }))
+			}`
+			let [diagnostic] = diagnosticsFor(
+				program(`case { a: Item } { <- "item" }
+						case { a: Integer } { <- "integer" }`),
+			)
+
+			expect(diagnostic?.code).toBe("erased-case-conflict")
+			expect(diagnostic?.notes[1]).toBe(
+				"A Record Matcher still checks that its members are present, but Types erase before a Match runs, so it can not test a member's Type against a Type Parameter — '{ a: Item }' takes 'a' whatever Type it holds.",
+			)
+			expect(diagnostic?.helps).toEqual([
+				"Write this Case above 'case { a: Item }', which takes 'a' whatever Type it holds.",
+			])
+			expect(
+				compiles(
+					program(`case { a: Integer } { <- "integer" }
+						case { a: Item } { <- "item" }`),
+				),
+			).toBe(true)
+		})
+
 		it("should not warn about a Generic Case written below the Cases it would swallow", () => {
 			expect(
 				diagnosticsFor(`implementation {
