@@ -206,13 +206,25 @@ describe("A return Type nothing could read off the body", () => {
 		})
 	}`
 
-	// A forgotten `<-` is the usual cause. An annotation alone would only move
-	// the report to `missing-return`.
+	// A forgotten `<-` is the usual cause. An annotation of the value's Type
+	// would only move the report to `missing-return`, so the second Help names
+	// the one annotation such a body fits.
 	it("names the missing '<-' first", () => {
 		expect(helpsOfCode(source, "uninferable-return-type")).toEqual([
 			"Return the value with '<-' — a body whose last line is a value answers with nothing.",
-			"Or give the Function an explicit '-> Type'.",
+			"Or, where the body is meant to answer nothing, write '-> {}' after its Parameter list.",
 		])
+	})
+
+	it("compiles once the body is declared to answer nothing", () => {
+		expect(
+			compiles(source.replace("map((number) {", "map((number) -> {} {")),
+		).toBe(true)
+		expect(
+			codesOfSource(
+				source.replace("map((number) {", "map((number) -> Integer {"),
+			),
+		).toEqual(["missing-return"])
 	})
 
 	it("compiles once the value is returned", () => {

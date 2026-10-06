@@ -4171,13 +4171,13 @@ Error: The return Type could not be inferred from the body
    │                                        ╰──── the body's Type is not determined here
    │ 
    │ Help 1: Return the value with '<-' — a body whose last line is a value answers with nothing.
-   │ Help 2: Or give the Function an explicit '-> Type'.
+   │ Help 2: Or, where the body is meant to answer nothing, write '-> {}' after its Parameter list.
 ───╯
 ```
 
 </div>
 
-Return the value, `(number) { <- number::multiply(with 2) }`, or write the return type with `->`. The first help is offered only where the body's last line is a value; a body that does return and still answers nothing has the annotation and nothing else.
+Return the value, `(number) { <- number::multiply(with 2) }`. Where the body is meant to answer nothing, write `-> {}` instead; any other return type leaves it short of a `<-`, which [`missing-return`](#missing-return) then reports. Both helps are offered only where the body's last line is a value; a body that does return and still answers nothing is asked for its `-> Type` and nothing else.
 
 Taught on: [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions)
 

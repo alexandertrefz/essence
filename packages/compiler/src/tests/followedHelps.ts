@@ -133,6 +133,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"unicode-escape-out-of-range",
 		"uninferable-item-type",
 		"uninferable-property-type",
+		"uninferable-return-type",
 		"unknown-name",
 		"wrong-type-argument-count",
 	]

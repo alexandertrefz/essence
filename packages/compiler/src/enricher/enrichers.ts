@@ -15807,12 +15807,13 @@ function resolveContextualReturnType(
 		let position =
 			node.parameters[0]?.position ?? node.parameterListPosition
 		let message = "The return Type could not be inferred from the body"
-		// A missing `<-` is the usual cause, so the Help names it first; an
-		// annotation would only move the report to `missing-return`.
+		// A missing `<-` is the usual cause, so the Help names it first. Only
+		// `-> {}` fits a body that returns nothing, and any other annotation
+		// would move the report to `missing-return`.
 		let helps = endsInAnUnreturnedValue(node.body)
 			? [
 					"Return the value with '<-' — a body whose last line is a value answers with nothing.",
-					"Or give the Function an explicit '-> Type'.",
+					"Or, where the body is meant to answer nothing, write '-> {}' after its Parameter list.",
 				]
 			: ["Give the Function an explicit '-> Type'."]
 
