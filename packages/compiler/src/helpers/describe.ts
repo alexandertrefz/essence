@@ -1474,7 +1474,7 @@ function lastStep(path: string): string {
 // #endregion
 
 // The Method a value of this Type answers a Boolean question with, for a
-// Condition or a `where` clause that answers a value. Every Type has `::is(…)`,
+// Condition or a `where` clause that answers a value. `::is(…)` is the fallback,
 // but an Optional, a String, a List and a number each have a better one.
 export function booleanQuestionFor(type: common.Type): string {
 	if (type.type === "Refinement") {

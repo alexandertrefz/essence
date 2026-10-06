@@ -13,7 +13,6 @@ import { caseDefaults, parameterDefaults } from "../helpers/defaults"
 import {
 	asynchronyData,
 	asynchronyHelps,
-	booleanQuestionFor,
 	countOf,
 	declaredSpelling,
 	describeParameter,
@@ -62,6 +61,7 @@ import {
 	typeContainsUnknown,
 } from "../helpers/types"
 import { type Claim, claimedCaseReport } from "./claimedCases"
+import { reportConditionNotBoolean } from "./conditions"
 import {
 	collectDeclarationOrder,
 	type DeclarationOrder,
@@ -158,8 +158,10 @@ let topLevelStatementFloor = 0
 // DEVELOPMENT.md.
 let alreadyReported = false
 
-// How a report writes a declared name for this Program's reader.
+// How a report writes a declared name for this Program's reader. The bound
+// one answers null for a name nothing here binds.
 let readerSpelling: Spelling = declaredSpelling
+let boundSpelling: Spelling = declaredSpelling
 
 export type ValidateOptions = {
 	// What the parser abandoned on its way to this Program. The typed Program
@@ -184,6 +186,7 @@ export const validate = (
 	topLevelStatementFloor = 0
 	alreadyReported = options.reported === true
 	readerSpelling = programSpelling(program)
+	boundSpelling = programSpelling(program, true)
 	forgetRefusedValues()
 
 	let { diagnostics } = collectDiagnostics(() => {
@@ -3161,34 +3164,20 @@ function validateAssertion(
 	return node
 }
 
-// Every Condition must be a Boolean, since Essence has no truthiness.
 // `description` names the Condition in the message.
 function validateCondition(
 	condition: common.typed.ExpressionNode,
 	description: string,
 ): void {
 	if (condition.type.type !== "Boolean" && condition.type.type !== "Error") {
-		reportError(`${description} has to be a Boolean`, condition.position, {
-			code: "condition-not-boolean",
-			labels: [
-				primary(
-					condition.position,
-					`this is ${withArticle(describeType(condition.type))}`,
-				),
-			],
-			notes: [
-				"Essence has no truthiness — only a Boolean can be a Condition.",
-			],
-			helps: [booleanQuestionHelp(condition.type)],
+		reportConditionNotBoolean(condition, description, {
+			canWait: bodyCanWait(),
+			barrier: completionBarrier(),
+			spell: boundSpelling,
 		})
 	}
 
 	validateExpression(condition)
-}
-
-// The Help for a Condition that is not a Boolean.
-function booleanQuestionHelp(type: common.Type): string {
-	return `Ask a question that answers a Boolean — '::${booleanQuestionFor(type)}' reads ${withArticle(describeType(type))}.`
 }
 
 function validateDefiniteReturn(

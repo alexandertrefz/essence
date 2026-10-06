@@ -12205,7 +12205,8 @@ export {
 	})
 
 	// A Matcher names what this file can write: a Record nothing here binds by
-	// its shape, a Case of a Choice nothing here binds bare.
+	// its shape, a Case of a Choice nothing here binds bare. A Choice's
+	// `::is` needs the Choice bound, so without it the Help is withheld.
 	describe("a Match a Help writes", () => {
 		let lib = `implementation {
 	type Point = { x: Integer }
@@ -12263,6 +12264,112 @@ ${body}
 					(diagnostic) => diagnostic.code !== "unused-import",
 				),
 			)
+
+		it("should ask a Condition's members with Matchers this file can write", () => {
+			let refusals = analysed(`	if spot() {
+		Terminal.print("a")
+	}
+
+	if pick() {
+		Terminal.print("b")
+	}`)
+
+			expect(codesOf(refusals)).toEqual([
+				"condition-not-boolean",
+				"condition-not-boolean",
+			])
+			expect(refusals.map((refusal) => refusal.helps)).toEqual([
+				[
+					"Ask each member its own question in a Match that answers a Boolean — 'match … -> Boolean { case Integer { <- @::isGreaterThan(0) } case { x: Integer } { <- @::is(…) } }'.",
+				],
+				[],
+			])
+			expect(
+				codesOf(
+					analysed(`	if match spot() -> Boolean { case Integer { <- @::isGreaterThan(0) } case { x: Integer } { <- @::is({ x = 1 }) } } {
+		Terminal.print("a")
+	}`),
+				),
+			).toEqual([])
+		})
+
+		// A Choice's `::is` is derived where the Choice is in scope, so a value
+		// holding one the file does not import gets no question.
+		it("should ask '::is' of a Choice only where this file binds it", () => {
+			let outcomes = `implementation {
+	choice Outcome { Won, Lost }
+
+	type Standing = { team: String, last: Outcome }
+
+	function outcome() -> Outcome {
+		<- Outcome#Won
+	}
+
+	function standing() -> Standing {
+		<- { team = "a", last = Outcome#Won }
+	}
+}
+
+export {
+	Outcome
+	Standing
+	outcome
+	standing
+}
+`
+			let reading = (entries: string, body: string) =>
+				withProject(
+					{
+						"Main.es": `import {
+	from "./Outcomes.es" {
+		${entries}
+	}
+}
+
+implementation {
+${body}
+}
+`,
+						"Outcomes.es": outcomes,
+					},
+					(directory) =>
+						analysedAt(directory, "Main.es", "Main.es").filter(
+							(diagnostic) => diagnostic.code !== "unused-import",
+						),
+				)
+			let asked = `	if outcome() {
+		Terminal.print("a")
+	}
+
+	if standing() {
+		Terminal.print("b")
+	}`
+
+			expect(
+				reading("outcome\n\t\tstanding", asked).map(
+					(diagnostic) => diagnostic.helps,
+				),
+			).toEqual([[], []])
+			expect(
+				reading("Outcome\n\t\toutcome", asked.split("\n\n")[0]!).map(
+					(diagnostic) => diagnostic.helps,
+				),
+			).toEqual([
+				[
+					"Ask a question that answers a Boolean — '::is(…)' reads an Outcome.",
+				],
+			])
+			expect(
+				codesOf(
+					reading(
+						"Outcome\n\t\toutcome",
+						`	if outcome()::is(Outcome#Won) {
+		Terminal.print("a")
+	}`,
+					),
+				),
+			).toEqual([])
+		})
 
 		it("should read a member in an arm this file can write", () => {
 			let refusals = analysed(`	constant value = made()

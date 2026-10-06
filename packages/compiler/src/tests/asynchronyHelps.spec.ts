@@ -74,6 +74,12 @@ let preamble = [
 	"	function shown<infer Item is Printable>(_ item: Item) -> Integer {",
 	"		<- 0",
 	"	}",
+	"",
+	"	function ready() -> Future<Boolean> {",
+	"		complete Async.sleep(milliseconds 1)",
+	"",
+	"		<- true",
+	"	}",
 ].join("\n")
 
 type Site = {
@@ -128,6 +134,23 @@ let sites: Array<Site> = [
 		written: "Terminal.print(shown(fetched()))",
 		followed: "Terminal.print(shown(complete fetched()))",
 		asDefault: "shown(fetched())",
+	},
+	{
+		code: "condition-not-boolean",
+		written: "Terminal.print(define { as 1 if fetched() as 0 otherwise })",
+		followed: [
+			"constant answered = complete fetched()",
+			"",
+			"		Terminal.print(define { as 1 if answered::isGreaterThan(0) as 0 otherwise })",
+		].join("\n"),
+		asDefault: "define { as 1 if fetched() as 0 otherwise }",
+	},
+	{
+		code: "condition-not-boolean",
+		written: "Terminal.print(define { as 1 if ready() as 0 otherwise })",
+		followed:
+			"Terminal.print(define { as 1 if complete ready() as 0 otherwise })",
+		asDefault: "define { as 1 if ready() as 0 otherwise }",
 	},
 ]
 

@@ -667,6 +667,35 @@ ${fetched}
 			"'complete' only stands in a body that answers a Future, and this one does not — reach through it with '::map((value) { … })', which answers another Future, or declare the enclosing Function '-> Future<…>'.",
 		])
 	})
+
+	// Reaching through would answer another Future, which no Condition takes,
+	// so a Condition is told only the two steps that wait.
+	it("names the two steps a Condition in a body that can not wait takes", () => {
+		let checked = (answer: string, condition: string) => `implementation {
+	function ready() -> Future<Boolean> {
+		complete Async.sleep(milliseconds 1)
+
+		<- true
+	}
+
+	function shown() -> ${answer} {
+		if ${condition} {
+			<- 1
+		}
+
+		<- 0
+	}
+}`
+
+		expect(
+			helpsOfCode(checked("Integer", "ready()"), "condition-not-boolean"),
+		).toEqual([
+			"Declare the enclosing Function '-> Future<…>', which is what lets its body wait, then add 'complete'.",
+		])
+		expect(compiles(checked("Future<Integer>", "complete ready()"))).toBe(
+			true,
+		)
+	})
 })
 
 describe("One mistake, one report", () => {
@@ -783,6 +812,184 @@ describe("Reports that knew the fix and said nothing", () => {
 		}
 	}`),
 		).toBe(true)
+	})
+
+	// A Function has no `::is`, so the question is asked of what it answers.
+	// One that answers a Boolean is the Condition once called.
+	it("names the call a Function in a Condition is missing", () => {
+		let checked = (
+			declaration: string,
+			condition: string,
+		) => `implementation {
+		${declaration}
+
+		if ${condition} {
+			Terminal.print("yes")
+		}
+	}`
+		let ready = "function ready() -> Boolean {\n\t\t\t<- true\n\t\t}"
+		let count = "constant count = (_ step: Integer) -> Integer { <- step }"
+
+		expect(
+			helpsOfCode(checked(ready, "ready"), "condition-not-boolean"),
+		).toEqual(["Call it — 'ready()' answers a Boolean."])
+		expect(compiles(checked(ready, "ready()"))).toBe(true)
+
+		expect(
+			helpsOfCode(checked(count, "count"), "condition-not-boolean"),
+		).toEqual([
+			"Call it, and ask a question of what it answers — 'count(…)::isGreaterThan(0)' reads an Integer.",
+		])
+		expect(compiles(checked(count, "count(1)::isGreaterThan(0)"))).toBe(
+			true,
+		)
+	})
+
+	// A Future answers once waited for. `complete` takes the whole chain
+	// behind it, so the value is waited for on a line of its own.
+	it("waits for a Future before asking what it answers", () => {
+		let checked = (statements: string) => `implementation {
+		function fetched() -> Future<Integer> {
+			complete Async.sleep(milliseconds 1)
+
+			<- 41
+		}
+
+		${statements}
+	}`
+
+		expect(
+			helpsOfCode(
+				checked('if fetched() {\n\t\t\tTerminal.print("yes")\n\t\t}'),
+				"condition-not-boolean",
+			),
+		).toEqual([
+			"Wait for it on a line of its own — 'constant answered = complete …' — and ask 'answered::isGreaterThan(0)'.",
+		])
+		expect(
+			compiles(
+				checked(
+					'constant answered = complete fetched()\n\n\t\tif answered::isGreaterThan(0) {\n\t\t\tTerminal.print("yes")\n\t\t}',
+				),
+			),
+		).toBe(true)
+	})
+
+	// An unbounded Type Parameter answers no Method, so no question is
+	// offered. Bounded by `Equatable` it answers `::is`.
+	it("asks a Type Parameter only what its bound answers", () => {
+		let checked = (bound: string, condition: string) => `implementation {
+		function counted<infer Item${bound}>(_ item: Item) -> Integer {
+			if ${condition} {
+				<- 1
+			}
+
+			<- 0
+		}
+	}`
+
+		expect(
+			helpsOfCode(checked("", "item"), "condition-not-boolean"),
+		).toEqual([])
+		expect(
+			helpsOfCode(
+				checked(" is Equatable", "item"),
+				"condition-not-boolean",
+			),
+		).toEqual([
+			"Ask a question that answers a Boolean — '::is(…)' reads an Item.",
+		])
+		expect(compiles(checked(" is Equatable", "item::is(item)"))).toBe(true)
+	})
+
+	// No one question fits every member of a Union of different Types, so
+	// each member is asked its own in a Match.
+	it("asks each member of a Union its own question", () => {
+		let checked = (condition: string) => `implementation {
+		constant value: Integer | String = 1
+
+		if ${condition} {
+			Terminal.print("yes")
+		}
+	}`
+
+		expect(helpsOfCode(checked("value"), "condition-not-boolean")).toEqual([
+			"Ask each member its own question in a Match that answers a Boolean — 'match value -> Boolean { case Integer { <- @::isGreaterThan(0) } case String { <- @::hasCharacters() } }'.",
+		])
+		expect(
+			compiles(
+				checked(
+					"match value -> Boolean { case Integer { <- @::isGreaterThan(0) } case String { <- @::hasCharacters() } }",
+				),
+			),
+		).toBe(true)
+	})
+
+	// Each answer is asked through one question a value of its Type takes. A
+	// Union of different Types takes none, nor does a Record holding a
+	// Function, so nothing that would not compile is offered.
+	it("offers nothing where no one question fits what is answered", () => {
+		let condition = (
+			declarations: string,
+			value: string,
+		) => `implementation {
+		${declarations}
+
+		if ${value} {
+			Terminal.print("yes")
+		}
+	}`
+
+		for (let source of [
+			condition(
+				"function check() -> Integer | String {\n\t\t\t<- 1\n\t\t}",
+				"check",
+			),
+			condition(
+				"function fetched() -> Future<Integer | String> {\n\t\t\tcomplete Async.sleep(milliseconds 1)\n\n\t\t\t<- 1\n\t\t}",
+				"fetched()",
+			),
+			condition(
+				"constant value: List<Integer> | List<String> = [1]",
+				"value",
+			),
+			condition(
+				"function make() -> Integer {\n\t\t\t<- 1\n\t\t}\n\n\t\tconstant value: Integer | { run: () -> Integer } = { run = make }",
+				"value",
+			),
+		]) {
+			expect(codesOfSource(source)).toEqual(["condition-not-boolean"])
+			expect(helpsOfCode(source, "condition-not-boolean")).toEqual([])
+		}
+	})
+
+	// A static Method and a member holding a Function are called by the name
+	// the Condition wrote.
+	it("calls a Function the Condition reads off a Namespace or a Record", () => {
+		let condition = (value: string) => `implementation {
+		namespace Checks for Integer {
+			static ready() -> Boolean {
+				<- true
+			}
+		}
+
+		function yes() -> Boolean {
+			<- true
+		}
+
+		constant checks = { ready = yes }
+
+		if ${value} {
+			Terminal.print("yes")
+		}
+	}`
+
+		for (let value of ["Checks.ready", "checks.ready"]) {
+			expect(
+				helpsOfCode(condition(value), "condition-not-boolean"),
+			).toEqual([`Call it — '${value}()' answers a Boolean.`])
+			expect(compiles(condition(`${value}()`))).toBe(true)
+		}
 	})
 
 	it("names the question a String answers in a 'define'", () => {
