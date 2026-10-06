@@ -519,7 +519,8 @@ describe("The two new cuts, and the filter-map", () => {
 
 describe("Which rung a call lands on", () => {
 	// The seedless fold spends the proof, so an unproven List has no entry to
-	// reach. The refused Function's Parameters are then Types nothing decides.
+	// reach. The refused call is the one mistake: the literal it was passed
+	// takes no Types from it and reports nothing.
 	it("refuses the seedless fold on a List with no proof", () => {
 		let diagnostics = diagnosticsOf(`implementation {
 			constant handed: List<Integer> = [1, 2]
@@ -529,15 +530,11 @@ describe("Which rung a call lands on", () => {
 			})::toString())
 		}`)
 
-		// The cascade comes first: reporting what the call passed enriches
-		// the literal that no context reached.
 		expect(diagnostics.map(({ code }) => code)).toEqual([
-			"uninferable-parameter-type",
-			"uninferable-parameter-type",
 			"no-matching-overload",
 		])
 		// The entries `List` declares, spelled out rather than counted.
-		expect(diagnostics[2]!.notes).toEqual([
+		expect(diagnostics[0]!.notes).toEqual([
 			"'List::reduce' takes 2 Arguments: Parameter 'startingWith' is Answer, Parameter 2 is (_: Answer, _: Integer) -> Answer.",
 			"'List::reduce' takes 2 Arguments: Parameter 'startingWith' is Answer, Parameter 'step' is (_: Answer, _: Integer) -> Step<Answer, Answer>.",
 		])

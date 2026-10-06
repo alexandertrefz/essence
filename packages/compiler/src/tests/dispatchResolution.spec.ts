@@ -1738,6 +1738,26 @@ describe("What a refused call is told", () => {
 		])
 	})
 
+	// A call of the wrong shape pairs no Parameter with the literal. Reading
+	// what the call passed takes no Types for it, so the call's refusal is the
+	// only report.
+	it("reports no Function literal a call of the wrong shape passed", () => {
+		let diagnostics = diagnosticsFor(`implementation {
+			constant numbers = [1, 2, 3]
+
+			Terminal.print(numbers::map((item) { <- item }, 5)::length()::toString())
+			Terminal.print(numbers::map(5, (item) { <- item })::length()::toString())
+		}`)
+
+		expect(diagnostics.map(({ code }) => code)).toEqual([
+			"no-matching-overload",
+			"no-matching-overload",
+		])
+		expect(diagnostics[0]!.labels[0]!.message).toBe(
+			"this call passes 2 Arguments",
+		)
+	})
+
 	// A Type Parameter bound to a blank by an earlier Argument refuses the next
 	// as a write into the blank. The report explains the blank as every refusal
 	// over one does.

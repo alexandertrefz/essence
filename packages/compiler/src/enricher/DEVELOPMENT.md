@@ -718,7 +718,8 @@ The report leads with the closest candidate (`closestRefusal`): the one that ans
 refusing. At the same depth a refusal over a Type beats one over a label, since labels are compared first. Ties go
 to the candidate declared first. A candidate whose Parameters the Arguments could not be paired with refused the
 call's shape. If every candidate did, the report says how many Arguments the call passed and of which Types, and
-names any label no candidate declares (`unknownLabelEvidence`).
+names any label no candidate declares (`unknownLabelEvidence`). Those Types are read inside the refused call
+(`underRefusedCall`), so a Function literal no Parameter was paired with takes no Types and reports nothing.
 
 Otherwise the primary label names the refused Argument and what it is. An Argument whose Type holds an Error could
 not be read, and the label says so, unless its only Errors are holes for the Functions refused as values it holds.

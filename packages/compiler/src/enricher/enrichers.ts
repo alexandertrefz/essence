@@ -10775,14 +10775,16 @@ function methodArgumentPositions(
 }
 
 // What each written Argument came to. It enriches, so only the fallback report
-// asks; the typer keeps the one Node per Argument.
+// asks; the typer keeps the one Node per Argument. That report refuses the call,
+// so a Function literal typed here takes no Types and reports nothing.
 function writtenArgumentTypes(
 	args: Array<parser.ArgumentNode>,
 	typer: ArgumentTyper,
 ): Array<common.Type> {
-	return args.map(
-		(argument) => typer.enrichedArgumentValue(argument.value).type,
-	)
+	let typeOf = (argument: parser.ArgumentNode) =>
+		typer.enrichedArgumentValue(argument.value).type
+
+	return underRefusedCall(true, () => args.map(typeOf))
 }
 
 function resolveInvokedMethodInNamespace(
