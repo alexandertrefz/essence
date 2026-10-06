@@ -441,6 +441,7 @@ export type DiagnosticCode =
 	| "path-without-context"
 	| "uninferable-item-type"
 	| "uninferable-return-type"
+	| "uninferable-property-type"
 	| "missing-return-type"
 	// Documentation in `§§` blocks.
 	| "missing-documentation-separator"

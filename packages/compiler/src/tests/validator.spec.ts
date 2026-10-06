@@ -6,6 +6,12 @@ import { enrich } from "../enricher/index"
 import { parse } from "../parser/index"
 import { reachWork } from "../validator/declarationOrder"
 import { validate } from "../validator/index"
+import {
+	analysedDiagnosticsFor,
+	codesOfSource,
+	compiles,
+	firstAnalysed,
+} from "./followedHelps"
 
 function diagnosticsFor(source: string): Array<common.Diagnostic> {
 	let { program, diagnostics } = enrich(parse(source))
@@ -3247,6 +3253,301 @@ describe("Validator", () => {
 
 				expect(long).toBeGreaterThan(short)
 				expect(long).toBeLessThanOrEqual(short * 2.2)
+			})
+		})
+
+		// The enricher answers such a read with an Error, and the validator
+		// reports it once the order check has run. See "Static Properties
+		// while hoisting" in packages/compiler/src/enricher/DEVELOPMENT.md.
+		describe("an unannotated static Property read before its Type is decided", () => {
+			let sizes = (property: string) => `namespace Sizes {
+					${property}
+				}`
+
+			it("reports every read above what the value reads once, at the Property", () => {
+				let program = (
+					property: string,
+					constantFirst: boolean,
+				) => `implementation {
+					${constantFirst ? "constant size = 4" : ""}
+
+					function first() -> Integer {
+						<- Sizes.base
+					}
+
+					function second() -> Integer {
+						<- Sizes.base::add(1)
+					}
+
+					${constantFirst ? "" : "constant size = 4"}
+
+					${sizes(property)}
+
+					Terminal.print(first()::add(second()))
+				}`
+				let source = program("static base = size", false)
+				let diagnostics = analysedDiagnosticsFor(source)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["uninferable-property-type"])
+				expect(diagnostics[0].message).toBe(
+					"'Sizes.base' is read before its Type is decided",
+				)
+				expect(
+					diagnostics[0].labels.map((label) =>
+						underlinedBy(source, label),
+					),
+				).toEqual(["base", "base", "base"])
+				expect(diagnostics[0].position?.start.line).toBe(
+					source
+						.split("\n")
+						.findIndex((line) => line.includes("static base")) + 1,
+				)
+				expect(diagnostics[0].helps).toEqual([
+					"Annotate 'Sizes.base' with its Type: 'static base: Type = …'.",
+					"Or declare what its value reads above every read of it.",
+				])
+				expect(
+					compiles(program("static base: Integer = size", false)),
+				).toBe(true)
+				expect(compiles(program("static base = size", true))).toBe(true)
+			})
+
+			// Moving the Statement below the Namespace answers both.
+			it.each([
+				["a Statement", "Terminal.print(Sizes.base)"],
+				[
+					"a Function the Statement hands on",
+					"Terminal.inspect([1, 2]::map((value) { <- value::add(Sizes.base) }))",
+				],
+			])(
+				"leaves a read %s runs above the Namespace to the order check",
+				(_, statement) => {
+					let codes = codesOfSource(`implementation {
+						${statement}
+
+						constant size = 4
+
+						${sizes("static base = size")}
+					}`)
+
+					expect(codes).toContain("use-before-declaration")
+					expect(codes).not.toContain("uninferable-property-type")
+				},
+			)
+
+			it.each<[string, string, common.DiagnosticCode]>([
+				[
+					"names nothing declared",
+					"static base = sise",
+					"unknown-name",
+				],
+				[
+					"reads itself",
+					"static base = Sizes.base::add(size)",
+					"use-before-declaration",
+				],
+			])(
+				"reports only the value's own mistake where it %s",
+				(_, property, code) => {
+					expect(
+						codesOfSource(`implementation {
+							constant size = 4
+
+							function useIt() -> Integer {
+								<- Sizes.base
+							}
+
+							${sizes(property)}
+
+							Terminal.print(useIt())
+						}`),
+					).toEqual([code])
+				},
+			)
+
+			// `xs` is declared above the read, but its item Type is decided
+			// only by the assignment below it.
+			it("offers only the annotation where the value's Type is undecided", () => {
+				let program = (property: string) => `implementation {
+					variable xs = []
+
+					function count() -> Integer {
+						<- Sizes.items::length()
+					}
+
+					xs = [1, 2]
+
+					${sizes(property)}
+
+					Terminal.print(count())
+				}`
+
+				expect(
+					firstAnalysed(
+						program("static items = xs"),
+						"uninferable-property-type",
+					).helps,
+				).toEqual([
+					"Annotate 'Sizes.items' with its Type: 'static items: Type = …'.",
+				])
+				expect(
+					compiles(program("static items: List<Integer> = xs")),
+				).toBe(true)
+			})
+
+			// `Outer.total` reads `Inner.base` while hoisting, before anything
+			// can type it, so it waits and settles like `Inner.base`.
+			describe("read by another Property's value", () => {
+				let program = (
+					constantFirst: boolean,
+					total: string,
+				) => `implementation {
+					${constantFirst ? "constant size = 4" : ""}
+
+					function show() -> String {
+						<- Outer.total
+					}
+
+					${constantFirst ? "" : "constant size = 4"}
+
+					${sizes("static base = size").replace("Sizes", "Inner")}
+
+					namespace Outer {
+						${total}
+					}
+
+					Terminal.print(show())
+				}`
+
+				it.each([
+					["without", "static total = Inner.base::add(1)"],
+					["with", "static total: Integer = Inner.base::add(1)"],
+				])(
+					"checks a read of it %s an annotation against its Type",
+					(_, total) => {
+						expect(codesOfSource(program(true, total))).toEqual([
+							"return-type-mismatch",
+						])
+					},
+				)
+
+				it("reports a read of it above what the values read", () => {
+					let diagnostics = analysedDiagnosticsFor(
+						program(false, "static total = Inner.base::add(1)"),
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => diagnostic.message),
+					).toEqual([
+						"'Outer.total' is read before its Type is decided",
+					])
+				})
+			})
+
+			// The Protocol's body may not name `Limits` at all, which is the one
+			// report.
+			it("leaves a read in a provided Method to the refusal of the name", () => {
+				expect(
+					codesOfSource(`implementation {
+						protocol Sized {
+							size() -> Integer
+
+							limit() -> Integer {
+								<- Limits.most
+							}
+						}
+
+						constant most = 4
+
+						namespace Limits {
+							static most = most
+						}
+
+						type Box = { items: List<Integer> }
+
+						namespace Box for Box is Sized {
+							size() -> Integer {
+								<- @.items::length()
+							}
+						}
+
+						Terminal.print({ items = [1] }::limit())
+					}`),
+				).toEqual(["provided-method-out-of-reach"])
+			})
+
+			// `C.c` fails because `A.a` names `size`, which is not declared
+			// where `show` is checked.
+			it("offers declaring what the value reads through other Properties", () => {
+				let program = (
+					constantFirst: boolean,
+					c: string,
+				) => `implementation {
+					${constantFirst ? "constant size = 4" : ""}
+
+					function show() -> Integer {
+						<- C.c
+					}
+
+					${constantFirst ? "" : "constant size = 4"}
+
+					namespace A {
+						static a = size
+					}
+
+					namespace B {
+						static b = A.a::add(1)
+					}
+
+					namespace C {
+						${c}
+					}
+
+					Terminal.print(show())
+				}`
+
+				expect(
+					firstAnalysed(
+						program(false, "static c = B.b::add(1)"),
+						"uninferable-property-type",
+					).helps,
+				).toEqual([
+					"Annotate 'C.c' with its Type: 'static c: Type = …'.",
+					"Or declare what its value reads above every read of it.",
+				])
+				expect(
+					compiles(program(false, "static c: Integer = B.b::add(1)")),
+				).toBe(true)
+				expect(compiles(program(true, "static c = B.b::add(1)"))).toBe(
+					true,
+				)
+			})
+
+			it("reports a read in the tests section", () => {
+				expect(
+					codesOfSource(
+						`implementation {
+							Terminal.print("main")
+						}
+
+						tests {
+							function show() -> String {
+								<- Sizes.base
+							}
+
+							constant size = 4
+
+							${sizes("static base = size")}
+
+							test "reads it" {
+								expect show()::length()::is(1)
+							}
+						}`,
+						{ tests: true },
+					),
+				).toEqual(["uninferable-property-type"])
 			})
 		})
 	})

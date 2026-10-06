@@ -116,11 +116,13 @@ import {
 	unknownTypeRemedy,
 	withImportOf,
 } from "./spelling"
+import { namespaceMemberType } from "./staticProperties"
 import { inferringRefused } from "./typeParameters"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
 // Lookups and Literals from their enriched children, conformance solving, and
-// the Namespaces a Scope can see. No Expression is walked here.
+// the Namespaces a Scope can see. No Expression is walked here, save the value
+// of a static Property `namespaceMemberType` types where it is read.
 
 // Where every written annotation meets its Type, so the annotation index is
 // recorded here alone. Nested annotations recurse through this function, so
@@ -719,10 +721,10 @@ export function lookupTypeOf(
 	}
 
 	if (baseType.type === "Namespace") {
-		if (Object.hasOwn(baseType.properties, memberName)) {
-			return baseType.properties[memberName]
-		} else if (Object.hasOwn(baseType.methods, memberName)) {
-			return baseType.methods[memberName]
+		let member = namespaceMemberType(baseType, memberName, positions, scope)
+
+		if (member !== null) {
+			return member
 		} else if (
 			scope !== null &&
 			memberDeclarationWasAbandoned(scope, memberName)

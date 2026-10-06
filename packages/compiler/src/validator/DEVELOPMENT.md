@@ -9,8 +9,9 @@ The validator keeps its walk state in module variables, such as `witnessScopes`,
 `abandonedLines`, as the Diagnostic collection does. The alternative is threading each through every `validate…`
 function, and only one Program is validated at a time. `validate` resets them on entry, except `waitingBodies`, so
 no Program is checked against state another Program left. That includes the map in `refusedValues.ts`, through
-`forgetRefusedValues`. The stacks `waitingBodies`, `witnessScopes` and
-`writtenBounds` are pushed and popped in a `finally`, so a throw mid-walk can not leave them wrong.
+`forgetRefusedValues`, and the set in `untypedReads.ts`, which `collectDeclarationOrder` clears. The stacks
+`waitingBodies`, `witnessScopes` and `writtenBounds` are pushed and popped in a `finally`, so a throw mid-walk can
+not leave them wrong.
 
 `validate` walks the implementation's top-level Statements, then the tests section's when the compile asked for
 tests. A throw while validating one Statement is reported as `internal-error` at that Statement, and the walk goes
@@ -139,8 +140,9 @@ Each unit's closure over the bodies it runs is worked out once, per strongly con
 it needs something to exist. Moments count Statements, and a Namespace's Statement gives one to each Property in
 written order. A Statement whose closure needs nothing later than itself costs no further walk.
 Otherwise a walk with parent links finds each Namespace it reaches too early, and reports it once per Statement at
-what reaches it, unless `checkNamespaceIsDeclared` reported it for that Statement already. `reachWork` counts the
-walk for a spec that holds it linear.
+what reaches it, unless `checkNamespaceIsDeclared` reported it for that Statement already. Either way `refuseUse`
+notes the use, so `untypedReads.ts` leaves a read of an untyped static Property there to this report. `reachWork`
+counts the walk for a spec that holds it linear.
 
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its

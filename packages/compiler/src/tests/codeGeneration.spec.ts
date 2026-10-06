@@ -160,6 +160,62 @@ describe("Code Generation", () => {
 				`),
 			).toEqual(['"1.0"'])
 		})
+
+		// The Namespace hoists though its Property's value reads a Constant, and
+		// the Property is typed where `late` reads it.
+		it("runs a Namespace whose unannotated Property reads a Constant", async () => {
+			expect(
+				await run(`
+					implementation {
+						function early() -> Integer {
+							<- Sizes.doubled()
+						}
+
+						constant size = 4
+
+						function late() -> Integer {
+							<- Sizes.base::add(early())
+						}
+
+						namespace Sizes {
+							static base = size
+
+							static doubled() -> Integer {
+								<- Sizes.base::multiply(with 2)
+							}
+						}
+
+						Terminal.inspect(late())
+					}
+				`),
+			).toEqual(["12"])
+		})
+
+		// `Outer.total` waits while hoisting until `Inner.base` settles, so the
+		// read in `show` is typed rather than an Error.
+		it("runs a Property that reads another unannotated one", async () => {
+			expect(
+				await run(`
+					implementation {
+						constant size = 4
+
+						function show() -> Integer {
+							<- Outer.total::multiply(with 3)
+						}
+
+						namespace Inner {
+							static base = size
+						}
+
+						namespace Outer {
+							static total = Inner.base::add(1)
+						}
+
+						Terminal.inspect(show())
+					}
+				`),
+			).toEqual(["15"])
+		})
 	})
 
 	// A discarded value is bound to a name rather than dropped. See "Discarded

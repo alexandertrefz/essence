@@ -8,6 +8,7 @@ import {
 	type Unit,
 	type Units,
 } from "./reachUnits"
+import { forgetRefusedUses, refuseUse } from "./untypedReads"
 
 // Each top-level Namespace's index in the Statement list and its name's
 // Position. See "Use before declaration" in DEVELOPMENT.md.
@@ -27,6 +28,7 @@ type Declarations = Map<
 // Statements. `reported` holds `index name` for each Namespace a Statement's
 // own use was reported for, so a call reaching it is not reported again.
 export type DeclarationOrder = {
+	program: common.typed.Program | null
 	nodes: Array<common.typed.ImplementationNode>
 	namespaces: TopLevelNamespaces
 	constants: Declarations
@@ -79,9 +81,10 @@ type Via = { position: common.Position; label: string }
 const STEPS = 1 << 20
 
 export function collectDeclarationOrder(
-	nodes: Array<common.typed.ImplementationNode>,
-	imports: common.typed.ImportSectionNode | null = null,
+	program: common.typed.Program | null,
 ): DeclarationOrder {
+	let nodes = program?.implementation.nodes ?? []
+	let imports = program?.imports ?? null
 	let namespaces: TopLevelNamespaces = new Map()
 	let constants: Declarations = new Map()
 	let properties: Declarations = new Map()
@@ -133,8 +136,10 @@ export function collectDeclarationOrder(
 	)
 
 	reachWork.visits = 0
+	forgetRefusedUses()
 
 	return {
+		program,
 		nodes,
 		namespaces,
 		constants,
@@ -545,6 +550,17 @@ function reportFrom(
 		for (let dependency of step.unit.dependencies) {
 			let declaration = declarationOf(order, dependency)
 			let key = `${dependency.kind} ${dependency.name}`
+
+			// Refused even where it is reported once already, so no read of a
+			// Property through it is reported again.
+			if (
+				declaration !== undefined &&
+				(dependency.kind === "namespace" ||
+					dependency.kind === "cycle") &&
+				availableFrom(dependency, order) >= moment
+			) {
+				refuseUse(dependency.position)
+			}
 
 			// A Constant or a Property the Statement reads itself is the
 			// enricher's and `checkPropertyIsBound`'s to report.

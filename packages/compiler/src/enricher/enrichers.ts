@@ -5976,7 +5976,7 @@ function enrichNamespaceDefinitionStatement(
 			}
 
 			boundProperties[propertyKey] = type
-			settleProperty(namespaceType.properties, propertyKey, value.type)
+			settleProperty(namespaceType, propertyKey, value)
 		}
 
 		return result

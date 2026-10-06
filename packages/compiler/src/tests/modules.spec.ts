@@ -5916,6 +5916,259 @@ implementation {
 		)
 	})
 
+	// The same without the annotation. `Game.es` calls a Method, which needs no
+	// Type of the Property.
+	describe("a Namespace whose unannotated static Property reads a Constant", () => {
+		let board = `import {
+	from "./Game.es" {
+		Game
+	}
+}
+
+implementation {
+	type Board = List<Integer>
+
+	constant size = 2
+
+	namespace Board for Board {
+		static empty = List.repeat(0, times size)
+
+		static blank() -> Board {
+			<- Board.empty
+		}
+
+		filled() -> Integer {
+			<- @::length()
+		}
+	}
+
+	function cells(_ game: Game) -> Integer {
+		<- game.board::filled()
+	}
+}
+
+export {
+	Board
+	cells
+}
+`
+		let game = (board: string) => `import {
+	from "./Board.es" {
+		Board
+		cells
+	}
+}
+
+implementation {
+	type Game = { board: Board }
+
+	function start() -> Game {
+		<- { board = ${board} }
+	}
+
+	function count() -> Integer {
+		<- cells(start())
+	}
+}
+
+export {
+	Game
+	count
+	start
+}
+`
+		let main = `import {
+	from "./Game.es" {
+		count
+	}
+}
+
+implementation {
+	Terminal.inspect(count())
+}
+`
+
+		it("binds the Namespace across a cycle", async () => {
+			await withBuiltProject(
+				{
+					"Board.es": board,
+					"Game.es": game("Board.blank()"),
+					"Main.es": main,
+				},
+				async (directory) => {
+					expect(analysedAt(directory, "Main.es", "Game.es")).toEqual(
+						[],
+					)
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["2"])
+				},
+			)
+		})
+
+		// Either Module of the cycle may be enriched first, so the read is
+		// refused whichever the entry imports first. A Label on the Property
+		// would point into `Board.es`, so the report has the read alone.
+		it.each([
+			["Game.es", main],
+			[
+				"Board.es",
+				`import {
+	from "./Board.es" {
+		cells
+	}
+	from "./Game.es" {
+		count
+	}
+}
+
+implementation {
+	Terminal.inspect(count())
+}
+`,
+			],
+		])(
+			"refuses a cycle partner's read of the Property from an entry importing %s first",
+			(_, entry) => {
+				withProject(
+					{
+						"Board.es": board,
+						"Game.es": game("Board.empty"),
+						"Main.es": entry,
+					},
+					(directory) => {
+						let [refusal, ...rest] = analysedAt(
+							directory,
+							"Main.es",
+							"Game.es",
+						)
+
+						expect(rest).toEqual([])
+						expect(refusal?.code).toBe("uninferable-property-type")
+						expect(refusal?.labels).toHaveLength(1)
+						expect(refusal?.helps).toEqual([
+							"Annotate 'Board.empty' with its Type: 'static empty: Type = …'.",
+						])
+					},
+				)
+			},
+		)
+
+		it("types a Property an imported Function reads through another", async () => {
+			let library = (returned: string, read: string) => `implementation {
+	constant size = 4
+
+	function show() -> ${returned} {
+		<- ${read}
+	}
+
+	namespace Inner {
+		static base = size
+	}
+
+	namespace Outer {
+		static total = Inner.base::add(1)
+	}
+}
+
+export {
+	show
+}
+`
+			let entry = `import {
+	from "./Lib.es" {
+		show
+	}
+}
+
+implementation {
+	Terminal.inspect(show())
+}
+`
+
+			withProject(
+				{
+					"Lib.es": library("String", "Outer.total"),
+					"Main.es": entry,
+				},
+				(directory) => {
+					expect(
+						codesOf(analysedAt(directory, "Main.es", "Lib.es")),
+					).toEqual(["return-type-mismatch"])
+				},
+			)
+
+			await withBuiltProject(
+				{
+					"Lib.es": library(
+						"Integer",
+						"Outer.total::multiply(with 3)",
+					),
+					"Main.es": entry,
+				},
+				async (directory) => {
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["15"])
+				},
+			)
+		})
+
+		it("runs a Method an imported Function calls above it", async () => {
+			await withBuiltProject(
+				{
+					"Sizes.es": `implementation {
+	function early() -> Integer {
+		<- Sizes.doubled()
+	}
+
+	constant size = 4
+
+	namespace Sizes {
+		static base = size
+
+		static doubled() -> Integer {
+			<- Sizes.base::multiply(with 2)
+		}
+	}
+}
+
+export {
+	early
+}
+`,
+					"Main.es": `import {
+	from "./Sizes.es" {
+		early
+	}
+}
+
+implementation {
+	Terminal.inspect(early())
+}
+`,
+				},
+				async (directory) => {
+					expect(
+						analysedAt(directory, "Main.es", "Sizes.es"),
+					).toEqual([])
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual(["8"])
+				},
+			)
+		})
+	})
+
 	// The Module fixtures, with a cycle among them, linked end to end with every
 	// Diagnostic stage run. They are meant to be clean.
 	it("links the Module fixtures without a single Diagnostic", () => {

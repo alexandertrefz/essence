@@ -971,13 +971,44 @@ Constant never resolves there, since a Constant does not hoist. Left alone, such
 until the in-order enrichment reaches it. A body written above it can not call its Methods then, and another Module
 of a cycle never binds it.
 
-`hoistStalls` gives the hoist one more round once a round makes no progress. In that settling round an annotated
-Property whose value does not resolve takes its annotation, and its Namespace hoists. An unannotated one still waits.
-Only a stuck hoist settles, so a value that waits for something still to hoist keeps its own Type. Once the
-in-order enrichment reaches the value, `settleProperty` gives the Property the value's Type. Code below the
-Namespace reads the Type it would read from a Namespace resolved in order. A Property of another Namespace whose
-value read a settled one while hoisting holds the annotation's Type too, so it is settled with it and given its
-value's Type the same way.
+`hoistStalls` gives the hoist one more round once a round makes no progress. In that settling round a Property
+whose value does not resolve takes its annotation, and its Namespace hoists. One without an annotation is left
+untyped, and its Namespace hoists all the same. Only a stuck hoist settles, so a value that waits for something
+still to hoist keeps its own Type. Once the in-order enrichment reaches the value, `settleProperty` gives the
+Property the value's Type. Code below the Namespace reads the Type it would read from a Namespace resolved in order.
+A Property of another Namespace whose value read a settled one while hoisting holds the annotation's Type too, so it
+is settled with it and given its value's Type the same way.
+
+An untyped Property is typed at the first read where its value types. `namespaceMemberType`, which `lookupTypeOf`
+asks for every member of a Namespace, enriches the value in the Scope it was written in, as that Scope stands at
+the read. A Constant declared above the read is in it by then. Its record, an `UntypedProperty` in
+`helpers/untypedProperties.ts`, is kept for the whole compile.
+
+A read where the value still does not resolve, or where its Type holds an undecided slot, answers an Error without a
+report, and the record notes why. Another Module of the same hoist group never types it, since that Module may be
+enriched before the value whichever Module the compile starts from. Its reads fail the same way. A value that fails
+through another untyped Property takes the cause of that read (`nestedCauses`), so a name declared too late two
+Properties away still counts as one. A read in a provided Method notes nothing, since `provided-method-out-of-reach`
+refuses the Namespace's name there.
+
+While hoisting, a Property value that reads such a Property must not take that Error as its Type, or code above its
+Namespace reads an Error nothing reports. So the read throws instead (`UntypedPropertyPending`), and
+`typeBodiedProperties` counts the value as unresolved, as it does one whose Type holds an Error. Outside the
+settling round its Namespace waits. In the settling round it takes its annotation or is left untyped too.
+
+The validator reports these reads in `validator/untypedReads.ts`, once its order check has run. It walks a Program
+only once any read has failed in the process (`anyFailedReads`), and walks the tests section too. Two reads are left
+out until another mistake is fixed:
+
+- A read the order check refused. Its `use-before-declaration` comes first, and moving the Statement below the
+  Namespace answers both.
+- Every read of a Property whose own value holds an Error where it is written, which `settleProperty` notes. The
+  value's own report comes first, and the reads are reported once it is fixed if they still fail.
+
+What is left is one `uninferable-property-type` per Property and Module. It stands at the Property where that Module
+declares it, with a Label on each read, and at the first read otherwise, since a Label's Position names no file.
+Its Help is the annotation. A second Help, to declare what the value reads above the reads, is offered only where
+every read failed on a name not declared there.
 
 A Namespace that hoists this way answers calls above it that it would otherwise miss. A Method call on a refinement
 above it may then resolve to it rather than to a Namespace for the refinement's base.

@@ -652,6 +652,8 @@ Error: Namespace 'Doubling' is used before it is declared
 
 A statement can use a namespace only below its declaration, the same as a JavaScript `class` declaration. That covers what the statement runs: `Terminal.print(quadrupled(3))` above `Doubling` is `use-before-declaration` at the call, because the call runs the body there.
 
+A body above a namespace can call its methods even when one of its statics reads a constant declared further down. A static without an annotation takes its value's type, though, so a body can read it only where that value can be typed. With `static side = width` in a namespace `Square`, a function above `constant width` that reads `Square.side` is [`uninferable-property-type`](/docs/reference/diagnostics#uninferable-property-type). Annotate the static, `static side: Integer = width`, or declare `width` above the function.
+
 A namespace may be declared inside a function body. Its methods then exist only inside that body:
 
 ```essence

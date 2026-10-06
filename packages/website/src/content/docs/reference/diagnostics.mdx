@@ -4179,6 +4179,40 @@ Return the value, `(number) { <- number::multiply(with 2) }`, or write the retur
 
 Taught on: [Coming from JavaScript › Functions](/docs/getting-started/coming-from-javascript#functions)
 
+### `uninferable-property-type`
+
+**Error.** A static property without a type annotation is read where its value cannot be typed yet: in code checked before what the value reads is declared, or from another module of its import cycle.
+
+<div class="error-output">
+
+```
+[uninferable-property-type]
+Error: 'Square.side' is read before its Type is decided
+   ╭─┤ Square.es:9:10 │
+   │
+ 3 │        <- Square.side::multiply(with 4)
+   │                  ──┬─  
+   │                    ╰─── read where its value can not be typed
+   │ 
+ 9 │        static side = width
+   │               ──┬─  
+   │                 ╰─── no annotation, so its value decides its Type
+   │ 
+   │ Help 1: Annotate 'Square.side' with its Type: 'static side: Type = …'.
+   │ Help 2: Or declare what its value reads above every read of it.
+   │ 
+   │ Note: A static Property without an annotation takes its value's Type, so it can be read only where its value can be typed.
+───╯
+```
+
+</div>
+
+A namespace is hoisted, so a function above it may call its methods. A static property without an annotation has its value's type, though, and `width` does not exist yet where `perimeter` is checked. Annotate the property, `static side: Integer = width`, or declare `width` above `perimeter`. Either way the program prints `12`. The report stands on the property and labels every read, so one annotation answers them all. The second help is offered only where every read came before a name the value uses; where the value's type has an undecided part, as a `[]` that a later assignment fills, only the annotation is offered.
+
+A read that runs before the namespace exists is [`use-before-declaration`](/docs/reference/diagnostics#use-before-declaration) instead, and a value with a mistake of its own reports that mistake alone. A module of an import cycle never reads such a property typed, whichever module the compile starts from, since the other module may be checked first. Its report stands on its first read, without a label on the property, and offers only the annotation.
+
+Taught on: [Namespaces and methods › Where a namespace can be used](/docs/language/namespaces-and-methods#where-a-namespace-can-be-used)
+
 ### `missing-return-type`
 
 **Error.** A function literal that is not passed as an argument has no `-> Type`.

@@ -1547,6 +1547,131 @@ describe("Enricher", () => {
 			).toBe("Narrow")
 		})
 
+		// Without an annotation the Property has no Type while hoisting, but
+		// nothing above the Namespace reads it here.
+		it("should hoist a Namespace whose unannotated static Property reads a Constant", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function useIt() -> Integer {
+						<- Sizes.doubled()::add(3::tripled())
+					}
+
+					constant size = 4
+
+					namespace Sizes for Integer {
+						static base = size
+
+						static doubled() -> Integer {
+							<- Sizes.base::multiply(with 2)
+						}
+
+						tripled() -> Integer {
+							<- @::multiply(with 3)
+						}
+					}
+
+					Terminal.inspect(useIt())
+				}`),
+			).toEqual([])
+		})
+
+		it("should answer a refinement's Method from such a Namespace without an annotation", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				type NonZero = Integer where @::isNot(0)
+
+				constant base = 10
+
+				namespace Wide for Integer {
+					label() -> String { <- "wide" }
+				}
+
+				function describe(_ n: NonZero) -> String {
+					<- n::label()
+				}
+
+				namespace Narrow for NonZero {
+					static scale = base
+
+					label() -> String { <- "narrow" }
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let describe = program.implementation.nodes.find(
+				(node) => node.nodeType === "FunctionStatement",
+			)
+			let answer =
+				describe?.nodeType === "FunctionStatement"
+					? describe.value.body[0]
+					: undefined
+
+			expect(
+				answer?.nodeType === "ReturnStatement" &&
+					answer.expression.nodeType === "MethodInvocation"
+					? answer.expression.namespace.name
+					: null,
+			).toBe("Narrow")
+		})
+
+		// `size` is declared by the time `useIt` reads `Sizes.base`, so the
+		// value is typed there.
+		it("should type an unannotated static Property where it is read once its value resolves", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				constant size = 4
+
+				function useIt() -> Integer {
+					<- Sizes.base
+				}
+
+				namespace Sizes {
+					static base = size
+				}
+
+				constant late = Sizes.base
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let late = program.implementation.nodes.at(-1)
+
+			expect(
+				late?.nodeType === "ConstantDeclarationStatement"
+					? printType(late.type)
+					: null,
+			).toBe("Integer")
+		})
+
+		// Whether the read is refused depends on what runs before the
+		// Namespace, which only the validator knows.
+		it("should answer a read it can not type with an Error and no report", () => {
+			let { program, diagnostics } = enrichSource(`implementation {
+				function useIt() -> Integer {
+					<- Sizes.base
+				}
+
+				constant size = 4
+
+				namespace Sizes {
+					static base = size
+				}
+			}`)
+
+			expect(diagnostics).toEqual([])
+
+			let useIt = program.implementation.nodes[0]
+			let answer =
+				useIt?.nodeType === "FunctionStatement"
+					? useIt.value.body[0]
+					: undefined
+
+			expect(
+				answer?.nodeType === "ReturnStatement"
+					? answer.expression.type.type
+					: null,
+			).toBe("Error")
+		})
+
 		it("should still report duplicate hoisted declarations", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				type Name = String

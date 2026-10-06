@@ -130,6 +130,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"surrogate-unicode-escape",
 		"unbraced-unicode-escape",
 		"unicode-escape-out-of-range",
+		"uninferable-property-type",
 		"unknown-name",
 		"wrong-type-argument-count",
 	]

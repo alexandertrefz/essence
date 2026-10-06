@@ -73,6 +73,7 @@ import {
 	rememberRefusedValue,
 	validateNoBoundFunctionValue,
 } from "./refusedValues"
+import { reportUntypedReads } from "./untypedReads"
 
 type CurrentFunctionContext = common.typed.FunctionDefinitionNode | null
 
@@ -124,7 +125,7 @@ function insideBody(
 // Where each top-level Namespace is declared. A Namespace is emitted as a
 // `class`, so a use that runs before its Declaration fails. See "Use before
 // declaration" in DEVELOPMENT.md.
-let declarationOrder: DeclarationOrder = collectDeclarationOrder([])
+let declarationOrder: DeclarationOrder = collectDeclarationOrder(null)
 
 // The index of the top-level Statement being validated, or null inside a
 // Function body, which runs when called. A static Property's initialiser keeps
@@ -174,10 +175,7 @@ export const validate = (
 	// Fresh state per run. See "Module state" in DEVELOPMENT.md.
 	witnessScopes = []
 	writtenBounds = []
-	declarationOrder = collectDeclarationOrder(
-		program.implementation.nodes,
-		program.imports,
-	)
+	declarationOrder = collectDeclarationOrder(program)
 	executingTopLevelIndex = null
 	initialisingProperty = null
 	abandonedLines = new Set(options.recovery?.lines ?? [])
@@ -215,6 +213,8 @@ export const validate = (
 
 			raiseTopLevelStatementFloor(node)
 		}
+
+		reportUntypedReads(declarationOrder)
 	})
 
 	return diagnostics
