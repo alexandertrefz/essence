@@ -22,7 +22,10 @@ the runtime and the prelude, and the Variables view renders values the way
 The adapter compiles nothing itself. What compiling *means* is a capability
 the host injects: `essence dap` hands in the CLI's in-process pipeline, and
 the standalone `esdap` falls back to spawning `essence build`. From the
-compiler it imports only `isSynthesizedName`, to tell the bindings the
-compiler made from the ones the author wrote. Debugging requires Node: the
+compiler it imports only naming rules: `isSynthesizedName`, to tell the
+bindings the compiler made from the ones the author wrote, and the rewriter's
+`mangledNamePrefix`, `reservedJavaScriptWords` and `escapeName`, to read an
+emitted name back as the author spelled it and to spell a name typed into the
+debug console the way the bundle does. Debugging requires Node: the
 adapter speaks the V8 inspector
 protocol to the debuggee.

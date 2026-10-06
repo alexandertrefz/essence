@@ -1,4 +1,6 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { Lexer } from "@essence-lang/compiler/lexer"
 import { escapeName } from "@essence-lang/compiler/rewriter/names"
@@ -146,5 +148,39 @@ describe("isCompilerBinding", () => {
 		]) {
 			expect(isCompilerBinding(name)).toBe(true)
 		}
+	})
+})
+
+// The README says the adapter borrows only the compiler's naming rules, and
+// names each one, so an import it adds must be named there too. An import of
+// another shape could hide a name, so every import is held to the braced one.
+describe("the compiler imports", () => {
+	it("are each named in the README", () => {
+		let sourceDirectory = join(import.meta.dir, "..")
+		let readme = readFileSync(join(sourceDirectory, "../README.md"), "utf8")
+		let sources = readdirSync(sourceDirectory)
+			.filter((name) => name.endsWith(".ts"))
+			.map((name) => readFileSync(join(sourceDirectory, name), "utf8"))
+		let braced = sources.flatMap((source) => [
+			...source.matchAll(
+				/import (?:type )?\{([^}]*)\} from "@essence-lang\/compiler(?:\/[^"]+)?"/g,
+			),
+		])
+		let imported = braced
+			.flatMap((match) => (match[1] as string).split(","))
+			.map((name) => name.trim().replace(/^type /, ""))
+			.filter((name) => name !== "")
+
+		expect(
+			sources.flatMap((source) => [
+				...source.matchAll(
+					/from "@essence-lang\/compiler(?:\/[^"]+)?"/g,
+				),
+			]).length,
+		).toBe(braced.length)
+		expect(imported.length).toBeGreaterThan(0)
+		expect(
+			imported.filter((name) => !readme.includes(`\`${name}\``)),
+		).toEqual([])
 	})
 })
