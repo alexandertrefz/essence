@@ -1083,6 +1083,62 @@ describe("Type matching", () => {
 				],
 			])
 		})
+
+		// A written part is asked for its evidence with each refused Function
+		// in it a hole. The List still has an item, and `3` still is no zero.
+		it("should admit a written part around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = (_: Integer, _: Integer) -> Integer
+
+				choice Holder {
+					Has { rule: Rule, count: NonZeroInteger },
+					Lacks,
+				}
+
+				function use(_ settings: { rule: Rule, count: NonZeroInteger }) -> Integer {
+					<- settings.count
+				}
+
+				constant rows: List<NonEmptyList<Rule>> = [[Integer.add]]
+				constant record: { rule: Rule, count: NonZeroInteger } = { rule = Integer.add, count = 3 }
+				constant used = use({ rule = Integer.add, count = 3 })
+				constant held: Holder = #Has({ rule = Integer.add, count = 3 })
+				constant table: Dictionary<String, NonEmptyList<Rule>> = ["a" = [Integer.add]]
+			}`)
+
+			expect(errors.map((error) => error.code)).toEqual([
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+				"overloaded-function-value",
+			])
+		})
+
+		// The part that proves nothing is named, not the one holding the hole.
+		it("should name the part beside a refused Function that proves nothing", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = (_: Integer, _: Integer) -> Integer
+
+				constant rows: List<NonEmptyList<Rule>> = [[Integer.add], []]
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"assignment-type-mismatch",
+					["this is a List<List<…>>", "this item is a List<Unknown>"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
 	})
 
 	// Two Modules may each declare `choice Outcome`, so a Choice's identity is

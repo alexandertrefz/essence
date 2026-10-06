@@ -212,6 +212,11 @@ fit as it stands. A level a path key built is a partial, which only the merge wi
 is not asked. A Case payload is a written Record too: the validator asks it against the Case's members, and
 `wrapSingleMemberShorthand` reads an admitted Record as the payload rather than wrapping it.
 
+Each part is asked as the validator measures a value (`measuredValue`): a Function refused as a value in it is a
+hole, reported where it is written. So `[[Integer.add]]` still has an item, and `{ rule = Integer.add, count = 3 }`
+still proves its `count`. `unadmittedWrittenItem` asks the parts the same way, so it names the part that proves
+nothing rather than the one holding the hole.
+
 `refinementInside` gates all of this. It looks down List items, Dictionary slots and Record members. It never looks
 into a Case, since a payload is asked where it is constructed.
 

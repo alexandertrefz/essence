@@ -7,6 +7,7 @@ import {
 	genericNamesMentioned,
 	matchesType,
 	matchesTypeWithBindings,
+	measuredValue,
 	provenConjuncts,
 } from "./types"
 
@@ -22,7 +23,8 @@ function admittedByEvaluation(
 
 // The Type a written value is admitted at, given the Type its position asks
 // for, or null where nothing was decided. Lists, Dictionaries and Records are
-// asked part by part. See "Containers" in DEVELOPMENT.md.
+// asked part by part, a Function refused as a value in a part read as a hole.
+// See "Containers" in DEVELOPMENT.md.
 export function admittedTypeOf(
 	expected: common.Type,
 	value: common.typed.ExpressionNode,
@@ -59,7 +61,7 @@ export function admittedTypeOf(
 
 	let itemTypes: Array<common.Type> = []
 
-	for (let item of value.values) {
+	for (let item of value.values.map(measuredValue)) {
 		let decided = admittedTypeOf(expected.itemType, item, binds)
 
 		if (
@@ -98,20 +100,22 @@ function admittedDictionaryTypeOf(
 	let valueTypes: Array<common.Type> = []
 
 	for (let entry of value.entries) {
-		let key = admittedTypeOf(expected.keyType, entry.key, binds)
-		let held = admittedTypeOf(expected.valueType, entry.value, binds)
+		let written = measuredValue(entry.key)
+		let stored = measuredValue(entry.value)
+		let key = admittedTypeOf(expected.keyType, written, binds)
+		let held = admittedTypeOf(expected.valueType, stored, binds)
 
 		if (
 			(key === null &&
-				!fitsAsItStands(expected.keyType, entry.key.type, binds)) ||
+				!fitsAsItStands(expected.keyType, written.type, binds)) ||
 			(held === null &&
-				!fitsAsItStands(expected.valueType, entry.value.type, binds))
+				!fitsAsItStands(expected.valueType, stored.type, binds))
 		) {
 			return null
 		}
 
-		keyTypes.push(key ?? entry.key.type)
-		valueTypes.push(held ?? entry.value.type)
+		keyTypes.push(key ?? written.type)
+		valueTypes.push(held ?? stored.type)
 	}
 
 	return {
@@ -135,7 +139,8 @@ function admittedRecordTypeOf(
 
 	let members: Record<string, common.Type> = {}
 
-	for (let [name, member] of Object.entries(value.members)) {
+	for (let [name, written] of Object.entries(value.members)) {
+		let member = measuredValue(written)
 		let slot = Object.hasOwn(expected.members, name)
 			? expected.members[name]
 			: undefined
@@ -220,20 +225,15 @@ export function unadmittedWrittenItem(
 		value.nodeType === "DictionaryValue"
 	) {
 		for (let entry of value.entries) {
-			if (!partFits(container.keyType, entry.key)) {
-				return unadmittedWrittenPart(
-					container.keyType,
-					entry.key,
-					"key",
-				)
+			let key = measuredValue(entry.key)
+			let held = measuredValue(entry.value)
+
+			if (!partFits(container.keyType, key)) {
+				return unadmittedWrittenPart(container.keyType, key, "key")
 			}
 
-			if (!partFits(container.valueType, entry.value)) {
-				return unadmittedWrittenPart(
-					container.valueType,
-					entry.value,
-					"value",
-				)
+			if (!partFits(container.valueType, held)) {
+				return unadmittedWrittenPart(container.valueType, held, "value")
 			}
 		}
 
@@ -248,7 +248,7 @@ export function unadmittedWrittenItem(
 		return null
 	}
 
-	for (let item of value.values) {
+	for (let item of value.values.map(measuredValue)) {
 		if (partFits(container.itemType, item)) {
 			continue
 		}
