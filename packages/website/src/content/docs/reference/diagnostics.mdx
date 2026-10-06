@@ -4925,8 +4925,7 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
    │ 
    │ Help: Declare a Namespace 'for { x: Integer } is Comparable'.
    │ 
-   │ Note 1: List<{ x: Integer }> does not conform to 'Comparable'.
-   │ Note 2: { x: Integer } does not conform to 'Comparable'.
+   │ Note: { x: Integer } does not conform to 'Comparable'.
 ───╯
 ```
 
@@ -4934,7 +4933,7 @@ Error: List<{ x: Integer }> does not conform to 'Comparable'
 
 Make the item type conform to the protocol, as the Help shows. The Help names the
 **last** link of the chain — the type that actually has no conforming namespace,
-which the notes walk down to. A namespace declared for the outer type answers the
+which the note names. A namespace declared for the outer type answers the
 one call and leaves every other list of that record unsorted.
 
 A condition is solved where the call is, under the protocol its namespace
