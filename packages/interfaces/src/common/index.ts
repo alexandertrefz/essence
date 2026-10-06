@@ -151,7 +151,7 @@ export type DiagnosticData =
 			methods: Array<string>
 	  }
 	// What `value::<Name>method(…)` writes between the angle brackets to pick a
-	// candidate: the Protocol for a provided Method, else the Namespace.
+	// candidate alone: a Namespace, or a Protocol for a provided Method.
 	| { kind: "namespace-candidates"; names: Array<string> }
 	// A Protocol something has to conform to, and the Type Parameter whose
 	// declaration would carry the bound, or null where there is none.

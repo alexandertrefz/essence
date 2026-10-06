@@ -2568,7 +2568,7 @@ Error: 'shout' is provided by more than one Namespace
 
 </div>
 
-Name the namespace at the call: `"hello"::<Loud>shout()`.
+Name the namespace at the call: `"hello"::<Loud>shout()`. Where two protocols provide the method, name the protocol whose body should run. Where one protocol's body reaches the value through two namespaces, naming that protocol picks neither. The help then names a protocol only one of the namespaces conforms to, such as a `Left` that extends it. Where there is none, the help is to drop the conformance from all but one of the namespaces. On a union, a pick holds for every member, so the help names one only where every member answers through it. Otherwise it asks for a `match` that picks in the arm for the ambiguous member.
 
 Quick Fix: **Write '::&lt;Loud&gt;' at the call**, one for each candidate.
 

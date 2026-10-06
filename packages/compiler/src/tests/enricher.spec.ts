@@ -5819,7 +5819,9 @@ describe("Enricher", () => {
 
 		// A specifier at the call picks the candidate for every member of a
 		// Union receiver, so the `data` is the same.
-		it("should carry the candidate specifiers for a Union member too", () => {
+		// A specifier on the call holds for every member, and String answers
+		// through neither Namespace, so none is offered.
+		it("should carry no candidate specifier the other Union members do not answer through", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				namespace FirstTag for Integer {
 					tag() -> String {
@@ -5840,8 +5842,11 @@ describe("Enricher", () => {
 			expect(diagnostics[0].code).toBe("ambiguous-namespace")
 			expect(diagnostics[0].data).toEqual({
 				kind: "namespace-candidates",
-				names: ["FirstTag", "SecondTag"],
+				names: [],
 			})
+			expect(diagnostics[0].helps).toEqual([
+				"Match on the value, and call '@::<FirstTag>tag(…)' in the arm for Integer.",
+			])
 		})
 
 		it("should prefer a nested generic target over a flat one", () => {

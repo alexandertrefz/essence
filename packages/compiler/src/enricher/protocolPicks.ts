@@ -225,11 +225,22 @@ function pickedRequirementHelp(
 		: `Drop the pick, and call '${methodName}' on a value whose Namespace writes it.`
 }
 
-// Whether the call compiles once its pick is dropped, asked silently. The
-// Arguments are enriched first, as the refused call enriches them, so their
-// own Diagnostics are reported and the probe judges the call alone.
+// Whether the call compiles once its pick is dropped, asked silently.
 export function compilesWithoutPick(
 	node: parser.MethodInvocationNode,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+): boolean {
+	return compilesWithSpecifier(node, null, baseType, scope, typer)
+}
+
+// Whether the call compiles with `specifier` written in place of its own,
+// asked silently. The Arguments are enriched first, as a refused call enriches
+// them, so their own Diagnostics are reported and the probe judges the call.
+export function compilesWithSpecifier(
+	node: parser.MethodInvocationNode,
+	specifier: parser.IdentifierNode | null,
 	baseType: common.Type,
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
@@ -241,7 +252,7 @@ export function compilesWithoutPick(
 	let { result } = probeContextualFunctionTypes(() =>
 		collectDiagnostics(() =>
 			resolveMethodInvocation(
-				{ ...node, namespaceSpecifier: null },
+				{ ...node, namespaceSpecifier: specifier },
 				baseType,
 				scope,
 				typer,

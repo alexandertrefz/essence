@@ -506,6 +506,148 @@ describe("Protocol-provided Methods", () => {
 			})
 		})
 
+		// `Base` provides `describe` through both Namespaces, so naming it picks
+		// neither. `Left` reaches `Base`'s body through `LeftBoxes` alone.
+		const TWO_SOURCES = (left: string, right: string) =>
+			[
+				"implementation {",
+				"\tprotocol Base {",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "base"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Left is Base {}",
+				"",
+				"\tprotocol Right is Base {}",
+				"",
+				"\ttype Box = { v: Integer }",
+				"",
+				`\tnamespace LeftBoxes for Box${left} {}`,
+				"",
+				`\tnamespace RightBoxes for Box${right} {}`,
+				"",
+				"\tconstant box: Box = { v = 3 }",
+				"\tTerminal.inspect(box::describe())",
+				"}",
+			].join("\n")
+
+		it("should name a Protocol that tells two Namespaces apart", async () => {
+			let source = TWO_SOURCES(" is Left", " is Right")
+
+			expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+			expect(helpsOf(source)).toEqual([
+				"Name it at the call, e.g. 'value::<Left>describe(…)'.",
+			])
+			expect(diagnosticsOf(source)[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: ["Left", "Right"],
+			})
+			expect(
+				await run(
+					source.replace("box::describe()", "box::<Left>describe()"),
+				),
+			).toEqual(['"base"'])
+		})
+
+		it("should ask to drop a conformance where no Protocol tells two Namespaces apart", () => {
+			let source = TWO_SOURCES(" is Base", " is Base")
+
+			expect(helpsOf(source)).toEqual([
+				"Drop the conformance from all but one of these Namespaces.",
+			])
+			expect(diagnosticsOf(source)[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: [],
+			})
+			expect(codesOf(TWO_SOURCES(" is Base", ""))).toEqual([])
+		})
+
+		// A specifier on a Union's call picks for every member, so only one that
+		// `Crate` answers through as well may be named.
+		const UNION_SOURCES = (crate: string, call: string) =>
+			[
+				"implementation {",
+				"\tprotocol Base {",
+				"\t\tsize() -> Integer",
+				"",
+				"\t\tdescribe() -> String {",
+				'\t\t\t<- "base {@::size()}"',
+				"\t\t}",
+				"\t}",
+				"",
+				"\tprotocol Left is Base {}",
+				"",
+				"\tprotocol Right is Base {}",
+				"",
+				"\ttype Box = { v: Integer }",
+				"",
+				"\tnamespace LeftBoxes for Box is Left {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 10",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tnamespace RightBoxes for Box is Right {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 20",
+				"\t\t}",
+				"\t}",
+				"",
+				"\ttype Crate = { w: Integer }",
+				"",
+				`\tnamespace Crates for Crate is ${crate} {`,
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 30",
+				"\t\t}",
+				"\t}",
+				"",
+				"\tfunction show(_ x: Box | Crate) -> String {",
+				`\t\t<- ${call}`,
+				"\t}",
+				"",
+				"\tTerminal.inspect(show({ v = 1 }))",
+				"}",
+			].join("\n")
+
+		it("should name only a specifier every member of a Union answers through", () => {
+			let source = UNION_SOURCES("Left", "x::describe()")
+			let data = diagnosticsOf(source)[0].data
+			let names = data?.kind === "namespace-candidates" ? data.names : []
+
+			expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+			expect(names).toEqual(["Left"])
+			expect(helpsOf(source)).toEqual([
+				"Name it at the call, e.g. 'value::<Left>describe(…)'.",
+			])
+
+			for (let name of names) {
+				expect(
+					codesOf(UNION_SOURCES("Left", `x::<${name}>describe()`)),
+				).toEqual([])
+			}
+		})
+
+		it("should ask for a match where no specifier holds for the whole Union", () => {
+			let source = UNION_SOURCES("Base", "x::describe()")
+
+			expect(diagnosticsOf(source)[0].data).toEqual({
+				kind: "namespace-candidates",
+				names: [],
+			})
+			expect(helpsOf(source)).toEqual([
+				"Match on the value, and call '@::<Left>describe(…)' in the arm for Box.",
+			])
+			expect(
+				codesOf(
+					UNION_SOURCES(
+						"Base",
+						"match x -> String { case Box { <- @::<Left>describe() } case Crate { <- @::describe() } }",
+					),
+				),
+			).toEqual([])
+		})
+
 		// A Namespace declaring the name ties with the provided Method on
 		// another rung. The note names the Protocol, since `Integer.es`
 		// declares no `isBetween`.

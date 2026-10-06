@@ -103,6 +103,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
@@ -12085,31 +12086,6 @@ function candidateNamespaceName(
 	return namespaceType.providedBy === undefined ? key : namespaceType.name
 }
 
-// What a reader writes to name this candidate at the call: the Namespace, or
-// the Protocol for a provided Method.
-function candidateSpecifierName(
-	key: string,
-	namespaceType: common.NamespaceType,
-	scope: enricher.Scope,
-): string {
-	return namespaceType.providedBy === undefined
-		? key
-		: describeProtocol(namespaceType.providedBy, scope)
-}
-
-// What one candidate declares, as a note. A provided Method names both the
-// Protocol and the Namespace it is reached through.
-function describeCandidateDeclaration(
-	key: string,
-	namespaceType: common.NamespaceType,
-	methodName: string,
-	scope: enricher.Scope,
-): string {
-	return namespaceType.providedBy === undefined
-		? `'${key}' declares '${methodName}'.`
-		: `'${describeProtocol(namespaceType.providedBy, scope)}' provides '${methodName}' for '${namespaceType.name}'.`
-}
-
 // A derived Method answers only where no written Namespace declares the name.
 // When one replaced it, a note says so. The receiver's Namespaces are looked up
 // again, since a Printable derive reads the whole set.
@@ -12227,37 +12203,6 @@ function reportNoMatchingOverload(
 			],
 			helps,
 			...(data === undefined ? {} : { data }),
-		},
-	)
-}
-
-// Each candidate as what it declares and what a call writes to pick it, which
-// differ for a provided Method.
-function reportAmbiguousNamespace(
-	node: parser.MethodInvocationNode,
-	candidates: Array<{ declaration: string; specifier: string }>,
-): void {
-	reportError(
-		`'${node.member.content}' is provided by more than one Namespace`,
-		node.position,
-		{
-			code: "ambiguous-namespace",
-			labels: [
-				primary(
-					node.member.position,
-					"these Arguments match all of them",
-				),
-			],
-			notes: candidates.map((candidate) => candidate.declaration),
-			helps: [
-				`Name it at the call, e.g. 'value::<${candidates[0]?.specifier}>${node.member.content}(…)'.`,
-			],
-			// Every specifier, since a Quick Fix offers the choice the Help can
-			// only show one of.
-			data: {
-				kind: "namespace-candidates",
-				names: candidates.map((candidate) => candidate.specifier),
-			},
 		},
 	)
 }
@@ -12599,19 +12544,11 @@ export function resolveMethodInvocation(
 
 		reportAmbiguousNamespace(
 			node,
-			resolvedMethods.map((method) => ({
-				declaration: describeCandidateDeclaration(
-					method.namespace.name,
-					method.namespace.type,
-					node.member.content,
-					scope,
-				),
-				specifier: candidateSpecifierName(
-					method.namespace.name,
-					method.namespace.type,
-					scope,
-				),
+			resolvedMethods.map(({ namespace }) => ({
+				key: namespace.name,
+				namespaceType: namespace.type,
 			})),
+			scope,
 		)
 
 		return resolveFailedMethodInvocation()
@@ -12829,41 +12766,14 @@ function resolveUnionMethodDispatch(
 		if (resolvedMethods.length > 1) {
 			commitContextualFunctionTypes(lastRecording)
 
-			reportError(
-				`'${node.member.content}' is provided by more than one Namespace for ${describeType(memberType)}`,
-				node.position,
-				{
-					code: "ambiguous-namespace",
-					labels: [
-						primary(
-							node.member.position,
-							"these Arguments match all of them",
-						),
-					],
-					notes: resolvedMethods.map((method) =>
-						describeCandidateDeclaration(
-							method.namespaceName,
-							method.namespaceType,
-							node.member.content,
-							scope,
-						),
-					),
-					helps: [
-						`Name it at the call, e.g. 'value::<${candidateSpecifierName(resolvedMethods[0].namespaceName, resolvedMethods[0].namespaceType, scope)}>${node.member.content}(…)'.`,
-					],
-					// As for a receiver that is no Union; a specifier picks the
-					// candidate for every member at once.
-					data: {
-						kind: "namespace-candidates",
-						names: resolvedMethods.map((method) =>
-							candidateSpecifierName(
-								method.namespaceName,
-								method.namespaceType,
-								scope,
-							),
-						),
-					},
-				},
+			reportAmbiguousNamespace(
+				node,
+				resolvedMethods.map((method) => ({
+					key: method.namespaceName,
+					namespaceType: method.namespaceType,
+				})),
+				scope,
+				{ type: unionType, member: memberType, typer },
 			)
 
 			return resolveFailedMethodInvocation()
