@@ -1376,8 +1376,6 @@ function analyseCaseProbe(program: common.typed.Program): {
 				)
 				return
 			}
-			case "TypeAliasStatement":
-				return
 		}
 
 		forEachTypedChild(node, visitNode, null)

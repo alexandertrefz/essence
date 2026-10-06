@@ -4135,6 +4135,10 @@ describe("Completion inside each kind of node", () => {
 					"\t}",
 				],
 			],
+			[
+				"a refinement's predicate",
+				["\ttype Backward = Edge where place(#‸)::is(@)"],
+			],
 		])("should offer the expected Choice's Cases in %s", (_, lines) => {
 			expect(casesAt(lines)).toEqual(["Front (preselected)", "Back"])
 		})
