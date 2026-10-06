@@ -10,8 +10,14 @@ import {
 	displayChoiceName,
 	isDeclaration,
 	type Spelling,
+	spellType,
 } from "../helpers/describe"
 import { closestMatch } from "../helpers/suggest"
+import {
+	flattenUnionMembers,
+	type GenericBindings,
+	matchesTypeWithBindings,
+} from "../helpers/types"
 import { modulePathOf } from "./scope"
 
 // The name this Scope binds a declaration under. That is its declared name
@@ -273,6 +279,70 @@ export function spellingAfterImport(
 			: null)
 }
 
+// A generic Alias of an application that writes a Case's application. It comes
+// with the Type Argument it takes for each of its Type Parameters, null where
+// the Case leaves one open. `type Boxes<A> = Box<List<A>>` writes the
+// `Box<List<Integer>>` of `#Full` as `Boxes<Integer>`.
+function aliasWriting(
+	candidate: common.CaseType,
+	scope: enricher.Scope,
+): { name: string; typeArguments: Array<common.Type | null> } | null {
+	for (
+		let current: enricher.Scope | null = scope;
+		current !== null;
+		current = current.parent
+	) {
+		for (let name in current.types) {
+			let alias = current.types[name]
+
+			if (
+				alias.type !== "GenericAlias" ||
+				isDeclaration(alias) ||
+				typeBoundIn(name, scope) !== alias
+			) {
+				continue
+			}
+
+			let bindings: GenericBindings = new Map()
+			let aliased = (
+				alias.aliasedType.type === "UnionType"
+					? flattenUnionMembers(alias.aliasedType)
+					: [alias.aliasedType]
+			).find(
+				(arm) =>
+					arm.type === "Case" &&
+					arm.choice === candidate.choice &&
+					arm.name === candidate.name,
+			)
+
+			if (
+				aliased !== undefined &&
+				matchesTypeWithBindings(aliased, candidate, {
+					bindableNames: new Set(
+						alias.generics.map((generic) => generic.name),
+					),
+					bindings,
+				})
+			) {
+				return {
+					name,
+					typeArguments: alias.generics.map(({ name: generic }) => {
+						let bound = bindings.get(generic)
+
+						return bound === undefined ||
+							(bound.type === "GenericUse" &&
+								bound.name === generic)
+							? null
+							: bound
+					}),
+				}
+			}
+		}
+	}
+
+	return null
+}
+
 function typeBoundIn(name: string, scope: enricher.Scope): common.Type | null {
 	for (
 		let current: enricher.Scope | null = scope;
@@ -287,19 +357,53 @@ function typeBoundIn(name: string, scope: enricher.Scope): common.Type | null {
 	return null
 }
 
+// Where a bare Case was written, as its report says. A construction in an
+// expected Type is applied, and a Matcher writes no Type Arguments.
+export type BareCasePosition =
+	| "in scope"
+	| "in the expected Type"
+	| "in the matched Union"
+
 // Shows the qualified spelling for each candidate. A declared generic Choice
 // also needs its Type Arguments, written as `<…>`, since its Type Parameter
 // names are not in scope at the call. Each Choice is named as this Scope binds
-// it. See `caseCandidatePrefixes`.
+// it, else through a generic Alias that renames it. See `caseCandidatePrefixes`.
 export function reportAmbiguousCase(
 	caseName: parser.IdentifierNode,
 	candidates: Array<common.CaseType>,
-	where: string,
+	where: BareCasePosition,
 	scope: enricher.Scope,
-	applied: boolean = false,
 ): void {
 	let spell = spellingIn(scope)
-	let prefixes = caseCandidatePrefixes(candidates, applied, spell)
+	// A Choice no name here binds is written through a generic Alias of its
+	// application. A Matcher writes no Type Arguments, and a construction writes
+	// the Alias's own, since the Alias decides none of them.
+	let throughAlias = (
+		candidate: common.CaseType,
+	): { name: string; generic: boolean } | null => {
+		let alias =
+			spell(displayChoiceName(candidate.choice), candidate) === null
+				? aliasWriting(candidate, scope)
+				: null
+
+		if (alias === null || where === "in the matched Union") {
+			return alias === null ? null : { name: alias.name, generic: false }
+		}
+
+		let bound = alias.typeArguments.flatMap((typeArgument) =>
+			typeArgument === null ? [] : [spellType(typeArgument, spell)],
+		)
+
+		return bound.length === alias.typeArguments.length
+			? { name: `${alias.name}<${bound.join(", ")}>`, generic: false }
+			: { name: alias.name, generic: true }
+	}
+	let prefixes = caseCandidatePrefixes(
+		candidates,
+		where === "in the expected Type",
+		spell,
+		throughAlias,
+	)
 	let choiceNames = prefixes.map((prefix) => prefix.name)
 	let wording = ambiguousCaseWording(
 		caseName.content,

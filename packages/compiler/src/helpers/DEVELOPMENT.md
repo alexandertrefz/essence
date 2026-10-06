@@ -524,6 +524,13 @@ declaration counts (`isDeclaration`). `type Pair = Box<Integer>` names one appli
 Parameters are in an order of its own. An import keeps the declared name on the Alias it binds, so `Box as Carton`
 still counts.
 
+`ambiguous-case` reaches one step further for a Choice no name binds. It writes the Choice through a Generic Alias
+of one of its applications, matching the Alias against the application each candidate is to bind the Alias's own
+Type Parameters (`aliasWriting`). `type Boxes<A> = Box<List<A>>` writes `Box<List<Integer>>` as `Boxes<Integer>`,
+and `type Flip<A, B> = Pair<B, A>` writes `Pair<String, Integer>` as `Flip<Integer, String>`. A construction writes
+the Alias's Type Arguments, or `Boxes<…>#Full` where the candidate leaves them open, since the Alias decides none of
+them. A Matcher writes `Boxes#Full`, as for any Choice.
+
 There are two Spellings. The enricher's (`spellingIn` in `enricher/spelling.ts`) reads the Scope, so a nested
 declaration counts. After enrichment no Scope is left, so `programSpelling` reads the typed Program's import entries
 and top-level Choices. The validator and the language server's Match scaffold use it. Only a Choice carries the

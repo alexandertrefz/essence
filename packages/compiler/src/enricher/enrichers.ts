@@ -14123,13 +14123,7 @@ function resolveCaseInExpectedType(
 	}
 
 	if (candidates.length > 1) {
-		reportAmbiguousCase(
-			caseName,
-			candidates,
-			"in the expected Type",
-			scope,
-			true,
-		)
+		reportAmbiguousCase(caseName, candidates, "in the expected Type", scope)
 
 		return { type: "Error" }
 	}

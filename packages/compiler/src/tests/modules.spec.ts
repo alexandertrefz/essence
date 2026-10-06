@@ -11839,6 +11839,152 @@ ${body}
 		).toEqual([])
 	})
 
+	// `Crate` renames `Box`, which `Main.es` does not import. A construction
+	// through it writes the Type Arguments, and a Matcher writes none.
+	it("names an ambiguous Case's Choice through a generic Alias that renames it", () => {
+		let crated = (body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Crates.es" { Crate }
+}
+
+implementation {
+	choice Bag { Full { value: Integer }, Empty }
+
+${body}
+}
+`,
+					"Crates.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	type Crate<V> = Box<V>
+}
+
+export {
+	Crate
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let helpsOf = (body: string) =>
+			crated(body).find(
+				(diagnostic) => diagnostic.code === "ambiguous-case",
+			)?.helps
+		let matched = (
+			matcher: string,
+		) => `	function describe(_ box: Crate<Integer> | Bag) -> String {
+		<- match box -> String {
+			case ${matcher} { <- "full" }
+			case _ { <- "other" }
+		}
+	}
+
+	Terminal.print(describe(Bag#Empty))`
+
+		expect(
+			helpsOf(
+				'\tconstant box: Crate<Integer> | Crate<String> = #Full("x")',
+			),
+		).toEqual([
+			"Write 'Crate<Integer>#Full' to pick 'Crate<Integer>'.",
+			"Write 'Crate<String>#Full' to pick 'Crate<String>'.",
+		])
+		expect(
+			codesOf(
+				crated(
+					'\tconstant box: Crate<Integer> | Crate<String> = Crate<String>#Full("x")\n\tTerminal.inspect(box)',
+				),
+			),
+		).toEqual([])
+
+		expect(helpsOf("\tconstant box = #Full(1)")).toEqual([
+			"Write 'Crate<…>#Full' with its Type Arguments to pick 'Crate'.",
+			"Write 'Bag#Full' to pick 'Bag'.",
+		])
+		expect(
+			codesOf(
+				crated(
+					"\tconstant box = Crate<Integer>#Full(1)\n\tTerminal.inspect(box)",
+				),
+			),
+		).toEqual([])
+
+		expect(helpsOf(matched("#Full"))).toEqual([
+			"Write 'Crate#Full' to pick 'Crate'.",
+			"Write 'Bag#Full' to pick 'Bag'.",
+		])
+		expect(codesOf(crated(matched("Crate#Full")))).toEqual([])
+	})
+
+	// `Boxes` and `Flip` each write their Choice's applications under Type
+	// Arguments of their own. The Help binds them by matching each Alias
+	// against the application it picks.
+	it("binds a generic Alias's own Type Arguments for an ambiguous Case", () => {
+		let shelved = (entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Shelf.es" {
+		${entries}
+	}
+}
+
+implementation {
+${body}
+}
+`,
+					"Shelf.es": `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Pair<X, Y> { Both { x: X, y: Y }, Neither }
+	type Boxes<A> = Box<List<A>>
+	type Flip<A, B> = Pair<B, A>
+}
+
+export {
+	Boxes
+	Flip
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let helpsOf = (entries: string, body: string) =>
+			shelved(entries, body).find(
+				(diagnostic) => diagnostic.code === "ambiguous-case",
+			)?.helps
+
+		expect(
+			helpsOf(
+				"Boxes",
+				'\tconstant box: Boxes<Integer> | Boxes<String> = #Full(["x"])',
+			),
+		).toEqual([
+			"Write 'Boxes<Integer>#Full' to pick 'Boxes<Integer>'.",
+			"Write 'Boxes<String>#Full' to pick 'Boxes<String>'.",
+		])
+		expect(
+			helpsOf(
+				"Flip",
+				'\tconstant pair: Flip<Integer, String> | Flip<String, Integer> = #Both({ x = 1, y = "s" })',
+			),
+		).toEqual([
+			"Write 'Flip<Integer, String>#Both' to pick 'Flip<Integer, String>'.",
+			"Write 'Flip<String, Integer>#Both' to pick 'Flip<String, Integer>'.",
+		])
+		expect(
+			codesOf(
+				shelved(
+					"Boxes\n\t\tFlip",
+					`	constant box: Boxes<Integer> | Boxes<String> = Boxes<String>#Full(["x"])
+	constant pair: Flip<Integer, String> | Flip<String, Integer> = Flip<String, Integer>#Both({ x = 1, y = "s" })
+	Terminal.inspect(box)
+	Terminal.inspect(pair)`,
+				),
+			),
+		).toEqual([])
+	})
+
 	it("writes a missing Case under the name an import gave its Choice", () => {
 		let match = (handlers: string) =>
 			importing(

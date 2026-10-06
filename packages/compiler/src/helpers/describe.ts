@@ -571,6 +571,11 @@ export function caseCandidatePrefixes(
 	candidates: Array<common.CaseType>,
 	applied: boolean,
 	spell: Spelling = declaredSpelling,
+	// The prefix for a candidate whose Choice is written another way, as
+	// through a generic Alias, or null.
+	written: (
+		candidate: common.CaseType,
+	) => { name: string; generic: boolean } | null = () => null,
 ): Array<{ name: string; generic: boolean }> {
 	return candidates.flatMap((candidate) => {
 		let sameChoice = candidates.filter(
@@ -582,7 +587,7 @@ export function caseCandidatePrefixes(
 		}
 
 		return [
-			{
+			written(candidate) ?? {
 				name:
 					applied && sameChoice.length > 1
 						? spellCaseChoice(candidate, spell)
