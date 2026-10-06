@@ -975,7 +975,11 @@ function readTable(
 // The edit a syntax error names, where it names the missing character. Only
 // the first error gets one, since the later ones are about text the recovery
 // has lost track of.
-function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
+function parseErrorHelp(
+	error: ParseError,
+	first: boolean,
+	sourceText: string,
+): Array<string> {
 	if (!first) {
 		return []
 	}
@@ -988,7 +992,7 @@ function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
 		case "ColonExpected":
 			return ["Write the ':' between the key and its value."]
 		case "CommaExpected":
-			return ["Write the ',' that separates this from the one above it."]
+			return [missingCommaHelp(sourceText, error.offset)]
 		case "CloseBraceExpected":
 			return ["Write the '}' that closes the object."]
 		case "CloseBracketExpected":
@@ -1003,6 +1007,69 @@ function parseErrorHelp(error: ParseError, first: boolean): Array<string> {
 		default:
 			return []
 	}
+}
+
+// jsonc asks for a ',' wherever a list or an object goes on unclosed. A ','
+// in front of a closer or a key would not read there. So a closer that matches
+// no open bracket, or a key inside a list, names the bracket instead.
+function missingCommaHelp(sourceText: string, offset: number): string {
+	let open = openBracketsAt(sourceText, offset)
+	let innermost = open.at(-1)
+	let next = sourceText[offset]
+
+	if (innermost === "[" && next === "}") {
+		return "Write the ']' that closes the list."
+	}
+
+	if (
+		innermost === "[" &&
+		/^"(?:[^"\\]|\\.)*"\s*:/.test(sourceText.slice(offset))
+	) {
+		return "Write the ']' that closes the list, and a ',' after it."
+	}
+
+	if (innermost === "{" && next === "]") {
+		return open.includes("[")
+			? "Write the '}' that closes the object."
+			: "Write '}' in place of this ']'."
+	}
+
+	return "Write the ',' that separates this from the one above it."
+}
+
+// The brackets still open at `offset`, outermost first. A bracket inside a
+// String or a Comment opens nothing, so both are stepped over.
+function openBracketsAt(sourceText: string, offset: number): Array<string> {
+	let open: Array<string> = []
+	let index = 0
+
+	while (index < offset) {
+		let character = sourceText[index]
+
+		if (character === '"') {
+			index++
+
+			while (index < offset && sourceText[index] !== '"') {
+				index += sourceText[index] === "\\" ? 2 : 1
+			}
+		} else if (sourceText.startsWith("//", index)) {
+			let end = sourceText.indexOf("\n", index)
+
+			index = end === -1 ? offset : end
+		} else if (sourceText.startsWith("/*", index)) {
+			let end = sourceText.indexOf("*/", index + 2)
+
+			index = end === -1 ? offset : end + 1
+		} else if (character === "{" || character === "[") {
+			open.push(character)
+		} else if (character === "}" || character === "]") {
+			open.pop()
+		}
+
+		index++
+	}
+
+	return open
 }
 
 // A syntax error's code as a sentence.
@@ -1095,7 +1162,7 @@ export function parseProjectConfiguration(
 					"Every setting is at its default until the file reads.",
 					"The file is JSON with comments and trailing commas allowed, as tsconfig.json is.",
 				],
-				parseErrorHelp(error, error === errors[0]),
+				parseErrorHelp(error, error === errors[0], sourceText),
 			)
 		}
 

@@ -7019,6 +7019,8 @@ Warning: essence.json could not be read as JSON
 
 Write what the label says was expected. The help names that token where the parser names one — a `}`, a `]`, a `:`, a `,`, a quoted key, a value, the `*/` of a comment — and is absent for the verdicts that say a character cannot stand where it does rather than that one is missing. It is offered for the first refusal alone: the parser recovers generously, and what it asks for after that is about text it has already lost track of.
 
+The parser asks for a `,` wherever a list or an object goes on unclosed. Where that `,` would stand in front of a closer of the other kind, or of a key inside a list, writing it would not read, so the help names the bracket that was left open instead: `Write the ']' that closes the list.` A `]` where no list is open is the object's `}` mistyped, and the help says to write `}` in its place.
+
 Taught on: [essence.json › Mistakes are Warnings](/docs/reference/project-file#mistakes-are-warnings)
 
 ## The compiler as a program

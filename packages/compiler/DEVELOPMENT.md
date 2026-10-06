@@ -301,8 +301,10 @@ because the language server's discovery walk runs inside a request.
 A mistake in the file is a warning with a span, never a refusal. The setting falls back to its default, and the
 Diagnostic's note, the setting's `fallback`, says what is in force meanwhile. A file that does not parse is read
 as all defaults. `jsonc-parser` recovers, but the author could not predict a setting read from half a file.
-Only the first syntax error gets a Help, since the later ones describe text the recovery has lost track of. A
-list is read item by item, so one bad item leaves the rest in force.
+Only the first syntax error gets a Help, since the later ones describe text the recovery has lost track of.
+`jsonc-parser` asks for a `,` wherever a list or an object goes on unclosed. Where the `,` would stand before a
+closer of the other kind or a key inside a list, it would not read, so `missingCommaHelp` names the open bracket
+instead. A list is read item by item, so one bad item leaves the rest in force.
 
 `projectSettings` is the catalogue of every setting: its shape, its description, its fallback and one example.
 The reader walks the file against it, so every unknown key and near miss is reported in one place.

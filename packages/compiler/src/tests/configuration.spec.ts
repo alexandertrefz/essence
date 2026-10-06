@@ -424,6 +424,96 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 		])
 	})
 
+	// Each Help applied where its label points, in turn, until the file reads.
+	// A Help names one missing character, so a file missing two takes two
+	// rounds, each of them a true report.
+	describe("followed", () => {
+		let offsetOf = (
+			text: string,
+			at: { line: number; column: number } | undefined,
+		): number =>
+			text
+				.split("\n")
+				.slice(0, (at?.line ?? 1) - 1)
+				.reduce((sum, line) => sum + line.length + 1, 0) +
+			(at?.column ?? 1) -
+			1
+
+		let followed = (text: string, edits: Array<[string, string]>) => {
+			let current = text
+
+			for (let [help, written] of edits) {
+				let [diagnostic] = diagnosticsOf(parse(current))
+				let offset = offsetOf(current, diagnostic?.position?.start)
+
+				expect(diagnostic?.helps).toEqual([help])
+
+				current = written.startsWith("in place of ")
+					? `${current.slice(0, offset)}${written.slice(-1)}${current.slice(offset + 1)}`
+					: `${current.slice(0, offset)}${written}${current.slice(offset)}`
+			}
+
+			return diagnosticsOf(parse(current))
+		}
+
+		it("reads once each missing character is written", () => {
+			expect(
+				followed(`{\n\t"exclude": ["build"`, [
+					["Write the ']' that closes the list.", "]"],
+					["Write the '}' that closes the object.", "}"],
+				]),
+			).toEqual([])
+			expect(
+				followed(`{\n\t"exclude" ["build"]\n}`, [
+					["Write the ':' between the key and its value.", ":"],
+				]),
+			).toEqual([])
+			expect(
+				followed(`{\n\t"exclude": ["a" "b"]\n}`, [
+					[
+						"Write the ',' that separates this from the one above it.",
+						",",
+					],
+				]),
+			).toEqual([])
+		})
+
+		// A list left open is met by the object's `}` or by the next key, where
+		// jsonc asks for a ','. A ',' there would not read, so the Help names
+		// the ']'.
+		it("names the bracket a list was left open by", () => {
+			expect(
+				followed(`{\n\t"exclude": ["build"\n}`, [
+					["Write the ']' that closes the list.", "]"],
+				]),
+			).toEqual([])
+			expect(
+				followed(`{\n\t"exclude": ["build"\n\t"test": {}\n}`, [
+					[
+						"Write the ']' that closes the list, and a ',' after it.",
+						"],",
+					],
+				]),
+			).toEqual([])
+		})
+
+		// A `]` where only objects are open closes nothing, so it was meant as
+		// the object's `}`.
+		it("names the closer a wrong one stands in place of", () => {
+			expect(
+				followed(`{\n\t"test": { "cases": 3 ]\n}`, [
+					["Write '}' in place of this ']'.", "in place of }"],
+				]),
+			).toEqual([])
+			// The file then reads as JSON, and `exclude` is told what it holds.
+			expect(
+				followed(`{\n\t"exclude": ["a", { "b": 1 ]\n}`, [
+					["Write the '}' that closes the object.", "}"],
+				]).map((diagnostic) => diagnostic.code),
+			).not.toContain("unreadable-project-file")
+		})
+	})
+
 	it("reports a file whose top level is not an object", () => {
 		let [diagnostic] = diagnosticsOf(parse(`["broken"]`))
 
