@@ -79,6 +79,7 @@ import {
 	matchesType,
 	matchesTypeWithBindings,
 	returnedTypeOf,
+	measuredValue,
 	mentionsUnsolvedTypeParameter,
 	mergeUnionMembers,
 	mergedRecordType,
@@ -1175,18 +1176,14 @@ function reportUnsettableEntries(
 			)
 		}
 
-		if (
-			valueType !== null &&
-			!fitsWritten(valueType, entry.value) &&
-			!holdsFunctionRefusedAsValue(entry.value.type)
-		) {
+		// A Function refused as a value is reported where it is written, so it
+		// is a hole here.
+		let held = measuredValue(entry.value)
+
+		if (valueType !== null && !fitsWritten(valueType, held)) {
 			// The labels name the entry and the Dictionary. A Record value's
 			// refusing member goes into the notes rather than a third label.
-			let record = recordMismatchEvidence(
-				valueType,
-				entry.value.type,
-				null,
-			)
+			let record = recordMismatchEvidence(valueType, held.type, null)
 
 			reportError(
 				"This is not a value the Dictionary holds",
@@ -1196,7 +1193,7 @@ function reportUnsettableEntries(
 					labels: [
 						primary(
 							entry.value.position,
-							`this is ${withArticle(describeType(entry.value.type))}`,
+							`this is ${withArticle(describeType(held.type))}`,
 						),
 						secondary(
 							lhs.position,
@@ -7115,10 +7112,11 @@ function enrichCasePayloadDefault(
 		return value
 	}
 
-	// A written member carries its own evidence for a refinement.
+	// A written member carries its own evidence for a refinement, and a
+	// Function refused as a value is a hole, reported where it is written.
 	let written = admittedPartialType(payloadType, value.type, value)
 
-	if (!isPartialOf(payloadType, written) && !isReportedValue(value.type)) {
+	if (!isPartialOf(payloadType, written)) {
 		// A partial, so a member the default leaves out is not missing. Only
 		// what it writes can be wrong.
 		let record = recordMismatchEvidence(payloadType, written, value, {
@@ -8484,10 +8482,13 @@ function enrichParameterDefault(
 	delete scope.parameterDefaultBarrier
 
 	let valueType = value.type
+	// A Function refused as a value is reported where it is written, so it is
+	// a hole here.
+	let measured = measuredValue(value)
 
 	// A written default is admitted by deciding a refinement's predicate, as a
-	// written Argument is. One already reported is not measured again.
-	if (fitsWritten(type, value) || isReportedValue(valueType)) {
+	// written Argument is.
+	if (fitsWritten(type, measured)) {
 		return value
 	}
 
@@ -8506,7 +8507,7 @@ function enrichParameterDefault(
 	if (
 		!typeContainsError(type) &&
 		!typeContainsError(valueType) &&
-		!matchesType(type, valueType)
+		!matchesType(type, measured.type)
 	) {
 		let name =
 			parameterInternalName(node)?.content ??
@@ -8515,7 +8516,7 @@ function enrichParameterDefault(
 
 		// Not a partial, so a member it does not write is missing and named
 		// with the rest.
-		let record = recordMismatchEvidence(type, valueType, value, {
+		let record = recordMismatchEvidence(type, measured.type, value, {
 			subject: "the Parameter's Type",
 		})
 
@@ -8530,7 +8531,7 @@ function enrichParameterDefault(
 					record.lead ??
 						primary(
 							node.defaultValue.position,
-							`this is ${withArticle(describeType(valueType))}`,
+							`this is ${withArticle(describeType(measured.type))}`,
 						),
 					...record.labels,
 				],

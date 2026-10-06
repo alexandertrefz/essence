@@ -1248,6 +1248,62 @@ describe("Type matching", () => {
 				],
 			])
 		})
+
+		// A default and a Dictionary update are measured around a refused
+		// Function as a value written anywhere else is.
+		it("should name only the default's or the update's mismatch around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = (_ n: Integer, _ m: Integer) -> Integer
+				type Entry = { rule: Rule, count: Integer }
+
+				choice Call {
+					Post { rule: Rule, count: Integer, body: String } = { rule = Integer.add, count = "x" },
+					Idle,
+				}
+
+				function use(_ s: Entry = { rule = Integer.add, count = "y" }) -> Integer {
+					<- s.count
+				}
+
+				constant first = (_ n: Integer, _ m: Integer) -> Integer { <- n }
+				constant d: Dictionary<String, Entry> = ["a" = { rule = first, count = 1 }]
+				constant e = [d with "b" = { rule = Integer.add, count = "z" }]
+				constant fits = [d with "c" = { rule = Integer.add, count = 2 }]
+			}`)
+
+			expect(
+				errors.map((error) => [error.code, error.labels?.[0]?.message]),
+			).toEqual([
+				[
+					"default-type-mismatch",
+					"this is a String, and '#Post' declares an Integer",
+				],
+				[
+					"default-type-mismatch",
+					"this is a String, and Entry declares an Integer",
+				],
+				[
+					"partial-type-mismatch",
+					"this is a { rule: …, count: String }",
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+				],
+			])
+		})
 	})
 
 	// Two Modules may each declare `choice Outcome`, so a Choice's identity is

@@ -181,8 +181,8 @@ still proves a `NonEmptyList` has an item, and a mismatch reported about it labe
 Argument are measured the same way, so `#Has({ rule = Integer.add, count = "x" })` still reports its `count`. A call
 the enricher refuses is matched again with each such Function a hole (`typerAroundRefusedFunctions`). It is no
 `no-matching-overload` where a candidate then accepts it. An update is measured with such a Function a hole too, so
-`{ base with rule = Integer.add, count = "x" }` still reports its `count`. A call whose receiver holds one is no
-`no-matching-overload`.
+`{ base with rule = Integer.add, count = "x" }` still reports its `count`. So do a Dictionary update, a
+Parameter's default and a payload default. A call whose receiver holds one is no `no-matching-overload`.
 `validateNoBoundFunctionValue` reports it once where it stands, each `define` arm included. A `define` or a `match`
 is not reported itself, since its arms carry the value. Nor is a `start` or a `complete` before no work, which
 answers its operand. Nor is a read of a Constant, a Variable, a Pattern's binding or a static Property whose value
@@ -196,8 +196,8 @@ at each read.
 Record, a List or a Dictionary, a Case payload, a declaration's value, a `<-`, a `define` arm, and a `start` or
 `complete` operand. A callee is called rather than written as a value, so a name or a static path is not walked. Any
 other callee is walked as an Expression, and a Lookup callee's base is checked as a value. The enricher's own checks
-on such a value stand down through `isReportedValue`: a default's mismatch, a hole's `Printable` bound, a receiver's
-Namespace lookup, a callee that is no Function, and the Warning on a needless `start` or `complete`.
+on such a value stand down through `isReportedValue`: a hole's `Printable` bound, a receiver's Namespace lookup, a
+callee that is no Function, and the Warning on a needless `start` or `complete`.
 
 ## Match
 
