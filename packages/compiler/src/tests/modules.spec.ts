@@ -12397,4 +12397,48 @@ ${body}
 			).toEqual([])
 		})
 	})
+
+	// The edit is to the Declaration, which `Sizes.es` writes as `Sizes`,
+	// not under the name this file imports it as.
+	it("names an imported Namespace's Declaration as its file declares it", () => {
+		let checked = (keyword: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Sizes.es" { Sizes as S }
+}
+
+implementation {
+	type Small = Integer where @::isSmall()
+
+	constant small: Small = 3
+
+	Terminal.inspect(small)
+}
+`,
+					"Sizes.es": `implementation {
+	namespace Sizes for Integer {
+		${keyword}isSmall() -> Boolean {
+			<- @::isLessThan(10)
+		}
+	}
+}
+
+export {
+	Sizes
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			checked("static ").find(
+				(diagnostic) => diagnostic.code === "static-method-on-value",
+			)?.helps,
+		).toEqual([
+			"Declare 'isSmall' in 'Sizes', which this file imports as 'S', without 'static' — a predicate asks a Method of '@', and a static Method has no receiver.",
+		])
+		expect(codesOf(checked(""))).toEqual([])
+	})
 })

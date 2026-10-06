@@ -15,11 +15,18 @@ export function reportStaticMethodOnValue(
 	scope: enricher.Scope,
 ): void {
 	let namespaceNames = [...staticNamespaces.keys()]
+	let owner = staticNamespaces.get(namespaceNames[0])
 	let accepted = staticCallArities(
-		staticNamespaces.get(namespaceNames[0])?.methods[node.member.content],
+		owner?.methods[node.member.content],
 		node.arguments.length,
 	)
 	let predicate = inRefinementPredicate(scope)
+	// The Declaration is edited where it was written, under the name it was
+	// declared with there.
+	let declaration =
+		owner?.declaredName === undefined
+			? `'${namespaceNames[0]}'`
+			: `'${owner.declaredName}', which this file imports as '${namespaceNames[0]}',`
 
 	reportError(
 		memberType === null
@@ -52,7 +59,7 @@ export function reportStaticMethodOnValue(
 					? []
 					: [
 							instanceDeclarationHelp(
-								namespaceNames[0],
+								declaration,
 								node.member.content,
 								accepted,
 							),
@@ -125,7 +132,7 @@ function staticCallArities(
 // The predicate's Help. A static that takes the value as its first Argument
 // keeps that Parameter once `static` goes, so `@` has to stand in for it.
 function instanceDeclarationHelp(
-	namespace: string,
+	declaration: string,
 	methodName: string,
 	accepted: { acceptsValue: boolean; acceptsWithoutValue: boolean },
 ): string {
@@ -134,7 +141,7 @@ function instanceDeclarationHelp(
 			? ", reading '@' in place of its first Parameter"
 			: ""
 
-	return `Declare '${methodName}' in '${namespace}' without 'static'${reading} — a predicate asks a Method of '@', and a static Method has no receiver.`
+	return `Declare '${methodName}' in ${declaration} without 'static'${reading} — a predicate asks a Method of '@', and a static Method has no receiver.`
 }
 
 // The Help built from that answer. Where both or neither fit, it hedges.

@@ -697,6 +697,9 @@ export type NamespaceType = {
 	type: "Namespace"
 	targetType: Type | null
 	name: string
+	// The name the declaring file wrote, on the copy an import binds under
+	// another `name`. A Help that asks for an edit to the Declaration reads it.
+	declaredName?: string
 	generics: Array<GenericDeclaration>
 	properties: Record<string, Type | GenericUse>
 	methods: Record<string, MethodType>

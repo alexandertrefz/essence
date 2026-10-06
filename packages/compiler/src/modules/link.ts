@@ -367,9 +367,18 @@ function moduleSections(
 }
 
 // A shallow copy carrying the local name, since an emitted Method call reads
-// the Namespace Type's own `name`. Nothing else may key off that name.
+// the Namespace Type's own `name`. Nothing else may key off that name. A copy
+// under another name keeps the declared one beside it.
 function underLocalName(type: common.Type, localName: string): common.Type {
-	return type.type === "Namespace" ? { ...type, name: localName } : type
+	if (type.type !== "Namespace") {
+		return type
+	}
+
+	let { declaredName = type.name, ...namespace } = type
+
+	return declaredName === localName
+		? { ...namespace, name: localName }
+		: { ...namespace, name: localName, declaredName }
 }
 
 function bindInto(
