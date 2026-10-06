@@ -163,8 +163,9 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 		expect(diagnostic.helps).toHaveLength(1)
 	})
 
-	// The refusal of a bound on the Namespace leads with the per-Method edit,
-	// which works whatever the Namespace declares.
+	// The refusal of a bound on the Namespace leads with the per-Method edit.
+	// A Method that fulfils a conformance can carry no bound of its own, so the
+	// second Help gives those Methods the conformance's `where`.
 	it("should send a refused Namespace bound to the Methods", () => {
 		let source = `implementation {
 			namespace Boxes<infer Item is Comparable> for List<Item> is Printable {
@@ -180,8 +181,145 @@ describe("A bound on a Namespace's own Type Parameter", () => {
 			firstOf(source, "protocol-bound-namespace-generic").helps,
 		).toEqual([
 			"Bound it on each Method that needs it: write '<Item is Comparable>' after that Method's name.",
-			"Or bound it on a conformance this Namespace declares: 'is Printable where Item is Comparable'.",
+			"A Method that fulfils 'Printable' can carry no bound of its own, so bound it on the conformance instead: 'is Printable where Item is Comparable'.",
 		])
+		expect(
+			compiles(
+				source
+					.replace("<infer Item is Comparable>", "<infer Item>")
+					.replace(
+						"is Printable {",
+						"is Printable where Item is Comparable {",
+					),
+			),
+		).toBe(true)
+	})
+
+	// A conformance that already carries a `where` takes the bound as one more
+	// condition, so the Help spells the whole clause it becomes.
+	it("should spell the condition beside a 'where' already written", () => {
+		let source = (generics: string, clause: string) => `implementation {
+			namespace Boxes<${generics}> for { items: List<Item>, other: Other } is Printable ${clause} {
+				toString() -> String {
+					<- "{@.items::sort()::length()} items {@.other}"
+				}
+			}
+
+			Terminal.print({ items = [3, 1], other = 1 })
+		}`
+
+		expect(
+			firstOf(
+				source(
+					"infer Item is Comparable, infer Other",
+					"where Other is Printable",
+				),
+				"protocol-bound-namespace-generic",
+			).helps[1],
+		).toBe(
+			"A Method that fulfils 'Printable' can carry no bound of its own, so bound it on the conformance instead: 'is Printable where Other is Printable, Item is Comparable'.",
+		)
+		expect(
+			compiles(
+				source(
+					"infer Item, infer Other",
+					"where Other is Printable, Item is Comparable",
+				),
+			),
+		).toBe(true)
+	})
+
+	// A clause that already binds the Type Parameter takes no second bound. So
+	// the Help gives the edit the conformance check gives: a Namespace of its
+	// own. A clause that binds it to the same Protocol has the bound already.
+	it("should send a bound a clause can not take to a Namespace of its own", () => {
+		let boxes = (generics: string, clause: string) => `implementation {
+			namespace Boxes<${generics}> for { items: List<Item> } is Printable ${clause} {
+				toString() -> String {
+					<- "{@.items::sort()::length()} items"
+				}
+			}
+
+			Terminal.print({ items = [3, 1] })
+		}`
+		let refusedWith = (clause: string) =>
+			firstOf(
+				boxes("infer Item is Comparable", clause),
+				"protocol-bound-namespace-generic",
+			).helps[1]
+
+		expect(refusedWith("where Item is Printable")).toBe(
+			"A Method that fulfils 'Printable' can carry no bound of its own, and 'Item' already carries 'Printable' on that conformance, which takes one bound per Type Parameter — declare 'is Printable where Item is Comparable' on a Namespace of its own.",
+		)
+		expect(compiles(boxes("infer Item", "where Item is Comparable"))).toBe(
+			true,
+		)
+		expect(refusedWith("where Item is Comparable")).toBe(
+			"A Method that fulfils 'Printable' can carry no bound of its own, so bound it on the conformance instead: 'is Printable where Item is Comparable'.",
+		)
+	})
+
+	// Each conformance's Methods take the bound on that conformance, so every
+	// clause is spelled, not one of them.
+	it("should spell the bound on every conformance declared", () => {
+		expect(
+			firstOf(
+				`implementation {
+			namespace Boxes<infer Item is Comparable> for { items: List<Item> } is Printable, is Equatable {
+				toString() -> String {
+					<- "a box"
+				}
+
+				is(_ other: { items: List<Item> }) -> Boolean {
+					<- true
+				}
+			}
+		}`,
+				"protocol-bound-namespace-generic",
+			).helps[1],
+		).toBe(
+			"A Method that fulfils a requirement can carry no bound of its own, so bound it on each conformance whose Methods need it: 'is Printable where Item is Comparable', 'is Equatable where Item is Comparable'.",
+		)
+	})
+
+	// The two Helps complement each other: `toString` fulfils 'Printable' and
+	// takes the `where`, while `biggest` takes a bound of its own.
+	it("should compile with each Help applied to the Methods it names", () => {
+		let source = `implementation {
+			namespace Boxes<infer Item is Comparable> for { items: List<Item> } is Printable {
+				toString() -> String {
+					<- "{@.items::sort()::length()} items"
+				}
+
+				biggest() -> Optional<Item> {
+					<- @.items::sort()::lastItem()
+				}
+			}
+
+			Terminal.print({ items = [3, 1] })
+		}`
+		let unbounded = source.replace(
+			"<infer Item is Comparable>",
+			"<infer Item>",
+		)
+
+		expect(
+			compiles(
+				unbounded
+					.replace(
+						"is Printable {",
+						"is Printable where Item is Comparable {",
+					)
+					.replace("biggest()", "biggest<Item is Comparable>()"),
+			),
+		).toBe(true)
+		expect(
+			codesOfSource(
+				unbounded
+					.replace("toString()", "toString<Item is Comparable>()")
+					.replace("biggest()", "biggest<Item is Comparable>()"),
+			),
+		).toContain("nonconforming-namespace")
 	})
 
 	it("should offer the per-Method edit where nothing is declared", () => {

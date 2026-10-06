@@ -4725,7 +4725,7 @@ Error: A Namespace's Type Parameters can not carry Protocol bounds
    │                                        ╰────── this bound is not supported here
    │ 
    │ Help 1: Bound it on each Method that needs it: write '<Item is Comparable>' after that Method's name.
-   │ Help 2: Or bound it on a conformance this Namespace declares: 'is Printable where Item is Comparable'.
+   │ Help 2: A Method that fulfils 'Printable' can carry no bound of its own, so bound it on the conformance instead: 'is Printable where Item is Comparable'.
    │ 
    │ Note 1: A bound written here would apply to every Method of 'Boxes', including the ones that do not need it.
    │ Note 2: A 'where' condition reaches the Methods that fulfil its conformance, which is the part a bound on the Namespace itself could never say.
@@ -4740,14 +4740,22 @@ exactly what they are about.
 
 Move it to the methods that need it: `biggest<Item is Comparable>() -> Optional<Item>`.
 The parameter is still the namespace's — still worked out from the receiver, still
-written without `infer` — and the bound holds for that method alone. This works
-whatever the namespace declares, which is why the Help leads with it.
+written without `infer` — and the bound holds for that method alone.
 
-Or move it into a conditional conformance: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
-A `where` reaches the methods that **fulfil** that conformance and no others, so it
-bounds a whole family at once. Where the namespace already declares a conformance
-the Help names it, because the condition belongs on one this namespace owes rather
-than on one it would then be reported for not writing.
+A method that **fulfils** a conformance can not take that edit: the conformance
+promised it unconditionally, so a bound of its own is refused. Its bound goes into a
+conditional conformance instead: `namespace Boxes<infer Item> for { value: Item } is Printable where Item is Printable`.
+A `where` reaches the methods that fulfil that conformance and no others, so it
+bounds a whole family at once. The two Helps are not alternatives: a namespace whose
+fulfilling methods and other methods both need the bound takes both edits. The second
+Help appears only where the namespace already declares a conformance, and names it,
+because the condition belongs on one this namespace owes rather than on one it would
+then be reported for not writing. It spells each clause whole: one that has a `where`
+already takes the bound as one more condition, `is Printable where Other is Printable,
+Item is Comparable`, and a namespace with several conformances gets every one of them. A clause
+whose `where` already binds that type parameter to another protocol takes no second
+bound, so for it the help asks for the conformance on a namespace of its own, as
+[`nonconforming-namespace`](#nonconforming-namespace) does.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

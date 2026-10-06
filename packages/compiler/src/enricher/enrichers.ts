@@ -205,6 +205,7 @@ import {
 import { reportStaticMethodOnValue } from "./staticMethods"
 import { settleProperty, typeBodiedProperties } from "./staticProperties"
 import {
+	conformanceBoundHelps,
 	namespaceParameterNames,
 	refuseDuplicateTypeParameters,
 	refuseUndecidedTypeParameters,
@@ -6020,16 +6021,13 @@ function enrichNamespaceDefinitionStatement(
 	}
 
 	// A bound on a Namespace's own Type Parameter would apply to every Method.
-	// It belongs on a Method's `<…>` or a conformance's `where`. The
-	// conformance Help names only conformances this Namespace already declares.
+	// It belongs on a Method's `<…>`. A Method that fulfils a conformance can
+	// carry no bound of its own, so its bound goes on that conformance's
+	// `where`. The Help names only conformances this Namespace declares.
 	for (let generic of node.generics) {
 		if (generic.constraint !== null) {
-			let conformances = node.conformsTo.map(
-				(clause) => clause.protocol.content,
-			)
 			let parameter = generic.name.content
 			let protocolName = generic.constraint.content
-			let bound = `where ${parameter} is ${protocolName}`
 
 			reportError(
 				"A Namespace's Type Parameters can not carry Protocol bounds",
@@ -6048,13 +6046,7 @@ function enrichNamespaceDefinitionStatement(
 					],
 					helps: [
 						`Bound it on each Method that needs it: write '<${parameter} is ${protocolName}>' after that Method's name.`,
-						...(conformances.length === 0
-							? []
-							: [
-									`Or bound it on a conformance this Namespace declares: '${conformances
-										.map((name) => `is ${name} ${bound}`)
-										.join("' or '")}'.`,
-								]),
+						...conformanceBoundHelps(node, parameter, protocolName),
 					],
 				},
 			)

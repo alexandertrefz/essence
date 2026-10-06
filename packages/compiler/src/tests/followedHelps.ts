@@ -127,6 +127,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"operator-not-supported",
 		"path-without-context",
 		"picked-requirement",
+		"protocol-bound-namespace-generic",
 		"redundant-pattern-binder",
 		"surrogate-unicode-escape",
 		"unbraced-unicode-escape",

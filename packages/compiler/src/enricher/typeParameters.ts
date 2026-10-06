@@ -85,6 +85,54 @@ export function inferringRefused(
 	)
 }
 
+// The Help that moves a refused Namespace bound onto the conformances it
+// declares, each clause spelled whole. A clause that has a `where` already
+// takes the bound as one more condition. One that binds the Type Parameter to
+// another Protocol takes no second bound. So that conformance moves to a
+// Namespace of its own, as `nonconforming-namespace` asks.
+export function conformanceBoundHelps(
+	node: parser.NamespaceDefinitionStatementNode,
+	parameter: string,
+	protocolName: string,
+): Array<string> {
+	let condition = `${parameter} is ${protocolName}`
+	let clauses: Array<string> = []
+	let moved: Array<string> = []
+
+	for (let clause of node.conformsTo) {
+		let protocol = clause.protocol.content
+		let written = clause.conditions.map(
+			(each) => `${each.generic.content} is ${each.protocol.content}`,
+		)
+		let carried = clause.conditions.find(
+			(each) => each.generic.content === parameter,
+		)?.protocol.content
+
+		if (carried !== undefined && carried !== protocolName) {
+			moved.push(
+				`A Method that fulfils '${protocol}' can carry no bound of its own, and '${parameter}' already carries '${carried}' on that conformance, which takes one bound per Type Parameter — declare 'is ${protocol} where ${condition}' on a Namespace of its own.`,
+			)
+		} else {
+			clauses.push(
+				`'is ${protocol} where ${(carried === undefined ? [...written, condition] : written).join(", ")}'`,
+			)
+		}
+	}
+
+	let bounded =
+		clauses.length === 0
+			? []
+			: clauses.length === 1 && moved.length === 0
+				? [
+						`A Method that fulfils '${node.conformsTo[0]?.protocol.content}' can carry no bound of its own, so bound it on the conformance instead: ${clauses[0]}.`,
+					]
+				: [
+						`A Method that fulfils a requirement can carry no bound of its own, so bound it on each conformance whose Methods need it: ${clauses.join(", ")}.`,
+					]
+
+	return [...bounded, ...moved]
+}
+
 // One `<…>` naming a Type Parameter twice. Readers key a Generic list by name
 // and the last writing wins, so `<Item is Comparable, Item is Printable>` would
 // drop a bound silently. Checked here, not in the Parser, so the formatter
