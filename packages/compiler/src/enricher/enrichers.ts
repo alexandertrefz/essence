@@ -4172,10 +4172,19 @@ export function enrichTestProperties(
 		)
 	}
 
+	// The names the Parameters write, which a refused Pattern leaves to them.
+	let named = new Set(
+		node.parameters.flatMap((parameter) =>
+			parameter.internalName?.nodeType === "Identifier"
+				? [parameter.internalName.content]
+				: [],
+		),
+	)
+
 	return {
 		nodeType: "TestProperties",
 		parameters: node.parameters.map((parameter) =>
-			enrichTestProperty(parameter, scope, bodyScope),
+			enrichTestProperty(parameter, scope, bodyScope, named),
 		),
 		position: node.position,
 	}
@@ -4185,6 +4194,7 @@ function enrichTestProperty(
 	parameter: parser.ParameterNode,
 	scope: enricher.Scope,
 	bodyScope: enricher.Scope,
+	named: ReadonlySet<string>,
 ): common.typed.TestPropertyNode {
 	let name =
 		parameter.internalName?.nodeType === "Identifier"
@@ -4206,6 +4216,24 @@ function enrichTestProperty(
 			`Name the whole value — 'for any (value: ${type.type === "Error" ? "…" : spellType(type, spellingIn(scope))})' — and take it apart inside the body.`,
 			"A counterexample is reported beside the name it was generated for, and a Pattern names no value.",
 		)
+
+		// Its names are still bound at their members' Types, so the body does
+		// not report them again but is still checked. An annotated last step
+		// narrows as in a Matcher, and an annotation earlier on binds Error.
+		for (let bound of patternBindings(parameter.internalName)) {
+			let annotated = bound.steps.findIndex((step) => step.type !== null)
+			let boundType: common.Type =
+				annotated === -1
+					? typeAtPath(type, bound.path)
+					: annotated === bound.steps.length - 1 &&
+						  bound.type !== null
+						? resolveType(bound.type, scope)
+						: { type: "Error" }
+
+			if (!named.has(bound.name.content)) {
+				declareVariableInScope(bound.name, boundType, bodyScope, true)
+			}
+		}
 	}
 
 	// `a: Integer` records one Identifier as both names, so a label is two

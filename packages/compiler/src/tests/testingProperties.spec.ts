@@ -762,6 +762,49 @@ describe("Property tests", () => {
 			])
 		})
 
+		// Each name the Pattern would have bound is bound at its member's Type.
+		// So the body reading it is not reported again, and a mistake the body
+		// makes with it still is.
+		it("binds the names of a refused Pattern, so the body does not cascade", () => {
+			expect(
+				codesOf(
+					sectionOf(
+						"{ name }: { name: String }",
+						"expect name::is(name)",
+					),
+				),
+			).toEqual(["property-parameters"])
+			expect(
+				codesOf(
+					sectionOf(
+						"{ name }: { name: String }",
+						"expect name::frobnicate()",
+					),
+				),
+			).toEqual(["property-parameters", "unknown-method"])
+		})
+
+		// A member the Pattern annotates is bound at the annotation, which
+		// narrows it as it would in a Matcher.
+		it("binds an annotated member of a refused Pattern at its annotation", () => {
+			expect(
+				codesOf(
+					sectionOf(
+						"{ score: Integer }: { score: Integer | String }",
+						"expect score::isGreaterThan(0)",
+					),
+				),
+			).toEqual(["property-parameters"])
+		})
+
+		// A name another Parameter writes is that Parameter's, so the Pattern
+		// does not bind it a second time.
+		it("binds no name of a refused Pattern that another Parameter writes", () => {
+			expect(
+				codesOf(sectionOf("{ name }: { name: String }, name: String")),
+			).toEqual(["property-parameters"])
+		})
+
 		// The Help names the whole value at the Type the reader wrote.
 		it("spells the Type a Pattern was written at", () => {
 			expect(
