@@ -1606,6 +1606,88 @@ describe("Validator", () => {
 				],
 			)
 		})
+
+		// No Matcher can name a Case inside a member, so the crossing is
+		// looked for under the Matchers' members.
+		describe("at a member", () => {
+			let held = (cases: string) => `implementation {
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				choice Holder {
+					Hold { box: Box<Integer> | Box<String> },
+					Nothing,
+				}
+
+				function describe(_ value: Holder) -> String {
+					<- match value -> String {
+						${cases}
+						case #Nothing { <- "nothing" }
+						case _ { <- "other" }
+					}
+				}
+			}`
+
+			it("should warn about a payload requirement another application's Case reaches first", () => {
+				let diagnostics = diagnosticsFor(
+					held(`case #Hold({ box: Box<Integer> }) { <- "integers" }
+						case #Hold({ box: Box<String> }) { <- "strings" }`),
+				)
+
+				expect(diagnostics[0]?.code).toBe("type-argument-overlap")
+				expect(diagnostics[0]?.message).toBe(
+					"This Case never sees Holder#Hold values whose box is Box<String>#Empty",
+				)
+				expect(diagnostics[0]?.position?.start.line).toBe(15)
+			})
+
+			it("should warn about a Record Matcher another application's Case reaches first", () => {
+				let diagnostics = diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					function describe(_ value: { box: Box<Integer> } | { box: Box<String> }) -> String {
+						<- match value -> String {
+							case { box: Box<Integer> } { <- "integers" }
+							case { box: Box<String> } { <- "strings" }
+						}
+					}
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.message),
+				).toEqual([
+					"This Case never sees { box: Box<String> } values whose box is Box<String>#Empty",
+				])
+			})
+
+			it("should stay silent where the payload tells the applications apart", () => {
+				expect(
+					diagnosticsFor(
+						held(`case #Hold({ box: Box<Integer>#Full }) { <- "integers" }
+							case #Hold({ box: Box<String>#Full }) { <- "strings" }`),
+					).map((diagnostic) => diagnostic.code),
+				).not.toContain("type-argument-overlap")
+			})
+
+			it("should stay silent once the member is matched in a Case of its own", () => {
+				expect(
+					diagnosticsFor(
+						held(`case #Hold({ box }) {
+							<- match box -> String {
+								case Box#Empty { <- "empty" }
+								case Box<Integer> { <- "integers" }
+								case Box<String> { <- "strings" }
+							}
+						}`),
+					).map((diagnostic) => diagnostic.code),
+				).not.toContain("type-argument-overlap")
+			})
+		})
 	})
 
 	// A Match on an Integer or a String has no Union to be exhaustive over, so

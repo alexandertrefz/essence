@@ -9,10 +9,12 @@ import {
 	spellType,
 	withArticle,
 } from "../helpers/describe"
+import { flattenUnionMembers } from "../helpers/types"
 import {
 	acceptsAllAtRuntime,
 	type ApplicationCrossing,
 	crossingApplication,
+	nestedCrossing,
 } from "./runtimeOverlap"
 
 type MatchHandler = common.typed.MatchNode["handlers"][number]
@@ -123,6 +125,124 @@ export function reportDispatchApplicationOverlap(
 			],
 		},
 	)
+}
+
+// The same crossing at a member of a Record or a Case. No Matcher can name a
+// Case there, so the Help binds the member in one Case and matches it there.
+export function reportNestedApplicationOverlap(
+	handler: MatchHandler,
+	matcher: common.Type,
+	earlierHandler: MatchHandler,
+	earlierMatcher: common.Type,
+	reaching: Array<common.Type>,
+	memberTypes: Array<common.Type>,
+	spell: Spelling,
+): boolean {
+	for (let memberType of reaching) {
+		let nested = nestedCrossing(earlierMatcher, matcher, memberType)
+
+		if (nested === null) {
+			continue
+		}
+
+		let { path, crossings } = nested
+		let first =
+			crossings.find((crossing) =>
+				acceptsAllAtRuntime(crossing.matcher, crossing.member),
+			) ?? crossings[0]
+		let values = `${spellType(memberType, spell)} values whose ${path.join(".")} is ${spellType(first.member, spell)}`
+
+		reportWarning(
+			`This Case never sees ${values}`,
+			handler.matcherPosition,
+			{
+				code: "type-argument-overlap",
+				labels: [
+					primary(
+						handler.matcherPosition,
+						`${values} fit the Case above too`,
+					),
+					secondary(
+						earlierHandler.matcherPosition,
+						"this Case runs first",
+					),
+				],
+				notes: [
+					"Cases are tried in order, and the first one that fits wins.",
+					crossingNote(
+						first,
+						acceptsAllAtRuntime(first.matcher, first.member),
+						spell,
+					),
+				],
+				helps: [
+					bindingHelp(
+						memberType,
+						path,
+						crossings,
+						memberTypes,
+						spell,
+					),
+				],
+			},
+		)
+
+		return true
+	}
+
+	return false
+}
+
+// One Case binding the member's first step, whose Match answers for the
+// crossing Cases first. A deeper crossing is that Match's to report.
+function bindingHelp(
+	memberType: common.Type,
+	path: Array<string>,
+	crossings: Array<ApplicationCrossing>,
+	memberTypes: Array<common.Type>,
+	spell: Spelling,
+): string {
+	let [step] = path
+	let owner =
+		memberType.type === "Case"
+			? spellMatcher(memberType, spell, memberTypes)
+			: null
+	let pattern =
+		memberType.type === "Case"
+			? owner === null
+				? null
+				: `${owner}({ ${step} })`
+			: `{ ${step} }`
+
+	if (pattern === null) {
+		return `Bind '${step}' in one Case in place of these Cases, and match it there.`
+	}
+
+	let binding = `Bind '${step}' in one 'case ${pattern}' in place of these Cases`
+	let matchers =
+		path.length === 1
+			? spelledMatchers(crossings, typesAt(memberType, step), spell)
+			: null
+
+	return matchers === null
+		? `${binding}, and match it there.`
+		: `${binding}, and match it there with ${quoted(matchers)} first.`
+}
+
+// The Types a Record or Case member can hold, so a Case Matcher written for one
+// of them is checked against the others.
+function typesAt(memberType: common.Type, step: string): Array<common.Type> {
+	let held =
+		(memberType.type === "Record" || memberType.type === "Case") &&
+		Object.hasOwn(memberType.members, step)
+			? memberType.members[step]
+			: null
+
+	if (held === null) {
+		return []
+	}
+
+	return held.type === "UnionType" ? flattenUnionMembers(held) : [held]
 }
 
 function crossingNote(

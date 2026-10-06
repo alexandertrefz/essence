@@ -12981,6 +12981,64 @@ ${byApplication}`),
 		).toEqual([])
 	})
 
+	it("names the Case a member takes from another application as imported", () => {
+		let holderModule = `implementation {
+	choice Box<Item> { Full { item: Item }, Empty }
+	choice Holder { Hold { box: Box<Integer> | Box<String> }, Nothing }
+}
+
+export {
+	Box
+	Holder
+}
+`
+		let main = (cases: string) => `import {
+	from "./Holder.es" {
+		Box as Carton
+		Holder
+	}
+}
+
+implementation {
+	function describe(_ value: Holder) -> String {
+		<- match value -> String {
+${cases}
+			case #Nothing { <- "nothing" }
+		}
+	}
+}
+`
+		let analysed = (cases: string) =>
+			withProject(
+				{ "Main.es": main(cases), "Holder.es": holderModule },
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let warning =
+			analysed(`			case #Hold({ box: Carton<Integer> }) { <- "integers" }
+			case #Hold({ box: Carton<String> }) { <- "strings" }
+			case _ { <- "other" }`).find(
+				(diagnostic) => diagnostic.code === "type-argument-overlap",
+			)
+
+		expect(warning?.message).toBe(
+			"This Case never sees Holder#Hold values whose box is Carton<String>#Empty",
+		)
+		expect(warning?.helps).toEqual([
+			"Bind 'box' in one 'case Holder#Hold({ box })' in place of these Cases, and match it there with 'case Carton#Empty' first.",
+		])
+		expect(
+			codesOf(
+				analysed(`			case Holder#Hold({ box }) {
+				<- match box -> String {
+					case Carton#Empty { <- "empty" }
+					case Carton<Integer> { <- "integers" }
+					case Carton<String> { <- "strings" }
+				}
+			}`),
+			),
+		).toEqual([])
+	})
+
 	let renamingModule = `implementation {
 	choice Pair<A, B> { Both { first: A, second: B }, Neither }
 	choice Either<First, Second> { Left { value: First }, Right { value: Second } }

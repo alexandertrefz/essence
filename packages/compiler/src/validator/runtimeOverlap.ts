@@ -298,6 +298,124 @@ export function crossingApplication(
 	return crossing
 }
 
+// The crossing Cases at one member path of a Record or a Case.
+export type NestedCrossing = {
+	path: Array<string>
+	crossings: Array<ApplicationCrossing>
+}
+
+// The Cases at a member of `memberType` that `earlier` takes through another
+// application while `later` takes them as written. They are found at the first
+// member path that has any, or the answer is null. Each pair of Matcher arms
+// that share the member's shape is asked on its own. See "Runtime overlap" in
+// DEVELOPMENT.md.
+export function nestedCrossing(
+	earlier: common.Type,
+	later: common.Type,
+	memberType: common.Type,
+): NestedCrossing | null {
+	if (memberType.type === "UnionType") {
+		return firstNested(flattenUnionMembers(memberType), (armType) =>
+			nestedCrossing(earlier, later, armType),
+		)
+	}
+
+	if (memberType.type !== "Record" && memberType.type !== "Case") {
+		return null
+	}
+
+	let earlierArms = armsShaped(earlier, memberType)
+	let laterArms = armsShaped(later, memberType)
+
+	for (let [name, memberAt] of Object.entries(memberType.members)) {
+		for (let earlierArm of earlierArms) {
+			for (let laterArm of laterArms) {
+				let found =
+					Object.hasOwn(earlierArm.members, name) &&
+					Object.hasOwn(laterArm.members, name)
+						? crossingAt(
+								earlierArm.members[name],
+								laterArm.members[name],
+								memberAt,
+							)
+						: null
+
+				if (found !== null) {
+					return {
+						path: [name, ...found.path],
+						crossings: found.crossings,
+					}
+				}
+			}
+		}
+	}
+
+	return null
+}
+
+// At one member: the Cases `later` takes as written and `earlier` through
+// another application, or else those deeper inside it.
+function crossingAt(
+	earlier: common.Type,
+	later: common.Type,
+	memberType: common.Type,
+): NestedCrossing | null {
+	let arms =
+		memberType.type === "UnionType"
+			? flattenUnionMembers(memberType)
+			: [memberType]
+	let crossings = arms.flatMap((armType) =>
+		armType.type === "Case" &&
+		crossingApplication(later, armType) === null &&
+		overlapsAtRuntime(later, armType)
+			? (crossingApplication(earlier, armType) ?? [])
+			: [],
+	)
+
+	if (crossings.length > 0) {
+		return { path: [], crossings }
+	}
+
+	return firstNested(arms, (armType) =>
+		nestedCrossing(earlier, later, armType),
+	)
+}
+
+// The arms of a Matcher that ask about values shaped like `memberType`, a
+// Record or a Case of one tag, and accept some of them.
+function armsShaped(
+	matcher: common.Type,
+	memberType: common.RecordType | common.CaseType,
+): Array<common.RecordType | common.CaseType> {
+	let arms =
+		matcher.type === "UnionType" ? flattenUnionMembers(matcher) : [matcher]
+
+	return arms.filter(
+		(arm): arm is common.RecordType | common.CaseType =>
+			(memberType.type === "Record"
+				? arm.type === "Record"
+				: arm.type === "Case" &&
+					arm.choice === memberType.choice &&
+					arm.name === memberType.name) &&
+			overlapsAtRuntime(arm, memberType),
+	)
+}
+
+function firstNested(
+	arms: Array<common.Type>,
+	crossingOf: (arm: common.Type) => NestedCrossing | null,
+): NestedCrossing | null {
+	for (let arm of arms) {
+		let found = crossingOf(arm)
+
+		if (found !== null) {
+			return found
+		}
+	}
+
+	return null
+}
+
 // Whether a Case Matcher's Type Arguments take the member's. A written Case
 // Matcher carries none, and takes every application. Refinements erase, as
 // everywhere at runtime.

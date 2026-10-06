@@ -709,6 +709,89 @@ describe("A Case another application's Case crosses into", () => {
 	})
 })
 
+describe("A Case another application's Case crosses into at a member", () => {
+	let box = `choice Box<Item> {
+		Full { item: Item },
+		Count { n: Integer },
+		Empty,
+	}`
+	// The Match the Help asks for, binding the member and answering for the
+	// crossing Cases before the Cases for each application.
+	let split = `<- match box -> String {
+		case Box#Count { <- "count" }
+		case Box#Empty { <- "empty" }
+		case Box<Integer> { <- "integers" }
+		case Box<String> { <- "strings" }
+	}`
+
+	// A Pattern can not name a Case of every application, so the member is
+	// bound once and matched on its own.
+	it("should compile with the member bound in one Case of a payload", () => {
+		let held = (cases: string) => `implementation {
+			${box}
+
+			choice Holder {
+				Hold { box: Box<Integer> | Box<String> },
+				Nothing,
+			}
+
+			function describe(_ value: Holder) -> String {
+				<- match value -> String {
+					${cases}
+					case #Nothing { <- "nothing" }
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				held(`case #Hold({ box: Box<Integer> }) { <- "integers" }
+					case #Hold({ box: Box<String> }) { <- "strings" }
+					case _ { <- "other" }`),
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Bind 'box' in one 'case Holder#Hold({ box })' in place of these Cases, and match it there with 'case Box#Count' and 'case Box#Empty' first.",
+		])
+
+		let followed = held(`case Holder#Hold({ box }) {
+			${split}
+		}`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	it("should compile with the member bound in one Record Case", () => {
+		let records = (cases: string) => `implementation {
+			${box}
+
+			function describe(_ value: { box: Box<Integer> } | { box: Box<String> }) -> String {
+				<- match value -> String {
+					${cases}
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				records(`case { box: Box<Integer> } { <- "integers" }
+					case { box: Box<String> } { <- "strings" }`),
+				"type-argument-overlap",
+			).helps,
+		).toEqual([
+			"Bind 'box' in one 'case { box }' in place of these Cases, and match it there with 'case Box#Count' and 'case Box#Empty' first.",
+		])
+
+		let followed = records(`case { box } {
+			${split}
+		}`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+})
+
 describe("A Case of a Match on values", () => {
 	let alreadyEnded = `implementation {
 		function describe(_ count: Integer) -> String {

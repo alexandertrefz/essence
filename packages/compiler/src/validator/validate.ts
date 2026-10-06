@@ -64,6 +64,7 @@ import {
 import {
 	reportApplicationOverlap,
 	reportDispatchApplicationOverlap,
+	reportNestedApplicationOverlap,
 } from "./applicationOverlap"
 import { type Claim, claimedCaseReport } from "./claimedCases"
 import { reportConditionNotBoolean } from "./conditions"
@@ -1610,15 +1611,22 @@ function reportErasedOverlap(
 				(claimedBy[memberIndex] ?? earlierIndex) >= earlierIndex,
 		)
 
+		let reachingTypes = reaching.map(
+			(memberIndex) => memberTypes[memberIndex],
+		)
+
 		if (
-			reportApplicationOverlap(
-				handler,
-				runtimeMatchers[handlerIndex],
-				earlierHandler,
-				earlierMatcher,
-				reaching.map((memberIndex) => memberTypes[memberIndex]),
-				memberTypes,
-				readerSpelling,
+			[reportApplicationOverlap, reportNestedApplicationOverlap].some(
+				(report) =>
+					report(
+						handler,
+						runtimeMatchers[handlerIndex],
+						earlierHandler,
+						earlierMatcher,
+						reachingTypes,
+						memberTypes,
+						readerSpelling,
+					),
 			)
 		) {
 			return

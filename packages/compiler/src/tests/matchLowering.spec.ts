@@ -429,6 +429,69 @@ describe("Match Lowering", () => {
 				'"integers"',
 			])
 		})
+
+		// A payload requirement asks its member the same erased question.
+		describe("at a member", () => {
+			let held = (cases: string) => `implementation {
+				choice Box<Item> {
+					Full { item: Item },
+					Empty,
+				}
+
+				choice Holder {
+					Hold { box: Box<Integer> | Box<String> },
+					Nothing,
+				}
+
+				function describe(_ value: Holder) -> String {
+					<- match value -> String {
+						${cases}
+						case #Nothing { <- "nothing" }
+					}
+				}
+
+				Terminal.inspect(describe(#Hold({ box = Box<String>#Empty })))
+				Terminal.inspect(describe(#Hold({ box = Box<String>#Full({ item = "a" }) })))
+				Terminal.inspect(describe(#Hold({ box = Box<Integer>#Full({ item = 1 }) })))
+			}`
+			let byApplication =
+				held(`case #Hold({ box: Box<Integer> }) { <- "integers" }
+				case #Hold({ box: Box<String> }) { <- "strings" }
+				case _ { <- "other" }`)
+
+			it("reports the Case another application's Case never reaches", () => {
+				expect(
+					diagnosticsOf(byApplication).map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toContain("type-argument-overlap")
+			})
+
+			it("takes the first application's Case where the payload can not tell", async () => {
+				expect(await run(byApplication)).toEqual([
+					'"integers"',
+					'"strings"',
+					'"integers"',
+				])
+			})
+
+			it("answers each value from its own Case once the Help is followed", async () => {
+				let followed = held(`case #Hold({ box }) {
+					<- match box -> String {
+						case Box#Empty { <- "empty" }
+						case Box<Integer> { <- "integers" }
+						case Box<String> { <- "strings" }
+					}
+				}`)
+
+				expect(diagnosticsOf(followed)).toEqual([])
+				expect(await run(followed)).toEqual([
+					'"empty"',
+					'"strings"',
+					'"integers"',
+				])
+			})
+		})
 	})
 
 	// A Match on an Integer or a String is a chain of value comparisons, ending

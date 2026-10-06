@@ -284,9 +284,16 @@ never crosses, and the Help asks for it above the earlier Case. Two things narro
 Handler claimed never reaches a later one, which holds for the empty containers too. And only a member the later
 Case takes as written is one it misses, since `case Box<Boolean>` also overlaps `Box<String>#Empty`.
 
+The same Case crosses inside a member, as with `case #Hold({ box: Box<Integer> })` above the Case for `Box<String>`.
+`nestedCrossing` walks the members of a Record or a Case, pairing each arm of the earlier Matcher with each arm of
+the later one that shares the member's shape. At a Case it asks what `crossingApplication` asks, with the later arm
+in place of the later Case. No Matcher can name a Case of every application inside a Pattern, so the Help binds the
+member in one Case and matches it there, Case Matchers first. A crossing deeper down is that Match's own to report.
+
 Method dispatch over a Union receiver picks branches the same way, so `validateDispatchCases` reports the same
 conflicts between dispatch branches. A branch every value of which another takes is `erased-case-conflict`, since it
-never runs.
+never runs. A crossing inside a member is not reported there, since a Match that binds the member would have to
+rebuild the receiver in every arm to call the Method.
 
 ## Literal Matches
 
