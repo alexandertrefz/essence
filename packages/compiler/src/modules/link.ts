@@ -29,6 +29,7 @@ import {
 	type TypedNode,
 } from "../visitor/index"
 import type { Module, ModuleGraph } from "./graph"
+import { resolveSpecifier } from "./resolve"
 
 // What a top-level declaration was written as. A Variable can not be
 // exported, and a Constant can not be imported across a cycle. Every other
@@ -415,6 +416,12 @@ function bindAsError(
 	countTypeDeclaration()
 	scope.constants.add(localName)
 	scope.declarations[localName] = position
+}
+
+function importsItself(state: ModuleState, entry: parser.ImportNode): boolean {
+	let resolution = resolveSpecifier(entry.source.path, state.module.filePath)
+
+	return resolution.kind === "rejected" && resolution.reason === "self-import"
 }
 
 function isTaken(scope: enricher.Scope, name: string): boolean {
@@ -997,8 +1004,13 @@ function seedImports(
 		let { entry, localName, dependencyPath } = binding
 		let rebinding = binding.state === "bound"
 
+		// The graph reported a Module it could not load on its specifier. The
+		// entry waits for the final round, so a loaded entry binds the name
+		// first. A self-import asks for the Module's own names, so none binds.
 		if (dependencyPath === null) {
-			binding.state = "refused"
+			if (importsItself(state, entry)) {
+				binding.state = "refused"
+			}
 
 			continue
 		}
@@ -1035,10 +1047,6 @@ function seedImports(
 		let surface = surfaceFor(dependencyPath)
 
 		if (surface === null) {
-			if (!rebinding) {
-				binding.state = "refused"
-			}
-
 			continue
 		}
 
@@ -1094,7 +1102,8 @@ function seedImports(
 }
 
 // An entry still pending names an export that never resolved, which its own
-// Module reported. Its name is bound as an Error.
+// Module reported, or a Module that was never loaded. Its name is bound as an
+// Error once every loaded entry has bound, unless something holds it.
 function refuseUnboundImports(state: ModuleState): void {
 	for (let binding of state.imports) {
 		if (binding.state !== "pending") {
@@ -1103,7 +1112,10 @@ function refuseUnboundImports(state: ModuleState): void {
 
 		binding.state = "refused"
 
-		if (!isTaken(state.scope, binding.localName)) {
+		if (
+			!state.declarations.has(binding.localName) &&
+			!isTaken(state.scope, binding.localName)
+		) {
 			bindAsError(
 				state.scope,
 				binding.localName,

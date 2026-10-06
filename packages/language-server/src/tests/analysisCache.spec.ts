@@ -536,7 +536,7 @@ describe("the analysis cache", () => {
 			workspace
 				.analysisOf(pathOf("Importer.es"))!
 				.diagnostics.map((diagnostic) => diagnostic.code),
-		).toEqual(["module-not-found", "unknown-name"])
+		).toEqual(["module-not-found"])
 
 		writeFileSync(
 			path.join(root, "Base.es"),
@@ -1108,7 +1108,6 @@ describe("the Server's request loop", () => {
 
 			expect(session.codesFor(files.pathOf("Importer.es"))).toEqual([
 				"module-not-found",
-				"unknown-name",
 			])
 
 			writeFileSync(

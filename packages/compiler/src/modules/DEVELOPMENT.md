@@ -39,7 +39,10 @@ the Type in the importing file would dispatch through the base Namespace. There 
 entry binds at most three times and the rounds terminate.
 
 A refused entry's name is bound to an Error by `bindAsError`, so that its uses stay quiet. One refusal then
-reads as one mistake rather than an `unknown-name` at every use.
+reads as one mistake rather than an `unknown-name` at every use. An entry whose specifier the graph refused, or
+whose Module it could not load, stays pending until the final round. There `refuseUnboundImports` binds it to
+Error unless the Module or a loaded entry holds the name, so the order the entries are written in decides
+nothing. A self-import binds nothing: its names are the Module's own, and one it never declares is unknown.
 
 After enrichment each Module of a cycle also reports `cyclic-side-effects` on its first Statement that is not
 a declaration. A Module body runs on first import, and inside a cycle the entry point decides which body runs

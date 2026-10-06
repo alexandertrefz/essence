@@ -678,6 +678,122 @@ ${moduleProgram()}`,
 		)
 	})
 
+	// The specifier is the one mistake, so the names under it are bound to
+	// Error and their uses stay quiet. A name the Module declares itself keeps
+	// its own meaning.
+	it("reports a refused or missing specifier once, not at each use", () => {
+		// A missing Module's Note names where its specifier resolves, so the
+		// graph is analysed without `analysedAt`'s check that no path shows.
+		let codesIn = (main: string) =>
+			withProject({ "Main.es": main }, (directory) =>
+				codesOf(
+					analyseLinkedModules([
+						...linkProject(directory, "Main.es").modules.values(),
+					])?.get(path.join(directory, "Main.es")) ?? [],
+				),
+			)
+		let importing = (specifier: string, body: string) => `import {
+	from "${specifier}" { area }
+}
+
+implementation {
+${body}
+}
+`
+
+		for (let [specifier, code] of [
+			["Geometry.es", "invalid-module-specifier"],
+			["./Missing.es", "module-not-found"],
+		] as const) {
+			expect(
+				codesIn(importing(specifier, "\tTerminal.print(area(2))")),
+			).toEqual([code])
+		}
+
+		expect(
+			codesIn(
+				importing(
+					"Geometry.es",
+					"\tconstant area = 4\n\n\tTerminal.print(area::add(1))",
+				),
+			),
+		).toEqual(["invalid-module-specifier"])
+	})
+
+	// An entry that loaded binds first, whichever line it is written on, so a
+	// missing Module beside it changes nothing about what the name means.
+	it("lets a loaded entry keep a name an unloaded one also asks for", () => {
+		let reportsIn = (first: string, second: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "${first}" { helper }
+	from "${second}" { helper }
+}
+
+implementation {
+	constant answer: String = helper()
+}
+`,
+					"Library.es": `implementation {
+	function helper() -> Integer {
+		<- 1
+	}
+}
+
+export {
+	helper
+}
+`,
+				},
+				(directory) =>
+					codesOf(
+						analyseLinkedModules([
+							...linkProject(
+								directory,
+								"Main.es",
+							).modules.values(),
+						])?.get(path.join(directory, "Main.es")) ?? [],
+					),
+			)
+
+		for (let [first, second] of [
+			["./Aaa.es", "./Library.es"],
+			["./Library.es", "./Zzz.es"],
+		]) {
+			expect(reportsIn(first as string, second as string)).toEqual(
+				expect.arrayContaining([
+					"module-not-found",
+					"assignment-type-mismatch",
+				]),
+			)
+			expect(reportsIn(first as string, second as string)).not.toContain(
+				"duplicate-import",
+			)
+		}
+	})
+
+	// A Module's own names are in scope already, so a self-import binds none
+	// of them, and a name the Module never declares is still unknown.
+	it("leaves a name a self-import asks for unbound", () => {
+		expect(
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Main.es" { helper }
+}
+
+implementation {
+	Terminal.print(helper())
+}
+`,
+				},
+				(directory) =>
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+			),
+		).toEqual(["self-import", "unknown-name"])
+	})
+
 	it("compiles with the specifier each Help writes", () => {
 		let geometry = `implementation {
 	function area(_ side: Integer) -> Integer {
