@@ -144,6 +144,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"surrogate-unicode-escape",
 		"table-not-written",
 		"table-parameters",
+		"test-outside-tests",
 		"unbraced-unicode-escape",
 		"undocumented-parameter",
 		"ungeneratable-type",

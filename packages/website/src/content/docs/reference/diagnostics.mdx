@@ -5802,6 +5802,8 @@ Error: A 'test' may only be written in the 'tests { … }' section
 
 Move it into the `tests { … }` block at the end of the file.
 
+A `test` written inside another test's body stands in the tests section already, so the report says `A 'test' can not be written inside a test's body` instead, and the Help moves it out beside that test or groups the two in a `suite "…" { … }`. One written in another block inside the tests section, such as a function's body or an `if` in a suite, is told `A 'test' can not be written inside a block`, and the Help moves it out of the block.
+
 Taught on: [Tests › Tests and suites](/docs/language/tests#tests-and-suites)
 
 ### `expect-outside-test`

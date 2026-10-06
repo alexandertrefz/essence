@@ -385,6 +385,8 @@ describe("Tests Section", () => {
 			)
 		})
 
+		// It stands in the tests section already, so the report says where it
+		// does stand, and the Help moves it beside the test around it.
 		it("should report a test nested in another test's body", () => {
 			let { diagnostics } = parse(
 				`implementation {}
@@ -400,6 +402,125 @@ describe("Tests Section", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("test-outside-tests")
+			expect(diagnostics[0].message).toBe(
+				"A 'test' can not be written inside a test's body",
+			)
+			expect(diagnostics[0].labels[0]?.message).toBe(
+				"this 'test' stands in the body of another test",
+			)
+			expect(diagnostics[0].helps).toEqual([
+				"Move it out beside the test it stands in, or group the two in a 'suite \"…\" { … }'.",
+			])
+		})
+
+		it("should compile with a nested test moved where the Help says", () => {
+			let inner = `test "inner" {
+							expect true
+						}`
+
+			for (let tests of [
+				`test "outer" {
+						expect true
+					}
+
+					${inner}`,
+				`suite "both" {
+						test "outer" {
+							expect true
+						}
+
+						${inner}
+					}`,
+			]) {
+				expect(
+					compiles(`implementation {}\n\ntests {\n${tests}\n}`, {
+						tests: true,
+					}),
+				).toBe(true)
+			}
+		})
+
+		// A Function's body and a block of a suite are no test body. They still
+		// stand in the tests section, so the report says where the test does
+		// stand.
+		it("should report a test in a block inside the tests section", () => {
+			let reported = (section: string) =>
+				parse(
+					`implementation {}\n\ntests {\n${section}\n}`,
+				).diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.helps,
+				])
+			let inBlock = [
+				[
+					"test-outside-tests",
+					"A 'test' can not be written inside a block",
+					[
+						"Move it out of the block, beside the test or suite the block is written in.",
+					],
+				],
+			]
+
+			expect(
+				reported(`test "outer" {
+						constant check = () -> Boolean {
+							test "inner" {
+								expect true
+							}
+
+							<- true
+						}
+
+						expect check()
+					}`),
+			).toEqual(inBlock)
+			expect(
+				reported(`suite "s" {
+						constant flag = true
+
+						if flag {
+							test "inner" {
+								expect true
+							}
+						}
+					}`),
+			).toEqual(inBlock)
+			expect(
+				compiles(
+					`implementation {}
+
+				tests {
+					test "outer" {
+						constant check = () -> Boolean {
+							<- true
+						}
+
+						expect check()
+					}
+
+					test "inner" {
+						expect true
+					}
+				}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
+		it("should compile with a test moved into the tests section", () => {
+			expect(
+				compiles(
+					`implementation {}
+
+				tests {
+					test "nope" {
+						expect true
+					}
+				}`,
+					{ tests: true },
+				),
+			).toBe(true)
 		})
 
 		it("should refuse a name that is not a String", () => {

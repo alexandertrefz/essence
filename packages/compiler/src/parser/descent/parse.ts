@@ -26,6 +26,7 @@ import {
 	type MisplacedDefault,
 	reportMisplacedDefault,
 } from "./misplacedDefaults"
+import { refusedTestItem, writtenText } from "./testsRefusals"
 import {
 	describeToken,
 	fail,
@@ -701,23 +702,6 @@ function writtenValueText(value: parser.ExpressionNode): string {
 	return "…"
 }
 
-// The text a one-line span was read from, for a Help that spells the
-// reader's text back. A String Node holds decoded escapes, so it can not.
-// Empty where the span reaches past the text.
-function writtenText(lines: Array<string>, position: common.Position): string {
-	if (position.start.line !== position.end.line) {
-		return ""
-	}
-
-	let line = lines[position.start.line - 1]
-
-	if (line === undefined || position.end.column - 1 > line.length) {
-		return ""
-	}
-
-	return line.slice(position.start.column - 1, position.end.column - 1)
-}
-
 // An Expression that can only be a value, which tells a Dictionary's key
 // from a Record's member name. A name may be either. See
 // `parseRecordLiteralOrCombination`.
@@ -792,6 +776,9 @@ class DescentParser {
 	// Function body inside clears it, and a `suite` body, which is setup,
 	// never sets it.
 	protected insideTestBody = false
+	// Whether the Statement being read stands anywhere in the tests section,
+	// a Function body or a block written there included.
+	protected insideTestsSection = false
 	// Whether the Expression being read stands in an Argument list, the one
 	// position that hands a Function literal its Types. Every block clears it,
 	// so a literal's body is judged where it stands.
@@ -1352,7 +1339,9 @@ class DescentParser {
 		let keyword = this.tokens.next()
 		let leftBrace = this.tokens.next()
 
-		let nodes = this.parseStatementList(() => this.parseTestsNode())
+		let nodes = this.withinTestsSection(() =>
+			this.parseStatementList(() => this.parseTestsNode()),
+		)
 		let closingPosition = this.parseClosingBrace(leftBrace.position, true)
 
 		return generators.testsSection(nodes, {
@@ -2191,19 +2180,13 @@ class DescentParser {
 		if (this.startsTestItem(token)) {
 			this.parseTestItem()
 
-			throw new ParseError(
-				`A '${token.value}' may only be written in the 'tests { … }' section`,
-				token.position,
-				`this '${token.value}' stands outside every tests section`,
-				{
-					code: "test-outside-tests",
-					notes: [
-						"The tests section is written below the implementation block, and a 'suite' groups the tests inside it.",
-					],
-					helps: [
-						"Move it into the file's 'tests { … }' block, or open one below the implementation.",
-					],
-				},
+			throw refusedTestItem(
+				token,
+				this.insideTestBody
+					? "test-body"
+					: this.insideTestsSection
+						? "block"
+						: "outside",
 			)
 		}
 
@@ -7549,6 +7532,16 @@ class DescentParser {
 			return { result, completes: this.completesSeen > 0 }
 		} finally {
 			this.completesSeen = outer
+		}
+	}
+
+	protected withinTestsSection<T>(parse: () => T): T {
+		this.insideTestsSection = true
+
+		try {
+			return parse()
+		} finally {
+			this.insideTestsSection = false
 		}
 	}
 
