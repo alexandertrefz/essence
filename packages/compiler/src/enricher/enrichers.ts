@@ -8492,12 +8492,13 @@ function enrichParameterDefault(
 	}
 
 	// A Record default may be a partial Literal; `Parameter.defaultMembers`
-	// records what it leaves out, agreeing with `recordDefaultMembers`.
+	// records what it leaves out, agreeing with `recordDefaultMembers`. Its
+	// written members carry their own evidence for a refinement.
 	if (
 		type.type === "Record" &&
 		valueType.type === "Record" &&
 		node.defaultValue.nodeType === "RecordValue" &&
-		isPartialOf(type, valueType)
+		isPartialOf(type, admittedPartialType(type, valueType, value))
 	) {
 		return value
 	}
@@ -14455,18 +14456,18 @@ function payloadFitsCase(
 		type: "Record",
 		members: caseType.members,
 	}
+	// Each written member is typed as it is admitted, a partial's included.
+	let written = admittedMergeValue(recordShape, payloadValue, false)
 	let effectiveType =
 		mergedRecordType(
 			recordShape,
 			caseType.payloadDefault?.nesting,
-			admittedMergeValue(recordShape, payloadValue, false),
-		) ?? payloadType
+			written,
+		) ??
+		written?.type ??
+		payloadType
 
-	let admits = (shape: common.Type) =>
-		payloadValue !== null &&
-		admittedTypeOf(shape, payloadValue, false) !== null
-
-	if (matchesType(recordShape, effectiveType) || admits(recordShape)) {
+	if (matchesType(recordShape, effectiveType)) {
 		return true
 	}
 
@@ -14491,7 +14492,13 @@ function payloadFitsCase(
 		matchesType(recordShape, {
 			type: "Record",
 			members: { [memberNames[0]]: payloadType },
-		}) || admits(caseType.members[memberNames[0]]!)
+		}) ||
+		(payloadValue !== null &&
+			admittedTypeOf(
+				caseType.members[memberNames[0]]!,
+				payloadValue,
+				false,
+			) !== null)
 	)
 }
 

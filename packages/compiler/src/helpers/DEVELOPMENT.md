@@ -668,4 +668,6 @@ A Literal with a path key is measured by the Record the merge makes, from `merge
 assignability. As written it is never assignable, and asking first would bind a Generic off a partial member.
 This is asked only where the Parameter's default reaches into a member, since `mergedValue` enriches. `mergedValue`
 hands the merge the Literal with each written member typed as it is admitted (`admittedMergeValue`), so a path key
-writing `port = 8080` fills a `PositiveInteger` port.
+writing `port = 8080` fills a `PositiveInteger` port. The partial check reads that Literal too, path key or none, so
+`{ port = 8080 }` is a partial of a `{ port: PositiveInteger, host: String }`. A Case payload, a payload default and
+a Parameter's default are measured as partials the same way.

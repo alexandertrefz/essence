@@ -2249,10 +2249,7 @@ function validateCaseValue(
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
 	} else if (
-		!matchesType(payloadType, casePayloadType(node.type, node.value)) &&
-		// A written payload carries its own evidence for a refinement. It binds
-		// no Type Parameter: an enclosing Function's own are fixed.
-		admittedTypeOf(payloadType, node.value, false) === null
+		!matchesType(payloadType, casePayloadType(node.type, node.value))
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
@@ -2260,12 +2257,16 @@ function validateCaseValue(
 			casePayloadType(node.type, node.value),
 			null,
 		)
-		// The payload shape is named after its Case.
+		// The payload shape is named after its Case, and the members its default
+		// fills in are not missing.
 		let record = recordMismatchEvidence(
 			payloadType,
 			casePayloadType(node.type, node.value),
 			node.value,
-			{ subject: `'#${node.type.name}'` },
+			{
+				filled: node.type.payloadDefault?.members,
+				subject: `'#${node.type.name}'`,
+			},
 		)
 
 		reportError(
@@ -2344,8 +2345,9 @@ function casePayloadIsPartial(
 }
 
 // The payload's Type once the default fills in what a path key reaches, or
-// its own Type where it wrote no path key. A Function refused as a value is a
-// hole in it, so only what is written around one is measured.
+// its own Type where it wrote no path key. A written member carries its own
+// evidence for a refinement, binding no Type Parameter: an enclosing
+// Function's own are fixed. A Function refused as a value is a hole.
 function casePayloadType(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
@@ -2354,13 +2356,11 @@ function casePayloadType(
 		type: "Record",
 		members: caseType.members,
 	}
+	let written = admittedMergeValue(payload, value, false) ?? value
 
 	return refusedFunctionsAsHoles(
-		mergedRecordType(
-			payload,
-			caseType.payloadDefault?.nesting,
-			admittedMergeValue(payload, value, false),
-		) ?? value.type,
+		mergedRecordType(payload, caseType.payloadDefault?.nesting, written) ??
+			written.type,
 	)
 }
 
@@ -3440,17 +3440,18 @@ function missingMembersOf(
 }
 
 // The Argument's Type once the default fills in what a path key reaches, or
-// its own Type where it wrote no path key.
+// its own Type where it wrote no path key. Each written member is as admitted.
 function argumentRecordType(
 	parameter: common.Parameter,
 	argumentNode: common.typed.ArgumentNode,
 ): common.Type {
+	let written =
+		admittedMergeValue(parameter.type, argumentNode.value) ??
+		argumentNode.value
+
 	return refusedFunctionsAsHoles(
-		mergedRecordType(
-			parameter.type,
-			parameter.defaultNesting,
-			admittedMergeValue(parameter.type, argumentNode.value),
-		) ?? argumentNode.value.type,
+		mergedRecordType(parameter.type, parameter.defaultNesting, written) ??
+			written.type,
 	)
 }
 

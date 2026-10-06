@@ -1339,6 +1339,79 @@ describe("Code Generation", () => {
 			expect(call).toContain("port:")
 			expect(call).not.toContain("host:")
 		})
+
+		// A partial Literal's written members carry their own evidence for a
+		// refinement, as a whole Literal's do, wherever a default fills it in.
+		it("admits a partial Literal whose written member proves a refinement", async () => {
+			const source = (
+				port: string,
+				preset: string = port,
+			) => `implementation {
+	type Settings = { port: PositiveInteger, host: String }
+
+	choice Call {
+		Post { port: PositiveInteger, host: String } = { host = "a" },
+		Idle,
+	}
+
+	function configure(_ s: Settings = { port = 80, host = "a" }) -> String {
+		<- "{s.host}:{s.port}"
+	}
+
+	function preset(_ s: Settings = { port = ${preset} }) -> PositiveInteger {
+		<- s.port
+	}
+
+	constant call: Call = #Post({ port = ${port} })
+
+	Terminal.inspect(configure({ port = ${port} }))
+	Terminal.inspect(preset({ host = "b" }))
+	Terminal.inspect(call)
+}`
+
+			expect(await run(source("8080"))).toEqual([
+				'"a:8080"',
+				"8080",
+				'Call#Post { port = 8080, host = "a" }',
+			])
+
+			let codes = (port: string, preset: string) =>
+				diagnosticsOf(source(port, preset)).map(({ code }) => code)
+
+			expect(codes("8080", "0")).toEqual(["default-type-mismatch"])
+			expect(codes("0", "80")).toEqual([
+				"payload-type-mismatch",
+				"argument-type-mismatch",
+			])
+		})
+
+		// The members a payload's default fills in are not missing from it.
+		it("names only the written member a partial payload refuses", () => {
+			let refused = diagnosticsOf(`implementation {
+	choice Call {
+		Post { port: PositiveInteger, host: String } = { host = "a" },
+		Idle,
+	}
+
+	constant call: Call = #Post({ port = 0 })
+}`)
+
+			expect(
+				refused.map(({ code, labels, notes }) => [
+					code,
+					labels[0]?.message,
+					notes,
+				]),
+			).toEqual([
+				[
+					"payload-type-mismatch",
+					"this is an Integer, and '#Post' declares a PositiveInteger",
+					[
+						"'#Post' carries a { port: PositiveInteger, host: String }.",
+					],
+				],
+			])
+		})
 	})
 
 	describe("String Methods", () => {

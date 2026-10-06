@@ -157,8 +157,9 @@ export function admittedPartialType(
 		: (refusedFunctionsAsHoles(written) as common.RecordType)
 }
 
-// A Record Literal with path keys as its merge into a default reads it. Each
-// written member is typed as it is admitted, however deep a path key reaches.
+// A Record Literal as its merge into a default reads it, typed by its members.
+// Each written member is typed as it is admitted, however deep a path key
+// reaches, so a partial Literal is measured by what it proves.
 export function admittedMergeValue(
 	into: common.Type | common.GenericUse,
 	value: common.typed.ExpressionNode | null | undefined,
@@ -193,7 +194,11 @@ export function admittedMergeValue(
 		}
 	}
 
-	return { ...value, members }
+	let memberTypes = Object.fromEntries(
+		Object.entries(members).map(([name, member]) => [name, member.type]),
+	)
+
+	return { ...value, members, type: { ...value.type, members: memberTypes } }
 }
 
 // Each written member's Type, admitted where the expected Record asks for

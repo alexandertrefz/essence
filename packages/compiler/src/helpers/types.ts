@@ -3315,17 +3315,26 @@ function argumentFits(
 		return true
 	}
 
+	if (
+		parameter.defaultMembers === undefined ||
+		argument.spellsItsMembers !== true ||
+		expectedType.type !== "Record"
+	) {
+		return false
+	}
+
+	// A partial Literal is measured as the merge reads it, each written member
+	// typed as it is admitted.
+	let partial =
+		effectiveType === argumentType
+			? (argument.mergedValue?.(expectedType)?.type ?? argumentType)
+			: effectiveType
+
 	return (
-		parameter.defaultMembers !== undefined &&
-		argument.spellsItsMembers === true &&
-		expectedType.type === "Record" &&
-		effectiveType.type === "Record" &&
-		isPartialOf(expectedType, effectiveType, inferenceContext) &&
-		missingRecordMembers(
-			expectedType,
-			parameter.defaultMembers,
-			effectiveType,
-		).length === 0
+		partial.type === "Record" &&
+		isPartialOf(expectedType, partial, inferenceContext) &&
+		missingRecordMembers(expectedType, parameter.defaultMembers, partial)
+			.length === 0
 	)
 }
 
