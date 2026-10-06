@@ -113,6 +113,7 @@ import {
 } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
+import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -2411,6 +2412,7 @@ function reportUninferableCapture(
 	)
 
 	capturesReportedUndecided.add(node)
+	noteRefusedCapture(type)
 }
 
 // Captures already refused for an undecided Type. The call around one has an
@@ -3102,6 +3104,11 @@ function enrichIdentifier(
 	type: common.Type = resolveIdentifierType(node, scope),
 ): common.typed.IdentifierNode {
 	reportUninferableCapture(node, scope, type)
+
+	// A value read out of a refused capture is refused with it.
+	if (carriesRefusedCapture(type)) {
+		capturesReportedUndecided.add(node)
+	}
 
 	return {
 		nodeType: "Identifier",

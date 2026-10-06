@@ -392,7 +392,8 @@ decided.
 Reads written before the deciding assignment keep the undecided Type, which is sound, since the value they read is
 empty. A Function literal that captures the name is not sound: its body is checked once, against a Type that fits
 every List. `reportUninferableCapture` refuses such a capture with `uninferable-item-type`, and the call around it
-does not report its unbound Type Parameters again.
+does not report its unbound Type Parameters again. `noteRefusedCapture` marks the undecided parts of the refused
+Type, so a value read out of it, such as `complete work` of a refused `work`, is not reported again either.
 
 Two Match Handlers that assign different item Types leave the second mismatched rather than widening the slot to a
 Union. A name that holds both says so in its annotation. A reassigned Constant is already reported, so its

@@ -319,6 +319,8 @@ describe("A capture whose Type nothing has decided yet", () => {
 	})
 
 	// The blank sits inside a Future here, so the annotation wraps it there.
+	// A value read out of the capture carries the same blank, and the call on
+	// it is not reported again.
 	it("annotates a blank at the depth it stands", () => {
 		let source = `implementation {
 		constant work = Async.deferred(() { <- [] })
@@ -330,6 +332,7 @@ describe("A capture whose Type nothing has decided yet", () => {
 		}
 	}`
 
+		expect(codesOfSource(source)).toEqual(["uninferable-item-type"])
 		expect(helpsOfCode(source, "uninferable-item-type")).toEqual([
 			"Annotate the declaration — 'constant work: Future<List<Integer>>', for instance — so the Function is checked against the Type it will hold.",
 		])

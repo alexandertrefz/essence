@@ -208,7 +208,8 @@ Enricher, including `helpers/types.ts`:
   `scopeVersions`, `namespacesInScopeCache`, `refusedSpecifiers`, `namespaceIndexes` and
   `namespacesTargetingMemos`. In `helpers/types.ts`: `phantomTypeArgumentsMemo`, `renamedNamespaceTargets`,
   `bindingMentionsMemo` and `impliedKeyMemos`. In `enricher/tests.ts`: `answeredQuestions`, the questions an
-  asserted value answers, which the validator reads when it refuses the assertion.
+  asserted value answers, which the validator reads when it refuses the assertion. In
+  `enricher/refusedCaptures.ts`: `undecidedByRefusals`.
 - Values that only grow for the life of the process: `typeDeclarations` in `enricher/scope.ts`,
   `namespaceNames` in `resolvers.ts`, `freshGenericCounter` and the `identityPairings` cache in
   `helpers/types.ts`.
