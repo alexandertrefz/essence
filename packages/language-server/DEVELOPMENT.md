@@ -169,6 +169,25 @@ Scope's `values` correspond to the Enricher's members, and its `types` to the En
 - An argument label of a call whose callee is a plain Identifier links to the Parameter that declares it. Labels are
   collected during the walk and resolved after it, so a hoisted Function sees its labels whatever the order.
 
+### The parser walk
+
+`walkNode` carries a `Walk`: the Scope names resolve in, and the index it fills. A kind that opens a Scope or binds a
+name keeps a case of its own, since the table's visit order can not say when a name becomes visible. A Parameter's
+default is read before the Parameter is declared, though the table visits the name first. A Namespace's properties
+resolve outside its Type Parameters, and its Methods inside them.
+
+Three more kinds keep a case. A Function call links its labels to the callee's Parameters. A Record Type registers its
+members for `resolveRecordMembers` before it descends. A Record literal walks its Type first, so the Type's members
+are the definitions its own join, and keeps the edits of a shorthand member.
+
+Every other kind descends through `forEachParserChild`, so a field the parser table learns is reached at once.
+`walkChild` decides what an Identifier met there names, by the field holding it:
+
+- In a `type` field, or the `choice` of `Choice#Case`, it names a Type.
+- A member, a path step, a Case name, a label or a Pattern's binder names nothing a Scope holds. The typed pass binds
+  a member, a Function call's case links its labels, and the case holding a Pattern declares its binders.
+- Anywhere else it reads a value.
+
 ### Names the typed Program resolves
 
 A Method, a property or a Record member resolves through Types, not Scopes. When an enriched Program is at hand,

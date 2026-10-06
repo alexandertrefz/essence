@@ -7,7 +7,6 @@ import {
 import {
 	caseDefaults,
 	isMergedLevel,
-	memberExpression,
 	parameterInternalName,
 	patternBindings,
 } from "@essence-lang/compiler/helpers"
@@ -965,8 +964,9 @@ function walkBody(
 	}
 }
 
-// The parser walk. A kind that opens a Scope or binds a name has a case of
-// its own, and every other kind descends through `forEachParserChild`.
+// A kind that opens a Scope or binds a name has a case of its own, and every
+// other kind descends through `forEachParserChild`. See "The parser walk" in
+// DEVELOPMENT.md.
 function walkNode(node: ParserNode, walk: Walk) {
 	let { scope, context } = walk
 
@@ -1203,7 +1203,7 @@ function walkNode(node: ParserNode, walk: Walk) {
 					})
 				}
 
-				walkNode(argument.value, walk)
+				walkNode(argument, walk)
 			}
 
 			return
@@ -1272,37 +1272,29 @@ function walkNode(node: ParserNode, walk: Walk) {
 			}
 
 			return
-		case "RecordValue":
-			if (node.type !== null) {
-				walkTypeDeclaration(node.type, walk)
-			}
+		// The Type first, so the members it declares are the definitions the
+		// literal's members join.
+		case "RecordValue": {
+			let { members } = node
 
-			registerRecordSite(Object.values(node.members), context)
-
-			for (let member of Object.values(node.members)) {
-				// A shorthand member's value shares the member's Identifier, so
-				// it is referenced with edits that spell the member out.
-				if (
-					member.shorthand === true &&
-					member.steps === undefined &&
-					member.value?.nodeType === "Identifier"
-				) {
-					reference(
-						scope,
-						"values",
-						member.value,
-						context,
-						"read",
-						shorthandValueEdits(member),
-					)
-
-					continue
-				}
-
-				walkNode(memberExpression(member), walk)
-			}
-
+			walkTypeDeclaration(node.type, walk)
+			registerRecordSite(Object.values(members), context)
+			forEachParserChild(
+				node,
+				(child, memberWalk, field, key) => {
+					if (field !== "type") {
+						walkRecordMember(
+							members[key!],
+							child,
+							memberWalk,
+							field,
+						)
+					}
+				},
+				walk,
+			)
 			return
+		}
 		case "FunctionValue":
 			walkFunctionDefinition(node.value, walk, node.position)
 			return
@@ -1320,14 +1312,43 @@ const typeNameFields = new Set(["type", "choice"])
 
 // The fields whose Identifier names no Declaration a Scope holds. The typed
 // pass resolves a member or a path step. A Case resolves through its Choice,
-// and a label through the Function or Method it labels.
+// and a label through the Function or Method it labels. A Pattern's binder is
+// declared by the case of the node holding the Pattern.
 const unscopedNameFields = new Set([
 	"member",
 	"steps",
 	"caseName",
 	"name",
 	"externalName",
+	"binder",
 ])
+
+// A child of a Record literal's member. A shorthand member's value shares the
+// member's Position, so it is referenced with edits that spell the member out.
+function walkRecordMember(
+	member: parser.RecordValueMemberNode,
+	child: ParserNode,
+	walk: Walk,
+	field: string,
+) {
+	if (
+		field === "value" &&
+		child.nodeType === "Identifier" &&
+		member.shorthand === true &&
+		member.steps === undefined
+	) {
+		reference(
+			walk.scope,
+			"values",
+			child,
+			walk.context,
+			"read",
+			shorthandValueEdits(member),
+		)
+	} else {
+		walkChild(child, walk, field)
+	}
+}
 
 // A child reached through `forEachParserChild`. An Identifier there names a
 // value, unless the field holding it says otherwise.
@@ -2046,7 +2067,8 @@ function declarePattern(
 	visibleFrom: common.Cursor | null = null,
 ) {
 	registerPatternSite(pattern, walk.context)
-	walkPatternTypes(pattern, walk)
+	// Reaches only the Types the Pattern names, since its names are binders.
+	walkNode(pattern, walk)
 
 	for (let binding of patternBindings(pattern)) {
 		declareInScope(
@@ -2058,23 +2080,6 @@ function declarePattern(
 			visibleFrom,
 			editsForBinding(pattern, binding.name),
 		)
-	}
-}
-
-// Every Type a Pattern names, nested Patterns included.
-function walkPatternTypes(pattern: parser.PatternNode, walk: Walk) {
-	for (let member of Object.values(pattern.members)) {
-		if (member.kind !== "Type") {
-			continue
-		}
-
-		if (member.type !== null) {
-			walkTypeDeclaration(member.type, walk)
-		}
-
-		if (member.binder?.nodeType === "Pattern") {
-			walkPatternTypes(member.binder, walk)
-		}
 	}
 }
 
