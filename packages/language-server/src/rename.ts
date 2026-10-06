@@ -19,7 +19,7 @@ import {
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
-import { contains, isSmaller } from "./positions"
+import { contains, isSamePosition, isSmaller } from "./positions"
 import {
 	type ParserSection,
 	programSections,
@@ -149,6 +149,9 @@ type RecordMemberLookup = {
 
 type WalkContext = {
 	index: RenameIndex
+	// The sites of each Declaration holding more than `sitesScannedAtMost` of
+	// them, by Position, so `record` finds a repeat without a scan.
+	sitesByPosition: Map<Array<RenameSite>, Map<string, RenameSite>>
 	// The Function Definitions each value Declaration is known to hold, from
 	// Function Statements and Function Values bound by declaration or assignment.
 	functionDefinitions: Map<Declaration, Array<parser.FunctionDefinitionNode>>
@@ -420,6 +423,7 @@ export function indexProgram(
 ): ProgramIndex {
 	let context: WalkContext = {
 		index: [],
+		sitesByPosition: new Map(),
 		functionDefinitions: new Map(),
 		labels: new Map(),
 		pendingLabelReferences: [],
@@ -492,7 +496,7 @@ export function indexProgram(
 					labelDeclaration,
 					identifier.content,
 					identifier.position,
-					context.index,
+					context,
 				)
 				break
 			}
@@ -577,13 +581,7 @@ function declareImports(
 			scope.types.set(local.content, declaration)
 		}
 
-		record(
-			declaration,
-			local.content,
-			local.position,
-			context.index,
-			"write",
-		)
+		record(declaration, local.content, local.position, context, "write")
 	}
 }
 
@@ -683,11 +681,38 @@ function lookup(
 	return null
 }
 
+const sitesScannedAtMost = 16
+
+function positionKey(position: common.Position): string {
+	return `${position.start.line}:${position.start.column}:${position.end.line}:${position.end.column}`
+}
+
+function siteAt(
+	sites: Array<RenameSite>,
+	position: common.Position,
+	context: WalkContext,
+): RenameSite | undefined {
+	if (sites.length <= sitesScannedAtMost) {
+		return sites.find((site) => isSamePosition(site.position, position))
+	}
+
+	let byPosition = context.sitesByPosition.get(sites)
+
+	if (byPosition === undefined) {
+		byPosition = new Map(
+			sites.map((site) => [positionKey(site.position), site]),
+		)
+		context.sitesByPosition.set(sites, byPosition)
+	}
+
+	return byPosition.get(positionKey(position))
+}
+
 function record(
 	declaration: Declaration,
 	name: string,
 	position: common.Position,
-	index: RenameIndex,
+	context: WalkContext,
 	access: OccurrenceAccess = "read",
 	// See `RenameSite.edits`.
 	edits: Array<RenameEdit> | null = null,
@@ -695,13 +720,7 @@ function record(
 	// One Position is one occurrence of one Declaration, or a rename would
 	// write it twice. A shorthand binder is reached twice for its member, from
 	// the Pattern and from its desugared Lookup; the entry with edits wins.
-	let existing = declaration.occurrences.find(
-		(site) =>
-			site.position.start.line === position.start.line &&
-			site.position.start.column === position.start.column &&
-			site.position.end.line === position.end.line &&
-			site.position.end.column === position.end.column,
-	)
+	let existing = siteAt(declaration.occurrences, position, context)
 
 	if (existing !== undefined) {
 		existing.edits ??= edits
@@ -709,9 +728,14 @@ function record(
 		return
 	}
 
-	declaration.occurrences.push({ position, edits })
+	let site: RenameSite = { position, edits }
 
-	index.push({
+	declaration.occurrences.push(site)
+	context.sitesByPosition
+		.get(declaration.occurrences)
+		?.set(positionKey(position), site)
+
+	context.index.push({
 		name,
 		position,
 		access,
@@ -751,7 +775,7 @@ function declareInScope(
 		declaration,
 		identifier.content,
 		identifier.position,
-		context.index,
+		context,
 		"write",
 		edits,
 	)
@@ -776,7 +800,7 @@ function reference(
 			declaration,
 			identifier.content,
 			identifier.position,
-			context.index,
+			context,
 			access,
 			edits,
 		)
@@ -1464,7 +1488,7 @@ function walkFunctionDefinition(
 					labelDeclaration,
 					parameter.externalName.content,
 					parameter.externalName.position,
-					context.index,
+					context,
 					"write",
 				)
 				labels.set(parameter.externalName.content, labelDeclaration)
@@ -1511,7 +1535,7 @@ function walkFunctionDefinition(
 				labelDeclaration,
 				parameter.externalName.content,
 				parameter.externalName.position,
-				context.index,
+				context,
 				"write",
 			)
 			labels.set(parameter.externalName.content, labelDeclaration)
@@ -1601,7 +1625,7 @@ function walkProtocolDeclaration(
 			declaration,
 			member.name.content,
 			member.name.position,
-			context.index,
+			context,
 			"write",
 		)
 
@@ -1699,7 +1723,7 @@ function walkNamespaceDefinition(
 			declaration,
 			member.name.content,
 			member.name.position,
-			context.index,
+			context,
 			"write",
 		)
 	}
@@ -1726,7 +1750,7 @@ function walkNamespaceDefinition(
 			declaration,
 			member.name.content,
 			member.name.position,
-			context.index,
+			context,
 			"write",
 		)
 
@@ -1805,7 +1829,7 @@ function walkNativeSignature(
 				},
 				identifier.content,
 				identifier.position,
-				context.index,
+				context,
 				"write",
 			)
 		}
@@ -2189,7 +2213,7 @@ function resolveRecordMembers(context: WalkContext) {
 				declaration,
 				member.name,
 				member.position,
-				context.index,
+				context,
 				site.declares ? "write" : "read",
 				member.edits,
 			)
@@ -2202,7 +2226,7 @@ function resolveRecordMembers(context: WalkContext) {
 			lookupSite.name,
 		)
 
-		record(declaration, lookupSite.name, lookupSite.position, context.index)
+		record(declaration, lookupSite.name, lookupSite.position, context)
 	})
 }
 
@@ -2473,7 +2497,7 @@ function bindKeyedMember(
 	let declaration = context.namespaceMembers.get(key)?.get(memberName)
 
 	if (declaration !== undefined) {
-		record(declaration, memberName, position, context.index)
+		record(declaration, memberName, position, context)
 
 		return
 	}
@@ -2499,7 +2523,7 @@ function bindProtocolMembers(context: WalkContext) {
 				: protocolMember(context, ownProtocol, memberName)
 
 		if (declaration !== undefined) {
-			record(declaration, memberName, position, context.index)
+			record(declaration, memberName, position, context)
 		} else {
 			context.externalMembers.push({
 				namespaceName: identity,

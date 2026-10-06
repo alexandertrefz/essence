@@ -2090,6 +2090,28 @@ describe("Rename with Patterns", () => {
 		)
 	})
 
+	// The desugared Lookup reaches the binder again after many reads of the
+	// member, and is still the same site.
+	it("expands a shorthand binder once for a member read many times", () => {
+		let reads = Array.from({ length: 20 }, () => "box.width").join(", ")
+		let source = [
+			"implementation {",
+			"\tconstant box = { width = 1, height = 2 }",
+			`\tconstant widths = [${reads}]`,
+			"\tconstant { width, height } = box",
+			"",
+			"\tTerminal.print(width::add(height))",
+			"}",
+		].join("\n")
+
+		expect(rename(source, { line: 2, column: 19 }, "breadth")).toBe(
+			source
+				.replace("{ width = 1,", "{ breadth = 1,")
+				.replaceAll("box.width", "box.breadth")
+				.replace("{ width, height }", "{ breadth as width, height }"),
+		)
+	})
+
 	it("writes an annotated member's binder after its Type", () => {
 		let source = [
 			"implementation {",
@@ -2849,6 +2871,27 @@ describe("Rename of a name a Case payload default reads", () => {
 
 			expect(rename(descended, { line: 10, column: 47 }, "on")).toBe(
 				descended.replaceAll("enabled", "on"),
+			)
+		})
+
+		// The update's first step is reached twice, after the member's sites
+		// outgrew a scan, and is still one site.
+		it("renames an update's key once after the member is written many times", () => {
+			let written = [
+				"implementation {",
+				...Array.from(
+					{ length: 17 },
+					(_, index) =>
+						`\tconstant config${index} = { server = { port = ${index} }, name = "x" }`,
+				),
+				"\tconstant moved = { config0 with server.port = 2 }",
+				"",
+				"\tTerminal.inspect(moved.server.port)",
+				"}",
+			].join("\n")
+
+			expect(rename(written, { line: 2, column: 23 }, "host")).toBe(
+				written.replaceAll("server", "host"),
 			)
 		})
 
