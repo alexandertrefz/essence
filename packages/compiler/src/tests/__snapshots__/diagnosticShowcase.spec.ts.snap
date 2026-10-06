@@ -3658,7 +3658,7 @@ Error: This String Literal is never closed
     │  │ 
     │  ╰─ the input ends here
     │ 
-    │ Help: Add the missing '"'.
+    │ Help: Add the missing '"' at the end of line 16.
 ────╯
 
 ─── 1 error

@@ -218,6 +218,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"unbindable-case-payload",
 		"unbraced-unicode-escape",
 		"unclosed-block",
+		"unclosed-string",
 		"undecided-receiver-type",
 		"undecided-type-arguments",
 		"undispatchable-method",

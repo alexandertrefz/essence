@@ -461,7 +461,24 @@ describe("Parser Recovery", () => {
 
 		expect(diagnostics).toHaveLength(1)
 		expect(diagnostics[0].code).toBe("unclosed-string")
-		expect(diagnostics[0].helps).toEqual(["Add the missing '\"'."])
+		expect(diagnostics[0].helps).toEqual([
+			`Add the missing '"' at the end of line 3.`,
+		])
+	})
+
+	// A quote at the end of the input would close a String holding every
+	// later line, so the Help names the opening line.
+	it("should name the line the missing quote goes on", () => {
+		let source = `implementation {
+	constant greeting = "Hello
+	Terminal.print(greeting)
+}`
+
+		expect(parseWithDiagnostics(source).diagnostics[0]?.helps).toEqual([
+			`Add the missing '"' at the end of line 2.`,
+		])
+		expect(compiles(source.replace('"Hello', '"Hello"'))).toBe(true)
+		expect(compiles(`${source}"`)).toBe(false)
 	})
 
 	// An even number of forgotten quotes leaves nothing unterminated, only the

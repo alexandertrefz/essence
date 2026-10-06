@@ -456,13 +456,17 @@ export class TokenStream {
 				return
 			}
 
+			// The quote belongs where the Quick Fix writes it, not at the end
+			// of the input, where it would close a String holding every line.
 			reportError("This String Literal is never closed", position, {
 				code: "unclosed-string",
 				labels: [
 					primary(position, "the input ends here"),
 					secondary(quoteAt(error.openedAt), "opened here"),
 				],
-				helps: ["Add the missing '\"'."],
+				helps: [
+					`Add the missing '"' at the end of line ${error.openedAt.line}.`,
+				],
 			})
 
 			return

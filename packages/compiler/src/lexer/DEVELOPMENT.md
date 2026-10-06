@@ -25,7 +25,9 @@ down the file is reported about itself. The answer rides on `UnterminatedStringE
 `reportUnterminatedString` in the parser's `TokenStream` builds the `unclosed-string` report:
 
 - Without a swallower, the report stands at the end of the input, where the String runs out, clamped to just after
-  the last visible character. The opening quote is a secondary Label.
+  the last visible character. The opening quote is a secondary Label. A Help adds the missing quote at the end of the
+  opening line, where the Quick Fix writes it. A quote written where the report stands would close a String holding
+  every line below it.
 - With one, the report stands on the opening quote of the String that spans lines, since the missing quote belongs
   on that line. The quote it closed on and the end of the input are secondary Labels, so the reading that was not
   chosen stays on the page. A Help adds the missing quote at the end of the String's first line. The other reading,
