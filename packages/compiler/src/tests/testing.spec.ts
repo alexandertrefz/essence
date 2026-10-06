@@ -223,6 +223,36 @@ describe("Tests Section", () => {
 			// unknown names.
 			expect(program.tests?.nodes).toHaveLength(1)
 		})
+
+		it("should compile with the tests section moved where each Help says", () => {
+			let implementation = `implementation {
+					constant x = 1
+				}`
+			let tests = `tests {
+					test "reads" {
+						expect x::is(1)
+					}
+				}`
+			let exports = `export {
+					x
+				}`
+
+			expect(
+				parse(`${tests}\n\n${implementation}\n\n${exports}`)
+					.diagnostics[0]?.helps,
+			).toEqual([
+				"Move the 'tests { … }' block below 'implementation { … }', and below anything the Module exports.",
+			])
+			expect(
+				parse(`${implementation}\n\n${tests}\n\n${exports}`)
+					.diagnostics[0]?.helps,
+			).toEqual(["Move the 'tests { … }' block below 'export { … }'."])
+			expect(
+				compiles(`${implementation}\n\n${exports}\n\n${tests}`, {
+					tests: true,
+				}),
+			).toBe(true)
+		})
 	})
 
 	describe("test and suite", () => {
@@ -1313,6 +1343,54 @@ line two" = body
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("expect-outside-test")
+		})
+
+		// Either half of the Help: the assertion moves into a test, or the
+		// literal returns the value and the test asserts on it.
+		it("should compile with the assertion moved where the Help says", () => {
+			expect(
+				parse(`implementation {
+					constant x = 1
+
+					expect x::is(1)
+				}`).diagnostics[0]?.helps,
+			).toEqual([
+				"Move it into a 'test \"…\" { … }' block, or return the value and assert on it there.",
+			])
+			expect(
+				compiles(
+					`implementation {
+					constant x = 1
+				}
+
+				tests {
+					test "reads" {
+						expect x::is(1)
+					}
+				}`,
+					{ tests: true },
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					`implementation {
+					function double(_ number: Integer) -> Integer {
+						<- number::multiply(with 2)
+					}
+				}
+
+				tests {
+					test "doubles" {
+						constant check = (_ number: Integer) -> Integer {
+							<- double(number)
+						}
+
+						expect check(2)::isPositive()
+					}
+				}`,
+					{ tests: true },
+				),
+			).toBe(true)
 		})
 	})
 

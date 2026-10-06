@@ -675,6 +675,46 @@ describe("Tests Section Semantics", () => {
 			])
 		})
 
+		it("should compile with a question asked or the value taken apart", () => {
+			let played = (assertion: string) => `implementation {
+						choice Outcome {
+							Won,
+							Lost { by: Integer },
+						}
+
+						function play() -> Outcome {
+							<- #Won
+						}
+					}
+
+					tests {
+						test "one" {
+							constant result = play()
+
+							${assertion}
+						}
+					}`
+
+			expect(
+				compiles(played("expect result::is(#Won)"), { tests: true }),
+			).toBe(true)
+			expect(
+				compiles(played("require #Won = result"), { tests: true }),
+			).toBe(true)
+			expect(
+				compiles(
+					`implementation {}
+
+					tests {
+						test "one" {
+							expect 1::is(1)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toBe(true)
+		})
+
 		it("should demand a Boolean of a require as well", () => {
 			expect(
 				codesOf(
@@ -1124,6 +1164,18 @@ describe("Tests Section Semantics", () => {
 					`implementation {}
 
 					tests {
+						test "adds" across [{ a = 1, b = 2 }] (row: { a: Integer, b: Integer }) {
+							expect row.a::isLessThan(row.b)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					`implementation {}
+
+					tests {
 						test "adds" across [{ a = 1, b = 2 }] ({ a, b }: { a: Integer, b: Integer }) {
 							expect a::isLessThan(b)
 						}
@@ -1145,6 +1197,18 @@ describe("Tests Section Semantics", () => {
 						}
 					}`),
 			).toEqual(["Write one Parameter: '(row: Integer)'."])
+			expect(
+				compiles(
+					`implementation {}
+
+					tests {
+						test "rows" across [1, 2] (row: Integer) {
+							expect row::isGreaterThan(0)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toBe(true)
 		})
 
 		// The Help can not read the rows, so it hands back the reader's own
@@ -1581,6 +1645,47 @@ describe("Tests Section Semantics", () => {
 					}`,
 				),
 			).toEqual(["snapshot-not-printable"])
+		})
+
+		// A value of the Choice is asked for the conformance alone. A bare Case
+		// is also annotated at its Choice, which is what the Namespace targets.
+		it("records a Choice once the conformance is declared", () => {
+			let colours = (declared: string, value: string) => `implementation {
+						choice Colour {
+							Red,
+							Blue,
+						}
+
+						${declared}
+
+						constant favourite${value}
+					}
+
+					tests {
+						test "renders" {
+							expect favourite matches snapshot
+						}
+					}`
+			let printable = "namespace Colours for Colour is Printable {}"
+
+			expect(helpsOf(colours("", ": Colour = #Red"))).toEqual([
+				"Declare a 'Printable' conformance for it — 'namespace … for Colour is Printable { … }'.",
+				"Or snapshot a String you build yourself.",
+			])
+			expect(helpsOf(colours("", " = Colour#Red"))).toEqual([
+				"Declare a 'Printable' conformance for 'Colour' and annotate the value at it — a bare Case binds the Case, not the Choice.",
+				"Or snapshot a String you build yourself.",
+			])
+			expect(
+				compiles(colours(printable, ": Colour = #Red"), {
+					tests: true,
+				}),
+			).toBe(true)
+			expect(
+				compiles(colours(printable, ": Colour = Colour#Red"), {
+					tests: true,
+				}),
+			).toBe(true)
 		})
 
 		// A `for` clause names a Function Type as an annotation writes it.
