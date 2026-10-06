@@ -72,6 +72,10 @@ import {
 	type DeclarationOrder,
 	reportReachedNamespaces,
 } from "./declarationOrder"
+import {
+	reportDispatchEmptyContainerOverlap,
+	reportEmptyContainerOverlap,
+} from "./emptyOverlap"
 import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 import {
@@ -82,7 +86,7 @@ import {
 import {
 	acceptsAllAtRuntime,
 	crossingApplication,
-	emptyCrossoverKind,
+	emptyCrossover,
 	overlapsAtRuntime,
 } from "./runtimeOverlap"
 import { reportUntypedReads } from "./untypedReads"
@@ -888,45 +892,14 @@ function validateDispatchCases(
 				return
 			}
 
-			if (overlapsAtRuntime(earlierType, laterType)) {
-				// The List wording, unless a Dictionary is what crosses.
-				let dictionary =
-					emptyCrossoverKind(earlierType, laterType) === "Dictionary"
+			let crossover = emptyCrossover(earlierType, laterType)
 
-				reportWarning(
-					dictionary
-						? `The branch for ${describeType(laterType)} never sees an empty Dictionary`
-						: `The branch for ${describeType(laterType)} never sees an empty List`,
-					node.member.position,
-					{
-						code: dictionary
-							? "empty-dictionary-overlap"
-							: "empty-list-overlap",
-						labels: [
-							primary(
-								node.member.position,
-								dictionary
-									? `an empty Dictionary fits ${describeType(earlierType)} too, and that branch is tried first`
-									: `an empty List fits ${describeType(earlierType)} too, and that branch is tried first`,
-							),
-							secondary(
-								node.base.position,
-								`this is ${withArticle(describeType(node.base.type))}`,
-							),
-						],
-						notes: [
-							dictionary
-								? "Key and value Types erase before a branch is picked, so a Dictionary is placed by the entries it holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is."
-								: "Item Types erase before a branch is picked, so a List is placed by the items it holds — and an empty List holds none, which makes it a value of every List Type there is.",
-						],
-						// A Match alone meets the same overlap. A Guard decides
-						// an empty container, so the Help spells guarded Cases.
-						helps: [
-							dictionary
-								? "Guard the Cases of a Match with 'where @::hasEntries()', answer for the empty Dictionary in a Case of its own, and call the Method inside each arm."
-								: "Guard the Cases of a Match with 'where @::hasItems()', answer for the empty List in a Case of its own, and call the Method inside each arm.",
-						],
-					},
+			if (crossover !== null) {
+				reportDispatchEmptyContainerOverlap(
+					node,
+					earlierType,
+					laterType,
+					crossover,
 				)
 
 				return
@@ -1658,47 +1631,18 @@ function reportErasedOverlap(
 				acceptsAllAtRuntime(earlierMatcher, memberType) ||
 				!overlapsAtRuntime(earlierMatcher, memberType)
 					? null
-					: emptyCrossoverKind(earlierMatcher, memberType)
+					: emptyCrossover(earlierMatcher, memberType)
 
-			if (crossover === null) {
-				continue
+			if (crossover !== null) {
+				reportEmptyContainerOverlap(
+					handler,
+					earlierHandler,
+					memberType,
+					crossover,
+				)
+
+				return
 			}
-
-			reportWarning(
-				crossover === "List"
-					? "This Case never sees an empty List"
-					: "This Case never sees an empty Dictionary",
-				handler.matcherPosition,
-				{
-					code:
-						crossover === "List"
-							? "empty-list-overlap"
-							: "empty-dictionary-overlap",
-					labels: [
-						primary(
-							handler.matcherPosition,
-							`an empty ${describeType(memberType)} fits the Case above too`,
-						),
-						secondary(
-							earlierHandler.matcherPosition,
-							"this Case runs first",
-						),
-					],
-					notes: [
-						"Cases are tried in order, and the first one that fits wins.",
-						crossover === "List"
-							? "Item Types erase before a Match runs, so a List Matcher asks about the items the value holds — and an empty List holds none, which makes it a value of every List Type there is."
-							: "Key and value Types erase before a Match runs, so a Dictionary Matcher asks about the entries the value holds — and an empty Dictionary holds none, which makes it a value of every Dictionary Type there is.",
-					],
-					helps: [
-						crossover === "List"
-							? "Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own."
-							: "Guard the Cases with 'where @::hasEntries()' and answer for the empty Dictionary in a Case of its own.",
-					],
-				},
-			)
-
-			return
 		}
 	}
 }

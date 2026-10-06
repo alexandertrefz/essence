@@ -269,8 +269,10 @@ around it are for. Both functions are exported, so a spec can hold them to the r
 A partial overlap through an empty container gets its own Warning, `empty-list-overlap` or
 `empty-dictionary-overlap`, on the later Handler. `case List<String>` above `case List<Integer>` takes the empty
 `List<Integer>`. The Help guards the Cases with `hasItems()` or `hasEntries()` and gives the empty value a Case of
-its own. `emptyCrossoverKind` asks about a List first. Other partial overlaps are Matchers taking exactly the values
-they name, in order, and are not reported.
+its own. `emptyCrossover` asks about a List first, and gives the member path where the container crosses. A Guard on
+a member asks the name the Case's Pattern binds it to, since a payload requirement does not narrow `@`, and reads it
+off `@` only where nothing binds it. Other partial overlaps are Matchers taking exactly the values they name, in
+order, and are not reported.
 
 A Case of another application crosses the same way. Assignability compares a Case's payload and not its Type
 Arguments, so `Box<String>#Empty` is a value of `Box<Integer>`, and `case Box<Integer>` claims it.

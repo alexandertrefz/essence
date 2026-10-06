@@ -156,15 +156,16 @@ export function overlapsAtRuntime(
 	return false
 }
 
-// Whether the values crossing from `memberType` into `matcher` are the empty
-// ones of a container of `kind`.
-function overlapsThroughEmptyContainer(
+// The member path at which the values crossing from `memberType` into
+// `matcher` are the empty ones of a container of `kind`, or null. An empty
+// path is the value itself.
+function emptyContainerPath(
 	matcher: common.Type,
 	memberType: common.Type,
 	kind: EmptyCrossover,
-): boolean {
+): Array<string> | null {
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
-		return overlapsThroughEmptyContainer(
+		return emptyContainerPath(
 			eraseRefinements(matcher),
 			eraseRefinements(memberType),
 			kind,
@@ -174,18 +175,18 @@ function overlapsThroughEmptyContainer(
 	let isContainer = kind === "List" ? isRuntimeList : isRuntimeDictionary
 
 	if (isContainer(matcher) && isContainer(memberType)) {
-		return !acceptsAllAtRuntime(matcher, memberType)
+		return acceptsAllAtRuntime(matcher, memberType) ? null : []
 	}
 
 	if (memberType.type === "UnionType") {
-		return flattenUnionMembers(memberType).some((armType) =>
-			overlapsThroughEmptyContainer(matcher, armType, kind),
+		return firstPath(flattenUnionMembers(memberType), (armType) =>
+			emptyContainerPath(matcher, armType, kind),
 		)
 	}
 
 	if (matcher.type === "UnionType") {
-		return flattenUnionMembers(matcher).some((armType) =>
-			overlapsThroughEmptyContainer(armType, memberType, kind),
+		return firstPath(flattenUnionMembers(matcher), (armType) =>
+			emptyContainerPath(armType, memberType, kind),
 		)
 	}
 
@@ -193,33 +194,53 @@ function overlapsThroughEmptyContainer(
 		(matcher.type === "Record" && memberType.type === "Record") ||
 		(matcher.type === "Case" && memberType.type === "Case")
 	) {
-		return Object.entries(matcher.members).some(
-			([name, memberMatcher]) =>
-				Object.hasOwn(memberType.members, name) &&
-				overlapsThroughEmptyContainer(
-					memberMatcher,
-					memberType.members[name],
-					kind,
-				),
-		)
+		for (let [name, memberMatcher] of Object.entries(matcher.members)) {
+			let path = Object.hasOwn(memberType.members, name)
+				? emptyContainerPath(
+						memberMatcher,
+						memberType.members[name],
+						kind,
+					)
+				: null
+
+			if (path !== null) {
+				return [name, ...path]
+			}
+		}
 	}
 
-	return false
+	return null
 }
 
-// Which container's empty value crosses, or null. A List is asked about first.
-type EmptyCrossover = "List" | "Dictionary"
+function firstPath(
+	arms: Array<common.Type>,
+	pathOf: (arm: common.Type) => Array<string> | null,
+): Array<string> | null {
+	for (let arm of arms) {
+		let path = pathOf(arm)
 
-export function emptyCrossoverKind(
-	matcher: common.Type,
-	memberType: common.Type,
-): EmptyCrossover | null {
-	if (overlapsThroughEmptyContainer(matcher, memberType, "List")) {
-		return "List"
+		if (path !== null) {
+			return path
+		}
 	}
 
-	if (overlapsThroughEmptyContainer(matcher, memberType, "Dictionary")) {
-		return "Dictionary"
+	return null
+}
+
+// Which container's empty value crosses, and at which member path, or null. A
+// List is asked about first.
+type EmptyCrossover = "List" | "Dictionary"
+
+export function emptyCrossover(
+	matcher: common.Type,
+	memberType: common.Type,
+): { kind: EmptyCrossover; path: Array<string> } | null {
+	for (let kind of ["List", "Dictionary"] as const) {
+		let path = emptyContainerPath(matcher, memberType, kind)
+
+		if (path !== null) {
+			return { kind, path }
+		}
 	}
 
 	return null

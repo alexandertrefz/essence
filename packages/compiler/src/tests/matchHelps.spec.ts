@@ -403,6 +403,211 @@ describe("A Case an empty container crosses into", () => {
 	})
 })
 
+describe("A Case an empty container crosses into at a member", () => {
+	// `@` in a Guard is the Case, and the payload requirement does not
+	// narrow `@.items`, so the Guard asks the name the Pattern binds.
+	it("should guard a payload requirement through the name it binds", () => {
+		let bag = (cases: string) => `implementation {
+			choice Bag {
+				Items { items: List<Integer> | List<String> },
+				Nothing,
+			}
+
+			function describe(_ value: Bag) -> String {
+				<- match value -> String {
+					${cases}
+					case _ { <- "other" }
+				}
+			}
+		}`
+		let diagnostic = firstAnalysed(
+			bag(`case #Items({ items: List<Integer> }) { <- "integers" }
+				case #Items({ items: List<String> }) { <- "strings" }`),
+			"empty-list-overlap",
+		)
+
+		expect(diagnostic.labels[0]?.message).toBe(
+			"a Bag#Items with an empty List in 'items' fits the Case above too",
+		)
+		expect(diagnostic.helps).toEqual([
+			"Guard the Cases with 'where items::hasItems()' and answer for the empty List in a Case of its own.",
+		])
+
+		let followed =
+			bag(`case #Items({ items: List<Integer> }) where items::hasItems() { <- "integers" }
+				case #Items({ items: List<String> }) where items::hasItems() { <- "strings" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	it("should guard a nested member through the name it binds", () => {
+		let bag = (cases: string) => `implementation {
+			choice Bag {
+				Items { wrap: { items: List<Integer> } | { items: List<String> } },
+				Nothing,
+			}
+
+			function describe(_ value: Bag) -> String {
+				<- match value -> String {
+					${cases}
+					case _ { <- "other" }
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				bag(`case #Items({ wrap as { items: List<Integer> } }) { <- "integers" }
+					case #Items({ wrap as { items: List<String> } }) { <- "strings" }`),
+				"empty-list-overlap",
+			).helps,
+		).toEqual([
+			"Guard the Cases with 'where items::hasItems()' and answer for the empty List in a Case of its own.",
+		])
+
+		let followed =
+			bag(`case #Items({ wrap as { items: List<Integer> } }) where items::hasItems() { <- "integers" }
+				case #Items({ wrap as { items: List<String> } }) where items::hasItems() { <- "strings" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	it("should guard a Record Pattern's member through the name it binds", () => {
+		let records = (cases: string) => `implementation {
+			function describe(_ value: { items: List<Integer> } | { items: List<String> }) -> String {
+				<- match value -> String {
+					${cases}
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				records(`case { items: List<Integer> } { <- "integers" }
+					case { items: List<String> } { <- "strings" }`),
+				"empty-list-overlap",
+			).helps,
+		).toEqual([
+			"Guard the Cases with 'where items::hasItems()' and answer for the empty List in a Case of its own.",
+		])
+
+		let followed =
+			records(`case { items: List<Integer> } where items::hasItems() { <- "integers" }
+				case { items: List<String> } where items::hasItems() { <- "strings" }
+				case _ { <- "empty" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	// A Matcher with no Pattern binds nothing, and narrows `@` to its Type.
+	it("should guard a member read off '@' where the Case binds no name", () => {
+		let named = (cases: string) => `implementation {
+			type Numbers = { items: List<Integer> }
+			type Words = { items: List<String> }
+
+			function describe(_ value: Numbers | Words) -> String {
+				<- match value -> String {
+					${cases}
+				}
+			}
+		}`
+
+		expect(
+			firstAnalysed(
+				named(`case Numbers { <- "integers" }
+					case Words { <- "strings" }`),
+				"empty-list-overlap",
+			).helps,
+		).toEqual([
+			"Guard the Cases with 'where @.items::hasItems()' and answer for the empty List in a Case of its own.",
+		])
+
+		let followed =
+			named(`case Numbers where @.items::hasItems() { <- "integers" }
+			case Words where @.items::hasItems() { <- "strings" }
+			case _ { <- "empty" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	// The Match a dispatch asks for narrows `@` by each Matcher.
+	it("should guard a member a dispatch's Match reads off '@'", () => {
+		let namespaces = `namespace Numbers for { items: List<Integer> } {
+			describe() -> String {
+				<- "integers"
+			}
+		}
+
+		namespace Words for { items: List<String> } {
+			describe() -> String {
+				<- "strings"
+			}
+		}`
+		let show = (body: string) => `implementation {
+			${namespaces}
+
+			function show(_ value: { items: List<Integer> } | { items: List<String> }) -> String {
+				${body}
+			}
+		}`
+
+		expect(
+			firstAnalysed(show("<- value::describe()"), "empty-list-overlap")
+				.helps,
+		).toEqual([
+			"Guard the Cases of a Match with 'where @.items::hasItems()', answer for the empty List in a Case of its own, and call the Method inside each arm.",
+		])
+
+		let followed = show(`<- match value -> String {
+			case { items: List<Integer> } where @.items::hasItems() { <- @::describe() }
+			case { items: List<String> } where @.items::hasItems() { <- @::describe() }
+			case _ { <- "empty" }
+		}`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	it("should guard a Dictionary member through the name it binds", () => {
+		let ledger = (cases: string) => `implementation {
+			choice Ledger {
+				Entries { ages: Dictionary<String, Integer> | Dictionary<Integer, String> },
+				Nothing,
+			}
+
+			function describe(_ value: Ledger) -> String {
+				<- match value -> String {
+					${cases}
+					case _ { <- "other" }
+				}
+			}
+		}`
+		let diagnostic = firstAnalysed(
+			ledger(`case #Entries({ ages: Dictionary<String, Integer> }) { <- "by name" }
+				case #Entries({ ages: Dictionary<Integer, String> }) { <- "by number" }`),
+			"empty-dictionary-overlap",
+		)
+
+		expect(diagnostic.labels[0]?.message).toBe(
+			"a Ledger#Entries with an empty Dictionary in 'ages' fits the Case above too",
+		)
+		expect(diagnostic.helps).toEqual([
+			"Guard the Cases with 'where ages::hasEntries()' and answer for the empty Dictionary in a Case of its own.",
+		])
+
+		let followed =
+			ledger(`case #Entries({ ages: Dictionary<String, Integer> }) where ages::hasEntries() { <- "by name" }
+				case #Entries({ ages: Dictionary<Integer, String> }) where ages::hasEntries() { <- "by number" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+})
+
 describe("A Case another application's Case crosses into", () => {
 	let box = `choice Box<Item> {
 		Full { item: Item },
