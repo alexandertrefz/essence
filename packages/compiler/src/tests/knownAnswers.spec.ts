@@ -573,6 +573,11 @@ describe("A Case the position decides", () => {
 			kind: "suggestion",
 			suggestion: "Down",
 		})
+		expect(
+			compiles(`implementation {
+				Terminal.print(7/2::round(toward #Down)::toString())
+			}`),
+		).toBe(true)
 	})
 
 	// An editor enriches one parse tree over and over. The expectation is
@@ -775,6 +780,20 @@ ${future.replace("Future<Integer>", "Future<Answer>").replace("<- 41", "<- #Yes"
 		expect(diagnostic.helps).toEqual([
 			"Wait for it first — 'constant answered = complete …' — and match 'answered'.",
 		])
+		expect(
+			compiles(`implementation {
+				choice Answer { Yes, No }
+
+${future.replace("Future<Integer>", "Future<Answer>").replace("<- 41", "<- #Yes")}
+
+				constant answered = complete fetched()
+
+				match answered -> {} {
+					case #Yes { <- {} }
+					case _ { <- {} }
+				}
+			}`),
+		).toBe(true)
 	})
 })
 

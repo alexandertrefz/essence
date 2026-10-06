@@ -473,3 +473,56 @@ describe("A Pattern that names the whole value", () => {
 		).toBe(true)
 	})
 })
+
+describe("A Match that leaves a member out", () => {
+	let colours = (arms: string) => `implementation {
+		choice Colour { Red, Green, Blue }
+
+		function name(_ colour: Colour) -> String {
+			<- match colour -> String {
+				case #Red { <- "red" }
+				case #Green { <- "green" }
+				${arms}
+			}
+		}
+
+		Terminal.print(name(#Red))
+	}`
+
+	it("should name the Case it leaves out and the catch-all", () => {
+		expect(firstAnalysed(colours(""), "missing-case").helps).toEqual([
+			"Add 'case Colour#Blue', or a 'case _' that covers the rest.",
+		])
+	})
+
+	it("should compile with either arm written in", () => {
+		expect(compiles(colours('case Colour#Blue { <- "blue" }'))).toBe(true)
+		expect(compiles(colours('case _ { <- "other" }'))).toBe(true)
+	})
+
+	// A Union of Types is matched by its members' Types, which the Help
+	// spells as Matchers.
+	it("should spell a Union member's Type as its Matcher", () => {
+		let kinds = (arms: string) => `implementation {
+			function kind(_ value: Integer | String | Boolean) -> String {
+				<- match value -> String {
+					case Integer { <- "a number" }
+					${arms}
+				}
+			}
+
+			Terminal.print(kind(1))
+		}`
+
+		expect(firstAnalysed(kinds(""), "missing-case").helps).toEqual([
+			"Add 'case String', 'case Boolean', or a 'case _' that covers the rest.",
+		])
+		expect(
+			compiles(
+				kinds(
+					'case String { <- "a string" }\ncase Boolean { <- "a flag" }',
+				),
+			),
+		).toBe(true)
+	})
+})

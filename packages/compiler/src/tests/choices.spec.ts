@@ -238,6 +238,31 @@ describe("Choices", () => {
 			).toContain("case-default-without-payload")
 		})
 
+		it("compiles either way the payload-less default's Help is followed", () => {
+			expect(
+				helpsOf(`implementation {
+					choice Direction {
+						Up = { degrees = 0 },
+						Down,
+					}
+				}`),
+			).toEqual(["Give '#Up' a payload shape, or write it on its own."])
+
+			for (let up of [
+				"Up { degrees: Integer } = { degrees = 0 }",
+				"Up",
+			]) {
+				expect(
+					compiles(`implementation {
+					choice Direction {
+						${up},
+						Down,
+					}
+				}`),
+				).toBe(true)
+			}
+		})
+
 		it("keeps reading the Case list after refusing a payload-less default", () => {
 			let { program } = parseWithDiagnostics(`implementation {
 				choice Direction {
@@ -1152,10 +1177,16 @@ describe("Choices", () => {
 					"Or apply the Type Arguments here — 'Progress<…, String>#Stopped(…)', with the Type you mean in place of each '…'.",
 				])
 
-				// The spelling with its blank filled in compiles.
+				// The spelling with its blank filled in compiles, written at the
+				// construction or on the Declaration.
 				expect(
 					compiles(`implementation { ${progressChoice}
 					constant done = Progress<Integer, String>#Stopped({ value = "x" })
+				}`),
+				).toBe(true)
+				expect(
+					compiles(`implementation { ${progressChoice}
+					constant done: Progress<Integer, String> = #Stopped({ value = "x" })
 				}`),
 				).toBe(true)
 			})
@@ -2806,6 +2837,13 @@ describe("Choices", () => {
 						#Full(1)
 					}`),
 				).toEqual(["case-application-across-lines"])
+				expect(
+					compiles(`implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+
+						constant b = Box<Integer>#Full(1)
+					}`),
+				).toBe(true)
 			})
 
 			// The `#` is held to the line the Arguments close on, so they may span
@@ -4569,6 +4607,9 @@ describe("Choices", () => {
 			expect(helpsOf(source)).toContain(
 				"Drop the binding — the Matcher alone is the test.",
 			)
+			expect(
+				compiles(source.replace("case #Dot(what)", "case #Dot")),
+			).toBe(true)
 		})
 
 		// A multi-member Case has no single value to bind a name to, so the
@@ -4595,6 +4636,14 @@ describe("Choices", () => {
 			expect(helpsOf(source)).toContain(
 				"Take the payload apart instead: '#Rect({ width, height })'.",
 			)
+			expect(
+				compiles(
+					source.replace(
+						"case #Rect(box)",
+						"case #Rect({ width, height })",
+					),
+				),
+			).toBe(true)
 		})
 
 		it("lets a Guard name the binding", async () => {
@@ -4817,6 +4866,46 @@ describe("Choices", () => {
 					constant call: Fetch = #Blank
 				}`),
 			).toContain("missing-payload")
+			expect(
+				helpsOf(`implementation { ${fetchChoice}
+					constant call: Fetch = #Blank
+				}`),
+			).toEqual([
+				"Its default fills every member in — write '#Blank({})'.",
+			])
+			expect(
+				compiles(`implementation { ${fetchChoice}
+					constant call: Fetch = #Blank({})
+				}`),
+			).toBe(true)
+		})
+
+		// The shape is spelled with a blank per member, filled in here.
+		it("follows the missing payload's Help to a Program that compiles", () => {
+			let written = `implementation { ${fetchChoice}
+				constant call = Fetch#Get
+			}`
+
+			expect(helpsOf(written)).toEqual([
+				"Write the payload, filling each member in: '#Get({ url = …, retries = … })'.",
+			])
+			expect(
+				compiles(`implementation { ${fetchChoice}
+				constant call = Fetch#Get({ url = "a", retries = 1 })
+			}`),
+			).toBe(true)
+		})
+
+		it("follows the unexpected payload's Help to a Program that compiles", () => {
+			let written = `implementation { ${fetchChoice}
+				choice Signal { Ping, Pong }
+
+				constant signal: Signal = #Ping(1)
+			}`
+
+			expect(codesOf(written)).toEqual(["unexpected-payload"])
+			expect(helpsOf(written)).toEqual(["Write '#Ping' on its own."])
+			expect(compiles(written.replace("#Ping(1)", "#Ping"))).toBe(true)
 		})
 
 		it("names the members a payload had to write and did not", () => {
