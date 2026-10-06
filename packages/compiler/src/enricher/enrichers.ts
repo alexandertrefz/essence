@@ -100,6 +100,7 @@ import {
 	unionMembersKeepingNames,
 } from "../helpers/types"
 import { printSignature, printType, signaturesOf } from "../printType"
+import { wrapSingleMemberShorthand } from "./caseShorthand"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
 import {
 	isOneShapeMatch,
@@ -107,6 +108,7 @@ import {
 	unresolvedCaseBindings,
 } from "./patternMembers"
 import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
+import { typerAroundRefusedFunctions } from "./refusedArguments"
 import {
 	checkProtocolConformance,
 	type CheckedConformance,
@@ -774,70 +776,6 @@ function makePayloadReadings(
 
 			return reading.value
 		},
-	}
-}
-
-// Wraps a bare value handed to a one-member Case into the Record the validator
-// and simplifier expect. See "Case construction" in DEVELOPMENT.md.
-function wrapSingleMemberShorthand(
-	caseType: common.CaseType,
-	value: common.typed.ExpressionNode,
-): common.typed.ExpressionNode {
-	let memberNames = Object.keys(caseType.members)
-
-	if (memberNames.length !== 1) {
-		return value
-	}
-
-	// A generic Case's members are still GenericUses, so the fit binds the
-	// Choice's Type Parameters under fresh names in a throwaway context. Fresh
-	// names keep a caller's Type Parameter of the same name from binding to the
-	// Record.
-	let { rename, context: fitContext } = createFreshenedChoiceInference(
-		caseType.choiceGenerics ?? [],
-	)
-
-	let recordShape: common.Type = {
-		type: "Record",
-		members: caseType.members,
-	}
-
-	// Substituted only when something is renamed, because an instantiated
-	// Case's members may be a deep tree.
-	if (rename.size > 0) {
-		recordShape = applyGenericBindings(recordShape, rename)
-	}
-
-	if (matchesTypeWithBindings(recordShape, value.type, fitContext)) {
-		return value
-	}
-
-	// A Case that defaults its payload accepts a partial Record Literal, as in
-	// `#Post({ url = "/x" })`.
-	if (
-		caseType.payloadDefault !== undefined &&
-		value.nodeType === "RecordValue" &&
-		value.type.type === "Record" &&
-		isPartialOf(
-			recordShape as common.RecordType,
-			mergedRecordType(
-				recordShape,
-				caseType.payloadDefault.nesting,
-				value,
-			) ?? value.type,
-		)
-	) {
-		return value
-	}
-
-	let [memberName] = memberNames
-
-	return {
-		nodeType: "RecordValue",
-		declaredType: null,
-		type: { type: "Record", members: { [memberName]: value.type } },
-		members: { [memberName]: value },
-		position: value.position,
 	}
 }
 
@@ -9565,7 +9503,7 @@ function decidedLiteralNode(
 // Enriches each Argument value at most once per Invocation, reusing the typed
 // Node for every overload probe and the final Node. A Function literal without
 // annotations is re-resolved per probe and built from the winner's recording.
-type ArgumentTyper = {
+export type ArgumentTyper = {
 	getType: (
 		value: parser.ExpressionNode,
 		expectedType: common.Type,
@@ -10750,22 +10688,6 @@ function writtenArgumentTypes(
 ): Array<common.Type> {
 	return args.map(
 		(argument) => typer.enrichedArgumentValue(argument.value).type,
-	)
-}
-
-// Whether an Argument holds a Function refused as a value, which the validator
-// reports, so no call is refused over it again. A Function literal is left
-// untyped, since typing one away from its Parameter would report it.
-function argumentHoldsRefusedFunction(
-	args: Array<parser.ArgumentNode>,
-	typer: ArgumentTyper,
-): boolean {
-	return args.some(
-		(argument) =>
-			argument.value.nodeType !== "FunctionValue" &&
-			holdsFunctionRefusedAsValue(
-				typer.enrichedArgumentValue(argument.value).type,
-			),
 	)
 }
 
@@ -12204,31 +12126,39 @@ function reportNoMatchingOverload(
 ): void {
 	let receiverType = memberType ?? baseType
 
+	if (holdsFunctionRefusedAsValue(receiverType)) {
+		return
+	}
+
+	let measured = typerAroundRefusedFunctions(node.arguments, typer)
+	let matchableArguments = methodMatchableArguments(
+		node,
+		baseType,
+		measured ?? typer,
+		memberType,
+	)
+	let candidates = methodCandidates(node, namespaces, receiverType, scope)
+
+	// Refused only for a Function the validator reports where it stands.
 	if (
-		holdsFunctionRefusedAsValue(receiverType) ||
-		argumentHoldsRefusedFunction(node.arguments, typer)
+		measured !== null &&
+		candidates.some((candidate) =>
+			candidateAccepts(candidate, matchableArguments),
+		)
 	) {
 		return
 	}
 
-	let matchableArguments = methodMatchableArguments(
-		node,
-		baseType,
-		typer,
-		memberType,
-	)
 	let { labels, notes, helps, data } = overloadRefusalReport(
-		refusedCandidates(
-			methodCandidates(node, namespaces, receiverType, scope),
-			matchableArguments,
-		),
+		refusedCandidates(candidates, matchableArguments),
 		matchableArguments,
 		methodArgumentPositions(node),
 		{
 			position: node.position,
 			callee: node.member.position,
 			name: `'${node.member.content}'`,
-			passed: () => writtenArgumentTypes(node.arguments, typer),
+			passed: () =>
+				writtenArgumentTypes(node.arguments, measured ?? typer),
 			canWait: bodyCanWait(scope),
 			barrier: completionBarrierIn(scope),
 		},
@@ -13294,31 +13224,42 @@ function resolveFunctionInvocation(
 			selected: false,
 		}
 
-		if (argumentHoldsRefusedFunction(node.arguments, typer)) {
-			return failed
-		}
-
 		// Candidates are listed as this call writes them. A Method reached
 		// through its Namespace passes its receiver as an ordinary Argument, so
 		// nothing is dropped.
 		let callee = describeInvocationCallee(node.name)
+		let candidates = type.overloads.map((overload) => ({
+			name: callee,
+			qualifier: "",
+			signature: overload,
+			receiverParameters: 0,
+		}))
+		let measured = typerAroundRefusedFunctions(node.arguments, typer)
+		let measuredArguments =
+			measured === null
+				? matchableArguments
+				: argumentMatchables(node.arguments, measured)
+
+		// Refused only for a Function the validator reports where it stands.
+		if (
+			measured !== null &&
+			candidates.some((candidate) =>
+				candidateAccepts(candidate, measuredArguments),
+			)
+		) {
+			return failed
+		}
+
 		let { labels, notes, helps, data } = overloadRefusalReport(
-			refusedCandidates(
-				type.overloads.map((overload) => ({
-					name: callee,
-					qualifier: "",
-					signature: overload,
-					receiverParameters: 0,
-				})),
-				matchableArguments,
-			),
-			matchableArguments,
+			refusedCandidates(candidates, measuredArguments),
+			measuredArguments,
 			node.arguments.map((argument) => argument.value.position),
 			{
 				position: node.position,
 				callee: node.name.position,
 				name: callee,
-				passed: () => writtenArgumentTypes(node.arguments, typer),
+				passed: () =>
+					writtenArgumentTypes(node.arguments, measured ?? typer),
 				canWait: bodyCanWait(scope),
 				barrier: completionBarrierIn(scope),
 			},

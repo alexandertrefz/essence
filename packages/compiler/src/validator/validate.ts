@@ -50,6 +50,7 @@ import {
 	mergedRecordType,
 	missingRecordMembers,
 	type MatchableArgument,
+	measuredValue,
 	refusedFunctionsAsHoles,
 	withoutUndeclaredMembers,
 	typeContainsError,
@@ -2244,9 +2245,7 @@ function validateCaseValue(
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
 	} else if (
-		!matchesType(payloadType, casePayloadType(node.type, node.value)) &&
-		// Reported as a value that can not be one.
-		!holdsFunctionRefusedAsValue(node.value.type)
+		!matchesType(payloadType, casePayloadType(node.type, node.value))
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
@@ -2271,7 +2270,7 @@ function validateCaseValue(
 					record.lead ??
 						primary(
 							node.value.position,
-							`this is ${withArticle(describeType(node.value.type))}`,
+							`this is ${withArticle(describeType(measuredValue(node.value).type))}`,
 						),
 					...record.labels,
 				],
@@ -2338,17 +2337,18 @@ function casePayloadIsPartial(
 }
 
 // The payload's Type once the default fills in what a path key reaches, or
-// its own Type where it wrote no path key.
+// its own Type where it wrote no path key. A Function refused as a value is a
+// hole in it, so only what is written around one is measured.
 function casePayloadType(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
 ): common.Type {
-	return (
+	return refusedFunctionsAsHoles(
 		mergedRecordType(
 			{ type: "Record", members: caseType.members },
 			caseType.payloadDefault?.nesting,
 			value,
-		) ?? value.type
+		) ?? value.type,
 	)
 }
 
@@ -3266,23 +3266,9 @@ function fitsExpectedType(
 	)
 }
 
-// The value as a fit measures it: a Function refused as a value inside it is a
-// hole. A mismatch reported from it names no such Function a second time.
-function measuredValue(
-	value: common.typed.ExpressionNode,
-): common.typed.ExpressionNode {
-	// Holing keeps a Case a Case, so the Node keeps its kind.
-	return holdsFunctionRefusedAsValue(value.type)
-		? ({
-				...value,
-				type: refusedFunctionsAsHoles(value.type),
-			} as common.typed.ExpressionNode)
-		: value
-}
-
 // Arguments are asked exactly what the enricher asked them, literals and
-// `refinementDecidedBy` included. A committed Overload that fails to match is
-// an internal error here.
+// `refinementDecidedBy` included. A Function refused as a value is a hole in
+// one. A committed Overload that fails to match is an internal error here.
 function matchableArgumentsFromTypedNodes(
 	argumentNodes: Array<common.typed.ArgumentNode>,
 ): Array<MatchableArgument> {
@@ -3294,9 +3280,11 @@ function matchableArgumentsFromTypedNodes(
 		// the Arguments that decide a Type Parameter. See "Re-matching a
 		// committed call" in DEVELOPMENT.md.
 		bindsNothing: typeContainsUnknown(argumentNode.type),
-		getType: (expectedType) =>
-			admittedTypeOf(expectedType, argumentNode.value) ??
-			argumentNode.type,
+		getType: (expectedType) => {
+			let measured = measuredValue(argumentNode.value)
+
+			return admittedTypeOf(expectedType, measured) ?? measured.type
+		},
 	}))
 }
 
@@ -3445,12 +3433,12 @@ function argumentRecordType(
 	parameter: common.Parameter,
 	argumentNode: common.typed.ArgumentNode,
 ): common.Type {
-	return (
+	return refusedFunctionsAsHoles(
 		mergedRecordType(
 			parameter.type,
 			parameter.defaultNesting,
 			argumentNode.value,
-		) ?? argumentNode.value.type
+		) ?? argumentNode.value.type,
 	)
 }
 
@@ -3628,10 +3616,11 @@ function reportArgumentMismatch(
 		return
 	}
 
-	// Reported as a value that can not be one, by `validateNoBoundFunctionValue`.
-	if (holdsFunctionRefusedAsValue(argumentNode.value.type)) {
-		return
-	}
+	// A Function refused as a value is reported where it stands, by
+	// `validateNoBoundFunctionValue`, so the mismatch is measured around it.
+	let value = measuredValue(argumentNode.value)
+
+	argumentNode = { ...argumentNode, value, type: value.type }
 
 	let name = describeParameter(parameter, index)
 

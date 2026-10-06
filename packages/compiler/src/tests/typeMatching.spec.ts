@@ -848,6 +848,241 @@ describe("Type matching", () => {
 				],
 			])
 		})
+
+		// A payload is measured around a refused Function as a declaration is.
+		// A one-member Case reads a Record holding one as its payload Record.
+		it("should name only the payload mismatch around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				choice Holder {
+					Has { rule: (_: Integer, _: Integer) -> Integer, count: Integer },
+					Lacks,
+				}
+
+				choice Single {
+					Has { rule: (_: Integer, _: Integer) -> Integer },
+					Lacks,
+				}
+
+				choice Nested {
+					Has { settings: { rule: (_: Integer, _: Integer) -> Integer, count: Integer } },
+					Lacks,
+				}
+
+				constant held: Holder = #Has({ rule = Integer.add, count = "x" })
+				constant named = Holder#Has({ rule = Integer.add, count = "x" })
+				constant single: Single = #Has({ rule = Integer.add })
+				constant nested: Nested = #Has({ rule = Integer.add, count = "x" })
+				constant fits: Holder = #Has({ rule = Integer.add, count = 1 })
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"payload-type-mismatch",
+					["this is a String, and '#Has' declares an Integer"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"payload-type-mismatch",
+					["this is a String, and '#Has' declares an Integer"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"payload-type-mismatch",
+					[
+						"this is a String, and the expected Record declares an Integer",
+					],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
+
+		// An Argument is measured around a refused Function, whether it is the
+		// Argument, a member of a Record or an item of a List.
+		it("should name only the Argument mismatch around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				type Rule = (_: Integer, _: Integer) -> Integer
+
+				function settle(_ settings: { rule: Rule, n: Integer }) -> Integer {
+					<- settings.n
+				}
+
+				function pair(_ rule: Rule, _ n: Integer) -> Integer {
+					<- n
+				}
+
+				function labelled(with rule: Rule, at n: Integer) -> Integer {
+					<- n
+				}
+
+				function listed(_ rules: List<Rule>) -> Integer {
+					<- rules::length()
+				}
+
+				constant record = settle({ rule = Integer.add, n = "x" })
+				constant positional = pair(Integer.add, "x")
+				constant named = labelled(with Integer.add, at "x")
+				constant items = listed([Integer.add, "x"])
+				constant fits = settle({ rule = Integer.add, n = 1 })
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.map((label) => label.message),
+				]),
+			).toEqual([
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				[
+					"argument-type-mismatch",
+					[
+						"this is a String, and the Parameter's Type declares an Integer",
+					],
+				],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				["argument-type-mismatch", ["this is a String"]],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				["argument-type-mismatch", ["this is a String"]],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+				["argument-type-mismatch", ["this is a List<… | String>"]],
+				[
+					"overloaded-function-value",
+					["this names all 4 overloads at once"],
+				],
+			])
+		})
+
+		// Matching around a refused Function reads every Argument again, so each
+		// is read first where its own mistakes are reported. Selection stopped
+		// at the refused Function, before the Argument after it.
+		it("should keep the Diagnostics of an Argument after a refused Function", () => {
+			let source = (call: string) => `implementation {
+				type Rule = (_ n: Integer, _ m: Integer) -> Integer
+
+				namespace Tool for Integer {
+					overload both {
+						(_ r: Rule, _ xs: { a: Integer, b: Integer }) -> Integer { <- 1 }
+						(_ r: Rule, _ xs: { a: Integer, b: Boolean }) -> Integer { <- 2 }
+					}
+				}
+
+				Terminal.inspect(${call})
+			}`
+			let codes = (call: string) =>
+				errorsFor(source(call)).map((error) => error.code)
+
+			expect(codes(`1::both(Integer.add, { a = nope, b = 3 })`)).toEqual([
+				"unknown-name",
+				"overloaded-function-value",
+			])
+			expect(
+				codes(`1::both(Integer.add, { a = nope, b = "x" })`),
+			).toEqual([
+				"unknown-name",
+				"no-matching-overload",
+				"overloaded-function-value",
+			])
+			expect(
+				codes(`Tool.both(1, Integer.add, { a = nope, b = 3 })`),
+			).toEqual(["unknown-name", "overloaded-function-value"])
+			expect(
+				codes(`Tool.both(1, Integer.add, { a = nope, b = "x" })`),
+			).toEqual([
+				"unknown-name",
+				"no-matching-overload",
+				"overloaded-function-value",
+			])
+		})
+
+		// A call the enricher selects among candidates is refused around a
+		// refused Function too, and never for that Function alone. The enricher
+		// reports before the validator.
+		it("should refuse a Method call only for what is passed around a refused Function", () => {
+			let errors = errorsFor(`implementation {
+				namespace Tool for Integer {
+					settle(_ settings: { rule: (_: Integer, _: Integer) -> Integer, n: Integer }) -> Integer {
+						<- settings.n
+					}
+				}
+
+				constant record = 1::settle({ rule = Integer.add, n = "x" })
+				constant overloaded = Integer.add(Integer.subtract, "x")
+				constant fits = 1::settle({ rule = Integer.add, n = 1 })
+				constant alone = Integer.add(Integer.subtract, 1)
+			}`)
+
+			expect(
+				errors.map((error) => [
+					error.code,
+					error.labels?.[0]?.message,
+					error.notes.at(-1),
+				]),
+			).toEqual([
+				[
+					"no-matching-overload",
+					"this Argument's Type could not be read",
+					"'n' is a String; the expected Record declares an Integer.",
+				],
+				[
+					"no-matching-overload",
+					"this is a String",
+					"'Integer.add' takes 2 Arguments: Parameter 1 is Integer, Parameter 2 is Transcendental.",
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+					undefined,
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+					undefined,
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+					undefined,
+				],
+				[
+					"overloaded-function-value",
+					"this names all 4 overloads at once",
+					undefined,
+				],
+			])
+		})
 	})
 
 	// Two Modules may each declare `choice Outcome`, so a Choice's identity is

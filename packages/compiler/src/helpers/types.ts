@@ -1388,6 +1388,20 @@ export function refusedFunctionsAsHoles(
 	}
 }
 
+// The value as a fit measures it: a Function refused as a value inside it is a
+// hole. A mismatch reported from it names no such Function a second time.
+export function measuredValue(
+	value: common.typed.ExpressionNode,
+): common.typed.ExpressionNode {
+	// Holing keeps a Case a Case, so the Node keeps its kind.
+	return holdsFunctionRefusedAsValue(value.type)
+		? ({
+				...value,
+				type: refusedFunctionsAsHoles(value.type),
+			} as common.typed.ExpressionNode)
+		: value
+}
+
 // Whether a value of this Type was reported where it was written. It is the
 // Error Type, or it is or holds a Function refused as a value. A check on such
 // a value stands down.

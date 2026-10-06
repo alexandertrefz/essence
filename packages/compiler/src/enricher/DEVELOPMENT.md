@@ -28,6 +28,7 @@ A one-member Case accepts its payload Record or the member's value directly. `ex
 readings, and `wrapSingleMemberShorthand` wraps a value that does not fit the Record into it, so `#Done(5)` and
 `#Done({ value = 5 })` reach the instantiation identically. A Record that fits wins the ambiguity. The fit check
 binds the Choice's own Type Parameters under fresh names, so a Record that fits once they bind reads as the Record.
+A Function refused as a value is a hole in a Record, so `#Has({ rule = Integer.add })` reads as the Record too.
 A Case that defaults its payload also accepts a Record Literal that is a partial of its Record, as in
 `#Post({ url = "/x" })`.
 
