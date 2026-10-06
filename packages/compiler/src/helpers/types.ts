@@ -3107,9 +3107,11 @@ export type MatchableArgument = {
 	// Set on an Argument that binds no Type Parameter, a prefixed Case construction
 	// with no Type Arguments, which its Parameter decides.
 	bindsNothing?: boolean
-	// The enriched value, so a Literal with a path key is measured by its merge.
-	// Asked lazily, since it enriches.
-	mergedValue?: () => common.typed.ExpressionNode | null
+	// The enriched value as a merge into `into` reads it, so a Literal with a
+	// path key is measured by its merge. Asked lazily, since it enriches.
+	mergedValue?: (
+		into: common.Type | common.GenericUse,
+	) => common.typed.ExpressionNode | null | undefined
 	// Fills the Argument's own `Unknown` slots from the Type the finished call
 	// decided. Absent where there is no Node to write onto.
 	decide?: (decided: common.Type) => void
@@ -3302,7 +3304,7 @@ function argumentFits(
 			? mergedRecordType(
 					expectedType,
 					parameter.defaultNesting,
-					argument.mergedValue?.(),
+					argument.mergedValue?.(expectedType),
 					inferenceContext,
 				)
 			: null) ?? argumentType

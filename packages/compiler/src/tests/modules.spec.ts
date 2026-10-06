@@ -3021,6 +3021,48 @@ implementation {
 		)
 	})
 
+	// A path key into an imported Function's default is asked as its merge
+	// reads it.
+	it("admits a written member a path key reaches into an imported default", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Config.es" { configure }
+}
+
+implementation {
+	Terminal.print(configure({ server.port = 8080, retries = 1 }))
+}
+`,
+				"Config.es": `implementation {
+	type Server = { port: PositiveInteger, host: String }
+	type Settings = { server: Server, retries: NonNegativeInteger }
+
+	function configure(_ settings: Settings = { server = { port = 80, host = "a" }, retries = 0 }) -> Integer {
+		<- settings.server.port
+	}
+}
+
+export {
+	configure
+}
+`,
+			},
+			async (directory) => {
+				let sources = generateModules(
+					linkModuleGraph(
+						loadModuleGraph(
+							path.join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					),
+				)
+
+				expect(await runBundle(sources, directory)).toEqual(["8080"])
+			},
+		)
+	})
+
 	// An imported Namespace is no value either, and the Help reads a member the
 	// declaring Module wrote.
 	it("refuses an imported Namespace used as a value", () => {

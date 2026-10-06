@@ -31,7 +31,11 @@ import {
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { conformanceParameterName } from "../helpers/names"
-import { admittedTypeOf, fitsWritten } from "../helpers/predicateEval"
+import {
+	admittedMergeValue,
+	admittedTypeOf,
+	fitsWritten,
+} from "../helpers/predicateEval"
 import { bodyDefinitelyReturns } from "../helpers/returns"
 import {
 	applyGenericBindings,
@@ -2346,11 +2350,16 @@ function casePayloadType(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
 ): common.Type {
+	let payload: common.RecordType = {
+		type: "Record",
+		members: caseType.members,
+	}
+
 	return refusedFunctionsAsHoles(
 		mergedRecordType(
-			{ type: "Record", members: caseType.members },
+			payload,
 			caseType.payloadDefault?.nesting,
-			value,
+			admittedMergeValue(payload, value, false),
 		) ?? value.type,
 	)
 }
@@ -3277,7 +3286,7 @@ function matchableArgumentsFromTypedNodes(
 ): Array<MatchableArgument> {
 	return argumentNodes.map((argumentNode) => ({
 		name: argumentNode.name,
-		mergedValue: () => argumentNode.value,
+		mergedValue: (into) => admittedMergeValue(into, argumentNode.value),
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
 		// An Argument with an undecided slot binds nothing and is matched after
 		// the Arguments that decide a Type Parameter. See "Re-matching a
@@ -3440,7 +3449,7 @@ function argumentRecordType(
 		mergedRecordType(
 			parameter.type,
 			parameter.defaultNesting,
-			argumentNode.value,
+			admittedMergeValue(parameter.type, argumentNode.value),
 		) ?? argumentNode.value.type,
 	)
 }

@@ -5,6 +5,7 @@ import {
 	buildUnion,
 	type GenericBindings,
 	genericNamesMentioned,
+	isMergedLevel,
 	matchesType,
 	matchesTypeWithBindings,
 	measuredValue,
@@ -154,6 +155,45 @@ export function admittedPartialType(
 	return value?.nodeType === "RecordValue"
 		? admittedMembersOf(whole, value, false)
 		: (refusedFunctionsAsHoles(written) as common.RecordType)
+}
+
+// A Record Literal with path keys as its merge into a default reads it. Each
+// written member is typed as it is admitted, however deep a path key reaches.
+export function admittedMergeValue(
+	into: common.Type | common.GenericUse,
+	value: common.typed.ExpressionNode | null | undefined,
+	binds: boolean = true,
+): common.typed.ExpressionNode | null | undefined {
+	if (into.type !== "Record" || value?.nodeType !== "RecordValue") {
+		return value
+	}
+
+	let members: Record<string, common.typed.ExpressionNode> = {}
+
+	for (let [name, written] of Object.entries(value.members)) {
+		let slot = Object.hasOwn(into.members, name)
+			? into.members[name]
+			: undefined
+		let member = measuredValue(written)
+
+		if (slot === undefined) {
+			members[name] = member
+		} else if (isMergedLevel(member)) {
+			members[name] = admittedMergeValue(slot, member, binds) ?? member
+		} else {
+			let decided = admittedTypeOf(slot, member, binds)
+
+			members[name] =
+				decided === null
+					? member
+					: ({
+							...member,
+							type: decided,
+						} as common.typed.ExpressionNode)
+		}
+	}
+
+	return { ...value, members }
 }
 
 // Each written member's Type, admitted where the expected Record asks for

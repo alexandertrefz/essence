@@ -914,6 +914,29 @@ describe("Enricher", () => {
 				).toEqual([])
 			})
 
+			// A written member a path key reaches is evidence for a refinement
+			// only where the predicate holds of it, at a selected call too.
+			it("should admit a path key's written member only where the predicate holds", () => {
+				let source = (port: string) => `implementation {
+					type Server = { port: PositiveInteger, host: String }
+
+					namespace Tool for Integer {
+						configure(using settings: { server: Server } = { server = { port = 80, host = "a" } }) -> Integer {
+							<- settings.server.port
+						}
+					}
+
+					constant a = 1::configure(using { server.port = ${port} })
+				}`
+
+				expect(diagnosticsFor(source("8080"))).toEqual([])
+				expect(
+					diagnosticsFor(source("0")).map(
+						(diagnostic) => diagnostic.code,
+					),
+				).toEqual(["no-matching-overload"])
+			})
+
 			// Only the merged Literal merges, so a path key inside a member's own
 			// Literal reaches into nothing.
 			it("should refuse a path key one level inside an Argument", () => {

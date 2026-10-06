@@ -48,6 +48,7 @@ import {
 } from "../helpers/patterns"
 import {
 	admissionOfWrittenValue,
+	admittedMergeValue,
 	admittedPartialType,
 	admittedTypeOf,
 	describePredicate,
@@ -10654,7 +10655,11 @@ function argumentMatchables(
 		bindsNothing: bindsNoTypeParameter(argument),
 		decide: (decided: common.Type) =>
 			typer.decideArgument(argument.value, decided),
-		mergedValue: () => typer.enrichedArgumentValue(argument.value),
+		mergedValue: (into) =>
+			admittedMergeValue(
+				into,
+				typer.enrichedArgumentValue(argument.value),
+			),
 		spellsItsMembers: argument.value.nodeType === "RecordValue",
 	}))
 }
@@ -14445,7 +14450,7 @@ function payloadFitsCase(
 		mergedRecordType(
 			recordShape,
 			caseType.payloadDefault?.nesting,
-			payloadValue,
+			admittedMergeValue(recordShape, payloadValue, false),
 		) ?? payloadType
 
 	if (matchesType(recordShape, effectiveType)) {

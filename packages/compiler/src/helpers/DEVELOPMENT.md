@@ -208,11 +208,13 @@ An empty Literal decides nothing, and needs to decide nothing, since its `Unknow
 
 A written Record is asked member by member, so `{ count = 3 }` is a `{ count: NonZeroInteger }` for the reason `3`
 is a `NonZeroInteger`. A member the expected Record does not declare keeps its own Type, and the whole must still
-fit as it stands. A level a path key built is a partial, which only the merge with its default can measure, so it
-is not asked. A Case payload is a written Record too: the validator asks it against the Case's members, and
-`wrapSingleMemberShorthand` reads an admitted Record as the payload rather than wrapping it. So is what an update
-writes, asked member by member against the updated Record (`admittedPartialType`) and then measured as a partial,
-so `{ counted with count = 3 }` keeps a `NonZeroInteger` count.
+fit as it stands. A level a path key built is a partial, which only the merge with its default can measure. So such
+a Literal is asked as its merge reads it instead: `admittedMergeValue` types each written member as it is admitted,
+at whatever level, before `mergedRecordType` builds the merge. A Case payload is a written Record too: the validator
+asks it against the Case's members, and `wrapSingleMemberShorthand` reads an admitted Record as the payload rather
+than wrapping it. So is what an update writes, asked member by member against the updated Record
+(`admittedPartialType`) and then measured as a partial, so `{ counted with count = 3 }` keeps a `NonZeroInteger`
+count.
 
 Each part is asked as the validator measures a value (`measuredValue`): a Function refused as a value in it is a
 hole, reported where it is written. So `[[Integer.add]]` still has an item, and `{ rule = Integer.add, count = 3 }`
@@ -664,4 +666,6 @@ it carries no member its Type hides.
 
 A Literal with a path key is measured by the Record the merge makes, from `mergedRecordType`, before
 assignability. As written it is never assignable, and asking first would bind a Generic off a partial member.
-This is asked only where the Parameter's default reaches into a member, since `mergedValue` enriches.
+This is asked only where the Parameter's default reaches into a member, since `mergedValue` enriches. `mergedValue`
+hands the merge the Literal with each written member typed as it is admitted (`admittedMergeValue`), so a path key
+writing `port = 8080` fills a `PositiveInteger` port.

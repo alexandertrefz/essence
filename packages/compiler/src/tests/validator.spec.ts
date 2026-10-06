@@ -5161,6 +5161,74 @@ describe("Validator", () => {
 					}`),
 				).toEqual([])
 			})
+
+			// A Literal merged into a default is asked as its merge reads it,
+			// whatever level a path key writes.
+			describe("a path key into a default", () => {
+				const shapes = `type Server = { port: PositiveInteger, host: String }
+					type Settings = { server: Server, retries: NonNegativeInteger }
+
+					choice Call {
+						Post { server: Server, body: String } = { server = { port = 80, host = "a" } },
+						Idle,
+					}
+
+					function configure(_ settings: Settings = { server = { port = 80, host = "a" }, retries = 0 }) -> Integer {
+						<- settings.server.port
+					}
+
+					namespace Tool for Integer {
+						configure(_ settings: Settings = { server = { port = 80, host = "a" }, retries = 0 }) -> Integer {
+							<- settings.server.port::add(@)
+						}
+					}`
+
+				it("should admit a written member a path key reaches", () => {
+					expect(
+						diagnosticsFor(`implementation {
+							${shapes}
+
+							constant call: Call = Call#Post({ server.port = 8083, body = "x" })
+
+							Terminal.inspect(configure({ server.port = 8080 }))
+							Terminal.inspect(configure({ server.port = 8081, retries = 2 }))
+							Terminal.inspect(1::configure({ server.port = 8082 }))
+							Terminal.inspect(call)
+						}`),
+					).toEqual([])
+				})
+
+				it("should refuse a member a path key reaches the predicate refuses", () => {
+					let diagnostics = diagnosticsFor(`implementation {
+						${shapes}
+
+						constant zero = 0
+						constant written = configure({ server.port = 0 })
+						constant computed = configure({ server.port = zero })
+						constant call: Call = #Post({ server.port = 0, body = "x" })
+					}`)
+
+					expect(
+						diagnostics.map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.labels[0]?.message,
+						]),
+					).toEqual([
+						[
+							"argument-type-mismatch",
+							"this is an Integer, and Server declares a PositiveInteger",
+						],
+						[
+							"argument-type-mismatch",
+							"this is an Integer, and Server declares a PositiveInteger",
+						],
+						[
+							"payload-type-mismatch",
+							"this is an Integer, and Server declares a PositiveInteger",
+						],
+					])
+				})
+			})
 		})
 	})
 })

@@ -1,6 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { admittedTypeOf } from "../helpers/predicateEval"
+import { admittedMergeValue, admittedTypeOf } from "../helpers/predicateEval"
 import {
 	applyGenericBindings,
 	createFreshenedChoiceInference,
@@ -73,7 +73,7 @@ export function wrapSingleMemberShorthand(
 				mergedRecordType(
 					recordShape,
 					caseType.payloadDefault.nesting,
-					value,
+					admittedMergeValue(recordShape, value, bindsFresh),
 				) ?? value.type,
 			) as common.RecordType,
 		)
