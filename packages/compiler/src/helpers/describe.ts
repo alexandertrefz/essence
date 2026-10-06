@@ -273,8 +273,11 @@ export function choiceCarried(type: common.Type): string | null {
 // names its import entries and top-level Choices bind. A name the Program
 // declares itself is its own, since only a Choice's identity tells two
 // Modules' declarations apart. A Choice of another Module that nothing here
-// binds answers null.
-export function programSpelling(program: common.typed.Program): Spelling {
+// binds answers null, and so does any other name where `strict` asks.
+export function programSpelling(
+	program: common.typed.Program,
+	strict = false,
+): Spelling {
 	let imported = (program.imports?.entries ?? []).flatMap((entry) =>
 		entry.type === null
 			? []
@@ -299,7 +302,7 @@ export function programSpelling(program: common.typed.Program): Spelling {
 				? declared
 				: (imported.find((binding) =>
 						bindsDeclaration(binding.type, declared, carrier),
-					)?.name ?? declared)
+					)?.name ?? (strict ? null : declared))
 		}
 
 		if (!identity.includes("#")) {
@@ -493,6 +496,51 @@ export function spellMatcher(
 	}
 
 	return shared ? null : `#${type.name}`
+}
+
+// A Type spelled without the names its declarations gave it, as a Matcher a
+// reader can write in any Module. Null where it holds a part that can not be
+// spelled so.
+export function spellShape(type: common.Type): string | null {
+	switch (type.type) {
+		case "Integer":
+		case "Rational":
+		case "String":
+		case "Boolean":
+			return type.type
+		case "Refinement":
+			return spellShape(type.base)
+		case "List": {
+			let item = spellShape(type.itemType)
+
+			return item === null ? null : `List<${item}>`
+		}
+		case "Dictionary": {
+			let key = spellShape(type.keyType)
+			let value = spellShape(type.valueType)
+
+			return key === null || value === null
+				? null
+				: `Dictionary<${key}, ${value}>`
+		}
+		case "Record": {
+			let members = Object.entries(type.members).map(
+				([name, memberType]) => {
+					let shape = spellShape(memberType)
+
+					return shape === null ? null : `${name}: ${shape}`
+				},
+			)
+
+			if (members.includes(null)) {
+				return null
+			}
+
+			return members.length === 0 ? "{}" : `{ ${members.join(", ")} }`
+		}
+		default:
+			return null
+	}
 }
 
 // The Choice a Case belongs to, applied as `Box<Integer>` where the Case carries

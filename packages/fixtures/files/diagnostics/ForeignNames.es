@@ -24,8 +24,8 @@ implementation {
 	Terminal.print(names.length())
 	Terminal.print(names.length)
 
-	§ type-without-members — no Method of the name answers, so the report stays
-	§ what it was and the Help is the one that leads to `unknown-method`.
+	§ type-without-members — no Method of the name or near it answers, so the
+	§ report names the Namespaces it searched and spells no call.
 	Terminal.print(names.at(0))
 
 	§ unknown-member — a Record has members, and this is not one of them. Called,

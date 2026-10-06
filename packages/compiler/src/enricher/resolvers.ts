@@ -87,6 +87,7 @@ import {
 } from "../helpers/types"
 import { printType } from "../printType"
 import { recordAnnotation } from "./annotations"
+import { reportTypeWithoutMembers } from "./memberHelps"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
 import {
 	bodyCanWait,
@@ -707,6 +708,8 @@ export type MemberAccessContext = {
 	// Whether the Lookup is a call's callee: `names.length()` rather than
 	// `names.length`. A fix for the second adds the parentheses.
 	isCalled: boolean
+	// How many Arguments the call writes, 0 for a member that is only read.
+	writtenArguments: number
 	// The base as written, such as `box.inner`, or null where a Help could
 	// not print it back.
 	spelledBase: string | null
@@ -811,20 +814,10 @@ export function lookupTypeOf(
 			return { type: "Error" }
 		}
 
-		reportError("This value has no members to look up", positions.base, {
-			code: "type-without-members",
-			labels: [
-				primary(
-					positions.base,
-					`this is ${withArticle(describeType(baseType))}`,
-				),
-			],
-			notes: ["Only Records, Cases and Namespaces have members."],
-			// A value without members can only have meant a Method, so the
-			// `::` Help is offered even for a read.
-			helps: [
-				`A Method is called with '::' rather than '.' — write '::${memberName}(…)' if '${memberName}' is one.`,
-			],
+		reportTypeWithoutMembers(baseType, memberName, positions.base, {
+			access,
+			scope,
+			lookup: resolveMethodLookupNamespacesForReceiverType,
 		})
 
 		return { type: "Error" }

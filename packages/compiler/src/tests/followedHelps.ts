@@ -215,6 +215,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"table-parameters",
 		"test-outside-tests",
 		"top-level-return",
+		"type-without-members",
 		"unbindable-case-payload",
 		"unbraced-unicode-escape",
 		"unclosed-block",

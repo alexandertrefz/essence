@@ -440,7 +440,7 @@ A parameter gets the same code, with `A Parameter can not match a value against 
 
 A type check does not make a pattern refutable. In a declaration, `{ width: String }` is an annotation, and a value that does not fit is a type error. `constant { width: String } = size` is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch): `This value does not fit the declared Type of Constant 'width'`.
 
-A declaration also cannot take a union apart, even when every type in the union has the member you name. A union has no members to read, so the pattern is [`type-without-members`](/docs/reference/diagnostics#type-without-members). Here both types have an `x`:
+A declaration also cannot take a union apart, even when every type in the union has the member you name. A union has no members to read, so the pattern is [`type-without-members`](/docs/reference/diagnostics#type-without-members). Here `Click` has an `x`, and the help names the arm that reads it:
 
 <div class="error-output">
 
@@ -453,7 +453,7 @@ Error: This value has no members to look up
    │                ▲
    │                ╰── this is a Click | KeyPress
    │
-   │ Help: A Method is called with '::' rather than '.' — write '::x(…)' if 'x' is one.
+   │ Help: Read '@.x' in a Match arm that narrows the value — 'case Click { … }'.
    │
    │ Note: Only Records, Cases and Namespaces have members.
 ───╯

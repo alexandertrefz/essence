@@ -1348,9 +1348,8 @@ Error: This value has no members to look up
     │                    ──┬──  
     │                      ╰──── this is a List<String>
     │ 
-    │ Help: A Method is called with '::' rather than '.' — write '::at(…)' if 'at' is one.
-    │ 
-    │ Note: Only Records, Cases and Namespaces have members.
+    │ Note 1: Only Records, Cases and Namespaces have members.
+    │ Note 2: Searched Namespaces 'List', 'KeyedNumberList', 'GroupedList'.
 ────╯
 
 [unknown-member]

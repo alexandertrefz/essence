@@ -1598,7 +1598,27 @@ Error: This value has no members to look up
    │                    ──┬─  
    │                      ╰─── this is a String
    │ 
-   │ Help: A Method is called with '::' rather than '.' — write '::charAt(…)' if 'charAt' is one.
+   │ Note 1: Only Records, Cases and Namespaces have members.
+   │ Note 2: Searched Namespace 'String'.
+───╯
+```
+
+</div>
+
+A value with no members at all has nothing behind the `.`, so a method is what the name can have been. Where the value's type has a method of that name the report is [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot) instead. Where none is close, as for `charAt`, there is no help, and a note names the namespaces searched, as [`unknown-method`](/docs/reference/diagnostics#unknown-method) does. Where one is a near miss, the help spells the call, for a member that was called and for one that was only read. A call keeps its arguments, so it is offered only a method that accepts as many:
+
+<div class="error-output">
+
+```
+[type-without-members]
+Error: This value has no members to look up
+   ╭─┤ Spelling.es:4:17 │
+   │
+ 4 │     Terminal.print(text.lenght)
+   │                    ──┬─  
+   │                      ╰─── this is a String
+   │ 
+   │ Help: Write '::length()' in place of '.lenght' — a Method is called, never read.
    │ 
    │ Note: Only Records, Cases and Namespaces have members.
 ───╯
@@ -1606,9 +1626,9 @@ Error: This value has no members to look up
 
 </div>
 
-The help appears for a member that was called and for one that was only read: a value with no members at all has nothing behind the `.` that could be one, so a method is what it can have been. (The silence belongs to [`unknown-member`](/docs/reference/diagnostics#unknown-member), where the value *has* members and a `.` is how one of them is reached.)
+A union has no members either, but one of its members may. Only `@` in a `match` arm is narrowed, so on an `A | B` where `A` declares `x`, `v.x` is answered `Read '@.x' in a Match arm that narrows the value — 'case A { … }'.` A record that no name in the file binds, as one declared in a module it does not import, is written by its shape, `case { x: Integer }`, and a case of such a choice is written bare, `case #Circle`. A [pattern](/docs/language/patterns) such as `constant { length } = text` writes no `.`, so its help says to bind the whole value and call `::length()` on it instead.
 
-`charAt` is no method of a `String`, which is why this is not [`method-called-with-dot`](/docs/reference/diagnostics#method-called-with-dot): write `text::charAt(0)` and the next report is [`unknown-method`](/docs/reference/diagnostics#unknown-method), `No Method named 'charAt' for this value`, with `Searched Namespace 'String'.` The `String` method for a character at a position is [`character(at:)`](/docs/library/string#character).
+The `String` method for a character at a position is [`character(at:)`](/docs/library/string#character).
 
 Taught on: [Method calls › Statics and the dot](/docs/language/method-calls#statics-and-the-dot)
 

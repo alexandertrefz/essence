@@ -12,7 +12,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
-import { codesOfSource } from "./followedHelps"
+import { codesOfSource, compiles } from "./followedHelps"
 
 // The full pipeline minus bundling, since every stage has a part in a Pattern.
 function generate(source: string): string {
@@ -859,6 +859,31 @@ describe("Patterns", () => {
 			}`
 
 			expect(codesOf(source)).toContain("type-without-members")
+		})
+
+		// A Pattern writes no `.`, so its Help speaks of the Pattern.
+		it("names the binding a Pattern on a value with no members wants", () => {
+			let source = `implementation {
+				constant text = "hello"
+
+				constant { length } = text
+
+				Terminal.inspect(length)
+			}`
+
+			expect(codesOf(source)).toEqual(["type-without-members"])
+			expect(helpsOf(source)).toEqual([
+				"A Pattern takes apart a Record or a Case — bind the whole value instead, and call '::length()' on it.",
+			])
+			expect(
+				compiles(`implementation {
+				constant text = "hello"
+
+				constant length = text::length()
+
+				Terminal.inspect(length)
+			}`),
+			).toBe(true)
 		})
 
 		it("checks a member's written annotation against the value", () => {

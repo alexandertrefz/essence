@@ -352,6 +352,7 @@ function enrichCalleeExpression(
 	// Whether an Invocation asked for this Expression. Only a Lookup reads it,
 	// to tell `names.length()` from `names.length` when the member is missing.
 	isCalled = false,
+	writtenArguments = 0,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		case "MethodInvocation":
@@ -379,7 +380,7 @@ function enrichCalleeExpression(
 		case "DictionaryValue":
 			return enrichDictionaryValue(node, scope, expectedType)
 		case "Lookup":
-			return enrichLookup(node, scope, isCalled)
+			return enrichLookup(node, scope, isCalled, writtenArguments)
 		case "MemberPath":
 			return enrichMemberPath(node, scope, expectedType)
 		case "Identifier":
@@ -971,7 +972,13 @@ function enrichFunctionInvocation(
 ): common.typed.FunctionInvocationNode {
 	// The callee and every Argument are enriched once and reused for the final
 	// Node.
-	let name = enrichCalleeExpression(node.name, scope, null, true)
+	let name = enrichCalleeExpression(
+		node.name,
+		scope,
+		null,
+		true,
+		node.arguments.length,
+	)
 	let typer = makeArgumentTyper(scope, expectedType)
 	let {
 		type,
@@ -2653,6 +2660,7 @@ function enrichLookup(
 	// is a Method call written with another language's separator, and the
 	// Diagnostic says so.
 	isCalled = false,
+	writtenArguments = 0,
 ): common.typed.LookupNode {
 	// A base naming a Type, such as a Choice or a bounded Type Parameter, reads
 	// its member off a Namespace nobody declared. Asked before enriching the
@@ -2699,7 +2707,13 @@ function enrichLookup(
 				member: node.member.position,
 				base: node.base.position,
 			},
-			memberAccessContext(node, base.type, scope, isCalled),
+			memberAccessContext(
+				node,
+				base.type,
+				scope,
+				isCalled,
+				writtenArguments,
+			),
 			scope,
 		)
 
@@ -2753,6 +2767,7 @@ function memberAccessContext(
 	baseType: common.Type,
 	scope: enricher.Scope,
 	isCalled: boolean,
+	writtenArguments: number,
 ): MemberAccessContext | null {
 	if (baseType.type === "Namespace") {
 		return null
@@ -2765,6 +2780,7 @@ function memberAccessContext(
 			end: node.member.position.start,
 		},
 		isCalled,
+		writtenArguments,
 		spelledBase: spelledLookupBase(node.base),
 		methodNamed: (name) => {
 			let declaring = namespacesDeclaringMethod(

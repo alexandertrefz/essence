@@ -197,19 +197,54 @@ describe("Foreign syntax", () => {
 			])
 		})
 
-		// No such Method exists, so no fix is offered. The sentence leads to
-		// `unknown-method`, which lists what the value answers.
+		// No Method of the name or near it exists, so no Help spells one. The
+		// Note says where the name was looked for, as `unknown-method` does.
 		it("keeps type-without-members where no Method of the name exists", () => {
 			let source = program(
-				'constant s = "ada"',
+				'constant s: String = "ada"',
 				"Terminal.print(s.charAt(0))",
 			)
 
 			expect(codesOf(source)).toEqual(["type-without-members"])
-			expect(helpsOf(source)).toEqual([
-				"A Method is called with '::' rather than '.' — write '::charAt(…)' if 'charAt' is one.",
+			expect(helpsOf(source)).toEqual([])
+			expect(notesOf(source)).toEqual([
+				"Only Records, Cases and Namespaces have members.",
+				"Searched Namespace 'String'.",
 			])
 			expect(onlyDiagnostic(source).data).toBeUndefined()
+		})
+
+		// A Method one edit from the name is spelled as a call, the way
+		// `method-called-with-dot` spells the name itself.
+		it("names a Method close to the name, called or read", () => {
+			let written = (expression: string) =>
+				program(
+					'constant s: String = "ada"',
+					`Terminal.print(${expression}::toString())`,
+				)
+
+			expect(helpsOf(written("s.lenght"))).toEqual([
+				"Write '::length()' in place of '.lenght' — a Method is called, never read.",
+			])
+			expect(helpsOf(written("s.lenght()"))).toEqual([
+				"Write '::length' in place of '.lenght'.",
+			])
+			expect(compiles(written("s::length()"))).toBe(true)
+		})
+
+		// A call keeps its Arguments, so a near Method that takes none of them
+		// would trade this report for a refused call.
+		it("offers no Method a call's Arguments do not fit", () => {
+			let source = program(
+				'constant s: String = "ada"',
+				"Terminal.print(s.lenght(1))",
+			)
+
+			expect(helpsOf(source)).toEqual([])
+			expect(notesOf(source)).toEqual([
+				"Only Records, Cases and Namespaces have members.",
+				"Searched Namespace 'String'.",
+			])
 		})
 
 		// One mistake, one report: the refused body must not also report
@@ -231,18 +266,39 @@ describe("Foreign syntax", () => {
 			).toBe(true)
 		})
 
-		// A value with no members can only have meant a Method, so a member read
-		// gets the sentence too.
-		it("says it for a member read off a value with no members", () => {
+		// Only `@` in an arm is narrowed, so a member that one Union member
+		// declares is read there rather than called as a Method.
+		it("matches a Union first where a member of it declares the name", () => {
+			let read = (expression: string) =>
+				program(
+					"type A = { x: Integer }",
+					"type B = { y: Integer }",
+					"constant v: A | B = { y = 1 }",
+					`Terminal.inspect(${expression})`,
+				)
+
+			expect(codesOf(read("v.x"))).toEqual(["type-without-members"])
+			expect(helpsOf(read("v.x"))).toEqual([
+				"Read '@.x' in a Match arm that narrows the value — 'case A { … }'.",
+			])
+			expect(
+				compiles(
+					read(
+						"match v -> Integer {\n\tcase A { <- @.x }\n\tcase B { <- 0 }\n}",
+					),
+				),
+			).toBe(true)
+		})
+
+		// A read is answered as a call is, and nothing near `charAt` answers.
+		it("offers no Method for a read where none is close", () => {
 			let source = program(
 				'constant s = "ada"',
 				"Terminal.print(s.charAt)",
 			)
 
 			expect(codesOf(source)).toEqual(["type-without-members"])
-			expect(helpsOf(source)).toEqual([
-				"A Method is called with '::' rather than '.' — write '::charAt(…)' if 'charAt' is one.",
-			])
+			expect(helpsOf(source)).toEqual([])
 		})
 
 		it("adds the sentence to a Record's unknown member that was called", () => {

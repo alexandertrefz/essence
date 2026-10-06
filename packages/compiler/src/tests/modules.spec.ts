@@ -12203,4 +12203,91 @@ export {
 			),
 		).toEqual([])
 	})
+
+	// A Matcher names what this file can write: a Record nothing here binds by
+	// its shape, a Case of a Choice nothing here binds bare.
+	describe("a Match a Help writes", () => {
+		let lib = `implementation {
+	type Point = { x: Integer }
+	type Label = { text: String }
+
+	choice Colour { Red, Green }
+	choice Shape { Circle { radius: Integer }, Dot }
+
+	function spot() -> Integer | Point {
+		<- 1
+	}
+
+	function pick() -> Integer | Colour {
+		<- 1
+	}
+
+	function made() -> Point | Label {
+		<- { x = 1 }
+	}
+
+	function shaped() -> Shape | Integer {
+		<- 1
+	}
+}
+
+export {
+	Point
+	Label
+	Colour
+	Shape
+	spot
+	pick
+	made
+	shaped
+}
+`
+		let main = (body: string) => `import {
+	from "./Lib.es" {
+		spot
+		pick
+		made
+		shaped
+	}
+}
+
+implementation {
+${body}
+}
+`
+		// The imports a body leaves unread are reported too, and are no
+		// business of these specs.
+		let analysed = (body: string) =>
+			withProject({ "Main.es": main(body), "Lib.es": lib }, (directory) =>
+				analysedAt(directory, "Main.es", "Main.es").filter(
+					(diagnostic) => diagnostic.code !== "unused-import",
+				),
+			)
+
+		it("should read a member in an arm this file can write", () => {
+			let refusals = analysed(`	constant value = made()
+	constant shape = shaped()
+
+	Terminal.print(value.x)
+	Terminal.print(shape.radius)`)
+
+			expect(refusals.map((refusal) => refusal.helps)).toEqual([
+				[
+					"Read '@.x' in a Match arm that narrows the value — 'case { x: Integer } { … }'.",
+				],
+				[
+					"Read '@.radius' in a Match arm that narrows the value — 'case #Circle { … }'.",
+				],
+			])
+			expect(
+				codesOf(
+					analysed(`	constant value = made()
+	constant shape = shaped()
+
+	Terminal.print(match value -> Integer { case { x: Integer } { <- @.x } case { text: String } { <- 0 } })
+	Terminal.print(match shape -> Integer { case #Circle { <- @.radius } case #Dot { <- 0 } case Integer { <- @ } })`),
+				),
+			).toEqual([])
+		})
+	})
 })
