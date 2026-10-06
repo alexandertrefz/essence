@@ -184,9 +184,11 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"protocol-bound-namespace-generic",
 		"provided-method-out-of-reach",
 		"redundant-interpolation-to-string",
+		"redundant-key-check",
 		"redundant-pattern-binder",
 		"restated-inferred-parameter",
 		"self-import",
+		"shorthand-in-combination",
 		"snapshot-after-matcher",
 		"snapshot-not-printable",
 		"surrogate-unicode-escape",
@@ -211,4 +213,5 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"value-comment-outside-tests",
 		"where-on-protocol-extension",
 		"wrong-type-argument-count",
+		"wrong-update-brackets",
 	]

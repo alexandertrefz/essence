@@ -13,6 +13,7 @@ import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // The written forms of a Dictionary, `["a" = 1]`, `[=]` and `[base with …]`,
 // end to end. One Token past the first Expression decides between a List, a
@@ -241,6 +242,37 @@ describe("Dictionary literals", () => {
 			).value as parser.CombinationNode
 
 			expect(combination.rhs.nodeType).toBe("Identifier")
+		})
+
+		// A comma after a bare name says a key list was meant. The Helps spell
+		// entries, or one whole Dictionary to merge.
+		it("follows a bare key list's Helps to Programs that compile", () => {
+			let names = [
+				'\tconstant ages = ["kim" = 7]',
+				'\tconstant a = "ada"',
+				'\tconstant b = "bo"',
+				'\tconstant other = ["sam" = 25]',
+			]
+			let diagnostics = diagnosticsFor(
+				block(...names, "\tconstant older = [ages with a, b]"),
+			)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"shorthand-in-combination",
+			])
+			expect(diagnostics[0].helps).toEqual([
+				"Write each entry: '[d with a = 1, b = 2]'.",
+				"Or merge one whole Dictionary: '[d with other]'.",
+			])
+
+			for (let update of [
+				"[ages with a = 1, b = 2]",
+				"[ages with other]",
+			]) {
+				expect(
+					compiles(block(...names, `\tconstant older = ${update}`)),
+				).toBe(true)
+			}
 		})
 	})
 
@@ -626,6 +658,62 @@ describe("Dictionary literals", () => {
 				"Write the update in brackets: '[base with \"a\" = 1]'.",
 				"Or name the member, if a Record is what was meant: '{ base with a = 1 }'.",
 			])
+			expect(
+				compiles(
+					block(
+						'\tconstant ages = ["alex" = 39]',
+						'\tconstant older = [ages with "alex" = 40]',
+					),
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					block(
+						"\tconstant ages = { alex = 39 }",
+						"\tconstant older = { ages with alex = 40 }",
+					),
+				),
+			).toBe(true)
+		})
+
+		// The Enricher's report names the other pair, which is all the
+		// rewrite takes.
+		it("compiles once the update is written in the other pair", () => {
+			let swapped = (base: string, update: string) =>
+				diagnosticsFor(block(base, `\tconstant both = ${update}`))
+
+			expect(
+				swapped(
+					'\tconstant ages = ["alex" = 39]',
+					"{ ages with ages }",
+				)[0]?.helps,
+			).toEqual([
+				"Write the update in brackets: '[base with \"key\" = value]'.",
+			])
+			expect(
+				swapped(
+					"\tconstant config = { port = 1 }",
+					"[config with port = 2]",
+				)[0]?.helps,
+			).toEqual([
+				"Write the update in braces: '{ base with member = value }'.",
+			])
+			expect(
+				compiles(
+					block(
+						'\tconstant ages = ["alex" = 39]',
+						'\tconstant both = [ages with "kim" = 7]',
+					),
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					block(
+						"\tconstant config = { port = 1 }",
+						"\tconstant both = { config with port = 2 }",
+					),
+				),
+			).toBe(true)
 		})
 
 		// `uncombinable-types` reaches a Union of Dictionaries and a bare
@@ -852,6 +940,31 @@ describe("Dictionary literals", () => {
 			expect(diagnostic.helps).toEqual([
 				"Ask 'value(at:)' once and match its Optional, or use 'value(at:defaultingTo:)' or 'update(at:with:)'.",
 			])
+		})
+
+		// Each way out asks once, so the Warning is gone as well.
+		it("follows each Help to a Program that compiles without it", () => {
+			for (let lookup of [
+				[
+					'\tmatch ages::value(at "alex") -> {} {',
+					"\t\tcase #Value(age) { Terminal.print(age) }",
+					"\t\tcase #Empty {}",
+					"\t}",
+				],
+				[
+					'\tconstant age = ages::value(at "alex", defaultingTo 0)',
+					"\tTerminal.print(age)",
+				],
+				[
+					'\tconstant older = ages::update(at "alex", with (age) { <- age::add(1) })',
+					"\tTerminal.inspect(older)",
+				],
+			]) {
+				let followed = block(ages, ...lookup)
+
+				expect(compiles(followed)).toBe(true)
+				expect(codesFor(followed)).not.toContain("redundant-key-check")
+			}
 		})
 
 		it("stays silent where the branch reads another Dictionary", () => {
