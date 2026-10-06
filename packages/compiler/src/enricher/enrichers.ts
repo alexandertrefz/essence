@@ -204,6 +204,7 @@ import {
 } from "./spelling"
 import { reportStaticMethodOnValue } from "./staticMethods"
 import { settleProperty, typeBodiedProperties } from "./staticProperties"
+import { reportPropertyParameters } from "./tests"
 import {
 	conformanceBoundHelps,
 	namespaceParameterNames,
@@ -4181,13 +4182,20 @@ function enrichTestProperty(
 		parameter.internalName?.nodeType === "Identifier"
 			? parameter.internalName.content
 			: synthesizedName("any", parameter.position)
+	// A Parameter without a Type is still bound, to an Error, so the body does
+	// not cascade unknown names. A table binds an unreadable Parameter
+	// likewise.
+	let type: common.Type =
+		parameter.type === null
+			? { type: "Error" }
+			: resolveType(parameter.type, scope)
 
 	if (parameter.internalName?.nodeType === "Pattern") {
 		reportPropertyParameters(
 			parameter.position,
 			"A generated Parameter has to be a name",
 			"this takes a value apart",
-			"Name the whole value — 'for any (standing: Standing)' — and take it apart inside the body.",
+			`Name the whole value — 'for any (value: ${type.type === "Error" ? "…" : spellType(type, spellingIn(scope))})' — and take it apart inside the body.`,
 			"A counterexample is reported beside the name it was generated for, and a Pattern names no value.",
 		)
 	}
@@ -4217,14 +4225,6 @@ function enrichTestProperty(
 		)
 	}
 
-	// A Parameter without a Type is still bound, to an Error, so the body does
-	// not cascade unknown names. A table binds an unreadable Parameter
-	// likewise.
-	let type: common.Type =
-		parameter.type === null
-			? { type: "Error" }
-			: resolveType(parameter.type, scope)
-
 	declareVariableInScope(
 		binding(name, parameter.position),
 		type,
@@ -4243,7 +4243,7 @@ function enrichTestProperty(
 			"nothing here says what to generate",
 			wroteAType
 				? `Write a name for it: 'for any (value: ${name})'.`
-				: `Write the Type: 'for any (${name}: Integer)'.`,
+				: `Write the Type: 'for any (${name}: …)'.`,
 			"The Type is the whole of what a generator is derived from.",
 		)
 
@@ -4299,21 +4299,6 @@ function binding(
 	position: common.Position,
 ): parser.IdentifierNode {
 	return { nodeType: "Identifier", content: name, position }
-}
-
-function reportPropertyParameters(
-	position: common.Position,
-	message: string,
-	label: string,
-	help: string,
-	note?: string,
-): void {
-	reportError(message, position, {
-		code: "property-parameters",
-		labels: [primary(position, label)],
-		notes: note === undefined ? [] : [note],
-		helps: [help],
-	})
 }
 
 // What to draw a value of one Type from. A Namespace's own `Generatable`

@@ -3355,7 +3355,7 @@ Error: A generated Parameter has to write its Type
      │                                          ▲  
      │                                          ╰── nothing here says what to generate
      │ 
-     │ Help: Write the Type: 'for any (n: Integer)'.
+     │ Help: Write the Type: 'for any (n: …)'.
      │ 
      │ Note: The Type is the whole of what a generator is derived from.
 ─────╯

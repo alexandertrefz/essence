@@ -6552,7 +6552,7 @@ Error: A generated Parameter has to write its Type
    │                                  ▲  
    │                                  ╰── nothing here says what to generate
    │ 
-   │ Help: Write the Type: 'for any (a: Integer)'.
+   │ Help: Write the Type: 'for any (a: …)'.
    │ 
    │ Note: The Type is the whole of what a generator is derived from.
 ───╯
@@ -6560,9 +6560,9 @@ Error: A generated Parameter has to write its Type
 
 </div>
 
-Write a type for each parameter: `for any (a: Integer, b: Integer)`.
+Write a type for each parameter: `for any (a: Integer, b: Integer)`. Nothing says which type `a` was meant to have, so the help leaves it as `…` for you to fill in.
 
-Where the one word written *is* a type — `for any (Integer)` — the missing half is the name, and the Help asks for that instead: `Write a name for it: 'for any (value: Integer)'.`
+Where the one word written *is* a type — `for any (Integer)` — the missing half is the name, and the Help asks for that instead: `Write a name for it: 'for any (value: Integer)'.` A pattern written in place of the name, as in `for any ({ name }: Player)`, is asked to name the whole value at the type it was written with: `'for any (value: Player)'`, taken apart inside the body.
 
 Taught on: [Tests › Property tests](/docs/language/tests#property-tests)
 

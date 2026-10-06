@@ -524,6 +524,21 @@ export function refuseTableDefaults(node: parser.TestTableNode): void {
 	}
 }
 
+export function reportPropertyParameters(
+	position: common.Position,
+	message: string,
+	label: string,
+	help: string,
+	note?: string,
+): void {
+	reportError(message, position, {
+		code: "property-parameters",
+		labels: [primary(position, label)],
+		notes: note === undefined ? [] : [note],
+		helps: [help],
+	})
+}
+
 // Two tests of one name in one suite share an identity, and with it every
 // stored snapshot and baseline. A test and a suite of one name never collide,
 // because a suite is a step of the path rather than its end.

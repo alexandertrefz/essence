@@ -133,6 +133,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"operator-not-supported",
 		"path-without-context",
 		"picked-requirement",
+		"property-parameters",
 		"protocol-bound-namespace-generic",
 		"provided-method-out-of-reach",
 		"redundant-interpolation-to-string",

@@ -14,6 +14,7 @@ import { parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // `test "…" for any (…)` end to end: the generator the Enricher derives from
 // each Parameter's Type, what it refuses, the emission, and what a run reports.
@@ -731,20 +732,53 @@ describe("Property tests", () => {
 
 		// The Parser reads one written word as the name. Whether the word
 		// resolves to a Type decides whether the name or the Type is missing.
+		// Nothing says which Type was meant, so the Help leaves it blank.
 		it("asks for a name where the one word written is a Type", () => {
 			expect(analyse(sectionOf("Integer")).diagnostics[0]?.helps).toEqual(
 				["Write a name for it: 'for any (value: Integer)'."],
 			)
 
 			expect(analyse(sectionOf("n")).diagnostics[0]?.helps).toEqual([
-				"Write the Type: 'for any (n: Integer)'.",
+				"Write the Type: 'for any (n: …)'.",
 			])
+		})
+
+		it("compiles once the missing half is written", () => {
+			let body = 'expect "{value}"::hasCharacters()'
+
+			expect(
+				compiles(sectionOf("value: Integer", body), { tests: true }),
+			).toBe(true)
+			expect(
+				compiles(sectionOf("a: String, b: String", "expect a::is(a)"), {
+					tests: true,
+				}),
+			).toBe(true)
 		})
 
 		it("refuses a Pattern where a name belongs", () => {
 			expect(codesOf(sectionOf("{ name }: { name: String }"))).toEqual([
 				"property-parameters",
 			])
+		})
+
+		// The Help names the whole value at the Type the reader wrote.
+		it("spells the Type a Pattern was written at", () => {
+			expect(
+				analyse(sectionOf("{ name }: { name: String }")).diagnostics[0]
+					?.helps,
+			).toEqual([
+				"Name the whole value — 'for any (value: { name: String })' — and take it apart inside the body.",
+			])
+			expect(
+				compiles(
+					sectionOf(
+						"value: { name: String }",
+						"constant { name } = value\n\n\t\t\texpect name::is(name)",
+					),
+					{ tests: true },
+				),
+			).toBe(true)
 		})
 
 		it("refuses a label", () => {
