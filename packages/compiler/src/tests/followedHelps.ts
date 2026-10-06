@@ -135,5 +135,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"uninferable-property-type",
 		"uninferable-return-type",
 		"unknown-name",
+		"unsatisfied-bound",
+		"unsatisfied-conformance-condition",
 		"wrong-type-argument-count",
 	]

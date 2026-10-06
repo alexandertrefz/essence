@@ -822,6 +822,46 @@ describe("A Type in want of a conformance", () => {
 	})
 })
 
+describe("A Record in want of a conformance", () => {
+	let points = `namespace Points for { x: Integer } is Comparable {
+				compare(to other: { x: Integer }) -> Ordering {
+					<- @.x::compare(to other.x)
+				}
+			}`
+
+	it("should compile a bound with the Namespace it asks for", () => {
+		let largest = (declared: string) => `implementation {
+			function largest<infer Item is Comparable>(of items: List<Item>) -> Optional<Item> {
+				<- items::sort()::lastItem()
+			}
+
+			${declared}
+
+			Terminal.print(largest(of [{ x = 1 }, { x = 2 }]))
+		}`
+
+		expect(firstOf(largest(""), "unsatisfied-bound").helps).toEqual([
+			"Declare a Namespace 'for { x: Integer } is Comparable'.",
+		])
+		expect(compiles(largest(points))).toBe(true)
+	})
+
+	// The Help names the Record at the end of the chain, so the Namespace is
+	// declared for it rather than for the List around it.
+	it("should compile a condition with the Namespace it asks for", () => {
+		let sorted = (declared: string) => `implementation {
+			${declared}
+
+			Terminal.print([[{ x = 1 }], [{ x = 2 }]]::sort())
+		}`
+
+		expect(
+			firstOf(sorted(""), "unsatisfied-conformance-condition").helps,
+		).toEqual(["Declare a Namespace 'for { x: Integer } is Comparable'."])
+		expect(compiles(sorted(points))).toBe(true)
+	})
+})
+
 describe("A bounded Function used as a value", () => {
 	// Invoking the Function would throw the value away, so the Help also offers
 	// a wrapping Function literal, which keeps it.
