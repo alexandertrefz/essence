@@ -78,6 +78,7 @@ import {
 	reportDispatchEmptyContainerOverlap,
 	reportEmptyContainerOverlap,
 } from "./emptyOverlap"
+import { holesShiftTheCall } from "./holes"
 import { reportMissingCases } from "./missingCases"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 import {
@@ -1148,7 +1149,7 @@ function validateFunctionInvocation(
 
 	// A hole in a positional Argument moves every Argument after it, so the
 	// call stands down. A labelled hole moves nothing, and the rest is measured.
-	if (holesShiftTheCall(node.arguments)) {
+	if (holesShiftTheCall(node.arguments, functionType)) {
 		return node
 	}
 
@@ -3200,18 +3201,6 @@ function matchCommittedArguments(
 	let seeded = matchFreshened(second, matchable, collectAllMismatches)
 
 	return seeded.type === "Match" ? seeded : matched
-}
-
-// Whether a positional Argument is a hole, which shifts the Arguments after
-// it. A labelled hole shifts nothing.
-function holesShiftTheCall(
-	argumentNodes: Array<common.typed.ArgumentNode>,
-): boolean {
-	return argumentNodes.some(
-		(argumentNode) =>
-			argumentNode.name === null &&
-			typeContainsError(argumentNode.value.type),
-	)
 }
 
 function reportArityMismatch(

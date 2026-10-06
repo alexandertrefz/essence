@@ -8,6 +8,12 @@ import {
 } from "../diagnostics/index"
 import { countOf } from "../helpers/describe"
 import { parameterInternalName } from "../helpers/names"
+import {
+	createFreshenedInference,
+	type MatchableArgument,
+	matchArguments,
+	pairedByPlace,
+} from "../helpers/types"
 import { insideRefusedCall, underRefusedCall } from "./refusedCalls"
 import {
 	parameterDocumentation,
@@ -164,8 +170,9 @@ export function resolveContextualParameterTypes(
 			let expectedParameter = expectedFunction?.parameterTypes[index]
 
 			if (expectedParameter === undefined) {
-				// Silent inside a refused call; see `callRefused`.
-				if (insideRefusedCall()) {
+				// Silent inside a refused call where no Function stands at the
+				// literal's place; see `callRefused`.
+				if (expectedFunction === null && insideRefusedCall()) {
 					return {
 						name: null,
 						type: { type: "Error" },
@@ -240,6 +247,26 @@ function parameterLabel(parameter: parser.ParameterNode): string {
 		parameterInternalName(parameter)?.content ??
 		parameter.externalName?.content ??
 		"_"
+	)
+}
+
+// The one signature a refused call could have meant. Its Function literals read
+// the Parameter at their place, so a mistake inside one is still reported.
+export function readLiteralsByPlace(
+	signatures: Array<common.BaseFunction>,
+	matchableArguments: Array<MatchableArgument>,
+): void {
+	if (signatures.length !== 1) {
+		return
+	}
+
+	let { parameterTypes, context } = createFreshenedInference(signatures[0])
+
+	underRefusedCall(true, () =>
+		matchArguments(...pairedByPlace(parameterTypes, matchableArguments), {
+			collectAllMismatches: true,
+			inference: context,
+		}),
 	)
 }
 

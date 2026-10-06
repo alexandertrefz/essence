@@ -89,6 +89,7 @@ import {
 	negatedPredicateConjunct,
 	NotHoistedYet,
 	pairArguments,
+	pairedByPlace,
 	predicateConjunctKey,
 	provenConjuncts,
 	refinableBaseTag,
@@ -114,6 +115,7 @@ import {
 	probingCandidate,
 	probingCandidates,
 	readingArgumentLiteral,
+	readLiteralsByPlace,
 	resolveContextualParameterTypes,
 	returnTypeHelpIn,
 } from "./contextualParameters"
@@ -1022,6 +1024,7 @@ function enrichFunctionInvocation(
 		overloadedMethodIndex,
 		omittedParameterIndices,
 		selected,
+		refused,
 	} = resolveFunctionInvocation(node, name.type, scope, typer)
 
 	reportDeadFallbackOnFunctionInvocation(node, name.type, scope, typer, {
@@ -1034,10 +1037,12 @@ function enrichFunctionInvocation(
 		nodeType: "FunctionInvocation",
 		name,
 		// A call answering an Error is no refusal while it selected a candidate.
-		arguments: underRefusedCall(type.type === "Error" && !selected, () =>
-			node.arguments.map((argument) =>
-				typer.enrichArgumentNode(argument),
-			),
+		arguments: underRefusedCall(
+			(type.type === "Error" && !selected) || refused === true,
+			() =>
+				node.arguments.map((argument) =>
+					typer.enrichArgumentNode(argument),
+				),
 		),
 		position: node.position,
 		type,
@@ -12248,6 +12253,11 @@ function reportNoMatchingOverload(
 		return
 	}
 
+	readLiteralsByPlace(
+		candidates.map((candidate) => candidate.signature),
+		matchableArguments,
+	)
+
 	let { labels, notes, helps, data } = overloadRefusalReport(
 		refusedCandidates(candidates, matchableArguments),
 		matchableArguments,
@@ -13111,6 +13121,9 @@ function resolveFunctionInvocation(
 	// still answers its return Type, so the validator reports the Argument. The
 	// dead-fallback re-probe must not read that as an answer.
 	selected: boolean
+	// Set where the Arguments are read as a refused call's, though the call
+	// answers a Type: a lone signature whose count does not pair.
+	refused?: true
 } {
 	const type = nameType
 
@@ -13161,15 +13174,22 @@ function resolveFunctionInvocation(
 
 		// With one candidate a mismatch is a plain Argument mismatch, which the
 		// validator reports. Every Argument is still matched, so a Function
-		// literal after the first mismatch reads its Parameter Type rather than
-		// reporting as uninferable.
+		// literal reads the Parameter at its place rather than reporting as
+		// uninferable. A count that does not pair refuses the call.
+		// See "Matching Arguments" in packages/compiler/src/helpers/DEVELOPMENT.md.
 		let { parameterTypes, context, freshToOriginal } =
 			createFreshenedInference(type)
+		let paired = pairArguments(parameterTypes, matchableArguments) !== null
 
-		matchArguments(parameterTypes, matchableArguments, {
-			collectAllMismatches: true,
-			inference: context,
-		})
+		underRefusedCall(!paired, () =>
+			matchArguments(
+				...pairedByPlace(parameterTypes, matchableArguments),
+				{
+					collectAllMismatches: true,
+					inference: context,
+				},
+			),
+		)
 
 		// A bounded Type Parameter needs a witness, and a call that selected
 		// nothing has none. An Error Type says the call never resolved, so the
@@ -13190,6 +13210,7 @@ function resolveFunctionInvocation(
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
 			selected: false,
+			...(paired ? {} : { refused: true as const }),
 		}
 	} else if (
 		type.type === "OverloadedMethod" ||

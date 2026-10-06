@@ -625,7 +625,7 @@ members as `buildUnion` makes them, and the Error beside them. A Match over `Int
 `match-on-non-union`. As the expected Type the hole accepts anything. As the actual Type the Union is its known
 members (`withoutHoles`): `matchTypes` measures it so, and a call on it finds its Namespaces so. It fits where an
 Integer is expected and not where a String is, and `value::add(1)` answers an Integer. A Type Parameter binds it
-whole, so `id(value)` still holds the hole.
+whole, so `id(value)` still holds the hole. The validator measures such an Argument by its known members too.
 
 ### Cases, Records and Functions
 
@@ -652,6 +652,15 @@ Argument that no label committed to.
 With an inference context, a bindable Generic binds on its first occurrence and later ones are checked. Each
 Overload candidate gets a fresh context. A Parameter that took its default binds nothing, so a Type Parameter only
 it mentions stays unbound and is reported as `uninferable-type-parameter`.
+
+A call of a single signature that did not match is matched once more, so its Function literals still read their
+Parameter Types. `pairedByPlace` pairs them as a reader does: each Argument meets the Parameter of its label, or the
+unlabelled one at its place among the unlabelled, whatever the count. Where the count does not pair, the call still
+answers its declared Type, and its Arguments are read as a refused call's. A literal with no Function at its place
+reports nothing, and one with a Function there still reports a Parameter that Function lacks.
+`twice((x) { <- x::add("s") }, 1, 2)` then reports `argument-count-mismatch` and the mistake in the body, and
+nothing about the literal. A refused `::` call with one candidate reads its literals the same way
+(`readLiteralsByPlace`).
 
 ### Argument order
 

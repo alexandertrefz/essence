@@ -1738,9 +1738,8 @@ describe("What a refused call is told", () => {
 		])
 	})
 
-	// A call of the wrong shape pairs no Parameter with the literal. Reading
-	// what the call passed takes no Types for it, so the call's refusal is the
-	// only report.
+	// A call of the wrong shape is the one mistake. The literal reads the
+	// Parameter at its place, so the report names what it was read as.
 	it("reports no Function literal a call of the wrong shape passed", () => {
 		let diagnostics = diagnosticsFor(`implementation {
 			constant numbers = [1, 2, 3]
@@ -1754,7 +1753,7 @@ describe("What a refused call is told", () => {
 			"no-matching-overload",
 		])
 		expect(diagnostics[0]!.labels[0]!.message).toBe(
-			"this call passes 2 Arguments",
+			"this call passes 2 Arguments: a (_: Integer) -> Integer and an Integer",
 		)
 	})
 

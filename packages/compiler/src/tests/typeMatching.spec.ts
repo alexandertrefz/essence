@@ -363,6 +363,136 @@ describe("Type matching", () => {
 			).toEqual([])
 		})
 
+		// A call of the wrong count still meets each Parameter at its place, so
+		// its literal is typed and the count is the one mistake.
+		it("should report a call of the wrong count once beside its literal", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function twice(_ f: (_: Integer) -> Integer, _ n: Integer) -> Integer {
+					<- f(f(n))
+				}
+
+				function apply <infer T>(_ fn: (_: T) -> T, _ value: T) -> T {
+					<- fn(value)
+				}
+
+				constant extra = twice((x) { <- x }, 1, 2)
+				constant missing = twice((x) { <- x })
+				constant bound = apply((x) { <- x::add(1) }, 1, 2)
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["argument-count-mismatch", 10],
+				["argument-count-mismatch", 11],
+				["argument-count-mismatch", 12],
+			])
+		})
+
+		// A literal meets the Parameter of its label, or the unlabelled one at
+		// its place. One past the last, or at a place taking no Function, is no
+		// mistake of its own. The count is still measured beside its hole, and
+		// a mistake in a literal's body is its own.
+		it("should read each literal of a refused call at its place", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function twice(_ f: (_: Integer) -> Integer, _ n: Integer) -> Integer {
+					<- f(f(n))
+				}
+
+				function labelled(by n: Integer = 1, step f: (_: Integer) -> Integer) -> Integer {
+					<- f(n)
+				}
+
+				namespace Twice for Integer {
+					twice(_ f: (_: Integer) -> Integer, _ n: Integer) -> Integer {
+						<- f(f(n))
+					}
+				}
+
+				constant past = twice((y) { <- y }, 2, (x) { <- x })
+				constant swapped = twice(1, (x) { <- x }, 2)
+				constant body = twice((x) { <- x::add("s") }, 1, 2)
+				constant named = labelled(step (x) { <- x::add("t") }, by 1, 2)
+				constant reordered = labelled(step (x) { <- x }, 1)
+				constant method = 1::twice((x) { <- x::add("u") }, 1, 2)
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["no-matching-overload", 18],
+				["no-matching-overload", 19],
+				["no-matching-overload", 21],
+				["no-matching-overload", 21],
+				["argument-count-mismatch", 16],
+				["argument-count-mismatch", 17],
+				["argument-count-mismatch", 18],
+				["argument-count-mismatch", 19],
+				["argument-label-mismatch", 20],
+				["argument-label-mismatch", 20],
+			])
+		})
+
+		// The call still answers its declared Type, so what is done with the
+		// answer is measured. A literal paired with a Function at its place
+		// still reports a Parameter that Function lacks.
+		it("should keep what a refused call answers and its literals' own mistakes", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function twice(_ f: (_: Integer) -> Integer, _ n: Integer) -> Integer {
+						<- f(f(n))
+					}
+
+					function plain(_ n: Integer) -> Integer {
+						<- n
+					}
+
+					constant b: String = plain(1, 2)
+					constant c = plain(1, 2)::append("s")
+					constant e: String = plain()
+					constant extra = twice((x, y) { <- x }, 1, 2)
+				}`)
+					.map(
+						(diagnostic) =>
+							`${diagnostic.code}@${diagnostic.position?.start.line}`,
+					)
+					.sort(),
+			).toEqual([
+				"argument-count-mismatch@10",
+				"argument-count-mismatch@11",
+				"argument-count-mismatch@12",
+				"argument-count-mismatch@13",
+				"assignment-type-mismatch@10",
+				"assignment-type-mismatch@12",
+				"uninferable-parameter-type@13",
+				"unknown-method@11",
+			])
+		})
+
+		// A written Union holding a hole is no hole as an Argument: its known
+		// members are measured against the Parameter.
+		it("should measure an Argument holding a hole by its known members", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Pair = Integer | Colr
+
+					function takesString(_ s: String) -> String {
+						<- s
+					}
+
+					function described(_ value: Pair) -> String {
+						<- takesString(value)
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-type", "argument-type-mismatch"])
+		})
+
 		// Against the bound `(_: Integer) -> Integer`, a body answering a String
 		// is a return-Type mismatch inside the literal, at the answer.
 		it("should still reject a callback that disagrees with the binding", () => {
