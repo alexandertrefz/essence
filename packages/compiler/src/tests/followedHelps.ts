@@ -161,6 +161,8 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"dictionary-entry-syntax",
 		"duplicate-import",
 		"duplicate-type-parameter",
+		"empty-dictionary-overlap",
+		"empty-list-overlap",
 		"empty-path-group",
 		"expect-not-boolean",
 		"expect-outside-test",

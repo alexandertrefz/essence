@@ -337,6 +337,70 @@ describe("A Case an empty container crosses into", () => {
 			}`),
 		).toBe(true)
 	})
+
+	// In a Match of its own the Guards go on its Cases, and the empty
+	// container gets the Case they leave it to.
+	it("should compile the guarded List Cases a Match is asked for", () => {
+		expect(
+			firstAnalysed(
+				`implementation {
+					constant items: List<Integer> | List<String> = [1]
+
+					Terminal.print(match items -> String {
+						case List<String> { <- "strings" }
+						case List<Integer> { <- "integers" }
+					})
+				}`,
+				"empty-list-overlap",
+			).helps,
+		).toEqual([
+			"Guard the Cases with 'where @::hasItems()' and answer for the empty List in a Case of its own.",
+		])
+
+		let followed = `implementation {
+			constant items: List<Integer> | List<String> = [1]
+
+			Terminal.print(match items -> String {
+				case List<String> where @::hasItems() { <- "strings" }
+				case List<Integer> where @::hasItems() { <- "integers" }
+				case _ { <- "empty" }
+			})
+		}`
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+
+	it("should compile the guarded Dictionary Cases a Match is asked for", () => {
+		expect(
+			firstAnalysed(
+				`implementation {
+					constant ages: Dictionary<String, Integer> | Dictionary<Integer, String> = ["a" = 1]
+
+					Terminal.print(match ages -> String {
+						case Dictionary<Integer, String> { <- "names" }
+						case Dictionary<String, Integer> { <- "ages" }
+					})
+				}`,
+				"empty-dictionary-overlap",
+			).helps,
+		).toEqual([
+			"Guard the Cases with 'where @::hasEntries()' and answer for the empty Dictionary in a Case of its own.",
+		])
+
+		let followed = `implementation {
+			constant ages: Dictionary<String, Integer> | Dictionary<Integer, String> = ["a" = 1]
+
+			Terminal.print(match ages -> String {
+				case Dictionary<Integer, String> where @::hasEntries() { <- "names" }
+				case Dictionary<String, Integer> where @::hasEntries() { <- "ages" }
+				case _ { <- "empty" }
+			})
+		}`
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
 })
 
 describe("A Case of a Match on values", () => {
