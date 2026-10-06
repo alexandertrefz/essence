@@ -3704,6 +3704,30 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// A fulfilling Method declares the requirement's Parameters. It may give
+		// one a default, but a Parameter it adds is refused, defaulted or not.
+		it("should accept a default the requirement lacks but no added Parameter", () => {
+			let conforming = (parameters: string): Array<common.Diagnostic> =>
+				diagnosticsFor(`implementation {
+					protocol Greeter {
+						greet(times count: Integer) -> String
+					}
+
+					namespace Hello for Integer is Greeter {
+						greet(${parameters}) -> String {
+							<- "hi"
+						}
+					}
+				}`)
+
+			expect(conforming("times count: Integer = 1")).toEqual([])
+			expect(
+				conforming(
+					"times count: Integer, loudly loud: Boolean = false",
+				).map((diagnostic) => diagnostic.code),
+			).toEqual(["nonconforming-namespace"])
+		})
+
 		it("should reject a simple Method fulfilling a static requirement", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				protocol Creatable {

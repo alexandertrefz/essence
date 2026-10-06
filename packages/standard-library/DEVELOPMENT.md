@@ -899,9 +899,10 @@ it.
 
 A default is refused where a call could not rely on it: on a Protocol Method,
 required or provided (`default-on-protocol-method`), and on a Function literal
-in expression position (`default-on-function-literal`). And in this version a Method fulfilling
-a Protocol requirement must match it exactly, defaulted Parameters included —
-which is why `String.is` keeps its `overload` block rather than collapsing into
-a defaulted `comparing:` Parameter. Its `isNot` is `Equatable`'s provided one,
-which asks for the one-Parameter form and has no `comparing:` entry to
-collapse.
+in expression position (`default-on-function-literal`). A Method fulfilling a
+Protocol requirement declares exactly the requirement's Parameters
+(`signatureMatches`). It may give one of them a default the requirement lacks,
+but it may not add a Parameter, even a defaulted one. That is why `String.is`
+keeps its `overload` block rather than collapsing into a defaulted `comparing:`
+Parameter. Its `isNot` is `Equatable`'s provided one, which asks for the
+one-Parameter form and has no `comparing:` entry to collapse.
