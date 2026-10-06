@@ -228,7 +228,7 @@ function pickedRequirementHelp(
 // Whether the call compiles once its pick is dropped, asked silently. The
 // Arguments are enriched first, as the refused call enriches them, so their
 // own Diagnostics are reported and the probe judges the call alone.
-function compilesWithoutPick(
+export function compilesWithoutPick(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	scope: enricher.Scope,

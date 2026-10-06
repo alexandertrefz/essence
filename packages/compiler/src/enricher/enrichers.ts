@@ -111,7 +111,11 @@ import {
 	isUnknownMember,
 	unresolvedCaseBindings,
 } from "./patternMembers"
-import { answeringNamespaces, reportPickedRequirement } from "./protocolPicks"
+import {
+	answeringNamespaces,
+	compilesWithoutPick,
+	reportPickedRequirement,
+} from "./protocolPicks"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
@@ -214,6 +218,7 @@ import {
 	refuseDuplicateTypeParameters,
 	refuseUndecidedTypeParameters,
 } from "./typeParameters"
+import { dividedUnionNotes, reportNarrowedUnionMember } from "./unionDispatch"
 
 // Hoisting resolves each order-independent declaration's Type up front, keyed
 // by its Node, and the in-order enrichment reuses it. A Node absent from the
@@ -10940,7 +10945,7 @@ function payloadsOf(caseType: common.CaseType): Array<HeldValue> {
 // Whether a `::` call of this name resolves for this Type, by the lookup a call
 // uses, so unimported Namespaces do not count. Asked only after the call failed
 // on the receiver itself.
-function methodAnswersFor(
+export function methodAnswersFor(
 	methodName: string,
 	receiverType: common.Type,
 	scope: enricher.Scope,
@@ -11855,7 +11860,7 @@ function describeWrittenArgument(type: common.Type): string {
 }
 
 // An English list, for naming several Types in a row.
-function joinedWithAnd(described: Array<string>): string {
+export function joinedWithAnd(described: Array<string>): string {
 	if (described.length < 2) {
 		return described.join("")
 	}
@@ -12425,6 +12430,8 @@ export function resolveMethodInvocation(
 						node.position,
 					),
 					helps(),
+					baseType,
+					() => compilesWithoutPick(node, baseType, scope, typer),
 				)
 			}
 		} else {
@@ -12611,34 +12618,6 @@ export function resolveMethodInvocation(
 	}
 }
 
-// Which members of the Union answer the name and which do not, so the reader
-// sees how far off the call is. Empty where no member answers.
-function dividedUnionNotes(
-	node: parser.MethodInvocationNode,
-	unionType: common.UnionType,
-	scope: enricher.Scope,
-): Array<string> {
-	let providing: Array<string> = []
-	let lacking: Array<string> = []
-
-	for (let member of flattenUnionMembers(unionType)) {
-		let answers = methodAnswersFor(
-			node.member.content,
-			member,
-			scope,
-			node.position,
-		)
-
-		;(answers ? providing : lacking).push(describeType(member))
-	}
-
-	return providing.length === 0
-		? []
-		: [
-				`'${node.member.content}' answers for ${joinedWithAnd(providing)}, and not for ${joinedWithAnd(lacking)}.`,
-			]
-}
-
 // Per-member dispatch for a Union receiver: the Method resolves for each
 // member, and the Type is the Union of the branches' return Types. More
 // specific members come first, so an open Record member does not swallow the
@@ -12687,6 +12666,19 @@ function resolveUnionMethodDispatch(
 					memberType,
 					staticNamespaces,
 					scope,
+				)
+
+				return resolveFailedMethodInvocation()
+			}
+
+			// A specifier narrowed this member's lookup, not its Methods.
+			if (node.namespaceSpecifier !== null) {
+				reportNarrowedUnionMember(
+					node,
+					unionType,
+					memberType,
+					scope,
+					typer,
 				)
 
 				return resolveFailedMethodInvocation()

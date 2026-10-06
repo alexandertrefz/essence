@@ -1541,6 +1541,91 @@ describe("A Protocol pick of a name its Protocol inherits", () => {
 		).toBe(true)
 	})
 
+	// A String answers `isLessThan`, only not through `Orderable`, so the
+	// report is about the pick. Dropping it leaves `3` for the String's
+	// `isLessThan`, so the Help asks for a `match`.
+	it("should report a Union member the pick leaves without the Method", () => {
+		let reported = firstOf(
+			`implementation {
+				constant x: Integer | String = 5
+
+				Terminal.print(x::<Orderable>isLessThan(3))
+			}`,
+			"no-namespace-for-value",
+		)
+
+		expect(reported.notes).toEqual([
+			"The specifier limits the lookup to 'Orderable', which provides no 'isLessThan' for String.",
+		])
+		expect(reported.helps).toEqual([
+			"Match on the value, and call 'isLessThan' on '@' in each arm, with Arguments of that arm's Type.",
+		])
+		expect(
+			compiles(`implementation {
+				constant x: Integer | String = 5
+
+				Terminal.print(match x -> Boolean {
+					case Integer { <- @::<Orderable>isLessThan(3) }
+					case String  { <- @::isLessThan("b") }
+				})
+			}`),
+		).toBe(true)
+	})
+
+	it("should offer to drop a specifier that leaves a Union member out where the call then compiles", () => {
+		expect(
+			firstOf(
+				`implementation {
+				constant x: Integer | Rational = 5
+
+				Terminal.print(x::<Integer>isLessThan(3))
+			}`,
+				"no-namespace-for-value",
+			).helps,
+		).toEqual(["Drop the Namespace specifier."])
+		expect(
+			compiles(`implementation {
+				constant x: Integer | Rational = 5
+
+				Terminal.print(x::isLessThan(3))
+			}`),
+		).toBe(true)
+	})
+
+	// Dropping the pick leaves `is` and `isLessThan` refusing the Argument,
+	// so the Help names the Method whose Arguments to pass.
+	it("should offer to drop a pick of a name it has not got only where the call then compiles", () => {
+		let reported = enrich(
+			parse(`implementation {
+				Terminal.print(5::<Orderable>is("a"))
+				Terminal.print("abc"::<Orderable>isLessThan(5))
+			}`),
+		).diagnostics
+
+		expect(
+			reported.map((diagnostic) => [diagnostic.code, diagnostic.helps]),
+		).toEqual([
+			[
+				"no-namespace-for-value",
+				[
+					"Drop the Namespace specifier, and pass 'is' the Arguments 'Integer::is' takes.",
+				],
+			],
+			[
+				"no-namespace-for-value",
+				[
+					"Drop the Namespace specifier, and pass 'isLessThan' the Arguments 'String::isLessThan' takes.",
+				],
+			],
+		])
+		expect(
+			compiles(`implementation {
+				Terminal.print(5::is(5))
+				Terminal.print("abc"::isLessThan("b"))
+			}`),
+		).toBe(true)
+	})
+
 	// `String` is `Comparable` but not `Orderable`, so the body `Orderable`
 	// inherits is not offered for it.
 	it("should refuse a value that does not conform to the picked Protocol", () => {

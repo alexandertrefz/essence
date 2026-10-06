@@ -17,20 +17,32 @@ export function specifierWasRefused(
 
 // A call whose lookup found no Namespace for the receiver. `writers` are the
 // Namespaces that answer the Method for a call without the specifier, provided
-// and derived ones included, and `helps` the caller's own.
+// and derived ones included, and `helps` the caller's own. `member` is the
+// member of a Union receiver the lookup found nothing for. `compilesWithout`
+// asks whether the call compiles once the specifier is dropped.
 export function reportEmptyLookup(
 	node: parser.MethodInvocationNode,
 	baseType: common.Type,
 	scope: enricher.Scope,
 	writers: Map<string, common.NamespaceType>,
 	helps: Array<string>,
+	member: common.Type = baseType,
+	compilesWithout: () => boolean = () => true,
 ): void {
 	let methodName = node.member.content
 	let written = [...writers]
 		.filter(([, namespace]) => Object.hasOwn(namespace.methods, methodName))
 		.map(([name]) => name)
 
-	let wording = namespaceLookupWording(node, baseType, scope, written)
+	let wording = namespaceLookupWording(node, member, scope, written)
+
+	// Dropping the specifier is offered only where the call then compiles.
+	// Otherwise its Arguments do not fit the Method a Namespace writes.
+	if (written.length > 0 && !compilesWithout()) {
+		wording.helps = [
+			`Drop the Namespace specifier, and pass '${methodName}' the Arguments '${written[0]}::${methodName}' takes.`,
+		]
+	}
 
 	reportError(
 		`No Namespace provides Methods for this value`,
