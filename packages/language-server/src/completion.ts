@@ -706,8 +706,6 @@ function probeReceiverIn(node: TypedNode): common.Type | undefined {
 
 			break
 		}
-		case "TypeAliasStatement":
-			return undefined
 	}
 
 	return findTypedChild(node, probeReceiverIn)

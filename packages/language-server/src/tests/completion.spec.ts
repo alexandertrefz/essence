@@ -3977,6 +3977,16 @@ describe("Completion inside each kind of node", () => {
 
 			expect(labelsOf(source, cursor)).toEqual(["x", "y"])
 		})
+
+		it("should list the Methods of @ in a refinement's predicate", () => {
+			let { source, cursor } = atMarker([
+				"implementation {",
+				"\ttype Small = Integer where @::‸",
+				"}",
+			])
+
+			expect(labelsOf(source, cursor)).toContain("isLessThan")
+		})
 	})
 
 	describe("a Case's expected Type", () => {
