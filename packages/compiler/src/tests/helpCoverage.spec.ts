@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import * as path from "node:path"
 
 import type { common } from "@essence-lang/interfaces"
@@ -16,6 +16,41 @@ const DOCS = path.join(
 	import.meta.dir,
 	"../../../website/src/content/docs/reference/diagnostics.mdx",
 )
+
+const REPOSITORY = path.join(import.meta.dir, "../../../..")
+
+// Some Helps are no edit to a Program, such as a path on the command line or a
+// character `essence.json` lacks. `compiles` can not follow those, so each
+// code names the spec that does, as a path from the repository root. That
+// spec follows it in a `describe("followed")` block naming the code.
+const FOLLOWED_WITHOUT_COMPILING: Readonly<
+	Partial<Record<common.DiagnosticCode, string>>
+> = {
+	"file-not-found": "packages/cli/src/tests/cli.spec.ts",
+	"not-a-file": "packages/cli/src/tests/cli.spec.ts",
+	"unreadable-project-file":
+		"packages/compiler/src/tests/configuration.spec.ts",
+}
+
+// A spec's `describe("followed")` block, read to the line that closes it at its
+// own indentation, or null where the spec has none.
+function followedBlockOf(source: string): string | null {
+	let lines = source.split("\n")
+	let start = lines.findIndex((line) =>
+		/^\t*describe\("followed", \(\) => \{$/.test(line),
+	)
+
+	if (start === -1) {
+		return null
+	}
+
+	let indentation = /^\t*/.exec(lines[start] as string)?.[0] ?? ""
+	let end = lines.findIndex(
+		(line, index) => index > start && line === `${indentation}})`,
+	)
+
+	return end === -1 ? null : lines.slice(start, end + 1).join("\n")
+}
 
 // A Help spells something when it says `Write '…'` or quotes code, such as
 // "Add 'case Colour#Blue'" or `'<Item is Comparable>'`. Quoted code holds a
@@ -108,16 +143,52 @@ describe("Helps that spell something to write", () => {
 		).toEqual([])
 	})
 
+	it("has nothing stale among the codes followed without compiling", () => {
+		expect(
+			Object.keys(FOLLOWED_WITHOUT_COMPILING).filter(
+				(code) => !promising.includes(code as common.DiagnosticCode),
+			),
+		).toEqual([])
+	})
+
+	// A code is followed one way, so it is never in both lists.
+	it("follows each code without compiling only where nothing compiles it", () => {
+		expect(
+			COMPILE_CHECKED_HELP_CODES.filter(
+				(code) => FOLLOWED_WITHOUT_COMPILING[code] !== undefined,
+			),
+		).toEqual([])
+	})
+
+	// Deleting the block that follows a code, or moving it to another spec,
+	// fails here.
+	it("has every code followed without compiling in its spec's followed block", () => {
+		expect(
+			Object.entries(FOLLOWED_WITHOUT_COMPILING).filter(
+				([code, specPath]) => {
+					let file = path.join(REPOSITORY, specPath as string)
+					let block = existsSync(file)
+						? followedBlockOf(readFileSync(file, "utf8"))
+						: null
+
+					return block === null || !block.includes(`"${code}"`)
+				},
+			),
+		).toEqual([])
+	})
+
 	// Printed rather than failed: an uncovered code is a Help that nothing
-	// compiles yet, which is work to do rather than breakage.
+	// follows yet, which is work to do rather than breakage.
 	it("names what is left to compile", () => {
 		let uncovered = promising.filter(
-			(code) => !COMPILE_CHECKED_HELP_CODES.includes(code),
+			(code) =>
+				!COMPILE_CHECKED_HELP_CODES.includes(code) &&
+				FOLLOWED_WITHOUT_COMPILING[code] === undefined,
 		)
 
 		if (uncovered.length > 0) {
 			console.log(
-				`TODO — Helps that spell an edit and are not compiled anywhere (${uncovered.length}):\n  ${uncovered.join("\n  ")}`,
+				`TODO — Helps that spell an edit and are not followed anywhere (${uncovered.length}):\n  ${uncovered.join("\n  ")}`,
 			)
 		}
 	})

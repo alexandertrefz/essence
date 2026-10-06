@@ -2783,6 +2783,9 @@ describe("a path that can not be read", () => {
 			return quoted[1] as string
 		}
 
+		let reportedCode = (printed: string): string | undefined =>
+			/\[([a-z-]+)\]/.exec(printed)?.[1]
+
 		it("should check the file a near miss names", () =>
 			withFiles(
 				{ "src/Main.es": "implementation {}\n" },
@@ -2808,6 +2811,9 @@ describe("a path that can not be read", () => {
 						),
 					)
 
+					expect(reportedCode(`${refused.out}${refused.err}`)).toBe(
+						"file-not-found",
+					)
 					expect(code).toBe(EXIT_SUCCESS)
 				},
 			))
@@ -2842,6 +2848,9 @@ describe("a path that can not be read", () => {
 						),
 					)
 
+					expect(reportedCode(`${refused.out}${refused.err}`)).toBe(
+						"not-a-file",
+					)
 					expect(code).toBe(EXIT_SUCCESS)
 					expect(`${out}${err}`).toContain("2 files checked")
 				},

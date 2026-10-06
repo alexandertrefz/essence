@@ -446,6 +446,7 @@ describe("essence.json — mistakes are Warnings with a span", () => {
 				let [diagnostic] = diagnosticsOf(parse(current))
 				let offset = offsetOf(current, diagnostic?.position?.start)
 
+				expect(diagnostic?.code).toBe("unreadable-project-file")
 				expect(diagnostic?.helps).toEqual([help])
 
 				current = written.startsWith("in place of ")
