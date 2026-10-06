@@ -89,6 +89,29 @@ describe("A member path with no Function around it", () => {
 			"This position expects an Integer rather than a Function — read the members off a value instead, writing what this answers with in place of '<value>': '<value>.price'.",
 		])
 	})
+
+	it("compiles with the path passed to '::map'", () => {
+		expect(
+			compiles(`implementation {
+		type Product = { price: Integer }
+
+		constant products: List<Product> = [{ price = 1 }]
+		constant prices = products::map(.price)
+	}`),
+		).toBe(true)
+	})
+
+	it("compiles with the members read off a value", () => {
+		expect(
+			compiles(`implementation {
+		type Product = { price: Integer }
+
+		function priceOf(_ product: Product) -> Integer {
+			<- product.price
+		}
+	}`),
+		).toBe(true)
+	})
 })
 
 describe("A Method that can not be dispatched", () => {
@@ -215,6 +238,97 @@ describe("A return Type nothing could read off the body", () => {
 		expect(helpsOfCode(returns, "uninferable-return-type")).toEqual([
 			"Give the Function an explicit '-> Type'.",
 		])
+	})
+
+	it("compiles once the literal writes its return Type", () => {
+		expect(
+			compiles(`implementation {
+		function half(_ text: String) -> Result<Integer, String> {
+			<- Integer.parse(text)::toResult(failingWith "not a number")::andThen((value) -> Result<Integer, String> {
+				<- #Value(value)
+			})
+		}
+	}`),
+		).toBe(true)
+	})
+})
+
+describe("A capture whose Type nothing has decided yet", () => {
+	// The annotation keeps the reader's keyword and fills the blank where it
+	// stands, with an example Type the Help says is one.
+	let captured = (declaration: string, read: string, assigned = "") =>
+		`implementation {
+		${declaration}
+
+		constant count = () -> Integer {
+			<- ${read}
+		}
+		${assigned}
+	}`
+
+	it("annotates a List at its item Type", () => {
+		expect(
+			helpsOfCode(
+				captured("variable items = []", "items::length()"),
+				"uninferable-item-type",
+			),
+		).toEqual([
+			"Annotate the declaration — 'variable items: List<Integer>', for instance — so the Function is checked against the Type it will hold.",
+		])
+		expect(
+			compiles(
+				captured(
+					"variable items: List<Integer> = []",
+					"items::length()",
+					"items = [1, 2]",
+				),
+			),
+		).toBe(true)
+	})
+
+	it("annotates a Dictionary at both of its Types", () => {
+		expect(
+			helpsOfCode(
+				captured("variable ages = [=]", "ages::length()"),
+				"uninferable-item-type",
+			),
+		).toEqual([
+			"Annotate the declaration — 'variable ages: Dictionary<String, Integer>', for instance — so the Function is checked against the Types it will hold.",
+		])
+		expect(
+			compiles(
+				captured(
+					"variable ages: Dictionary<String, Integer> = [=]",
+					"ages::length()",
+					'ages = ["a" = 1]',
+				),
+			),
+		).toBe(true)
+	})
+
+	// The blank sits inside a Future here, so the annotation wraps it there.
+	it("annotates a blank at the depth it stands", () => {
+		let source = `implementation {
+		constant work = Async.deferred(() { <- [] })
+
+		constant count = () -> Future<Integer> {
+			constant items = complete work
+
+			<- items::length()
+		}
+	}`
+
+		expect(helpsOfCode(source, "uninferable-item-type")).toEqual([
+			"Annotate the declaration — 'constant work: Future<List<Integer>>', for instance — so the Function is checked against the Type it will hold.",
+		])
+		expect(
+			compiles(
+				source.replace(
+					"constant work =",
+					"constant work: Future<List<Integer>> =",
+				),
+			),
+		).toBe(true)
 	})
 })
 
