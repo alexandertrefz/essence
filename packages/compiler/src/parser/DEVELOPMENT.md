@@ -323,6 +323,10 @@ again as a Statement:
 - `require MATCHER = EXPR matches snapshot`, by `refuseSnapshotAfterMatcher`. A snapshot records a value, and this
   line took one apart.
 
+`descent/testsRefusals.ts` builds these refusals. Their Helps spell the Matcher and the value back as they were
+written, so the line a Help names is the reader's own. A span over several lines is spelled `…` for the reader to
+fill in.
+
 An assertion belongs to a test's own block and every block nested in it. A Function literal in a test body is the
 boundary, since its body runs wherever it is handed. `insideTestBody` tracks this, and `reportAssertionOutsideTest`
 reports an assertion outside it.

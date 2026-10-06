@@ -1,9 +1,11 @@
-import type { common, lexer } from "@essence-lang/interfaces"
+import type { common, lexer, parser } from "@essence-lang/interfaces"
 
+import { matcherNames } from "../../helpers/patterns"
 import { ParseError } from "./tokenStream"
 
-// The refusals written in and around a tests section, and the reader's text
-// their Helps spell back.
+// The refusals written in and around a tests section. Their Helps spell the
+// reader's own Matcher and value back. `…` stands for a span that runs over
+// several lines, which the reader fills in.
 
 // The text a one-line span was read from, for a Help that spells the
 // reader's text back. A String Node holds decoded escapes, so it can not.
@@ -23,6 +25,115 @@ export function writtenText(
 	}
 
 	return line.slice(position.start.column - 1, position.end.column - 1)
+}
+
+// A Matcher and the value it was written over.
+type Assertion = {
+	matcher: parser.MatcherNode
+	value: parser.ExpressionNode
+}
+
+function spelled(
+	lines: Array<string>,
+	assertion: Assertion,
+): { matcher: string; value: string } {
+	return {
+		matcher: writtenText(lines, assertion.matcher.position) || "…",
+		value: writtenText(lines, assertion.value.position) || "…",
+	}
+}
+
+// Comparing keeps the keyword the reader wrote.
+function takeApartHelps(
+	lines: Array<string>,
+	keyword: string,
+	assertion: Assertion,
+): Array<string> {
+	let { matcher, value } = spelled(lines, assertion)
+
+	return [
+		`Take the value apart with 'require': 'require ${matcher} = ${value}'.`,
+		`Or compare instead: '${keyword} ${value}::is(…)'.`,
+	]
+}
+
+// `expect MATCHER = EXPR`.
+export function refusedMatcherOnExpect(
+	lines: Array<string>,
+	matcher: parser.MatcherNode,
+	value: parser.ExpressionNode,
+): ParseError {
+	return new ParseError(
+		"An 'expect' can not take a value apart",
+		matcher.position,
+		"this would introduce a name",
+		{
+			code: "matcher-on-expect",
+			notes: [
+				"An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.",
+			],
+			helps: takeApartHelps(lines, "expect", { matcher, value }),
+		},
+	)
+}
+
+// `EXPR is MATCHER`, a form this language does not have.
+export function refusedMatcherAfterValue(
+	lines: Array<string>,
+	keyword: lexer.Token,
+	is: lexer.Token,
+	assertion: Assertion,
+): ParseError {
+	return new ParseError(
+		"An assertion has no 'is' form",
+		{ start: is.position.start, end: assertion.matcher.position.end },
+		"this Matcher stands after the value",
+		{
+			code: "matcher-after-value",
+			notes: [
+				"A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.",
+			],
+			helps: takeApartHelps(lines, keyword.value, assertion),
+		},
+	)
+}
+
+// `require MATCHER = EXPR matches snapshot`. A Matcher that names nothing,
+// such as `#Empty`, leaves nothing to record but the value.
+export function refusedSnapshotAfterMatcher(
+	lines: Array<string>,
+	snapshot: parser.SnapshotNode,
+	assertion: Assertion,
+): ParseError {
+	let names = matcherNames(assertion.matcher)
+	let { matcher, value } = spelled(lines, assertion)
+	let taken = `require ${matcher} = ${value}`
+	let whole = `Or snapshot the value whole, where it is one that prints: 'expect ${value} matches snapshot'.`
+
+	return new ParseError(
+		"A snapshot records a value, and this line took one apart",
+		snapshot.position,
+		"there is no value here to record",
+		{
+			code: "snapshot-after-matcher",
+			// The Matcher's names, for the Quick Fix that records one of them on
+			// a line of its own.
+			data: { kind: "introduced-names", names },
+			notes: [
+				"A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.",
+			],
+			helps:
+				names.length === 0
+					? [
+							`Drop 'matches snapshot' — '${taken}' names nothing to record.`,
+							whole,
+						]
+					: [
+							`Record ${names.length === 1 ? "the name" : "a name"} on a line of its own: '${taken}' then 'expect ${names[0]} matches snapshot'.`,
+							whole,
+						],
+		},
+	)
 }
 
 // A `test` or a `suite` read where only Statements stand. One in a test's own

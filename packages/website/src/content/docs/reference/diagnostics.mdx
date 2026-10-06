@@ -5875,8 +5875,8 @@ Error: An 'expect' can not take a value apart
    │               ──────┬──────  
    │                     ╰──────── this would introduce a name
    │ 
-   │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
-   │ Help 2: Or compare instead: 'expect value::is(…)'.
+   │ Help 1: Take the value apart with 'require': 'require #Value(first) = scores::firstItem()'.
+   │ Help 2: Or compare instead: 'expect scores::firstItem()::is(…)'.
    │ 
    │ Note: An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.
 ───╯
@@ -5905,8 +5905,8 @@ Error: An assertion has no 'is' form
    │                                    ────────┬───────  
    │                                            ╰───────── this Matcher stands after the value
    │ 
-   │ Help 1: Take the value apart with 'require': 'require #Value(item) = value'.
-   │ Help 2: Or compare instead: 'expect value::is(…)'.
+   │ Help 1: Take the value apart with 'require': 'require #Value(first) = scores::firstItem()'.
+   │ Help 2: Or compare instead: 'require scores::firstItem()::is(…)'.
    │ 
    │ Note: A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.
 ───╯
@@ -5993,8 +5993,8 @@ Error: A snapshot records a value, and this line took one apart
    │                                                    ────────┬───────  
    │                                                            ╰───────── there is no value here to record
    │ 
-   │ Help 1: Record the name on a line of its own: 'require #Value(item) = value' then 'expect item matches snapshot'.
-   │ Help 2: Or snapshot the value whole, where it is one that prints: 'expect value matches snapshot'.
+   │ Help 1: Record the name on a line of its own: 'require #Value(first) = scores::firstItem()' then 'expect first matches snapshot'.
+   │ Help 2: Or snapshot the value whole, where it is one that prints: 'expect scores::firstItem() matches snapshot'.
    │ 
    │ Note: A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.
 ───╯
@@ -6002,7 +6002,7 @@ Error: A snapshot records a value, and this line took one apart
 
 </div>
 
-Record the name on a line of its own: `require #Value(first) = scores::firstItem()`, then `expect first matches snapshot`.
+Record the name on a line of its own: `require #Value(first) = scores::firstItem()`, then `expect first matches snapshot`. A matcher that names nothing, such as `#Empty`, leaves nothing to record but the value, so the first help asks for `matches snapshot` to go instead.
 
 Quick Fix: **Record 'first' on a line of its own**.
 

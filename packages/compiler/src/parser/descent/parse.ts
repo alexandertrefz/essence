@@ -20,13 +20,18 @@ import {
 	semicolonAccount,
 } from "../../helpers/foreign"
 import { mixedRationalSpellings } from "../../helpers/mixedRational"
-import { matcherNames } from "../../helpers/patterns"
 import * as generators from "../nodeGenerators"
 import {
 	type MisplacedDefault,
 	reportMisplacedDefault,
 } from "./misplacedDefaults"
-import { refusedTestItem, writtenText } from "./testsRefusals"
+import {
+	refusedMatcherAfterValue,
+	refusedMatcherOnExpect,
+	refusedSnapshotAfterMatcher,
+	refusedTestItem,
+	writtenText,
+} from "./testsRefusals"
 import {
 	describeToken,
 	fail,
@@ -3554,7 +3559,7 @@ class DescentParser {
 				end: value.position.end,
 			}
 
-			this.refuseMatcherOnExpect(keyword, matcher)
+			this.refuseMatcherOnExpect(keyword, matcher, value)
 			this.refuseUnusableMatcher(matcher, value)
 
 			let matches = this.tokens.peek()
@@ -3563,7 +3568,7 @@ class DescentParser {
 				matches?.type === TokenType.Identifier &&
 				matches.value === MATCHES
 			) {
-				this.refuseSnapshotAfterMatcher(matcher)
+				this.refuseSnapshotAfterMatcher(matcher, value)
 			}
 
 			this.reportAssertionOutsideTest(keyword, position)
@@ -3581,7 +3586,7 @@ class DescentParser {
 			following?.type === TokenType.Identifier &&
 			following.value === "is"
 		) {
-			this.refuseMatcherAfterValue(following)
+			this.refuseMatcherAfterValue(keyword, following, value)
 		}
 
 		if (
@@ -3620,26 +3625,13 @@ class DescentParser {
 	protected refuseMatcherOnExpect(
 		keyword: Token,
 		matcher: parser.MatcherNode,
+		value: parser.ExpressionNode,
 	): void {
 		if (keyword.type !== TokenType.KeywordExpect) {
 			return
 		}
 
-		throw new ParseError(
-			"An 'expect' can not take a value apart",
-			matcher.position,
-			"this would introduce a name",
-			{
-				code: "matcher-on-expect",
-				notes: [
-					"An 'expect' records its result and the test carries on, so a name it introduced would stand below a line that may never have run. A 'require' ends the test where it stands, which is what makes the names it introduces safe to read.",
-				],
-				helps: [
-					"Take the value apart with 'require': 'require #Value(item) = value'.",
-					"Or compare instead: 'expect value::is(…)'.",
-				],
-			},
-		)
+		throw refusedMatcherOnExpect(this.sourceLines, matcher, value)
 	}
 
 	// A wildcard or a literal means nothing left of `=`. A shape that binds
@@ -3695,54 +3687,33 @@ class DescentParser {
 
 	// `EXPR is MATCHER`, a form this language does not have, refused after the
 	// Matcher is read. See "Assertions" in DEVELOPMENT.md.
-	protected refuseMatcherAfterValue(is: Token): never {
+	protected refuseMatcherAfterValue(
+		keyword: Token,
+		is: Token,
+		value: parser.ExpressionNode,
+	): never {
 		this.tokens.next()
 
 		let matcher = this.parseMatcher(true)
 
-		throw new ParseError(
-			"An assertion has no 'is' form",
-			{ start: is.position.start, end: matcher.position.end },
-			"this Matcher stands after the value",
-			{
-				code: "matcher-after-value",
-				notes: [
-					"A name is introduced left of '=', in a Parameter, or in a Handler head — never on the right of anything.",
-				],
-				helps: [
-					"Take the value apart with 'require': 'require #Value(item) = value'.",
-					"Or compare instead: 'expect value::is(…)'.",
-				],
-			},
-		)
+		throw refusedMatcherAfterValue(this.sourceLines, keyword, is, {
+			matcher,
+			value,
+		})
 	}
 
 	// `require MATCHER = EXPR matches snapshot`, refused after the snapshot is
 	// read: this line took a value apart rather than holding one.
-	protected refuseSnapshotAfterMatcher(matcher: parser.MatcherNode): never {
+	protected refuseSnapshotAfterMatcher(
+		matcher: parser.MatcherNode,
+		value: parser.ExpressionNode,
+	): never {
 		let snapshot = this.parseSnapshot()
 
-		throw new ParseError(
-			"A snapshot records a value, and this line took one apart",
-			snapshot.position,
-			"there is no value here to record",
-			{
-				code: "snapshot-after-matcher",
-				// The Matcher's names, for the Quick Fix that records one of
-				// them on a line of its own.
-				data: {
-					kind: "introduced-names",
-					names: matcherNames(matcher),
-				},
-				notes: [
-					"A snapshot is of the value an assertion is written over, printed as text. 'require MATCHER = EXPR' is written over a shape instead: it asks what the value has to be and names its parts, so what there is to record is one of those names.",
-				],
-				helps: [
-					"Record the name on a line of its own: 'require #Value(item) = value' then 'expect item matches snapshot'.",
-					"Or snapshot the value whole, where it is one that prints: 'expect value matches snapshot'.",
-				],
-			},
-		)
+		throw refusedSnapshotAfterMatcher(this.sourceLines, snapshot, {
+			matcher,
+			value,
+		})
 	}
 
 	// `matches snapshot`, inline or stored with `from`.

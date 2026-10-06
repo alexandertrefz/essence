@@ -1208,6 +1208,140 @@ line two" = body
 			})
 		})
 
+		// The Helps spell the reader's own Matcher and value, whatever shape
+		// the Matcher has, so the line they write compiles.
+		describe("the Helps of a Matcher on the wrong side", () => {
+			let reading = (line: string) => `implementation {
+				constant scores = [3, 1]
+				constant pair = { a = 1, b = 2 }
+			}
+
+			tests {
+				test "reads" {
+					${line}
+				}
+			}`
+			let helpsOf = (line: string) =>
+				parse(reading(line)).diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps,
+				])
+
+			it("should spell an 'expect' that takes a value apart", () => {
+				expect(
+					helpsOf("expect #Value(first) = scores::firstItem()"),
+				).toEqual([
+					[
+						"matcher-on-expect",
+						[
+							"Take the value apart with 'require': 'require #Value(first) = scores::firstItem()'.",
+							"Or compare instead: 'expect scores::firstItem()::is(…)'.",
+						],
+					],
+				])
+				expect(helpsOf("expect { a, b } = pair")).toEqual([
+					[
+						"matcher-on-expect",
+						[
+							"Take the value apart with 'require': 'require { a, b } = pair'.",
+							"Or compare instead: 'expect pair::is(…)'.",
+						],
+					],
+				])
+			})
+
+			it("should spell a Matcher written after the value", () => {
+				expect(
+					helpsOf("require scores::firstItem() is #Value(first)"),
+				).toEqual([
+					[
+						"matcher-after-value",
+						[
+							"Take the value apart with 'require': 'require #Value(first) = scores::firstItem()'.",
+							"Or compare instead: 'require scores::firstItem()::is(…)'.",
+						],
+					],
+				])
+				expect(helpsOf("expect pair is { a, b }")).toEqual([
+					[
+						"matcher-after-value",
+						[
+							"Take the value apart with 'require': 'require { a, b } = pair'.",
+							"Or compare instead: 'expect pair::is(…)'.",
+						],
+					],
+				])
+			})
+
+			it("should compile each line it spells", () => {
+				for (let line of [
+					"require #Value(first) = scores::firstItem()",
+					"require { a, b } = pair",
+					"expect scores::firstItem()::is(#Value(3))",
+					"require scores::firstItem()::is(#Value(3))",
+					"expect pair::is({ a = 1, b = 2 })",
+				]) {
+					expect(compiles(reading(line), { tests: true })).toBe(true)
+				}
+			})
+
+			it("should spell the line a snapshot was taken off", () => {
+				expect(
+					helpsOf(
+						"require #Value(first) = scores::firstItem() matches snapshot",
+					),
+				).toEqual([
+					[
+						"snapshot-after-matcher",
+						[
+							"Record the name on a line of its own: 'require #Value(first) = scores::firstItem()' then 'expect first matches snapshot'.",
+							"Or snapshot the value whole, where it is one that prints: 'expect scores::firstItem() matches snapshot'.",
+						],
+					],
+				])
+				expect(
+					helpsOf("require { a, b } = pair matches snapshot"),
+				).toEqual([
+					[
+						"snapshot-after-matcher",
+						[
+							"Record a name on a line of its own: 'require { a, b } = pair' then 'expect a matches snapshot'.",
+							"Or snapshot the value whole, where it is one that prints: 'expect pair matches snapshot'.",
+						],
+					],
+				])
+			})
+
+			// A Matcher that names nothing leaves nothing to record but the
+			// value, so the first Help drops the snapshot.
+			it("should drop a snapshot whose Matcher names nothing", () => {
+				expect(
+					helpsOf(
+						"require #Empty = scores::firstItem() matches snapshot",
+					),
+				).toEqual([
+					[
+						"snapshot-after-matcher",
+						[
+							"Drop 'matches snapshot' — 'require #Empty = scores::firstItem()' names nothing to record.",
+							"Or snapshot the value whole, where it is one that prints: 'expect scores::firstItem() matches snapshot'.",
+						],
+					],
+				])
+			})
+
+			it("should compile the lines a snapshot is split into", () => {
+				for (let line of [
+					"require #Value(first) = scores::firstItem()\n\t\t\t\t\texpect first matches snapshot",
+					"require { a, b } = pair\n\t\t\t\t\texpect a matches snapshot",
+					"require #Empty = scores::firstItem()",
+					"expect pair matches snapshot",
+				]) {
+					expect(compiles(reading(line), { tests: true })).toBe(true)
+				}
+			})
+		})
+
 		// A snapshot records a value, so on a line that takes one apart, the
 		// name it introduced is recorded on a line of its own.
 		it("should refuse a snapshot on a line that takes a value apart", () => {
