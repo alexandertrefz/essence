@@ -30,6 +30,7 @@ import { defaultOptimiserOptions, optimise } from "../optimiser/index"
 import { rewriteModules } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { compiles } from "./followedHelps"
 
 // A project written into a directory of its own and removed again, so each
 // spec shows where its files sit.
@@ -677,6 +678,46 @@ ${moduleProgram()}`,
 		)
 	})
 
+	it("compiles with the specifier each Help writes", () => {
+		let geometry = `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+
+export {
+	area
+}
+`
+		let importing = (specifier: string) => `import {
+	from "${specifier}" { area }
+}
+
+implementation {
+	Terminal.print(area(2))
+}
+`
+
+		expect(
+			compiles({
+				"Main.es": importing("Geometry.es"),
+				"Geometry.es": geometry,
+			}),
+		).toBe(false)
+		expect(
+			compiles({
+				"Main.es": importing("./Geometry.es"),
+				"Geometry.es": geometry,
+			}),
+		).toBe(true)
+		expect(
+			compiles({
+				"Main.es": importing("./shapes/Geometry.es"),
+				"shapes/Geometry.es": geometry,
+			}),
+		).toBe(true)
+	})
+
 	// These are reported on the specifier, and deleting one name leaves the
 	// same group, so the Help names the group. An export group's Module
 	// declares its names, so the edit there differs.
@@ -715,6 +756,22 @@ export {
 }
 `),
 		).toBe(`Write 'area' as a bare entry: 'export { area }'.`)
+	})
+
+	it("compiles with the group removed or written bare", () => {
+		let area = `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+
+	Terminal.print(area(2))
+}
+`
+
+		expect(compiles({ "Main.es": `import {\n}\n\n${area}` })).toBe(true)
+		expect(compiles({ "Main.es": `${area}\nexport {\n\tarea\n}\n` })).toBe(
+			true,
+		)
 	})
 
 	it("reports a specifier naming the standard library", () => {
@@ -1191,6 +1248,46 @@ ${exports}`
 		])
 	})
 
+	it("compiles once the name is listed in an export block", () => {
+		let library = (exports: string) => `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+
+	function perimeter(_ side: Integer) -> Integer {
+		<- side::multiply(with 4)
+	}
+}
+${exports}`
+		let main = `import {
+	from "./Library.es" { area }
+}
+
+implementation {
+	Terminal.print(area(2))
+}
+`
+
+		for (let exports of ["", "\nexport {\n\tperimeter\n}\n"]) {
+			expect(
+				compiles({ "Main.es": main, "Library.es": library(exports) }),
+			).toBe(false)
+		}
+
+		expect(
+			compiles({
+				"Main.es": main,
+				"Library.es": library("\nexport {\n\tarea\n\tperimeter\n}\n"),
+			}),
+		).toBe(true)
+		expect(
+			compiles({
+				"Main.es": main,
+				"Library.es": library("\nexport {\n\tarea\n}\n"),
+			}),
+		).toBe(true)
+	})
+
 	// Where the block lists the declaration under another name, the Note
 	// states the `as` rule.
 	it("names the 'as' rule in the not-exported Note", () => {
@@ -1344,6 +1441,37 @@ export {
 				])
 			},
 		)
+	})
+
+	it("compiles once the entry binds another name with 'as'", () => {
+		let library = `implementation {
+	function area(_ side: Integer) -> Integer {
+		<- side::multiply(with side)
+	}
+}
+
+export {
+	area
+}
+`
+		let main = (entry: string) => `import {
+	from "./Library.es" { ${entry} }
+}
+
+implementation {
+	constant area = 4
+
+	Terminal.print(area)
+	Terminal.print(tileArea(2))
+}
+`
+
+		expect(
+			compiles({
+				"Main.es": main("area as tileArea"),
+				"Library.es": library,
+			}),
+		).toBe(true)
 	})
 
 	// A Method call is emitted under the Namespace's name, so an aliased import

@@ -1,8 +1,18 @@
+import { tmpdir } from "node:os"
+import * as path from "node:path"
+
 import type { common } from "@essence-lang/interfaces"
 
-import { type AnalysisOptions, analyseSource } from "../analysis"
+import {
+	type AnalysisOptions,
+	analyseLinkedModules,
+	analyseSource,
+} from "../analysis"
 import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
+import { loadModuleGraph } from "../modules/graph"
+import { linkModuleGraph } from "../modules/link"
+import { canonicalPath } from "../modules/resolve"
 import { parse, parseWithDiagnostics } from "../parser/index"
 
 // The shared harness for specs about Helps: report a probe, read the Help off
@@ -40,12 +50,38 @@ export function firstOf(
 
 // A spec passes its probe with the Help's spelling written in, so a Help that
 // stops compiling fails the spec that prints it. Every stage runs, so a Help
-// followed into a Validator refusal fails too.
+// followed into a Validator refusal fails too. A Help about imports is
+// followed in a Program of several Modules, which compiles when every one
+// does.
 export function compiles(
-	source: string,
+	source: string | ModuleFiles,
 	options: AnalysisOptions = {},
 ): boolean {
-	return !containsErrors(analysedDiagnosticsFor(source, options))
+	return !containsErrors(
+		typeof source === "string"
+			? analysedDiagnosticsFor(source, options)
+			: graphDiagnosticsFor(source, options),
+	)
+}
+
+// A Program's Modules by file name, entered at the first. They are read from
+// memory under a directory that need not exist, so no file is written or read.
+// Only that directory's path is resolved.
+export type ModuleFiles = Record<string, string>
+
+function graphDiagnosticsFor(
+	files: ModuleFiles,
+	options: AnalysisOptions,
+): Array<common.Diagnostic> {
+	let directory = canonicalPath(path.join(tmpdir(), "essence-followed-helps"))
+	let entry = Object.keys(files)[0] ?? "Main.es"
+	let graph = loadModuleGraph(path.join(directory, entry), {
+		readFile: (filePath) => files[path.relative(directory, filePath)],
+	})
+	let linked = linkModuleGraph(graph, { tests: options.tests })
+	let analyses = analyseLinkedModules([...linked.modules.values()])
+
+	return [...linked.diagnostics, ...[...(analyses?.values() ?? [])].flat()]
 }
 
 // The Parser and the Enricher alone, for a probe whose point is a Type error.
@@ -115,6 +151,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"at-in-static-method",
 		"complete-outside-future",
 		"dictionary-entry-syntax",
+		"duplicate-import",
 		"duplicate-type-parameter",
 		"expect-not-boolean",
 		"expect-outside-test",
@@ -122,6 +159,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"incompatible-restatement",
 		"incomplete-record-argument",
 		"invalid-escape",
+		"invalid-module-specifier",
 		"literal-in-require",
 		"malformed-unicode-escape",
 		"matcher-after-value",
@@ -142,6 +180,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"redundant-interpolation-to-string",
 		"redundant-pattern-binder",
 		"restated-inferred-parameter",
+		"self-import",
 		"snapshot-after-matcher",
 		"snapshot-not-printable",
 		"surrogate-unicode-escape",
