@@ -61,6 +61,7 @@ import {
 	conformanceParameterName,
 	parameterInternalName,
 } from "../helpers/names"
+import { admittedPartialType } from "../helpers/predicateEval"
 import { type NamespaceReach } from "../helpers/providedReach"
 import { methodsRead, providedBodyReads } from "../helpers/providedReads"
 import { closestMatch } from "../helpers/suggest"
@@ -78,7 +79,6 @@ import {
 	matchesType,
 	NotHoistedYet,
 	refinementWithTypeArguments,
-	refusedFunctionsAsHoles,
 	resolveUnknownSlots,
 	type GenericBindings,
 	type NamespaceTarget,
@@ -306,8 +306,8 @@ export function combinationTypeOf(
 	let combined = resolved.type === "Record" ? resolved : lhsType
 
 	// A Function refused as a value is reported by the validator, so it is a
-	// hole here. Holing keeps a Record a Record.
-	let written = refusedFunctionsAsHoles(rhsType) as common.RecordType
+	// hole here. A written member carries its own evidence for a refinement.
+	let written = admittedPartialType(combined, rhsType, rhs)
 
 	if (isPartialOf(combined, written)) {
 		return combined

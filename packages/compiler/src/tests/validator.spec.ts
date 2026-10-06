@@ -5142,6 +5142,25 @@ describe("Validator", () => {
 					],
 				])
 			})
+
+			// An update is a written Record too, a path key's level included.
+			it("should admit a written member of a Record update", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						type Counted = { count: NonZeroInteger, label: String }
+						type Outer = { inner: Counted, rules: NonEmptyList<Integer> }
+
+						constant counted: Counted = { count = 1, label = "a" }
+						constant outer: Outer = { inner = counted, rules = [1] }
+						constant recounted: Counted = { counted with count = 3 }
+						constant deeper = { outer with inner.count = 4, rules = [5, 6] }
+						constant whole = { outer with inner = { count = 7, label = "b" } }
+
+						Terminal.inspect([recounted.count, deeper.inner.count, whole.inner.count])
+						Terminal.inspect(deeper.rules::length())
+					}`),
+				).toEqual([])
+			})
 		})
 	})
 })

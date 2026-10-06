@@ -175,11 +175,11 @@ fills in, by the rule `missingRecordMembers` applies to an Argument.
 
 A refinement usually needs a branch in front of it, something that asked its question. A value written down needs
 nobody to ask: `constant d: NonZeroInteger = 3` is a `NonZeroInteger` because 3 is not zero. `predicateEval.ts`
-decides such predicates while compiling, for a declared Constant, an Argument, a returned value, a Property and a
-Case payload. It reports nothing. A value it does not admit gets the ordinary mismatch where it stands, and
-`describePredicate` names the question it left unanswered. A value whose Type the base does not take is refused
-before any question, so `fitsRefinementBase` has the mismatch name the base instead and offer no check. Only an
-Argument's callee's own `infer` Type Parameters bind while the base is matched. An enclosing Declaration's `Item`
+decides such predicates while compiling, for a declared Constant, an Argument, a returned value, a Property, a Case
+payload and a Record update. It reports nothing. A value it does not admit gets the ordinary mismatch where it
+stands, and `describePredicate` names the question it left unanswered. A value whose Type the base does not take is
+refused before any question, so `fitsRefinementBase` has the mismatch name the base instead and offer no check. Only
+an Argument's callee's own `infer` Type Parameters bind while the base is matched. An enclosing Declaration's `Item`
 is fixed, so a `List<String>` is no `List<Item>`.
 
 Only a written Literal is admitted. Deciding anything else would need an interpreter and a second implementation
@@ -210,7 +210,9 @@ A written Record is asked member by member, so `{ count = 3 }` is a `{ count: No
 is a `NonZeroInteger`. A member the expected Record does not declare keeps its own Type, and the whole must still
 fit as it stands. A level a path key built is a partial, which only the merge with its default can measure, so it
 is not asked. A Case payload is a written Record too: the validator asks it against the Case's members, and
-`wrapSingleMemberShorthand` reads an admitted Record as the payload rather than wrapping it.
+`wrapSingleMemberShorthand` reads an admitted Record as the payload rather than wrapping it. So is what an update
+writes, asked member by member against the updated Record (`admittedPartialType`) and then measured as a partial,
+so `{ counted with count = 3 }` keeps a `NonZeroInteger` count.
 
 Each part is asked as the validator measures a value (`measuredValue`): a Function refused as a value in it is a
 hole, reported where it is written. So `[[Integer.add]]` still has an item, and `{ rule = Integer.add, count = 3 }`

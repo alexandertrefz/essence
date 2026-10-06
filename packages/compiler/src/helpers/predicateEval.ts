@@ -9,6 +9,7 @@ import {
 	matchesTypeWithBindings,
 	measuredValue,
 	provenConjuncts,
+	refusedFunctionsAsHoles,
 } from "./types"
 
 // Whether a written value is admitted into a refinement by deciding its
@@ -125,9 +126,9 @@ function admittedDictionaryTypeOf(
 	}
 }
 
-// A written Record, asked member by member. A member the Record does not
-// declare keeps its own Type, so the whole still fits by the ordinary rules. A
-// level a path key built is a partial, which only the merge can measure.
+// A written Record, asked member by member, so the whole still fits by the
+// ordinary rules. A level a path key built is a partial, which only the merge
+// can measure.
 function admittedRecordTypeOf(
 	expected: common.RecordType,
 	value: common.typed.RecordValueNode,
@@ -137,6 +138,32 @@ function admittedRecordTypeOf(
 		return null
 	}
 
+	let admitted = admittedMembersOf(expected, value, binds)
+
+	return fitsAsItStands(expected, admitted, binds) ? admitted : null
+}
+
+// What a partial of a Record writes, as an update does, each member asked as
+// a written Record's is. Where no Record is written, it is the Type the value
+// has, holes included.
+export function admittedPartialType(
+	whole: common.RecordType,
+	written: common.RecordType,
+	value: common.typed.ExpressionNode | null | undefined,
+): common.RecordType {
+	return value?.nodeType === "RecordValue"
+		? admittedMembersOf(whole, value, false)
+		: (refusedFunctionsAsHoles(written) as common.RecordType)
+}
+
+// Each written member's Type, admitted where the expected Record asks for
+// evidence, and otherwise as measured. A member the Record does not declare
+// keeps its own Type.
+function admittedMembersOf(
+	expected: common.RecordType,
+	value: common.typed.RecordValueNode,
+	binds: boolean,
+): common.RecordType {
 	let members: Record<string, common.Type> = {}
 
 	for (let [name, written] of Object.entries(value.members)) {
@@ -150,9 +177,7 @@ function admittedRecordTypeOf(
 			member.type
 	}
 
-	let admitted: common.RecordType = { type: "Record", members }
-
-	return fitsAsItStands(expected, admitted, binds) ? admitted : null
+	return { type: "Record", members }
 }
 
 // Whether a part nothing was decided about fits as it stands. Where the

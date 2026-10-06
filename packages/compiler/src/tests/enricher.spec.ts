@@ -952,6 +952,33 @@ describe("Enricher", () => {
 			).toEqual(["partial-type-mismatch"])
 		})
 
+		// A written member is evidence for a refinement only where the
+		// predicate holds of it. A computed one needs a check.
+		it("should report an update writing what a refined member refuses", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					type Counted = { count: NonZeroInteger, label: String }
+
+					constant counted: Counted = { count = 1, label = "a" }
+					constant three = 3
+					constant zero = { counted with count = 0 }
+					constant computed = { counted with count = three }
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.labels[0]?.message,
+				]),
+			).toEqual([
+				[
+					"partial-type-mismatch",
+					"this is an Integer, and Counted declares a NonZeroInteger",
+				],
+				[
+					"partial-type-mismatch",
+					"this is an Integer, and Counted declares a NonZeroInteger",
+				],
+			])
+		})
+
 		it("should report non-Record Type Annotations on Record Literals", () => {
 			let diagnostics = diagnosticsFor(`implementation {
 				constant a = String ~> { name = "x" }
