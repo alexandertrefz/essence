@@ -51,7 +51,11 @@ export function reportStaticMethodOnValue(
 				? isPreludeName(namespaceNames[0], scope)
 					? []
 					: [
-							`Declare '${node.member.content}' in '${namespaceNames[0]}' without 'static' — a predicate asks a Method of '@', and a static Method has no receiver.`,
+							instanceDeclarationHelp(
+								namespaceNames[0],
+								node.member.content,
+								accepted,
+							),
 						]
 				: [
 						staticCallHelp(
@@ -116,6 +120,21 @@ function staticCallArities(
 		acceptsValue: accepts(writtenArguments + 1),
 		acceptsWithoutValue: accepts(writtenArguments),
 	}
+}
+
+// The predicate's Help. A static that takes the value as its first Argument
+// keeps that Parameter once `static` goes, so `@` has to stand in for it.
+function instanceDeclarationHelp(
+	namespace: string,
+	methodName: string,
+	accepted: { acceptsValue: boolean; acceptsWithoutValue: boolean },
+): string {
+	let reading =
+		accepted.acceptsValue && !accepted.acceptsWithoutValue
+			? ", reading '@' in place of its first Parameter"
+			: ""
+
+	return `Declare '${methodName}' in '${namespace}' without 'static'${reading} — a predicate asks a Method of '@', and a static Method has no receiver.`
 }
 
 // The Help built from that answer. Where both or neither fit, it hedges.

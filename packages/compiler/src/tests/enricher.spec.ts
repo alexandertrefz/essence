@@ -6749,6 +6749,43 @@ describe("Enricher", () => {
 			expect(builtin.helps).toEqual([])
 		})
 
+		// Without 'static', a first Parameter that took the value is still an
+		// Argument. The Help says to read '@' in its place.
+		it("should name the Parameter '@' replaces inside a predicate", () => {
+			let refined = (declaration: string) => `implementation {
+				namespace Sizes for Integer {
+					${declaration} -> Boolean {
+						<- number::isLessThan(limit)
+					}
+				}
+
+				type Small = Integer where @::isSmall(below 10)
+			}`
+			let [refusal] = diagnosticsFor(
+				refined(
+					"static isSmall(_ number: Integer, below limit: Integer)",
+				),
+			)
+
+			expect(refusal.code).toBe("static-method-on-value")
+			expect(refusal.helps).toEqual([
+				"Declare 'isSmall' in 'Sizes' without 'static', reading '@' in place of its first Parameter — a predicate asks a Method of '@', and a static Method has no receiver.",
+			])
+			expect(
+				compiles(
+					refined("isSmall(below limit: Integer)").replace(
+						"number::isLessThan",
+						"@::isLessThan",
+					),
+				),
+			).toBe(true)
+			expect(
+				compiles(
+					refined("isSmall(_ number: Integer, below limit: Integer)"),
+				),
+			).toBe(false)
+		})
+
 		// A builtin static called on a value is refused, or the Simplifier
 		// would prepend the receiver as an Argument.
 		it("should reject a builtin static Method called on a value", () => {
