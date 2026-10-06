@@ -3,7 +3,6 @@ import type { common, enricher } from "@essence-lang/interfaces"
 import {
 	describeParameter,
 	describeType,
-	spellChoiceName,
 	withArticle,
 } from "../helpers/describe"
 import {
@@ -13,7 +12,7 @@ import {
 } from "../helpers/types"
 import { printType } from "../printType"
 import { describeProtocol, protocolOf } from "./resolvers"
-import { spellingIn } from "./spelling"
+import { annotateAtChoiceHelp } from "./spelling"
 
 // What a report says of a body that fulfils its requirement at the target
 // but not at the narrower binding. It names the first Parameter taken
@@ -45,7 +44,7 @@ export function narrowedBodyReport(
 	let at = describeType(binding)
 	let elsewhere =
 		binding.type === "Case"
-			? `or annotate the value at '${spellChoiceName(binding, spellingIn(scope))}', since a bare Case binds the Case, not the Choice.`
+			? annotateAtChoiceHelp(binding, scope, ", since", true)
 			: `or declare a Namespace for ${at} that conforms to '${describeProtocol(askedFor, scope)}'.`
 
 	// The first Parameter is `Self`, the receiver, which both take.

@@ -37,7 +37,6 @@ import {
 	displayChoiceName,
 	namespaceHead,
 	namespaceWhere,
-	spellChoiceName,
 	unnameableTargetNote,
 	displayGenericName,
 	displayProtocolName,
@@ -107,13 +106,13 @@ import {
 	reportSpecifierNamesNoValue,
 } from "./specifiers"
 import {
+	annotateAtChoiceHelp,
 	choiceBindingIn,
 	choiceNameIn,
 	foreignChoiceRemedy,
 	foreignChoicesOf,
 	foreignChoicesSpelled,
 	spellingAfterImport,
-	spellingIn,
 	suggestionData,
 	suggestionHelps,
 	suggestionInScope,
@@ -6008,7 +6007,7 @@ function unansweredReadReport(
 			? []
 			: [
 					binding.type === "Case"
-						? `Annotate the value at '${spellChoiceName(binding, spellingIn(scope))}', since a bare Case binds the Case, not the Choice.`
+						? annotateAtChoiceHelp(binding, scope, ", since")
 						: `Declare a Namespace for ${at} that conforms to '${describeProtocol(asked, scope)}'.`,
 				]
 
@@ -6227,9 +6226,7 @@ function conformanceRemedy(
 		if (choice === null || conforms) {
 			return {
 				notes: [],
-				helps: [
-					`Annotate the value at '${spellChoiceName(culprit, spellingIn(scope))}': a bare Case binds the Case, not the Choice.`,
-				],
+				helps: [annotateAtChoiceHelp(culprit, scope, ":")],
 			}
 		}
 

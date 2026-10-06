@@ -10,6 +10,7 @@ import {
 	displayChoiceName,
 	isDeclaration,
 	spellCaseChoice,
+	spellChoiceName,
 	type Spelling,
 	spellType,
 } from "../helpers/describe"
@@ -363,6 +364,26 @@ export function spellingAfterImport(
 				: (foreign.exportedAs ?? foreign.name))
 		)
 	}
+}
+
+// The Help that widens a bare Case's annotation to its Choice, which a Choice of
+// another Module no name here binds needs imported first. `joiner` leads the
+// reason, and a Help that `continues` another sentence starts with "or".
+export function annotateAtChoiceHelp(
+	caseType: common.CaseType,
+	scope: enricher.Scope,
+	joiner: ":" | ", since",
+	continues: boolean = false,
+): string {
+	let foreign = unboundForeignChoice(caseType, scope)
+	let foreigns = foreign === null ? [] : [foreign]
+	let choice = spellChoiceName(caseType, spellingAfterImport(scope, foreigns))
+	let help = withImportOf(
+		foreigns,
+		`Annotate the value at '${choice}'${joiner} a bare Case binds the Case, not the Choice.`,
+	)
+
+	return continues ? `or ${help[0].toLowerCase()}${help.slice(1)}` : help
 }
 
 // The Choices of other Modules that a spelling names and no name here binds,

@@ -11955,6 +11955,75 @@ export {
 		expect(reports("pair\n\t\tPair\n\t\tFnEq\n\t\tLight")).toEqual([])
 	})
 
+	// `red` holds a bare Case of `Colour`, which `Main.es` has no name for, so
+	// the annotation the Help asks for needs the import first. Followed, it
+	// leaves the true refusal: `Colour` itself is not Comparable.
+	it("leads the annotation a bare Case needs with the import of its Choice", () => {
+		let compared = (entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Colours.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function less<infer T is Comparable>(_ a: T, _ b: T) -> Boolean {
+		<- a::isLessThan(b)
+	}
+${body}
+}
+`,
+					"Colours.es": `implementation {
+	choice Colour { Red, Green }
+
+	constant red = Colour#Red
+}
+
+export {
+	Colour
+	red
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let annotated = `
+	constant colour: Colour = red
+
+	Terminal.inspect(less(colour, colour))`
+
+		expect(
+			compared("red", "\tTerminal.inspect(less(red, red))").map(
+				(diagnostic) => diagnostic.helps,
+			),
+		).toEqual([
+			[
+				"'Colour' is declared in Colours.es — import it here, and annotate the value at 'Colour': a bare Case binds the Case, not the Choice.",
+			],
+		])
+		expect(
+			compared("Colour\n\t\tred", annotated).map(
+				(diagnostic) => diagnostic.helps,
+			),
+		).toEqual([["Declare a Namespace 'for Colour is Comparable'."]])
+		expect(
+			codesOf(
+				compared(
+					"Colour\n\t\tred",
+					`
+	namespace ColourOrder for Colour is Comparable {
+		compare(to other: Colour) -> Ordering {
+			<- Ordering#Equal
+		}
+	}
+${annotated}`,
+				),
+			),
+		).toEqual([])
+	})
+
 	let shelfModule = `implementation {
 	choice Box<Value> { Full { value: Value }, Empty }
 	choice Light { Red, Green }
