@@ -8035,9 +8035,9 @@ function declareProtocolInScope(
 	return scope
 }
 
-// A path key outside a merged position reaches into nothing, so it is reported
-// and dropped, with or without a value. Called only where `hasPathKeys` found
-// one. See "Path keys" in DEVELOPMENT.md.
+// A path key outside a merged position reaches into nothing, so it is reported,
+// with or without a value. Its first step holds a hole. Called only where
+// `hasPathKeys` found one. See "Path keys" in DEVELOPMENT.md.
 function refusePathKeys(
 	members: Record<string, parser.RecordValueMemberNode>,
 ): Record<string, parser.RecordValueMemberNode> {
@@ -8053,6 +8053,17 @@ function refusePathKeys(
 		let position = {
 			start: member.steps[0].position.start,
 			end: member.steps[member.steps.length - 1].position.end,
+		}
+
+		// The member the path meant is written, so the Literal is not
+		// measured as lacking it.
+		plain[member.steps[0].content] ??= {
+			name: member.steps[0],
+			value: {
+				nodeType: "RefusedValue",
+				base: member.value ?? member.group!,
+				position,
+			},
 		}
 
 		reportError("A path key reaches into nothing here", position, {

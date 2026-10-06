@@ -1037,6 +1037,24 @@ describe("Enricher", () => {
 				expect(diagnostics).toHaveLength(1)
 				expect(diagnostics[0].code).toBe("path-key-outside-combination")
 			})
+
+			// The member the path meant holds a hole, so the Literal is not
+			// measured as lacking it, nor is a read through it refused.
+			it("should report a refused path key once in the whole analysis", () => {
+				expect(
+					codesOfSource(`implementation {
+					${config}
+					constant blank: Config = { name = "api", server.port = 1 }
+					constant grouped: Config = { name = "api", server.{ port = 1 } }
+					constant loose = { name = "api", server.port = 1 }
+					constant read = loose.server.port
+				}`),
+				).toEqual([
+					"path-key-outside-combination",
+					"path-key-outside-combination",
+					"path-key-outside-combination",
+				])
+			})
 		})
 
 		// An Argument for a defaulted Record Parameter, or a payload for a

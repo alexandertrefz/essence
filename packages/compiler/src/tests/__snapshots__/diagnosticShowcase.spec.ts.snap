@@ -2307,18 +2307,7 @@ Error: This descend updates nothing
 `;
 
 exports[`Diagnostic Showcase PathKeys.es should render the same report every time 1`] = `
-"[assignment-type-mismatch]
-Error: This value does not fit the declared Type of Constant 'blank'
-    ╭─┤ PathKeys.es:21:27 │
-    │
- 21 │     constant blank: Config = { name = "api", server.port = 8080 }
-    │                              ──────────────────┬─────────────────  
-    │                                                ╰─────────────────── 'server' is missing
-    │ 
-    │ Note: 'blank' is declared as Config.
-────╯
-
-[path-key-outside-combination]
+"[path-key-outside-combination]
 Error: A path key reaches into nothing here
     ╭─┤ PathKeys.es:21:43 │
     │
@@ -2359,7 +2348,7 @@ Error: A path key updates a value it can name
     │ Note: A path reaches into the value one level at a time, so the value is read once for each level it reaches through. A name, '@', or a chain of member reads over one of those reads the same value every time; anything worked out on the spot would be worked out again for each level.
 ────╯
 
-─── 4 errors
+─── 3 errors
 "
 `;
 
