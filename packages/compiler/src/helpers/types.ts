@@ -2590,6 +2590,24 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 	return { type: "UnionType", types: distinct }
 }
 
+// A generic Case with each Type Parameter its prefix leaves open a blank, where
+// nothing decides them: the Choice's, or a generic Alias's. Its payload is
+// still asked for every member.
+export function caseWithBlanks(
+	declared: common.CaseType,
+	open: Array<common.GenericDeclaration>,
+): common.CaseType {
+	let { choiceGenerics = [], ...instantiated } = declared
+	let blanks: GenericBindings = new Map(
+		[...choiceGenerics, ...open].map((generic) => [
+			generic.name,
+			{ type: "Unknown" },
+		]),
+	)
+
+	return applyGenericBindings(instantiated, blanks) as common.CaseType
+}
+
 function isError(type: common.Type): boolean {
 	return type.type === "Error"
 }

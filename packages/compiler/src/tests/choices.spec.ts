@@ -20,7 +20,7 @@ import { printType } from "../printType"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
-import { compiles } from "./followedHelps"
+import { codesOfSource, compiles } from "./followedHelps"
 
 // The full pipeline minus bundling, since a Choice works only once every stage
 // agrees on it. The Options are a Parameter so a spec can turn off
@@ -1541,6 +1541,71 @@ describe("Choices", () => {
 						Terminal.inspect(orElse(#Empty, 7)::toString())
 					}`),
 				).toEqual(['"7"'])
+			})
+
+			// The Type Parameters there are blanks, so a payload is still asked
+			// for each member its Case declares.
+			it("still asks a payload for its members where nothing decides it", () => {
+				expect(
+					codesOfSource(`implementation {
+						choice Pairing<Item> { Both { left: Item, right: Item }, Neither }
+
+						constant misspelt = sumBy(Pairing#Both({ lft = 1, right = 2 }))
+						constant written = sumBy(Pairing#Both({ left = 1, right = 2 }))
+					}`),
+				).toEqual([
+					"unknown-name",
+					"payload-type-mismatch",
+					"unknown-name",
+				])
+			})
+
+			// A call that resolved to nothing names no Parameter to decide a
+			// construction, and its own refusal is the mistake. A Case no Choice
+			// declares is still one of its own.
+			it("reports only the call around one it would have decided", () => {
+				let source = `implementation { ${blankBox}
+					constant valued = sumBy(#Value(1))
+					constant emptied = [1]::sumBy(#Empty)
+					constant blanked = sumBy(#Blank)
+					constant prefixed = sumBy(Box#Blank)
+					constant filled = sumBy(Box#Full(1))
+					constant unknown = sumBy(#Red)
+				}`
+
+				expect(
+					diagnosticsOf(source).map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.position?.start.line,
+					]),
+				).toEqual([
+					["unknown-name", 2],
+					["unknown-method", 3],
+					["unknown-name", 4],
+					["unknown-name", 5],
+					["unknown-name", 6],
+					["unknown-name", 7],
+					["unknown-case", 7],
+				])
+			})
+
+			// Through a generic Alias, the Alias's own Type Parameters are the
+			// blanks, so the payload is asked for its members all the same.
+			it("decides no construction a generic Alias prefixes there", () => {
+				expect(
+					codesOfSource(`implementation { ${blankBox}
+						choice Pairing<Item> { Both { left: Item, right: Item }, Neither }
+						type Crate<Item> = Box<Item>
+						type Twin<Item> = Pairing<Item>
+
+						constant crated = sumBy(Crate#Full(1))
+						constant misspelt = sumBy(Twin#Both({ lft = 1, right = 2 }))
+					}`),
+				).toEqual([
+					"unknown-name",
+					"unknown-name",
+					"payload-type-mismatch",
+				])
 			})
 		})
 	})

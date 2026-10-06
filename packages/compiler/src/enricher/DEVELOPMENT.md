@@ -64,6 +64,12 @@ Arguments written, then by the position, and otherwise `undecided-type-arguments
 offers only the instantiations the Alias can write (`offeredCases`), so `Boxes#Full`, under `type Boxes<A> =
 Box<List<A>>`, takes no `Box<Integer>`.
 
+A refused position leaves a construction undecided without a report, bare or prefixed. The position's own mistake
+is the one reported, as an annotation that did not resolve. A prefixed construction there takes each Type Parameter
+its prefix leaves open as a blank, a generic Alias's included (`caseWithBlanks`). So its payload is still asked for
+every member its Case declares. An Argument of a call that resolved to nothing stands in a refused position too
+(`refusedPosition`), so `sumBy(#Value(1))` reports only `sumBy`. A Case no Choice declares is still `unknown-case`.
+
 `reportUndecidedTypeArguments` in `undecidedCases.ts` is the one report for every undecided construction, spelled
 the way the source wrote it. Its notes name the Choice's own Type Parameters. Those names are not in scope at the
 construction, so the Helps spell an application instead. Each Argument the payload decided is written out, with `…`

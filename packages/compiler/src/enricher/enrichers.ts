@@ -66,6 +66,7 @@ import {
 	applyGenericBindings,
 	type ArgumentMismatchDetail,
 	buildUnion,
+	caseWithBlanks,
 	canonicalPredicateConjuncts,
 	createFreshenedChoiceInference,
 	createFreshenedInference,
@@ -147,7 +148,11 @@ import {
 	reportConstantReassignment,
 } from "./reassignment"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
-import { insideRefusedCall, underRefusedCall } from "./refusedCalls"
+import {
+	insideRefusedCall,
+	refusedPosition,
+	underRefusedCall,
+} from "./refusedCalls"
 import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
 	checkProtocolConformance,
@@ -542,9 +547,9 @@ function requiredParameters(
 	)
 }
 
-// Whether the position this construction stands in was itself refused. A bare
-// Case then stays silent about which Choice or Type Arguments it means, since
-// the real error is reported elsewhere. An unknown Case is still reported.
+// Whether the position this construction stands in was itself refused. A Case
+// then stays silent about which Choice or Type Arguments it means, since the
+// real error is reported elsewhere. An unknown Case is still reported.
 function positionWasRefused(expectedType: common.Type | null): boolean {
 	return expectedType?.type === "Error"
 }
@@ -555,8 +560,12 @@ function enrichCaseValue(
 	expectedType: common.Type | null = null,
 ): common.typed.CaseValueNode {
 	// An Argument's expected Type is the one the Invocation committed for the
-	// winning candidate's Parameter, read back here.
-	let context = expectedType ?? recordedContextualCaseValueType(node) ?? null
+	// winning candidate's Parameter, read back here. A refused call's Argument
+	// stands in a refused position; see `positionWasRefused`.
+	let context =
+		expectedType ??
+		recordedContextualCaseValueType(node) ??
+		refusedPosition()
 
 	// The Case resolves before its payload, so the position's members are what
 	// the payload stands in: `Box<Box<Integer>>#Full(Box#Full(1))` reads the
@@ -14303,6 +14312,10 @@ function resolvePrefixedCaseValueType(
 		if (decided !== null) {
 			return decided
 		}
+	}
+
+	if (positionWasRefused(expectedType)) {
+		return caseWithBlanks(declaredCase, generics)
 	}
 
 	return reportUndecidedTypeArguments(

@@ -1,3 +1,5 @@
+import type { common } from "@essence-lang/interfaces"
+
 // Whether the Arguments being enriched are those of a call that resolved to
 // nothing. A Function literal or a member path passed to one has no Parameter
 // Types to take. The call's own refusal is the one to report.
@@ -19,4 +21,10 @@ export function underRefusedCall<T>(refused: boolean, work: () => T): T {
 
 export function insideRefusedCall(): boolean {
 	return callRefused
+}
+
+// The position a refused call's Argument stands in, which no Case construction
+// is decided by.
+export function refusedPosition(): common.ErrorType | null {
+	return callRefused ? { type: "Error" } : null
 }
