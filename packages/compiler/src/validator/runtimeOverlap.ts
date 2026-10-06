@@ -158,17 +158,21 @@ export function overlapsAtRuntime(
 
 // The member path at which the values crossing from `memberType` into
 // `matcher` are the empty ones of a container of `kind`, or null. An empty
-// path is the value itself.
+// path is the value itself. Where the Case the values are for is given as
+// `later`, a member path counts only where both take one value at every other
+// member.
 function emptyContainerPath(
 	matcher: common.Type,
 	memberType: common.Type,
 	kind: EmptyCrossover,
+	later: common.Type | null,
 ): Array<string> | null {
 	if (matcher.type === "Refinement" || memberType.type === "Refinement") {
 		return emptyContainerPath(
 			eraseRefinements(matcher),
 			eraseRefinements(memberType),
 			kind,
+			later,
 		)
 	}
 
@@ -180,13 +184,13 @@ function emptyContainerPath(
 
 	if (memberType.type === "UnionType") {
 		return firstPath(flattenUnionMembers(memberType), (armType) =>
-			emptyContainerPath(matcher, armType, kind),
+			emptyContainerPath(matcher, armType, kind, later),
 		)
 	}
 
 	if (matcher.type === "UnionType") {
 		return firstPath(flattenUnionMembers(matcher), (armType) =>
-			emptyContainerPath(armType, memberType, kind),
+			emptyContainerPath(armType, memberType, kind, later),
 		)
 	}
 
@@ -194,17 +198,27 @@ function emptyContainerPath(
 		(matcher.type === "Record" && memberType.type === "Record") ||
 		(matcher.type === "Case" && memberType.type === "Case")
 	) {
-		for (let [name, memberMatcher] of Object.entries(matcher.members)) {
-			let path = Object.hasOwn(memberType.members, name)
-				? emptyContainerPath(
-						memberMatcher,
-						memberType.members[name],
-						kind,
-					)
-				: null
+		let laterArms = later === null ? [null] : armsShaped(later, memberType)
 
-			if (path !== null) {
-				return [name, ...path]
+		for (let [name, memberMatcher] of Object.entries(matcher.members)) {
+			for (let laterArm of laterArms) {
+				let path =
+					Object.hasOwn(memberType.members, name) &&
+					(laterArm === null ||
+						siblingsAgree(matcher, laterArm, memberType, name))
+						? emptyContainerPath(
+								memberMatcher,
+								memberType.members[name],
+								kind,
+								laterArm === null
+									? null
+									: slotOf(laterArm, name),
+							)
+						: null
+
+				if (path !== null) {
+					return [name, ...path]
+				}
 			}
 		}
 	}
@@ -234,9 +248,10 @@ type EmptyCrossover = "List" | "Dictionary"
 export function emptyCrossover(
 	matcher: common.Type,
 	memberType: common.Type,
+	later: common.Type | null = null,
 ): { kind: EmptyCrossover; path: Array<string> } | null {
 	for (let kind of ["List", "Dictionary"] as const) {
-		let path = emptyContainerPath(matcher, memberType, kind)
+		let path = emptyContainerPath(matcher, memberType, kind, later)
 
 		if (path !== null) {
 			return { kind, path }
@@ -329,7 +344,9 @@ export function nestedCrossing(
 				let earlierAt = slotOf(earlierArm, step)
 				let laterAt = slotOf(laterArm, step)
 				let found =
-					earlierAt === null || laterAt === null
+					earlierAt === null ||
+					laterAt === null ||
+					!siblingsAgree(earlierArm, laterArm, memberType, step)
 						? null
 						: crossingAt(earlierAt, laterAt, memberAt)
 
@@ -368,6 +385,25 @@ function slotsOf(type: common.Type): Array<[string, common.Type]> {
 	}
 
 	return []
+}
+
+// Whether some value of `memberType` passes both arms at every slot but
+// `step`, so a crossing at `step` is one value the two can share.
+function siblingsAgree(
+	earlierArm: common.Type,
+	laterArm: common.Type,
+	memberType: common.Type,
+	step: string,
+): boolean {
+	return slotsOf(memberType).every(([name, memberAt]) => {
+		let earlierAt = slotOf(earlierArm, name)
+
+		return (
+			name === step ||
+			earlierAt === null ||
+			overlapsAtRuntime(earlierAt, slotOf(laterArm, name) ?? memberAt)
+		)
+	})
 }
 
 function slotOf(type: common.Type, step: string): common.Type | null {

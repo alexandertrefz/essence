@@ -897,7 +897,7 @@ function validateDispatchCases(
 				return
 			}
 
-			let crossover = emptyCrossover(earlierType, laterType)
+			let crossover = emptyCrossover(earlierType, laterType, laterType)
 
 			if (crossover !== null) {
 				reportDispatchEmptyContainerOverlap(
@@ -1683,7 +1683,11 @@ function reportErasedOverlap(
 				acceptsAllAtRuntime(earlierMatcher, memberType) ||
 				!overlapsAtRuntime(earlierMatcher, memberType)
 					? null
-					: emptyCrossover(earlierMatcher, memberType)
+					: emptyCrossover(
+							earlierMatcher,
+							memberType,
+							runtimeMatchers[handlerIndex],
+						)
 
 			if (crossover !== null) {
 				reportEmptyContainerOverlap(

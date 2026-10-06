@@ -1517,6 +1517,29 @@ describe("Validator", () => {
 				]),
 			).toEqual([["empty-list-overlap", 10]])
 		})
+
+		// `n` keeps the earlier Case from every value the later one is for. The
+		// `case _` still misses an empty `items` whose `n` is an Integer.
+		it("should stay silent where another member keeps the earlier Case from the value", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				type Held = { items: List<Integer> | List<String>, n: Integer | String }
+
+				function describe(_ value: Held | Boolean) -> String {
+					<- match value -> String {
+						case { items: List<Integer>, n: Integer } { <- "integers" }
+						case { items: List<String>, n: String } { <- "strings" }
+						case _ { <- "other" }
+					}
+				}
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([["empty-list-overlap", 8]])
+		})
 	})
 
 	// Type Arguments erase, so `case Box<Integer>` takes a `Box<String>#Empty`,
@@ -1804,6 +1827,29 @@ describe("Validator", () => {
 						}`),
 					).map((diagnostic) => diagnostic.code),
 				).not.toContain("type-argument-overlap")
+			})
+
+			// `n` keeps every value the later Case is for out of the earlier
+			// one, whatever its `box` holds.
+			it("should stay silent where another member keeps the earlier Case from the value", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						choice Box<Item> {
+							Full { item: Item },
+							Empty,
+						}
+
+						type Held = { box: Box<Integer> | Box<String>, n: Integer | String }
+
+						function describe(_ value: Held | Boolean) -> String {
+							<- match value -> String {
+								case { box: Box<Integer>, n: Integer } { <- "integers" }
+								case { box: Box<String>, n: String } { <- "strings" }
+								case _ { <- "other" }
+							}
+						}
+					}`),
+				).toEqual([])
 			})
 
 			// The `case _` after the Cases sees the same member, and no Case
