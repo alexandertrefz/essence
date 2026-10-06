@@ -1,9 +1,7 @@
 import {
-	caseDefaults,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
 	isMergedLevel,
-	parameterDefaults,
 } from "@essence-lang/compiler/helpers"
 import {
 	printCaseWithPayload,
@@ -12,6 +10,7 @@ import {
 	signaturesOf,
 	withProtocolSpellings,
 } from "@essence-lang/compiler/printType"
+import { findTypedChild, type TypedNode } from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import type { DocumentAnalysis } from "./analyse"
@@ -626,13 +625,15 @@ function namedBaseIn(headText: string): string | null {
 	return before === "." || before === ":" || before === "#" ? null : name
 }
 
+// The Type the probe's made-up member was looked up on, from the first node
+// that holds the probe.
 function findProbeReceiver(
 	nodes: Array<common.typed.ImplementationNode>,
 ): common.Type | null {
 	for (let node of nodes) {
-		let found = findProbeReceiverInNode(node)
+		let found = probeReceiverIn(node)
 
-		if (found !== null) {
+		if (found !== undefined) {
 			return found
 		}
 	}
@@ -640,117 +641,10 @@ function findProbeReceiver(
 	return null
 }
 
-// A Parameter default is an Expression a writer types in, so the probe is
-// looked for there too.
-function findProbeReceiverInDefaults(
-	parameters: Array<common.typed.ParameterNode>,
-): common.Type | null {
-	for (let defaultValue of parameterDefaults(parameters)) {
-		let found = findProbeReceiverInNode(defaultValue)
-
-		if (found !== null) {
-			return found
-		}
-	}
-
-	return null
-}
-
-function findProbeReceiverInNode(
-	node: common.typed.ImplementationNode,
-): common.Type | null {
+// Answers where `node` is the probe or reads a path key, and otherwise lets
+// the shared visitor search its children.
+function probeReceiverIn(node: TypedNode): common.Type | undefined {
 	switch (node.nodeType) {
-		case "ConstantDeclarationStatement":
-		case "VariableDeclarationStatement":
-		case "VariableAssignmentStatement":
-			return findProbeReceiverInNode(node.value)
-		case "FunctionStatement":
-			return (
-				findProbeReceiverInDefaults(node.value.parameters) ??
-				findProbeReceiver(node.value.body)
-			)
-		case "NamespaceDefinitionStatement": {
-			for (let property of Object.values(node.properties)) {
-				let found = findProbeReceiverInNode(property.value)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					let found =
-						findProbeReceiverInDefaults(method.value.parameters) ??
-						findProbeReceiver(method.value.body)
-
-					if (found !== null) {
-						return found
-					}
-				}
-			}
-
-			// A native Method's defaults live in the frame the Compiler synthesizes for
-			// them.
-			for (let shim of node.nativeShims) {
-				let found = findProbeReceiverInDefaults(shim.parameters)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "IfStatement": {
-			let found = findProbeReceiverInNode(node.condition)
-
-			return found ?? findProbeReceiver(node.body)
-		}
-		case "IfElseStatement": {
-			let found = findProbeReceiverInNode(node.condition)
-
-			return (
-				found ??
-				findProbeReceiver(node.trueBody) ??
-				findProbeReceiver(node.falseBody)
-			)
-		}
-		case "ReturnStatement":
-			return findProbeReceiverInNode(node.expression)
-		// Neither Keyword opens a body, so the probe is looked for through it.
-		case "Start":
-		case "Complete":
-			return findProbeReceiverInNode(node.expression)
-		// And through a refused value, which a completion inside it is about.
-		case "RefusedValue":
-			return findProbeReceiverInNode(node.base)
-		case "ProtocolDeclarationStatement":
-			for (let member of Object.values(node.methods)) {
-				let methods =
-					member.nodeType === "OverloadedMethod" ||
-					member.nodeType === "OverloadedStaticMethod"
-						? member.methods
-						: [member.method]
-
-				for (let method of methods) {
-					let found =
-						findProbeReceiverInDefaults(method.value.parameters) ??
-						findProbeReceiver(method.value.body)
-
-					if (found !== null) {
-						return found
-					}
-				}
-			}
-
-			return null
 		// The receiver's Type, as Method resolution reads it. A Method's
 		// Arguments get no path-key reading: the probe cuts the call short, so
 		// no signature resolves.
@@ -759,31 +653,34 @@ function findProbeReceiverInNode(
 				return node.base.type
 			}
 
-			return (
-				findProbeReceiverInNode(node.base) ??
-				findProbeReceiverInArguments(node.arguments)
-			)
-		case "FunctionInvocation":
-			return (
-				findProbeKeyInArguments(
-					node.arguments,
-					node.name.type.type === "Function"
-						? node.name.type.parameterTypes
-						: null,
-				) ??
-				findProbeReceiverInNode(node.name) ??
-				findProbeReceiverInArguments(node.arguments)
-			)
+			break
+		// A leading `.|` probes as `.lspProbeMember`, which the Enricher desugars into
+		// a Lookup chain on the position's Parameter Type. So `.maker.|` needs no
+		// branch of its own.
 		case "Lookup":
 			if (node.member.content === probeMemberName) {
 				return node.base.type
 			}
 
-			return findProbeReceiverInNode(node.base)
+			break
+		case "FunctionInvocation": {
+			let found = findProbeKeyInArguments(
+				node.arguments,
+				node.name.type.type === "Function"
+					? node.name.type.parameterTypes
+					: null,
+			)
+
+			if (found !== null) {
+				return found
+			}
+
+			break
+		}
+		// A path key has no Lookup: the probe is a key of the level the Enricher
+		// wrote out, whose updated value owns the members. Read before the
+		// operands.
 		case "Combination":
-			// A path key has no Lookup: the probe is a key of the level the
-			// Enricher wrote out, whose updated value owns the members. Read
-			// before the operands.
 			if (
 				node.rhs.nodeType === "RecordValue" &&
 				node.rhs.memberPositions?.[probeKeyName] !== undefined
@@ -791,165 +688,29 @@ function findProbeReceiverInNode(
 				return node.lhs.type
 			}
 
-			return (
-				findProbeReceiverInNode(node.lhs) ??
-				findProbeReceiverInNode(node.rhs)
-			)
-		case "Match": {
-			let found = findProbeReceiverInNode(node.value)
+			break
+		// A payload merges into the Case's default, so a path key in one reaches into
+		// the Case's Record, as an Argument's does into its Parameter's.
+		case "CaseValue": {
+			let found =
+				node.value !== null && node.type.type === "Case"
+					? findProbeKeyInMerged(node.value, {
+							type: "Record",
+							members: node.type.members,
+						})
+					: null
 
 			if (found !== null) {
 				return found
 			}
 
-			for (let handler of node.handlers) {
-				// The Matcher and Guard first, in source order, where the probe was typed.
-				for (let expression of typedHandlerExpressions(handler)) {
-					let expressionFound = findProbeReceiverInNode(expression)
-
-					if (expressionFound !== null) {
-						return expressionFound
-					}
-				}
-
-				let handlerFound = findProbeReceiver(handler.body)
-
-				if (handlerFound !== null) {
-					return handlerFound
-				}
-			}
-
-			return null
-		}
-		case "Define": {
-			// In written order, `as VALUE if CONDITION`, where the probe was typed.
-			for (let expression of defineExpressions(node)) {
-				let found = findProbeReceiverInNode(expression)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "RecordValue": {
-			for (let member of Object.values(node.members)) {
-				let found = findProbeReceiverInNode(member)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "ListValue": {
-			for (let value of node.values) {
-				let found = findProbeReceiverInNode(value)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "DictionaryValue": {
-			for (let entry of node.entries) {
-				let found =
-					findProbeReceiverInNode(entry.key) ??
-					findProbeReceiverInNode(entry.value)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		case "InterpolatedStringValue": {
-			for (let segment of node.segments) {
-				if (segment.kind !== "expression") {
-					continue
-				}
-
-				let found = findProbeReceiverInNode(segment.expression)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		// A leading `.|` probes as `.lspProbeMember`, which the Enricher desugars into
-		// a Lookup chain on the position's Parameter Type. So `.maker.|` needs no
-		// branch of its own, only this walk into a literal's body.
-		case "FunctionValue":
-			return (
-				findProbeReceiverInDefaults(node.value.parameters) ??
-				findProbeReceiver(node.value.body)
-			)
-		case "CaseValue":
-			if (node.value === null) {
-				return null
-			}
-
-			// A payload merges into the Case's default, so a path key in one reaches into
-			// the Case's Record, as an Argument's does into its Parameter's.
-			return (
-				(node.type.type === "Case"
-					? findProbeKeyInMerged(node.value, {
-							type: "Record",
-							members: node.type.members,
-						})
-					: null) ?? findProbeReceiverInNode(node.value)
-			)
-		case "ChoiceDeclarationStatement": {
-			// A `.` in a payload default probes as one in a Parameter default does.
-			for (let defaultValue of caseDefaults(node.cases)) {
-				let found = findProbeReceiverInNode(defaultValue)
-
-				if (found !== null) {
-					return found
-				}
-			}
-
-			return null
-		}
-		// The asserted value and the Matcher's values. With a Matcher, as in
-		// `require { points = 3 } = standing.|`, the asserted Expression is the
-		// Statement before this one, which the walk reaches by itself.
-		case "ExpectStatement":
-		case "RequireStatement": {
-			let found = findProbeReceiverInNode(node.value)
-
-			if (found !== null || node.matcher === null) {
-				return found
-			}
-
-			if (node.matcher.literal !== null) {
-				found = findProbeReceiverInNode(node.matcher.literal)
-			}
-
-			for (let literal of Object.values(
-				node.matcher.memberLiterals ?? {},
-			)) {
-				found ??= findProbeReceiverInNode(literal)
-			}
-
-			return found
+			break
 		}
 		case "TypeAliasStatement":
-		case "Identifier":
-		case "Self":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-			return null
+			return undefined
 	}
+
+	return findTypedChild(node, probeReceiverIn)
 }
 
 // The Record a path key inside a merged Literal reaches into: the Parameter's
@@ -1007,20 +768,6 @@ function findProbeKeyInArguments(
 		}
 
 		let found = findProbeKeyInMerged(argument.value, parameter.type)
-
-		if (found !== null) {
-			return found
-		}
-	}
-
-	return null
-}
-
-function findProbeReceiverInArguments(
-	nodeArguments: Array<common.typed.ArgumentNode>,
-): common.Type | null {
-	for (let argument of nodeArguments) {
-		let found = findProbeReceiverInNode(argument.value)
 
 		if (found !== null) {
 			return found
