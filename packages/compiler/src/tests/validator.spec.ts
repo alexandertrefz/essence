@@ -285,6 +285,32 @@ describe("Validator", () => {
 			})
 		})
 
+		// `case Box<Integer>` answers for `Box<String>#Empty` too, so a Case
+		// Matcher for the rest would hide that. The application is named
+		// instead, and `type-argument-overlap` then reports the crossing.
+		it("should name the application another application's Matcher crosses into", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				choice Box<Item> { Full { item: Item }, Empty }
+
+				function describe(_ b: Box<Integer> | Box<String>) -> String {
+					<- match b -> String {
+						case Box<Integer> { <- "integers" }
+					}
+				}
+			}`)
+
+			expect(diagnostics[0].helps).toEqual([
+				"Add 'case Box<String>', or a 'case _' that covers the rest.",
+			])
+			expect(diagnostics[0].notes).toEqual([
+				"Unhandled: 'Box<String>#Full'.",
+			])
+			expect(diagnostics[0].data).toEqual({
+				kind: "missing-case",
+				unhandled: ["Box<String>"],
+			})
+		})
+
 		// A Matcher can not test a refinement's predicate, so the Help names
 		// the base, once for every refinement of it. The Note lists the
 		// members as the Union writes them.

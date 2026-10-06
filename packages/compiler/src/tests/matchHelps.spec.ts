@@ -709,6 +709,49 @@ describe("A Case another application's Case crosses into", () => {
 	})
 })
 
+describe("A Match missing the rest of an application", () => {
+	let boxes = (cases: string) => `implementation {
+		choice Box<Item> {
+			Full { item: Item },
+			Empty,
+		}
+
+		function describe(_ value: Box<Integer> | Box<String>) -> String {
+			<- match value -> String {
+				${cases}
+			}
+		}
+	}`
+
+	// The application's Case leads to the report of the crossing, whose own
+	// Help leaves nothing to report.
+	it("should lead to the crossing through the application it names", () => {
+		expect(
+			firstAnalysed(
+				boxes(`case Box<Integer> { <- "integers" }`),
+				"missing-case",
+			).helps,
+		).toEqual([
+			"Add 'case Box<String>', or a 'case _' that covers the rest.",
+		])
+
+		let added = boxes(`case Box<Integer> { <- "integers" }
+			case Box<String> { <- "strings" }`)
+
+		expect(compiles(added)).toBe(true)
+		expect(
+			analysedDiagnosticsFor(added).map((diagnostic) => diagnostic.code),
+		).toEqual(["type-argument-overlap"])
+
+		let followed = boxes(`case Box#Empty { <- "empty" }
+			case Box<Integer> { <- "integers" }
+			case Box<String> { <- "strings" }`)
+
+		expect(compiles(followed)).toBe(true)
+		expect(analysedDiagnosticsFor(followed)).toEqual([])
+	})
+})
+
 describe("A Case another application's Case crosses into at a member", () => {
 	let box = `choice Box<Item> {
 		Full { item: Item },

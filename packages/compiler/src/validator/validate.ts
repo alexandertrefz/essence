@@ -1258,6 +1258,7 @@ function validateMatch(node: common.typed.MatchNode): common.typed.MatchNode {
 				memberTypes,
 				unhandledTypes,
 				readerSpelling,
+				boundSpelling,
 			)
 		}
 

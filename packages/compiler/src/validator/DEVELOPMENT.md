@@ -213,7 +213,10 @@ callee that is no Function, and the Warning on a needless `start` or `complete`.
 A Match over a Union must handle every member. Union members are flattened first, so a member that is itself a Union
 is discharged by Handlers for its members. Only an unconditional Handler discharges a member: one with no literal,
 member literal, payload requirement or Guard. One `missing-case` reports every unhandled member, since they share a
-cause and a fix.
+cause and a fix. Its Help spells a Case as a Case Matcher, which takes every application. Where another Case of the
+same application is answered for by a Matcher of another application, the Help spells the application instead, as
+`case Box<String>` after `case Box<Integer>`, where the reader binds a name for the Choice. A Case Matcher would
+hide the crossing, which `type-argument-overlap` reports once the application has a Case of its own.
 
 A Handler is dead in two ways:
 

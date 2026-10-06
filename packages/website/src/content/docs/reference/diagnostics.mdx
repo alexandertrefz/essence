@@ -3511,6 +3511,8 @@ Error: This Match Expression does not handle every Case
 
 Add a `case` for each, or a `case _` for the rest.
 
+A case of a generic choice is named without type arguments, as `case Box#Full`, which matches it in every application. On a `Box<Integer> | Box<String>` that already has `case Box<Integer>`, the Help names `case Box<String>` instead, where the file has a name for `Box`: `case Box<Integer>` also takes a `Box<String>#Empty`, and a case for that application reports it as [`type-argument-overlap`](#type-argument-overlap).
+
 Quick Fix: **Add missing Cases** writes an empty `case` for each, with a `case _` for any member that cannot be written as a matcher.
 
 Taught on: [Choices and `match` › Guards, order and exhaustiveness](/docs/language/choices-and-match#guards-order-and-exhaustiveness)

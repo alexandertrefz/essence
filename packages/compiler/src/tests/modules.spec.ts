@@ -13039,6 +13039,103 @@ ${cases}
 		).toEqual([])
 	})
 
+	// Only the aliases are imported, so `Box<String>` would name nothing, and
+	// the Case Matcher stands as before.
+	it("names a missing Case as a Matcher where only aliases of its Choice are imported", () => {
+		let boxModule = `implementation {
+	choice Box<Item> { Full { item: Item }, Empty }
+	type IntBox = Box<Integer>
+	type StrBox = Box<String>
+}
+
+export {
+	IntBox
+	StrBox
+}
+`
+		let main = (cases: string) => `import {
+	from "./Box.es" {
+		IntBox
+		StrBox
+	}
+}
+
+implementation {
+	function describe(_ value: IntBox | StrBox) -> String {
+		<- match value -> String {
+${cases}
+		}
+	}
+}
+`
+		let analysed = (cases: string) =>
+			withProject(
+				{ "Main.es": main(cases), "Box.es": boxModule },
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let refusal = analysed(
+			`			case IntBox { <- "integers" }`,
+		).find((diagnostic) => diagnostic.code === "missing-case")
+
+		expect(refusal?.helps).toEqual([
+			"Add 'case #Full', or a 'case _' that covers the rest.",
+		])
+		expect(refusal?.notes).toEqual(["Unhandled: '#Full'."])
+		expect(
+			codesOf(
+				analysed(`			case IntBox { <- "integers" }
+			case #Full { <- "full" }`),
+			),
+		).toEqual([])
+	})
+
+	// `Secret` is not imported, so `Box<Secret>` would name nothing.
+	it("names a missing Case as a Matcher where a Type Argument has no name in the file", () => {
+		let boxModule = `implementation {
+	choice Box<Item> { Full { item: Item }, Empty }
+	type Secret = { code: Integer }
+	type SecretBox = Box<Secret>
+}
+
+export {
+	Box
+	SecretBox
+}
+`
+		let main = (cases: string) => `import {
+	from "./Box.es" {
+		Box
+		SecretBox
+	}
+}
+
+implementation {
+	function describe(_ value: Box<Integer> | SecretBox) -> String {
+		<- match value -> String {
+${cases}
+		}
+	}
+}
+`
+		let analysed = (cases: string) =>
+			withProject(
+				{ "Main.es": main(cases), "Box.es": boxModule },
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			analysed(`			case Box<Integer> { <- "integers" }`).find(
+				(diagnostic) => diagnostic.code === "missing-case",
+			)?.helps,
+		).toEqual(["Add 'case Box#Full', or a 'case _' that covers the rest."])
+		expect(
+			codesOf(
+				analysed(`			case Box<Integer> { <- "integers" }
+			case Box#Full { <- "full" }`),
+			),
+		).toEqual([])
+	})
+
 	let renamingModule = `implementation {
 	choice Pair<A, B> { Both { first: A, second: B }, Neither }
 	choice Either<First, Second> { Left { value: First }, Right { value: Second } }
