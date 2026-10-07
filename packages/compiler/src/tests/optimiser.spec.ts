@@ -5484,6 +5484,140 @@ describe("Optimiser", () => {
 			)
 		})
 
+		it("loops a provided Method and leaves each conformer the body it runs", async () => {
+			// The self call through `@` goes through the conformance, which runs a
+			// replacement or a re-provided body where the conformer has one.
+			let source = `implementation {
+	protocol Counting {
+		size() -> Integer
+
+		trail(from n: Integer, _ marks: String) -> String {
+			if n::isLessThan(1) {
+				<- marks
+			}
+
+			<- @::trail(from n::subtract(@::size()), "{marks}p")
+		}
+	}
+
+	protocol Recounting is Counting {
+		trail(from n: Integer, _ marks: String) -> String {
+			if n::isLessThan(1) {
+				<- marks
+			}
+
+			<- @::trail(from n::subtract(@::size()), "{marks}r")
+		}
+	}
+
+	type Plain = { plain: Integer }
+	type Replaced = { replaced: Integer }
+	type Extended = { extended: Integer }
+
+	namespace Plains for Plain is Counting {
+		size() -> Integer { <- @.plain }
+	}
+
+	namespace Replaceds for Replaced is Counting {
+		size() -> Integer { <- @.replaced }
+
+		trail(from n: Integer, _ marks: String) -> String {
+			<- "{marks}{n}"
+		}
+	}
+
+	namespace Extendeds for Extended is Recounting {
+		size() -> Integer { <- @.extended }
+	}
+
+	function trailed<infer Item is Counting>(_ item: Item) -> String {
+		<- item::trail(from 3, "")
+	}
+
+	constant plain: Plain = { plain = 1 }
+	constant replaced: Replaced = { replaced = 1 }
+	constant extended: Extended = { extended = 1 }
+
+	Terminal.print(plain::trail(from 3, ""))
+	Terminal.print(trailed(plain))
+	Terminal.print(replaced::trail(from 3, ""))
+	Terminal.print(trailed(replaced))
+	Terminal.print(extended::trail(from 3, ""))
+	Terminal.print(extended::<Counting>trail(from 3, ""))
+	Terminal.print(trailed(extended))
+}`
+
+			expect(generate(source)).toContain("continue $tail_")
+			expect(
+				await expectSamePrintedOutput("loop-self-tail-calls", source),
+			).toEqual(["ppp", "ppp", "3", "3", "rrr", "rrr", "rrr"])
+
+			// Two unrelated Protocols provide the name. A pick and a bound each run
+			// the body of the Protocol they name, whichever clause comes first.
+			let unrelated = `implementation {
+	protocol Stepping {
+		size() -> Integer
+
+		walk(_ n: Integer, _ marks: String) -> String {
+			if n::isLessThan(1) {
+				<- marks
+			}
+
+			<- @::walk(n::subtract(@::size()), "{marks}s")
+		}
+	}
+
+	protocol Other {
+		walk(_ n: Integer, _ marks: String) -> String {
+			if n::isLessThan(1) {
+				<- marks
+			}
+
+			<- @::walk(n::subtract(1), "{marks}o")
+		}
+	}
+
+	type First = { first: Integer }
+	type Second = { second: Integer }
+
+	namespace Firsts for First is Stepping, is Other {
+		size() -> Integer { <- 1 }
+	}
+
+	namespace Seconds for Second is Other, is Stepping {
+		size() -> Integer { <- 1 }
+	}
+
+	function viaStepping<infer Item is Stepping>(_ item: Item) -> String {
+		<- item::walk(3, "")
+	}
+
+	function viaOther<infer Item is Other>(_ item: Item) -> String {
+		<- item::walk(3, "")
+	}
+
+	constant first: First = { first = 1 }
+	constant second: Second = { second = 1 }
+
+	Terminal.print(first::<Stepping>walk(3, ""))
+	Terminal.print(first::<Other>walk(3, ""))
+	Terminal.print(viaStepping(first))
+	Terminal.print(viaOther(first))
+	Terminal.print(second::<Stepping>walk(3, ""))
+	Terminal.print(second::<Other>walk(3, ""))
+	Terminal.print(viaStepping(second))
+	Terminal.print(viaOther(second))
+}`
+
+			expect(generate(unrelated)).toContain("continue $tail_")
+			expect(
+				await expectSamePrintedOutput(
+					"loop-self-tail-calls",
+					unrelated,
+				),
+			).toEqual(["sss", "ooo", "sss", "ooo", "sss", "ooo", "sss", "ooo"])
+		})
+
 		it("rebinds every Parameter at once", async () => {
 			// `<- swap(b, a)` must not write `b` over `a` before reading `a`.
 			let source = `implementation {

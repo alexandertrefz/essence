@@ -784,8 +784,20 @@ function total(rest, sum) {
 ```
 
 A self call names the Function by its Identifier, or a Method by its Namespace and its mangled member. So another
-Overload of the same name is not a self call. A Function literal bound to a Constant can not name itself, and a
-Protocol's provided Method reaches itself through a conformance a conformer may override.
+Overload of the same name is not a self call. A Function literal bound to a Constant can not name itself. A
+Protocol's provided Method names itself through its conformance, as "A provided Method" sets out.
+
+#### A provided Method
+
+A provided body calls itself through `@`, which the simplifier writes as `Self__conformance.walked(_self, …)`. The
+call never passes the conformance. The witness's entry, built by `$type.providedConformance` or
+`$type.providedConformances`, appends the witness the body is curried with. So the pass reads the call as handing
+`Self__conformance`, the body's last Parameter, on unchanged.
+
+That call runs this body again. A witness answers each name with one body, which `conformanceProvidersIn` chooses: a
+pick and a bound through a Protocol run the same body, and only a Protocol extending the body's Protocol can replace
+it. So the witness a body is curried with runs that body for the name too, and the call through `Self__conformance`
+lands back here. See "The body a witness takes" in packages/compiler/src/enricher/DEVELOPMENT.md.
 
 #### Tail position
 

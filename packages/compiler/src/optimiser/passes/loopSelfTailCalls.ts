@@ -1,5 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { conformanceParameterName } from "../../helpers/names"
 import {
 	findSimpleChild,
 	forEachSimpleChild,
@@ -34,11 +35,13 @@ type SelfCallNode =
 	| common.typedSimple.FunctionInvocationNode
 	| MethodInvocationNode
 
-// What a call must name to call itself: a Function's Identifier, or a
-// Namespace and the mangled member. Another Overload is not a self call.
+// What a call must name to call itself: a Function's Identifier, a Namespace
+// and the mangled member, or a provided Method's conformance Parameter and
+// member. Another Overload is not a self call.
 type SelfIdentity =
 	| { kind: "function"; name: string }
 	| { kind: "method"; namespace: string; member: string }
+	| { kind: "provided"; conformance: string; member: string }
 
 // One Argument of a tail call. `omitted` covers the `omitted-argument`
 // intrinsic and an Argument list that stops short.
@@ -67,28 +70,50 @@ class Looping {
 			return value === null ? node : { ...node, value }
 		}
 
-		if (node.nodeType !== "NamespaceDefinitionStatement") {
-			return node
-		}
-
-		let looped: common.typedSimple.Methods | undefined
-
-		for (let [member, entry] of Object.entries(node.methods)) {
-			let value = this.looped(entry.method.value, {
+		if (node.nodeType === "NamespaceDefinitionStatement") {
+			let methods = this.loopedMethods(node.methods, (member) => ({
 				kind: "method",
 				namespace: node.name.name,
 				member,
-			})
+			}))
+
+			return methods === node.methods ? node : { ...node, methods }
+		}
+
+		// See "A provided Method" in DEVELOPMENT.md.
+		if (node.nodeType === "ProtocolDeclarationStatement") {
+			let methods = this.loopedMethods(node.methods, (member) => ({
+				kind: "provided",
+				conformance: conformanceParameterName("Self"),
+				member,
+			}))
+
+			return methods === node.methods ? node : { ...node, methods }
+		}
+
+		return node
+	}
+
+	// The Methods, each looped where it can be, or the same object where none
+	// is.
+	private loopedMethods(
+		methods: common.typedSimple.Methods,
+		identityOf: (member: string) => SelfIdentity,
+	): common.typedSimple.Methods {
+		let looped: common.typedSimple.Methods | undefined
+
+		for (let [member, entry] of Object.entries(methods)) {
+			let value = this.looped(entry.method.value, identityOf(member))
 
 			if (value === null) {
 				continue
 			}
 
-			looped ??= { ...node.methods }
+			looped ??= { ...methods }
 			looped[member] = { ...entry, method: { ...entry.method, value } }
 		}
 
-		return looped === undefined ? node : { ...node, methods: looped }
+		return looped ?? methods
 	}
 
 	// One Function looped, or null where it has no tail self call or can not be
@@ -105,13 +130,16 @@ class Looping {
 		let names = parameters.map((parameter) => parameter.internalName.name)
 
 		// A Parameter named like the Function, or a Method's Namespace, shadows
-		// it, so the body makes no self call.
+		// it, so the body makes no self call. A provided Method's conformance is
+		// its last Parameter, the one the witness appends to every call.
 		if (
-			names.includes(
-				identity.kind === "function"
-					? identity.name
-					: identity.namespace,
-			)
+			identity.kind === "provided"
+				? names.indexOf(identity.conformance) !== names.length - 1
+				: names.includes(
+						identity.kind === "function"
+							? identity.name
+							: identity.namespace,
+					)
 		) {
 			return null
 		}
@@ -745,15 +773,41 @@ function selfCallOf(
 			: null
 	}
 
+	let base =
+		identity.kind === "method" ? identity.namespace : identity.conformance
+
 	// A provided Method or a derived Equatable is another body.
-	return expression.nodeType === "MethodInvocation" &&
-		expression.base.name === identity.namespace &&
-		expression.member.name === identity.member &&
-		expression.providedBy === undefined &&
-		expression.derivedDescriptor === undefined &&
-		!shadowed.has(identity.namespace)
+	if (
+		expression.nodeType !== "MethodInvocation" ||
+		expression.base.name !== base ||
+		expression.member.name !== identity.member ||
+		expression.providedBy !== undefined ||
+		expression.derivedDescriptor !== undefined ||
+		shadowed.has(base)
+	) {
+		return null
+	}
+
+	// The witness appends the conformance the body is curried with, which runs
+	// this body for the name, so a turn hands it on unchanged. See "A provided
+	// Method" in DEVELOPMENT.md.
+	return identity.kind === "method"
 		? expression
-		: null
+		: {
+				...expression,
+				arguments: [
+					...expression.arguments,
+					{
+						nodeType: "Argument",
+						name: null,
+						value: {
+							nodeType: "Identifier",
+							name: base,
+							type: { type: "Unknown" },
+						},
+					},
+				],
+			}
 }
 
 // Every Return from this Function, with the names shadowed where it stands.

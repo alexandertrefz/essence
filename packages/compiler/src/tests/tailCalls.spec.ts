@@ -98,11 +98,52 @@ const methodWalk = `implementation {
 	Terminal.print(List.of(integersFrom 1, through ${TURNS})::walked(0))
 }`
 
-const walks: Array<{ name: string; source: string; looped: string }> = [
+// A provided body calls itself through `@`, so the call goes through the
+// conformance the witness handed it.
+const providedWalk = `implementation {
+	protocol Walking {
+		step() -> Integer
+
+		walked(_ n: Integer, _ sum: Integer) -> Integer {
+			if n::isLessThan(1) {
+				<- sum
+			}
+
+			<- @::walked(n::subtract(@::step()), sum::add(n))
+		}
+	}
+
+	type Walker = { stride: Integer }
+
+	namespace Walkers for Walker is Walking {
+		step() -> Integer {
+			<- @.stride
+		}
+	}
+
+	constant walker: Walker = { stride = 1 }
+
+	Terminal.print(walker::walked(${TURNS}, 0))
+}`
+
+// `looped` is what a self call names, and `emitted` the Function's own name
+// where it differs.
+const walks: Array<{
+	name: string
+	source: string
+	looped: string
+	emitted?: string
+}> = [
 	{ name: "the head and tail walk", source: headAndTail, looped: "total" },
 	{ name: "an accumulator walk", source: accumulator, looped: "countdown" },
 	{ name: "a walk over an Optional", source: optionalWalk, looped: "drain" },
 	{ name: "a Namespace Method walk", source: methodWalk, looped: "walked" },
+	{
+		name: "a provided Method walk",
+		source: providedWalk,
+		looped: "walked",
+		emitted: "\\$es_Walking__walked",
+	},
 ]
 
 function generate(
@@ -156,9 +197,11 @@ const withoutPass: OptimiserOptions = {
 
 // One emitted Function's text, from its header to its closing brace. The
 // claim is about the JavaScript, so the spec reads the emission rather than
-// asking the Optimiser.
+// asking the Optimiser. A provided Method is a prelude const.
 function emittedBody(generated: string, name: string): string {
-	let header = new RegExp(`(?:function|static) ${name}\\(`)
+	let header = new RegExp(
+		`(?:(?:function|static) ${name}|const ${name} = function )\\(`,
+	)
 	let match = header.exec(generated)
 
 	expect(match).not.toBeNull()
@@ -227,7 +270,8 @@ describe("self tail calls", () => {
 		// this would pass against a pass that did nothing.
 		for (let walk of walks) {
 			it(`leaves no self call in the answer of ${walk.name}`, () => {
-				let body = emittedBody(generate(walk.source), walk.looped)
+				let emitted = walk.emitted ?? walk.looped
+				let body = emittedBody(generate(walk.source), emitted)
 
 				expect(body).toContain("while (true)")
 				expect(body).toMatch(/continue \$tail_\d+/)
@@ -237,7 +281,7 @@ describe("self tail calls", () => {
 
 				let unlooped = emittedBody(
 					generate(walk.source, withoutPass),
-					walk.looped,
+					emitted,
 				)
 
 				expect(unlooped).not.toContain("while (true)")
