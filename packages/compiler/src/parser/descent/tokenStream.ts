@@ -15,6 +15,7 @@ import { holeHoldsAnEscape } from "../../helpers/stringHoles"
 import {
 	escapeSetSentence,
 	Lexer,
+	type StringHole,
 	UnterminatedStringError,
 } from "../../lexer/index"
 import {
@@ -230,13 +231,37 @@ function reportMissingSeparator(problem: DocumentationProblem): void {
 	)
 }
 
-// The span of the one character a quote Cursor stands on, since a
+// The span of the one character a quote or a brace Cursor stands on, since a
 // zero-width span renders as an arrow at nothing.
-function quoteAt(cursor: common.Cursor): common.Position {
+function characterAt(cursor: common.Cursor): common.Position {
 	return {
 		start: cursor,
 		end: { line: cursor.line, column: cursor.column + 1 },
 	}
+}
+
+// The hole's `{` and its first quote are the two places an edit fixes, so
+// the report labels both. See "A quote inside a hole" in
+// packages/compiler/src/lexer/DEVELOPMENT.md.
+function reportQuoteInHole(position: common.Position, hole: StringHole): void {
+	reportError("This String Literal is never closed", position, {
+		code: "unclosed-string",
+		labels: [
+			primary(position, "the input ends here"),
+			secondary(characterAt(hole.brace), "this '{' opens a hole"),
+			secondary(
+				characterAt(hole.quote),
+				"and this quote opens a String inside it",
+			),
+		],
+		notes: [
+			"A '{' inside a String opens a hole, which holds an Expression — so a quote written inside it opens a String of its own.",
+		],
+		helps: [
+			"Write '\\{' for a brace that stands for itself.",
+			"Or end the hole with a '}' in front of that quote, where it holds an Expression.",
+		],
+	})
 }
 
 // What was written from a cursor to the end of its line. The Quick Fix for
@@ -432,6 +457,14 @@ export class TokenStream {
 		let position = { start: endOfContent, end: endOfContent }
 		let swallower = error.swallower
 
+		// `"a } b { c"`: a quote in the hole opened a String of its own, so a
+		// quote added to any line inside the hole opens one more.
+		if (error.hole !== null) {
+			reportQuoteInHole(position, error.hole)
+
+			return
+		}
+
 		if (swallower === null) {
 			// `"{\"a\": 1}"`: the `{` opened a hole, so a missing quote is
 			// not the problem. See `holeHoldsAnEscape`.
@@ -441,7 +474,7 @@ export class TokenStream {
 					labels: [
 						primary(position, "the input ends here"),
 						secondary(
-							quoteAt(error.openedAt),
+							characterAt(error.openedAt),
 							"opened here, and a '{' inside it opens a hole",
 						),
 					],
@@ -462,7 +495,7 @@ export class TokenStream {
 				code: "unclosed-string",
 				labels: [
 					primary(position, "the input ends here"),
-					secondary(quoteAt(error.openedAt), "opened here"),
+					secondary(characterAt(error.openedAt), "opened here"),
 				],
 				helps: [
 					`Add the missing '"' at the end of line ${error.openedAt.line}.`,
@@ -477,13 +510,13 @@ export class TokenStream {
 		// reads.
 		reportError(
 			"This String Literal is never closed",
-			quoteAt(swallower.openedAt),
+			characterAt(swallower.openedAt),
 			{
 				code: "unclosed-string",
 				labels: [
-					primary(quoteAt(swallower.openedAt), "opened here"),
+					primary(characterAt(swallower.openedAt), "opened here"),
 					secondary(
-						quoteAt(swallower.closedAt),
+						characterAt(swallower.closedAt),
 						"closed by this quote, which reads as the start of another String",
 					),
 					secondary(position, "and the input ends inside that one"),

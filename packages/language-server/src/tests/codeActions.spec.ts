@@ -2221,6 +2221,56 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).toEqual([])
 		})
 
+		// A quote in a hole opens a String of its own, so the quote is withheld.
+		// Either fix can be the one meant, and each compiles where it fits.
+		it("should escape the brace or end the hole where a quote stands in one", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant s = "a } b { c"',
+				'\tconstant name = "Ada"',
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Write '\\{' for the brace",
+				"End the hole in front of the quote",
+			])
+			expect(fixes.every((fix) => !fix.isPreferred)).toBe(true)
+
+			let escaped = applied(lines, fixes[0])
+
+			expect(escaped[1]).toBe('\tconstant s = "a } b \\{ c"')
+			expect(codesOf(escaped)).toEqual([])
+
+			let named = [
+				"implementation {",
+				'\tconstant name = "Ada"',
+				'\tconstant s = "Hello, {name"',
+				"}",
+			]
+			let ended = applied(named, quickFixes(named)[1])
+
+			expect(ended[2]).toBe('\tconstant s = "Hello, {name}"')
+			expect(codesOf(ended)).toEqual([])
+		})
+
+		// A String Argument the hole holds closes on its own line, so the hole
+		// is ended in front of the quote after it.
+		it("should end the hole past a String Argument it holds", () => {
+			let lines = [
+				"implementation {",
+				'\tconstant names = ["a", "b"]',
+				'\tconstant s = "{names::join(with ", ")"',
+				"\tTerminal.print(s)",
+				"}",
+			]
+			let ended = applied(lines, quickFixes(lines)[1])
+
+			expect(ended[2]).toBe('\tconstant s = "{names::join(with ", ")}"')
+			expect(codesOf(ended)).toEqual([])
+		})
+
 		// A hole holding a name was meant, and the String is one quote short.
 		it("should still close a String whose hole holds a name", () => {
 			let lines = [

@@ -54,6 +54,40 @@ export function closeStringAction(
 	}
 }
 
+// A quote standing in a hole opens a String of its own, so a quote at the end
+// of the line would open one more. The report labels the hole's `{`. Only the
+// reader knows whether it stands for itself or the hole lacks its `}`.
+export function unclosedHoleActions(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): Array<CodeActionEntry> | null {
+	let labelOn = (character: string) =>
+		diagnostic.labels.find(
+			(label) => sliceOf(lines, label.position) === character,
+		)?.position.start
+
+	let brace = labelOn("{")
+	let quote = labelOn('"')
+
+	if (brace === undefined || quote === undefined) {
+		return null
+	}
+
+	let insertion = (at: common.Cursor, newText: string, title: string) => ({
+		title,
+		kind: "quickfix" as const,
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: false,
+		edits: [{ range: { start: at, end: at }, newText }],
+	})
+
+	return [
+		insertion(brace, "\\", "Write '\\{' for the brace"),
+		insertion(quote, "}", "End the hole in front of the quote"),
+	]
+}
+
 // How many backslashes a line ends in, counted back from `column`.
 function trailingBackslashes(text: string, column: number): number {
 	let count = 0

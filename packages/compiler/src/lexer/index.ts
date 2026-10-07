@@ -48,6 +48,12 @@ export type ClosedString = {
 	spansLines: boolean
 }
 
+// A hole's `{`, and the quote of the first String written inside it.
+export type StringHole = {
+	brace: Cursor
+	quote: Cursor
+}
+
 // The one fatal Lexer error, since after an unterminated String there is
 // nothing left to lex. It carries where the input ran out and where the String
 // was opened.
@@ -58,11 +64,15 @@ export class UnterminatedStringError extends Error {
 	// lines, the likelier culprit. See "Which quote is missing" in
 	// DEVELOPMENT.md.
 	swallower: ClosedString | null
+	// The hole this String's opening quote stands in, or null outside every
+	// hole. See "A quote inside a hole" in DEVELOPMENT.md.
+	hole: StringHole | null
 
 	constructor(
 		endOfInput: Cursor,
 		openedAt: Cursor,
 		swallower: ClosedString | null = null,
+		hole: StringHole | null = null,
 	) {
 		super(
 			`String Token not closed at line: ${endOfInput.line}, column: ${endOfInput.column}`,
@@ -70,6 +80,7 @@ export class UnterminatedStringError extends Error {
 		this.endOfInput = endOfInput
 		this.openedAt = openedAt
 		this.swallower = swallower
+		this.hole = hole
 	}
 }
 
@@ -471,6 +482,9 @@ export class Lexer {
 	protected closedStringOpenedColumn: number
 	protected closedStringClosedLine: number
 	protected closedStringClosedColumn: number
+	// Every hole being read, innermost last. A quote is recorded once a String
+	// opens inside the hole.
+	protected openHoles: Array<{ brace: Cursor; quote: Cursor | null }>
 
 	constructor() {
 		this.data = ""
@@ -485,6 +499,7 @@ export class Lexer {
 		this.closedStringOpenedColumn = 0
 		this.closedStringClosedLine = 0
 		this.closedStringClosedColumn = 0
+		this.openHoles = []
 	}
 
 	reset(data: string, state: Cursor = { line: 1, column: 1 }) {
@@ -499,6 +514,7 @@ export class Lexer {
 		this.closedStringOpenedColumn = 0
 		this.closedStringClosedLine = 0
 		this.closedStringClosedColumn = 0
+		this.openHoles = []
 	}
 
 	next(): lexer.Token | undefined {
@@ -812,6 +828,7 @@ export class Lexer {
 	protected lexStringChunks(extra: Array<Token>): Token {
 		let stringStart = this.cursor()
 		let stringStartOffset = this.index
+		let hole = this.openHoles.at(-1) ?? null
 
 		this.index++
 		this.column++
@@ -819,11 +836,11 @@ export class Lexer {
 		let firstChunk = this.scanStringChunk()
 
 		if (firstChunk.terminator === "eof") {
-			this.throwUnterminatedString(this.cursor(), stringStart)
+			this.throwUnterminatedString(this.cursor(), stringStart, hole)
 		}
 
 		if (firstChunk.terminator === "quote") {
-			this.noteClosedString(stringStart)
+			this.noteClosedString(stringStart, hole)
 
 			return {
 				value: firstChunk.value,
@@ -848,6 +865,11 @@ export class Lexer {
 			// reach the count.
 			let depth = 0
 
+			this.openHoles.push({
+				brace: { line: this.line, column: this.column - 1 },
+				quote: null,
+			})
+
 			while (true) {
 				// A Comment in a hole would run to the end of its line, past the
 				// hole's `}` and the closing quote. It is reported and read as
@@ -870,7 +892,7 @@ export class Lexer {
 				let holeToken = this.lexToken(extra)
 
 				if (holeToken === undefined) {
-					this.throwUnterminatedString(beforeToken, stringStart)
+					this.throwUnterminatedString(beforeToken, stringStart, hole)
 				}
 
 				if (
@@ -895,12 +917,14 @@ export class Lexer {
 				}
 			}
 
+			this.openHoles.pop()
+
 			let chunkStart = this.cursor()
 			let chunkStartOffset = this.index
 			let chunk = this.scanStringChunk()
 
 			if (chunk.terminator === "eof") {
-				this.throwUnterminatedString(this.cursor(), stringStart)
+				this.throwUnterminatedString(this.cursor(), stringStart, hole)
 			}
 
 			extra.push({
@@ -915,7 +939,7 @@ export class Lexer {
 			})
 
 			if (chunk.terminator === "quote") {
-				this.noteClosedString(stringStart)
+				this.noteClosedString(stringStart, hole)
 
 				break
 			}
@@ -926,7 +950,17 @@ export class Lexer {
 
 	// Called once the closing quote is consumed, so the quote is the
 	// character before the Lexer's Cursor.
-	protected noteClosedString(openedAt: Cursor): void {
+	protected noteClosedString(
+		openedAt: Cursor,
+		hole: { quote: Cursor | null } | null,
+	): void {
+		// A String in a hole that closes on a later line opened at the quote
+		// meant to close the String around it. See "A quote inside a hole" in
+		// DEVELOPMENT.md.
+		if (hole !== null && this.line !== openedAt.line) {
+			hole.quote ??= openedAt
+		}
+
 		this.closedStringOpenedLine = openedAt.line
 		this.closedStringOpenedColumn = openedAt.column
 		this.closedStringClosedLine = this.line
@@ -1422,11 +1456,18 @@ export class Lexer {
 		return { index: end, column: endColumn, decoded: "" }
 	}
 
-	protected throwUnterminatedString(cursor: Cursor, openedAt: Cursor): never {
+	protected throwUnterminatedString(
+		cursor: Cursor,
+		openedAt: Cursor,
+		hole: { brace: Cursor; quote: Cursor | null } | null,
+	): never {
 		throw new UnterminatedStringError(
 			cursor,
 			openedAt,
 			this.swallowedTheLinesBelow(openedAt),
+			hole === null
+				? null
+				: { brace: hole.brace, quote: hole.quote ?? openedAt },
 		)
 	}
 

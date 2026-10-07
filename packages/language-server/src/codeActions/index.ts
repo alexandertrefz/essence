@@ -88,6 +88,7 @@ import {
 	mixedRationalActions,
 	ordinaryCommentAction,
 	partialDecimalActions,
+	unclosedHoleActions,
 	unicodeEscapeActions,
 } from "./literalFixes"
 import {
@@ -562,6 +563,7 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"static-method-on-value": ({ diagnostic, program, lines }) =>
 		staticCallActions(diagnostic, program, lines),
 	"unclosed-string": ({ diagnostic, lines }) =>
+		unclosedHoleActions(diagnostic, lines) ??
 		listed(closeStringAction(diagnostic, lines)),
 	"undeclared-conformance": ({ diagnostic, program, imports }) =>
 		listed(declareConformanceAction(diagnostic, program, imports)),

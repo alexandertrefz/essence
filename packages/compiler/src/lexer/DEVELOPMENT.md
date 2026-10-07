@@ -48,12 +48,29 @@ reports it as `unclosed-string` about the String that spans lines. Its shape is 
 Statement right after a String spanning lines, on the line of its closing quote. Two Expressions never stand side by
 side, so nothing else has that shape.
 
-In every shape the opening quote is the first Label standing on a `"`. `closeStringAction` in the language server
-reads the String's start off that Label and writes the missing quote at the end of its line.
+In every shape above the opening quote is the first Label standing on a `"`. `closeStringAction` in the language
+server reads the String's start off that Label and writes the missing quote at the end of its line.
 
 A String whose `{` opened a hole holding a backslash, such as JSON with escaped quotes, is reported as a hole
 problem instead. Adding a quote there leaves the same refusal standing, so the Quick Fix withholds itself too.
 `holeHoldsAnEscape` answers the question for both.
+
+### A quote inside a hole
+
+In `"a } b { c"` the `{` opens a hole, and the quote after `c` opens a String inside it. That String runs to the end
+of the input. A quote added at the end of the line opens one more String in the same hole, so the report would come
+back unchanged. `"Hello, {name"` has the same shape, with the hole's `}` forgotten instead.
+
+`openHoles` records the `{` of each hole being read and the quote of the first String inside it that runs past its
+own line. An unterminated String whose own opening quote stands in a hole carries that record as
+`UnterminatedStringError.hole`, or its own quote where no String before it ran on. That quote is the one to label. A
+String that closes on its own line, as the `", "` in `"{names::join(with ", ")"` does, is an Argument the hole
+holds. The quote after it was meant to close the outer String, opened one of its own instead, and ran on.
+
+`reportQuoteInHole` in the parser's `TokenStream` answers it ahead of every other shape. Only the reader knows which
+of two edits was meant, so it offers both: `\{` for a brace that stands for itself, or a `}` in front of that first
+quote for a hole that holds an Expression. The report labels the `{` and the quote, and `unclosedHoleActions` in the
+language server reads the two Labels back as two Quick Fixes, neither preferred.
 
 ## Unicode escapes
 

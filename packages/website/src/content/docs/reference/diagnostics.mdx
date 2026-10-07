@@ -254,7 +254,37 @@ Error: This String Literal is never closed
 
 For a literal brace, write `\{` and `\}`: `"\{\"a\": 1\}"` prints `{"a": 1}`.
 
-Quick Fix: **Add the missing '"'** — withheld for the hole, where it would produce a file carrying the very report it answers.
+A quote written inside a hole opens a string of its own, and a quote added after it only opens another. `"a } b { c"` is answered with the hole's `{` and the first quote inside the hole:
+
+<div class="error-output">
+
+```
+[unclosed-string]
+Error: This String Literal is never closed
+   ╭─┤ Label.es:4:2 │
+   │
+ 2 │     constant label = "a } b { c"
+   │                             ▲  ▲  
+   │                             ╰──│── this '{' opens a hole
+   │                                │  
+   │                                ╰── and this quote opens a String inside it
+   │ 
+ 4 │ }
+   │  │ 
+   │  ╰─ the input ends here
+   │ 
+   │ Help 1: Write '\{' for a brace that stands for itself.
+   │ Help 2: Or end the hole with a '}' in front of that quote, where it holds an Expression.
+   │ 
+   │ Note: A '{' inside a String opens a hole, which holds an Expression — so a quote written inside it opens a String of its own.
+───╯
+```
+
+</div>
+
+Which edit is right depends on what was meant. `"a } b \{ c"` prints `a } b { c`. `"Hello, {name"` lost the `}` of a hole that holds an expression, and `"Hello, {name}"` reads `name`.
+
+Quick Fix: **Add the missing '"'** — withheld for both holes, where it would produce a file carrying the very report it answers. For a quote inside a hole, **Write '\{' for the brace** and **End the hole in front of the quote** make the two edits, neither preferred.
 
 Taught on: [Programs and values › Strings](/docs/language/programs-and-values#strings)
 

@@ -467,6 +467,75 @@ describe("Parser Recovery", () => {
 		])
 	})
 
+	// The quote in `"a } b { c"` stands in the hole, where it opens a String
+	// of its own. A quote at the end of the line would open one more, so each
+	// Help is followed until the file compiles. Below the hole, the first
+	// quote in it is still the one labelled.
+	it("should answer a quote that stands in a hole", () => {
+		let source = `implementation {
+	constant s = "a } b { c"
+	Terminal.print(s)
+}`
+		let { diagnostics } = parseWithDiagnostics(source)
+
+		expect(diagnostics).toHaveLength(1)
+		expect(diagnostics[0].code).toBe("unclosed-string")
+		expect(
+			diagnostics[0].labels.map((label) => [
+				label.message,
+				label.position.start,
+			]),
+		).toEqual([
+			["the input ends here", { line: 4, column: 2 }],
+			["this '{' opens a hole", { line: 2, column: 22 }],
+			[
+				"and this quote opens a String inside it",
+				{ line: 2, column: 25 },
+			],
+		])
+		expect(diagnostics[0].helps).toEqual([
+			"Write '\\{' for a brace that stands for itself.",
+			"Or end the hole with a '}' in front of that quote, where it holds an Expression.",
+		])
+		expect(compiles(source.replace("b { c", "b \\{ c"))).toBe(true)
+		expect(compiles(source.replace('"a } b { c"', '"a } b { c""'))).toBe(
+			false,
+		)
+
+		let name = `implementation {
+	constant name = "Ada"
+	constant greeting = "Hello, {name"
+	Terminal.print("{greeting}!")
+}`
+		let [missingBrace] = parseWithDiagnostics(name).diagnostics
+
+		expect(missingBrace?.helps).toEqual(diagnostics[0].helps)
+		expect(missingBrace?.labels[2]?.position.start).toEqual({
+			line: 3,
+			column: 35,
+		})
+		expect(compiles(name.replace("{name", "{name}"))).toBe(true)
+	})
+
+	// The `", "` is an Argument the hole holds and closes on its own line. The
+	// quote after the call is the one that ran on, so it is labelled, and the
+	// hole's `}` belongs in front of it.
+	it("should label the quote that runs on past a String the hole holds", () => {
+		let source = `implementation {
+	constant names = ["a", "b"]
+	constant s = "{names::join(with ", ")"
+	Terminal.print(s)
+}`
+		let [report] = parseWithDiagnostics(source).diagnostics
+
+		expect(report?.code).toBe("unclosed-string")
+		expect(report?.labels[2]?.position.start).toEqual({
+			line: 3,
+			column: 39,
+		})
+		expect(compiles(source.replace(`", ")"`, `", ")}"`))).toBe(true)
+	})
+
 	// A hole holding a name was meant, so the String really is one quote
 	// short.
 	it("should keep the missing quote where the hole holds a name", () => {
