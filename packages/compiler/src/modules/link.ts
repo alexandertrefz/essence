@@ -34,10 +34,14 @@ import {
 } from "../visitor/index"
 import type { Module, ModuleGraph } from "./graph"
 import { resolveSpecifier } from "./resolve"
+import {
+	constantStatementAt,
+	readWrittenConstantTypes,
+} from "./writtenConstants"
 
 // What a top-level declaration was written as. A Variable can not be
-// exported, and a Constant binds across a cycle only once its Statement is
-// enriched. Every other kind hoists.
+// exported, and a Constant written without its Type binds across a cycle only
+// once its Statement is enriched. Every other kind hoists.
 export type DeclaredKind =
 	| "constant"
 	| "variable"
@@ -234,8 +238,8 @@ type ImportBinding = {
 	localName: string
 	// Null when the specifier resolved to nothing, which the graph reported.
 	dependencyPath: string | null
-	// A `waiting` entry names a Constant of another Module of the cycle,
-	// which binds once its Statement is enriched.
+	// A `waiting` entry names a Constant of another Module of the cycle whose
+	// Type is not known yet. It binds once its Statement is enriched.
 	state: "pending" | "waiting" | "bound" | "refused"
 	// How many tables the entry has bound, compared with `tablesOffered`.
 	boundTables: number
@@ -248,6 +252,10 @@ type ModuleState = {
 	exports: Map<string, parser.ExportNode>
 	imports: Array<ImportBinding>
 	diagnostics: Array<common.Diagnostic>
+	// The written Types of the exported Constants, offered before their
+	// Statements are enriched. See "Constants across a cycle" in
+	// DEVELOPMENT.md.
+	writtenConstantTypes: Map<string, common.Type>
 }
 
 // Whether the emitted JavaScript binds a published name. Type Aliases, Choices
@@ -727,6 +735,7 @@ function linkGroup(
 			exports: exportedEntries(module.program),
 			imports: [],
 			diagnostics: [],
+			writtenConstantTypes: new Map(),
 		}
 
 		// The builtins a fresh top level Scope binds join the registry
@@ -773,7 +782,32 @@ function linkGroup(
 	let surfaceFor = (filePath: string): ExportSurface | null =>
 		surfaceOf(filePath, states, surfaces, new Set())
 
-	let seedRound = (final: boolean): boolean => {
+	// Only another Module of a cycle reads a Constant before its Statement.
+	let exportedConstantsOf = new Map(
+		group.length > 1
+			? [...states.values()].map(
+					(state) => [state, exportedConstants(state)] as const,
+				)
+			: [],
+	)
+	// Answers whether an annotation was read that had not been before.
+	let readWrittenConstants = (final: boolean): boolean => {
+		let read = false
+
+		for (let [state, statements] of exportedConstantsOf) {
+			read =
+				readWrittenConstantTypes(
+					statements,
+					state.scope,
+					state.writtenConstantTypes,
+					final,
+				) || read
+		}
+
+		return read
+	}
+
+	let seedEach = (final: boolean): boolean => {
 		let bound = false
 
 		for (let state of states.values()) {
@@ -790,6 +824,26 @@ function linkGroup(
 		}
 
 		return bound
+	}
+
+	let seedRound = (final: boolean): boolean => {
+		let bound = seedEach(final)
+
+		// An annotation may name what the seeding bound, and the Constant it
+		// types is offered at once.
+		while (readWrittenConstants(false)) {
+			bound = seedEach(final) || bound
+		}
+
+		return bound
+	}
+
+	// The hoist's last fill may complete a refinement an annotation names. An
+	// annotation that still does not resolve binds its Constant as an Error.
+	let settleWrittenConstants = (): void => {
+		while (readWrittenConstants(true)) {
+			seedEach(true)
+		}
 	}
 
 	// Once before the hoist, which binds a lone Module's whole block, and then
@@ -811,7 +865,12 @@ function linkGroup(
 		{
 			...modeOf(options),
 			seedRound,
-			lateNames: lateNamesOf(states, declares, surfaceFor),
+			lateNames: lateNamesOf(
+				states,
+				declares,
+				surfaceFor,
+				settleWrittenConstants,
+			),
 			annotationsFor:
 				annotationsIndex === -1 ? undefined : annotationsIndex,
 		},
@@ -890,6 +949,28 @@ function importedNames(state: ModuleState): ImportedNames {
 	return imported
 }
 
+// The Statements of the Constants the Module declares and exports. A
+// Pattern's binding has none of its own, since the annotation types the whole
+// value.
+function exportedConstants(
+	state: ModuleState,
+): Array<parser.ConstantDeclarationStatementNode> {
+	let exported = new Set(
+		[...state.exports.values()].flatMap((entry) =>
+			entry.source === null ? [entry.name.content] : [],
+		),
+	)
+
+	return state.module.program.implementation.nodes.filter(
+		(node): node is parser.ConstantDeclarationStatementNode =>
+			node.nodeType === "ConstantDeclarationStatement" &&
+			node.name.nodeType === "Identifier" &&
+			exported.has(node.name.content) &&
+			state.declarations.get(node.name.content)?.position ===
+				node.name.position,
+	)
+}
+
 // A linked Module's final surface, or one built from the current Scope of a
 // Module in the group. `visiting` stops a re-export chain that leads back into
 // the group.
@@ -927,12 +1008,16 @@ function surfaceOf(
 			surface.declarations[publicName] = declared.position
 
 			let exportedName = entry.name.content
-			let value = state.scope.members[exportedName]
+			let written = state.writtenConstantTypes.get(exportedName)
+			let value = state.scope.members[exportedName] ?? written
 
 			if (value !== undefined) {
 				surface.values[publicName] = value
 
-				if (state.scope.constants.has(exportedName)) {
+				if (
+					state.scope.constants.has(exportedName) ||
+					written !== undefined
+				) {
 					surface.constants.add(publicName)
 				}
 			}
@@ -1111,8 +1196,8 @@ function seedImports(
 
 		let tables = tablesOffered(surface, exportedName)
 
-		// A Constant does not hoist. One from a Module of the cycle binds once
-		// the in-order enrichment has reached its Statement.
+		// A Constant does not hoist. One from a Module of the cycle that offers
+		// no written Type binds once the in-order enrichment reaches it.
 		if (tables === 0 && kind === "constant" && states.has(dependencyPath)) {
 			binding.state = "waiting"
 
@@ -1183,7 +1268,7 @@ function declaringModule(
 	return null
 }
 
-// Read once the hoist has seeded its last round, after which an entry only
+// Read once `begin` has bound what the hoist left, after which an entry only
 // ever stops waiting. Kept by importer and by declaring Module.
 function heldEntries(states: Map<string, ModuleState>): {
 	byImporter: Map<ModuleState, Array<HeldEntry>>
@@ -1233,6 +1318,7 @@ function lateNamesOf(
 	states: Map<string, ModuleState>,
 	declares: (filePath: string, name: string) => Declaration | null,
 	surfaceFor: (filePath: string) => ExportSurface | null,
+	begin: () => void,
 ): LateNames {
 	let ordered = [...states.values()]
 	let held: ReturnType<typeof heldEntries> | null = null
@@ -1258,6 +1344,7 @@ function lateNamesOf(
 	}
 
 	return {
+		begin,
 		waiting: (index) =>
 			new Set(
 				waitingIn(ordered[index]!).map(
@@ -1383,12 +1470,28 @@ function refuseUnboundImports(state: ModuleState): void {
 
 // Every Module of the cycle waits for a Constant another has not reached.
 // `declaring` spells the Module that declares it, which a forwarding Module
-// may stand in front of.
+// may stand in front of. The first Help annotates the Constant where its
+// Statement declares it by name without a Type.
 function reportCyclicConstantImport(
-	{ binding: { entry }, declaredName }: HeldEntry,
+	{ binding: { entry }, declaring: declaringState, declaredName }: HeldEntry,
 	read: parser.IdentifierNode,
 	declaring: string,
 ): void {
+	let declared = declaringState?.declarations.get(declaredName)
+	let statement =
+		declaringState !== null && declared?.kind === "constant"
+			? constantStatementAt(
+					declaringState.module.program,
+					declared.position,
+				)
+			: null
+	let annotate =
+		statement?.type === null
+			? [
+					`Annotate '${declaredName}' with its Type in ${declaring}: 'constant ${declaredName}: Type = …'.`,
+				]
+			: []
+
 	reportError(
 		`Constant '${entry.name.content}' is read before ${declaring} declares it`,
 		read.position,
@@ -1406,10 +1509,11 @@ function reportCyclicConstantImport(
 			],
 			notes: [
 				`${entry.source.path} imports this Module back, directly or through further Modules.`,
-				`A Constant does not hoist, so its Type is known only once its Module has been read down to it. ${declaring} reads a Constant of this cycle before it has declared '${declaredName}', and that Constant waits on this Module's code from this Statement on.`,
+				`A Constant does not hoist, and one written without its Type takes its value's, known only once its Module has been read down to it. ${declaring} reads a Constant of this cycle before it has declared '${declaredName}', and that Constant waits on this Module's code from this Statement on.`,
 			],
 			helps: [
-				`Declare '${declaredName}' above the Statements of ${declaring} that read a Constant of this cycle, or move it into a Module outside the cycle.`,
+				...annotate,
+				`${annotate.length === 0 ? "Declare" : "Or declare"} '${declaredName}' above the Statements of ${declaring} that read a Constant of this cycle, or move it into a Module outside the cycle.`,
 			],
 		},
 	)

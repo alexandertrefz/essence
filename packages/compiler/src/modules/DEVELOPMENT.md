@@ -27,8 +27,8 @@ builds one from whatever its Scope holds at that moment, so the surface grows fr
 - A collision with a declaration of the importing Module is reported on the first pass. The declarations are
   read off the AST, so the collision is found before hoisting puts the declaration in Scope.
 - An export list is read off the AST too, so a name missing from it is reported on the first pass.
-- A Constant does not hoist, so one from a Module of the same cycle has no Type yet. The entry waits. See
-  "Constants across a cycle".
+- A Constant does not hoist, so one from a Module of the same cycle has no Type yet unless it is written with
+  one. The entry waits. See "Constants across a cycle".
 - Otherwise the entry binds whatever tables the surface offers the name, counted by `tablesOffered`.
 
 One name can live in several tables, such as a `type NonEmptyList` beside a `namespace NonEmptyList`, and the
@@ -61,6 +61,22 @@ A Constant enters its Module's Scope only when the in-order enrichment reaches i
 round. So an entry naming a Constant of another Module of the group is left `waiting` rather than refused, and
 `refuseUnboundImports` passes it over.
 
+A Constant written with its Type is known up front. Each `seedRound` reads the annotation of every Constant a Module
+of a cycle exports into `writtenConstantTypes`, once it resolves without an Error (`readWrittenConstantTypes` in
+`writtenConstants.ts`). An annotation naming a Type not in Scope yet is passed over unresolved, since spelling an
+`unknown-type` remedy is costly. `surfaceOf` offers the Type until the Statement puts the Constant in Scope, so an
+entry naming it binds in the seeding. An annotation may name a Type that the seeding just bound, so the reading and
+the seeding repeat until no new annotation resolves.
+
+The hoist fills a refinement's predicate only after its last seeding, and a Union of refinements reads the
+predicates. So once the hoist is over, `begin` reads the annotations again. One that still does not resolve binds its
+Constant as an Error, which its own Module reports, and an importing Module reads on quietly. One whose reading
+throws leaves its Constant to wait for the Statement.
+
+The value is still enriched and checked against the annotation at its Statement, and the emitted value runs where it
+is written. A read while the Module loads is refused as `cyclic-load-time-use`, as for any name of the cycle. A
+Pattern's annotation types the whole value, so its bindings wait.
+
 `lateNamesOf` tells the enricher which local names wait in each Module. The enricher takes the group's Programs a
 Statement at a time and holds back a Statement that reads a waiting name. See "Enriching a group in turns" in
 packages/compiler/src/enricher/DEVELOPMENT.md.
@@ -72,9 +88,10 @@ dependency's surface is built once per Statement, so the work grows with the Con
 
 The turns stall when every unfinished Module waits. Each waits on the Module declaring the Constant its next
 Statement reads, so following those waits closes a cycle of Modules. Refusing a Module outside that cycle would
-report a Constant that was coming. Of the cycle, the Module first by path is refused, as `cyclic-constant-import`
-at the read, and its name is bound as an Error. The group's order follows the entry, so it decides nothing here:
-an editor keeps a file's Diagnostics from whichever graph checked it first.
+report a Constant that was coming. Of the cycle, the Module first by path is refused, as `cyclic-constant-import` at
+the read, and its name is bound as an Error. Where its Statement declares the Constant by name without a Type, the
+first Help annotates it. The group's order follows the entry, so it decides nothing here: an editor keeps a file's
+Diagnostics from whichever graph checked it first.
 
 A wait on a declaring Module that has finished means that Module's Statement never bound the Constant, which it
 reported itself. So the name is bound as an Error in silence. So is every entry still waiting once the last

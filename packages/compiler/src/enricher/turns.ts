@@ -14,6 +14,8 @@ export type ProgramTurns = {
 // The names a Module of a cycle binds only once another Module's Statement
 // declares them. See "Enriching a group in turns" in DEVELOPMENT.md.
 export type LateNames = {
+	// Runs once the hoist is over, before the first Statement is enriched.
+	begin: () => void
 	// The local names the Program at `index` may not read yet.
 	waiting: (index: number) => ReadonlySet<string>
 	// Binds the waiting names `node`, just enriched in the Program at `index`,
@@ -35,6 +37,8 @@ export function enrichInTurns(
 ): void {
 	let next = programs.map(() => 0)
 	let finished = programs.map(() => false)
+
+	late?.begin()
 
 	for (;;) {
 		let progressed = false

@@ -2190,7 +2190,8 @@ implementation {
 					[2, "imported from a Module of this cycle"],
 				])
 				expect(refusal?.helps).toEqual([
-					"Declare 'SCALE' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+					"Annotate 'SCALE' with its Type in ./B.es: 'constant SCALE: Type = …'.",
+					"Or declare 'SCALE' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
 				])
 				// The name is bound as an Error, so `B.es` reads on.
 				expect(linkedAt(directory, linked, "B.es").diagnostics).toEqual(
@@ -2199,22 +2200,382 @@ implementation {
 			},
 		)
 
-		// The Help followed.
-		await withBuiltProject(
-			waitingCycle(`	constant SCALE = 3
+		// Each Help followed.
+		for (let scale of [
+			`	function shifted(_ value: Integer) -> Integer {
+		<- scaled(value)::add(OFFSET)
+	}
+
+	constant SCALE: Integer = 3`,
+			`	constant SCALE = 3
 
 	function shifted(_ value: Integer) -> Integer {
 		<- scaled(value)::add(OFFSET)
-	}`),
-			async (directory) => {
+	}`,
+		]) {
+			await withBuiltProject(waitingCycle(scale), async (directory) => {
 				expect(
 					await runBundle(
 						generateModules(linkProject(directory, "Main.es")),
 						directory,
 					),
 				).toEqual(["6", "16"])
+			})
+		}
+	})
+
+	// Imports the Modules of the cycle in `order`.
+	const mainOf = (order: Array<string>) => `import {
+${order.map((name) => `	from "./${name}" { ${name === "A.es" ? "f" : "g"} }`).join("\n")}
+}
+
+implementation {
+	Terminal.print(f())
+	Terminal.print(g())
+}
+`
+
+	// Each Module reads the other's Constant in a Function written above its
+	// own Constant. Only a Constant written without its Type waits.
+	const mutualCycle = (
+		a: string,
+		k: string,
+		main: string = mainOf(["A.es", "B.es"]),
+	) => ({
+		"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	function f() -> Integer {
+		<- k
+	}
+
+	${a}
+}
+
+export {
+	a
+	f
+}
+`,
+		"B.es": `import {
+	from "./A.es" { a }
+}
+
+implementation {
+	function g() -> Integer {
+		<- a
+	}
+
+	${k}
+}
+
+export {
+	g
+	k
+}
+`,
+		"Main.es": main,
+	})
+
+	it("binds a Constant written with its Type across a cycle before its Statement", async () => {
+		for (let [a, k] of [
+			["constant a = 1", "constant k: Integer = 2"],
+			["constant a: Integer = 1", "constant k = 2"],
+			["constant a: Integer = 1", "constant k: Integer = 2"],
+		] as const) {
+			// The same Diagnostics, none, from every entry.
+			withProject(mutualCycle(a, k), (directory) => {
+				for (let entry of ["Main.es", "A.es", "B.es"]) {
+					let linked = linkProject(directory, entry)
+
+					for (let name of ["A.es", "B.es"]) {
+						expect([
+							entry,
+							name,
+							reportsOf(analysedAt(directory, entry, name)),
+						]).toEqual([entry, name, []])
+						expect(
+							linkedAt(directory, linked, name).diagnostics,
+						).toEqual([])
+					}
+				}
+			})
+
+			// The entry imports the Modules of the cycle in either order.
+			for (let order of [
+				["A.es", "B.es"],
+				["B.es", "A.es"],
+			]) {
+				await withBuiltProject(
+					mutualCycle(a, k, mainOf(order)),
+					async (directory) => {
+						expect(
+							await runBundle(
+								generateModules(
+									linkProject(directory, "Main.es"),
+								),
+								directory,
+							),
+						).toEqual(["2", "1"])
+					},
+				)
+			}
+
+			// A bundle entered at a Module of the cycle loads both and reads
+			// neither Constant while they load.
+			for (let entry of ["A.es", "B.es"]) {
+				await withBuiltProject(mutualCycle(a, k), async (directory) => {
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, entry)),
+							directory,
+						),
+					).toEqual([])
+				})
+			}
+		}
+	})
+
+	it("refuses a Constant written without its Type that a cycle waits for, from every entry", async () => {
+		withProject(
+			mutualCycle("constant a = 1", "constant k = 2"),
+			(directory) => {
+				for (let entry of ["Main.es", "A.es", "B.es"]) {
+					let linked = linkProject(directory, entry)
+					let { diagnostics } = linkedAt(directory, linked, "A.es")
+
+					expect([entry, reportsOf(diagnostics)]).toEqual([
+						entry,
+						[
+							[
+								"cyclic-constant-import",
+								"Constant 'k' is read before ./B.es declares it",
+							],
+						],
+					])
+					expect(diagnostics[0]?.helps).toEqual([
+						"Annotate 'k' with its Type in ./B.es: 'constant k: Type = …'.",
+						"Or declare 'k' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+					])
+					expect(
+						linkedAt(directory, linked, "B.es").diagnostics,
+					).toEqual([])
+				}
 			},
 		)
+
+		// The first Help followed.
+		expect(
+			compiles(mutualCycle("constant a = 1", "constant k: Integer = 2")),
+		).toBe(true)
+		await withBuiltProject(
+			mutualCycle("constant a = 1", "constant k: Integer = 2"),
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["2", "1"])
+			},
+		)
+	})
+
+	// The refinement is the Type `A.es` reads, and `B.es` still checks its value
+	// against it.
+	it("checks a Constant written with a refinement across a cycle against it", async () => {
+		let refined = (value: string) =>
+			mutualCycle(
+				"constant a = 1",
+				`constant k: PositiveInteger = ${value}`,
+			)
+		let halving = (files: Record<string, string>) => ({
+			...files,
+			"A.es": files["A.es"]!.replace(
+				`	function f() -> Integer {
+		<- k
+	}`,
+				`	function halved(_ value: PositiveInteger) -> Integer {
+		<- value::quotient(dividingBy 2)
+	}
+
+	function f() -> Integer {
+		<- halved(k)
+	}`,
+			),
+		})
+
+		await withBuiltProject(halving(refined("4")), async (directory) => {
+			expect(
+				await runBundle(
+					generateModules(linkProject(directory, "Main.es")),
+					directory,
+				),
+			).toEqual(["2", "1"])
+		})
+
+		withProject(halving(refined("0")), (directory) => {
+			for (let entry of ["Main.es", "A.es", "B.es"]) {
+				expect([
+					entry,
+					codesOf(analysedAt(directory, entry, "A.es")),
+					codesOf(analysedAt(directory, entry, "B.es")),
+				]).toEqual([
+					entry,
+					["dependency-has-errors"],
+					["assignment-type-mismatch"],
+				])
+			}
+		})
+	})
+
+	// The Union reads the predicates of `Small` and `Big`, which the hoist
+	// fills only after its last seeding.
+	it("binds a Constant whose written Type needs the hoist's last fill", async () => {
+		let files = mutualCycle(
+			"constant a = 1",
+			`type Small = Integer where @::isLessThan(10)
+
+	type Big = Integer where @::isGreaterThan(100)
+
+	constant s: Small = 3
+
+	constant k: Small | Big = s`,
+		)
+
+		files["A.es"] = files["A.es"]
+			.replace("function f() -> Integer {", "function f() -> Boolean {")
+			.replace("<- k\n", "<- k::isLessThan(50)\n")
+
+		await withBuiltProject(files, async (directory) => {
+			expect(
+				await runBundle(
+					generateModules(linkProject(directory, "Main.es")),
+					directory,
+				),
+			).toEqual(["true", "1"])
+		})
+	})
+
+	// `k` binds as an Error once the hoist is over, so only `B.es` reports the
+	// annotation and `A.es` reads on.
+	it("reports a written Type that does not resolve once, where it is written", () => {
+		for (let [k, code] of [
+			["constant k: Nope = 2", "unknown-type"],
+			[
+				`choice Tree {
+		Leaf,
+		Node { child: Tree },
+	}
+
+	constant k: Tree = #Leaf`,
+				"recursive-type-declaration",
+			],
+		] as const) {
+			withProject(mutualCycle("constant a = 1", k), (directory) => {
+				for (let entry of ["Main.es", "A.es", "B.es"]) {
+					expect([
+						entry,
+						codesOf(analysedAt(directory, entry, "A.es")),
+						codesOf(analysedAt(directory, entry, "B.es")),
+					]).toEqual([entry, ["dependency-has-errors"], [code]])
+				}
+			})
+		}
+	})
+
+	// The Constant is marked as one before its Statement binds it.
+	it("refuses an assignment to a Constant written with its Type in another Module of the cycle", () => {
+		let files = mutualCycle("constant a = 1", "constant k: Integer = 2")
+
+		files["A.es"] = files["A.es"].replace("<- k\n", "k = 3\n\n\t\t<- k\n")
+
+		withProject(files, (directory) => {
+			for (let entry of ["Main.es", "A.es", "B.es"]) {
+				expect([
+					entry,
+					codesOf(analysedAt(directory, entry, "A.es")),
+				]).toEqual([entry, ["constant-reassignment"]])
+			}
+		})
+	})
+
+	// The annotation types the whole value, so `k` itself has none.
+	it("refuses a Constant a cycle waits for that a Pattern written with a Type binds", () => {
+		withProject(
+			mutualCycle(
+				"constant a = 1",
+				"constant { k }: { k: Integer } = { k = 2 }",
+			),
+			(directory) => {
+				let { diagnostics } = linkedAt(
+					directory,
+					linkProject(directory, "Main.es"),
+					"A.es",
+				)
+
+				expect(reportsOf(diagnostics)).toEqual([
+					[
+						"cyclic-constant-import",
+						"Constant 'k' is read before ./B.es declares it",
+					],
+				])
+				expect(diagnostics[0]?.helps).toEqual([
+					"Declare 'k' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+				])
+			},
+		)
+	})
+
+	// `Size` hoists in `A.es`, and `B.es` binds it in the seeding that follows,
+	// so the annotation of `k` resolves only once that seeding has run.
+	it("binds a Constant whose written Type another Module of the cycle declares", async () => {
+		let files = mutualCycle(
+			"constant a = 1",
+			"constant k: Size = { width = 3, height = 4 }",
+		)
+
+		files["A.es"] = files["A.es"]
+			.replace("<- k\n", "<- k.width\n")
+			.replace(
+				"constant a = 1",
+				"type Size = { width: Integer, height: Integer }\n\n\tconstant a = 1",
+			)
+			.replace("export {\n\ta\n\tf\n", "export {\n\ta\n\tf\n\tSize\n")
+		files["B.es"] = files["B.es"].replace("{ a }", "{ a Size }")
+
+		await withBuiltProject(files, async (directory) => {
+			expect(
+				await runBundle(
+					generateModules(linkProject(directory, "Main.es")),
+					directory,
+				),
+			).toEqual(["3", "1"])
+		})
+	})
+
+	// `k` is known before `B.es` has run, but a read while `A.es` loads may come
+	// first.
+	it("refuses a read of a Constant written with its Type while a Module of its cycle loads", () => {
+		let files = mutualCycle("constant a = 1", "constant k: Integer = 2")
+
+		files["A.es"] = files["A.es"]
+			.replace(
+				"constant a = 1",
+				"constant a = 1\n\n\tconstant early = k::add(1)",
+			)
+			.replace("export {\n\ta\n", "export {\n\ta\n\tearly\n")
+
+		withProject(files, (directory) => {
+			for (let entry of ["Main.es", "A.es", "B.es"]) {
+				expect([
+					entry,
+					codesOf(analysedAt(directory, entry, "A.es")),
+				]).toEqual([entry, ["cyclic-load-time-use"]])
+			}
+		})
 	})
 
 	// `A.es` waits for `B.es`, which waits with `C.es` on each other. Only that
@@ -2372,27 +2733,34 @@ implementation {
 					],
 				])
 				expect(a.diagnostics[0]?.helps).toEqual([
-					"Declare 'k' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
+					"Annotate 'k' with its Type in ./B.es: 'constant k: Type = …'.",
+					"Or declare 'k' above the Statements of ./B.es that read a Constant of this cycle, or move it into a Module outside the cycle.",
 				])
 			},
 		)
 
-		// The Help followed.
-		await withBuiltProject(
-			forwardedWait(`	constant k = 2
+		// Each Help followed.
+		for (let b of [
+			`	function useA() -> Integer {
+		<- a::add(useK())
+	}
+
+	constant k: Integer = 2`,
+			`	constant k = 2
 
 	function useA() -> Integer {
 		<- a::add(useK())
-	}`),
-			async (directory) => {
+	}`,
+		]) {
+			await withBuiltProject(forwardedWait(b), async (directory) => {
 				expect(
 					await runBundle(
 						generateModules(linkProject(directory, "Main.es")),
 						directory,
 					),
 				).toEqual(["3", "4"])
-			},
-		)
+			})
+		}
 	})
 
 	// In `A.es` a Parameter, a default's earlier Parameter, a local Constant, a

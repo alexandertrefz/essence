@@ -155,6 +155,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"case-default-without-payload",
 		"complete-outside-future",
 		"condition-not-boolean",
+		"cyclic-constant-import",
 		"declarations-outside-stdlib",
 		"define-without-answer-type",
 		"define-without-otherwise",

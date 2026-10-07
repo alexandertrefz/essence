@@ -393,6 +393,60 @@ export const both = [scaled(2n), shifted(2n)]
 
 		expect(module.both).toEqual([6n, 16n])
 	})
+
+	// Each Module reads the other's Constant in a Function written above its
+	// own Constant, which is written with its Type, so neither waits. Either
+	// Module may load first.
+	it("serves a cycle whose Functions read Constants written with their Type below them", async () => {
+		for (let imports of [
+			['import { f } from "./A.es"', 'import { g } from "./B.es"'],
+			['import { g } from "./B.es"', 'import { f } from "./A.es"'],
+		]) {
+			let directory = project({
+				"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	function f() -> Integer {
+		<- k
+	}
+
+	constant a: Integer = 1
+}
+
+export {
+	a
+	f
+}
+`,
+				"B.es": `import {
+	from "./A.es" { a }
+}
+
+implementation {
+	function g() -> Integer {
+		<- a
+	}
+
+	constant k: Integer = 2
+}
+
+export {
+	g
+	k
+}
+`,
+				"entry.js": `${imports.join("\n")}
+
+export const both = [f(), g()]
+`,
+			})
+			let { module } = await built(directory, "entry.js")
+
+			expect(module.both).toEqual([2n, 1n])
+		}
+	})
 })
 
 describe("The Bun plugin under the runtime", () => {

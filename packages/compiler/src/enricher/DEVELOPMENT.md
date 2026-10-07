@@ -1045,11 +1045,13 @@ matter during the rounds, because a bodied static Property's value is enriched w
 
 ### Seeding imports between rounds
 
-Each round starts with `seedRound`, which binds the imports that became bindable since the last one. An import
-across a cycle of Modules can only be bound once the declaration it names has hoisted. Seeding first means a
-Module has the import in Scope while its own declarations resolve. After the last round, `seedRound(true)` binds
-what the last declarations to hoist made bindable. It is the last moment an import may be bound before the bodies
-are enriched. Only a Constant of another Module of the cycle binds later, as "Enriching a group in turns" says.
+Each round starts with `seedRound`, which binds the imports that became bindable since the last one. An import across
+a cycle of Modules can only be bound once the declaration it names has hoisted. Seeding first means a Module has the
+import in Scope while its own declarations resolve. After the last round, `seedRound(true)` binds what the last
+declarations to hoist made bindable. It is the last moment an import may be bound before the bodies are enriched,
+save for a Constant of another Module of the cycle. One declared by name with its Type binds by the time the turns
+begin, unless reading the annotation throws. Any other binds once its Statement is enriched, as "Enriching a group in
+turns" says.
 
 A Namespace conforming to a Protocol that has not hoisted yet waits too (`deferOnPendingConformance`). It has to
 reach Scope with its conditional bounds woven in, or a use site before it would solve against an unbounded Method.
@@ -1074,9 +1076,10 @@ After the hoist, `enrichInTurns` in `turns.ts` enriches each Program of the grou
 Statement at a time. Each Program keeps one Diagnostic collection across its turns, entered with
 `collectDiagnosticsInto`, so `reportedOnLine` and the deduplication in `report` see every Statement before.
 
-A Constant does not hoist, so one that another Module of the cycle declares has no Type until the in-order
-enrichment reaches it. The linker hands over `lateNames`, the local names each Program may not read yet. A Statement
-that reads one of them waits, and the next Program takes its turn. After a Statement, `rebind` binds what it made
+A Constant does not hoist, so one that another Module of the cycle declares without its Type has no Type until the
+in-order enrichment reaches it. The linker hands over `lateNames`, the local names each Program may not read yet.
+Before the first Statement, `begin` lets the linker bind what the hoist's last fill made readable. A Statement that
+reads a waiting name waits, and the next Program takes its turn. After a Statement, `rebind` binds what it made
 readable.
 
 A needless wait can end in a refusal, so `firstRead` in `waitingReads.ts` counts only a value read. A label, a

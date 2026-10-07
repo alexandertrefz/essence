@@ -3872,10 +3872,11 @@ Error: Constant 'STEP' is read before ./Pong.es declares it
    │                      ──┬─  
    │                        ╰─── this needs the Type of 'STEP'
    │ 
-   │ Help: Declare 'STEP' above the Statements of ./Pong.es that read a Constant of this cycle, or move it into a Module outside the cycle.
+   │ Help 1: Annotate 'STEP' with its Type in ./Pong.es: 'constant STEP: Type = …'.
+   │ Help 2: Or declare 'STEP' above the Statements of ./Pong.es that read a Constant of this cycle, or move it into a Module outside the cycle.
    │ 
    │ Note 1: ./Pong.es imports this Module back, directly or through further Modules.
-   │ Note 2: A Constant does not hoist, so its Type is known only once its Module has been read down to it. ./Pong.es reads a Constant of this cycle before it has declared 'STEP', and that Constant waits on this Module's code from this Statement on.
+   │ Note 2: A Constant does not hoist, and one written without its Type takes its value's, known only once its Module has been read down to it. ./Pong.es reads a Constant of this cycle before it has declared 'STEP', and that Constant waits on this Module's code from this Statement on.
 ───╯
 
 [cyclic-side-effects]
