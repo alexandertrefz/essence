@@ -2837,8 +2837,38 @@ describe("Validator", () => {
 				"declared here, below the use",
 			)
 			expect(diagnostics[0].helps).toEqual([
-				"Move the use below the Declaration.",
+				"Move the Declaration of 'Doubling' above this Statement, or this Statement below it.",
 			])
+		})
+
+		it("offers only the move that compiles to a Statement using a Namespace itself", () => {
+			let program = (statements: Array<string>) => `implementation {
+				${statements.join("\n\n")}
+			}`
+			let sizes = `namespace Sizes {
+					static base: Integer = 4
+				}`
+
+			expect(
+				diagnosticsFor(
+					program([
+						"constant v = Sizes.base",
+						"Terminal.print(v)",
+						sizes,
+					]),
+				).map((diagnostic) => diagnostic.helps),
+			).toEqual([
+				["Move the Declaration of 'Sizes' above this Statement."],
+			])
+			expect(
+				compiles(
+					program([
+						sizes,
+						"constant v = Sizes.base",
+						"Terminal.print(v)",
+					]),
+				),
+			).toBe(true)
 		})
 
 		// A predicate is asked of a value, never run where it is written.

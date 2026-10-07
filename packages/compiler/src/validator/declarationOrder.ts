@@ -166,22 +166,7 @@ export function reportReachedNamespaces(
 		return
 	}
 
-	let simulation = (order.run ??= {
-		units: collectUnits(
-			order.nodes,
-			new Set(order.namespaces.keys()),
-			new Set(order.cycleMates.keys()),
-		),
-		order,
-		closures: new Map(),
-		escaped: new Set(),
-		escapedClosure: emptyClosure(),
-		fired: new Set(),
-		tails: new Map(),
-		late: [],
-		scheduled: new Set(),
-		needs: new Map(),
-	})
+	let simulation = simulationOf(order)
 	let node = order.nodes[index]
 	let home =
 		node.nodeType === "NamespaceDefinitionStatement"
@@ -235,6 +220,57 @@ export function reportReachedNamespaces(
 			reportFrom(order, simulation, { unit, via }, moment, home, reported)
 		}
 	}
+}
+
+function simulationOf(order: DeclarationOrder): Simulation {
+	return (order.run ??= {
+		units: collectUnits(
+			order.nodes,
+			new Set(order.namespaces.keys()),
+			new Set(order.cycleMates.keys()),
+		),
+		order,
+		closures: new Map(),
+		escaped: new Set(),
+		escapedClosure: emptyClosure(),
+		fired: new Set(),
+		tails: new Map(),
+		late: [],
+		scheduled: new Set(),
+		needs: new Map(),
+	})
+}
+
+// Reports a use of a top-level Namespace that the Statement at `index` makes
+// itself, before the Namespace's Declaration.
+export function reportNamespaceUse(
+	order: DeclarationOrder,
+	index: number,
+	dependency: Dependency,
+): void {
+	let declaration = order.namespaces.get(dependency.name)
+
+	if (declaration === undefined || declaration.index <= index) {
+		return
+	}
+
+	order.reported.add(`${index} ${dependency.name}`)
+	reportError(
+		`Namespace '${dependency.name}' is used before it is declared`,
+		dependency.position,
+		{
+			code: "use-before-declaration",
+			labels: [
+				primary(dependency.position, dependency.label),
+				secondary(declaration.position, "declared here, below the use"),
+			],
+			notes: [
+				ARRIVES,
+				"A Function's or a Method's body is not run where it is written, so a body may name a Namespace declared below it.",
+			],
+			helps: [moveHelp(simulationOf(order), index, dependency)],
+		},
+	)
 }
 
 function emptyClosure(): Closure {

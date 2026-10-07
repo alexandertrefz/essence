@@ -69,6 +69,7 @@ import { reportConditionNotBoolean } from "./conditions"
 import {
 	collectDeclarationOrder,
 	type DeclarationOrder,
+	reportNamespaceUse,
 	reportReachedNamespaces,
 } from "./declarationOrder"
 import {
@@ -2977,36 +2978,15 @@ function checkNamespaceIsDeclared(
 	position: common.Position,
 	useLabel: string,
 ): void {
-	if (executingTopLevelIndex === null) {
-		return
+	if (executingTopLevelIndex !== null) {
+		reportNamespaceUse(declarationOrder, executingTopLevelIndex, {
+			kind: "namespace",
+			name: namespaceName,
+			position,
+			label: useLabel,
+			home: null,
+		})
 	}
-
-	let declaration = declarationOrder.namespaces.get(namespaceName)
-
-	if (
-		declaration === undefined ||
-		declaration.index <= executingTopLevelIndex
-	) {
-		return
-	}
-
-	declarationOrder.reported.add(`${executingTopLevelIndex} ${namespaceName}`)
-	reportError(
-		`Namespace '${namespaceName}' is used before it is declared`,
-		position,
-		{
-			code: "use-before-declaration",
-			labels: [
-				primary(position, useLabel),
-				secondary(declaration.position, "declared here, below the use"),
-			],
-			notes: [
-				"A Namespace comes into being where it is written, so nothing that runs above it can reach it.",
-				"A Function's or a Method's body is not run where it is written, so a body may name a Namespace declared below it.",
-			],
-			helps: ["Move the use below the Declaration."],
-		},
-	)
 }
 
 // An assertion without a Matcher or a snapshot must be a Boolean, as an `if`
