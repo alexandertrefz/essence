@@ -123,6 +123,57 @@ type Widened<Node extends NodeLike> =
 			: never
 		: never
 
+// Where a visit can report a child of `Container`: the field it names, the
+// container it names, and the nodes held there. `Outer` is the node's own
+// field holding the container being searched, or undefined for the node.
+type Places<Container, Outer, Seen extends Depth> = Container extends unknown
+	? {
+			[Key in NodeKeys<Container>]-?: PlacesOf<
+				Key,
+				Outer,
+				NonNullable<Container[Key]>,
+				Seen
+			>
+		}[NodeKeys<Container>]
+	: never
+
+type PlacesOf<Field, Outer, Value, Seen extends Depth> = Value extends
+	| NodeLike
+	| Opaque
+	? { field: Field; container: Outer; child: HeldNodes<Value> }
+	: Value extends ReadonlyArray<infer Item>
+		? ItemPlaces<Field, Outer, Item, Seen>
+		: string extends keyof Value
+			? ItemPlaces<Field, Outer, Value[keyof Value], Seen>
+			: number extends keyof Value
+				? ItemPlaces<Field, Outer, Value[keyof Value], Seen>
+				: Deeper<Value, Field, Outer, Seen>
+
+type ItemPlaces<Field, Outer, Item, Seen extends Depth> = Item extends NodeLike
+	? { field: Field; container: Outer; child: Item }
+	: Deeper<Item, Field, Outer, Seen>
+
+// A container's fields are reported with the outermost field holding it.
+type Deeper<Container, Field, Outer, Seen extends Depth> = Container extends
+	| Primitive
+	| common.Type
+	? never
+	: Seen["length"] extends DepthLimit
+		? never
+		: Places<
+				Container,
+				[Outer] extends [undefined] ? Field : Outer,
+				[...Seen, unknown]
+			>
+
+// The names a visit of a child of `Node` can receive as `field`. A field the
+// table skips is among them. See "Walking with the tables" in DEVELOPMENT.md.
+export type FieldOf<Node> = Places<Node, undefined, []>["field"]
+
+// The names a visit of a child of `Node` can receive as `container`. It is
+// undefined for a child in a field of `Node` itself.
+export type ContainerOf<Node> = Places<Node, undefined, []>["container"]
+
 export type Key = number | string | undefined
 
 // Where a child stands. `container` is the node's own field holding the
@@ -518,28 +569,28 @@ export function compileEntry(
 }
 
 // What a walker's visit receives. Beside the child and the walker's state, it
-// says where the child stands. See "Walking with the tables" in
-// DEVELOPMENT.md.
-export type ChildVisit<Node, State, Result> = (
+// says where the child stands among the fields of `Parent`, the node walked.
+// See "Walking with the tables" in DEVELOPMENT.md.
+export type ChildVisit<Node, State, Result, Parent = Node> = (
 	child: Node,
 	state: State,
-	field: string,
+	field: FieldOf<Parent>,
 	key: Key,
-	container: string | undefined,
+	container: ContainerOf<Parent>,
 ) => Result
 
 // The two walks one table serves. `forEachChild` visits every child and
 // ignores what `visit` answers. `findChild` stops at the first child whose
 // visit answers anything but `undefined`, and answers that.
 export type ChildWalks<Node extends NodeLike> = {
-	forEachChild<State>(
-		node: Node,
-		visit: ChildVisit<Node, State, unknown>,
+	forEachChild<Parent extends Node, State>(
+		node: Parent,
+		visit: ChildVisit<Node, State, unknown, Parent>,
 		state: State,
 	): void
-	findChild<State, Result>(
-		node: Node,
-		visit: ChildVisit<Node, State, Result | undefined>,
+	findChild<Parent extends Node, State, Result>(
+		node: Parent,
+		visit: ChildVisit<Node, State, Result | undefined, Parent>,
 		state: State,
 	): Result | undefined
 }
@@ -595,9 +646,9 @@ export function childWalks<Node extends NodeLike, ByKind extends string>(
 		forEachChild(node, visit, state) {
 			dispatch(node, visit as Visit, state, false)
 		},
-		findChild<State, Result>(
-			node: Node,
-			visit: ChildVisit<Node, State, Result | undefined>,
+		findChild<Parent extends Node, State, Result>(
+			node: Parent,
+			visit: ChildVisit<Node, State, Result | undefined, Parent>,
 			state: State,
 		) {
 			return dispatch(node, visit as Visit, state, true) as

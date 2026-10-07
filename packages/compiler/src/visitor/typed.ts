@@ -278,18 +278,18 @@ export const typedNodeKinds: ReadonlyArray<string> = Object.keys(typedTable)
 // state, the field holding the child and its index or key there. A walker
 // recurses by calling this again from `visit`, and skips a subtree by not
 // doing so.
-export function forEachTypedChild(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, undefined, unknown>,
+export function forEachTypedChild<Parent extends TypedNode>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, undefined, unknown, Parent>,
 ): void
-export function forEachTypedChild<State>(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, State, unknown>,
+export function forEachTypedChild<Parent extends TypedNode, State>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, State, unknown, Parent>,
 	state: State,
 ): void
-export function forEachTypedChild<State>(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, State, unknown>,
+export function forEachTypedChild<Parent extends TypedNode, State>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, State, unknown, Parent>,
 	state?: State,
 ): void {
 	walks.forEachChild(node, visit, state as State)
@@ -297,18 +297,18 @@ export function forEachTypedChild<State>(
 
 // As `forEachTypedChild`, but stops at the first child whose visit answers
 // anything but `undefined`, and answers that.
-export function findTypedChild<Result>(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, undefined, Result | undefined>,
+export function findTypedChild<Parent extends TypedNode, Result>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, undefined, Result | undefined, Parent>,
 ): Result | undefined
-export function findTypedChild<State, Result>(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, State, Result | undefined>,
+export function findTypedChild<Parent extends TypedNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, State, Result | undefined, Parent>,
 	state: State,
 ): Result | undefined
-export function findTypedChild<State, Result>(
-	node: TypedNode,
-	visit: ChildVisit<TypedNode, State, Result | undefined>,
+export function findTypedChild<Parent extends TypedNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<TypedNode, State, Result | undefined, Parent>,
 	state?: State,
 ): Result | undefined {
 	return walks.findChild(node, visit, state as State)

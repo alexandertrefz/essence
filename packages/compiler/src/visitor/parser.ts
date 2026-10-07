@@ -466,18 +466,18 @@ export const parserNodeKinds: ReadonlyArray<string> = Object.keys(parserTable)
 // state, the field holding the child and its index or key there. A walker
 // recurses by calling this again from `visit`, and skips a subtree by not
 // doing so.
-export function forEachParserChild(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, undefined, unknown>,
+export function forEachParserChild<Parent extends ParserNode>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, undefined, unknown, Parent>,
 ): void
-export function forEachParserChild<State>(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, State, unknown>,
+export function forEachParserChild<Parent extends ParserNode, State>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, State, unknown, Parent>,
 	state: State,
 ): void
-export function forEachParserChild<State>(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, State, unknown>,
+export function forEachParserChild<Parent extends ParserNode, State>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, State, unknown, Parent>,
 	state?: State,
 ): void {
 	walks.forEachChild(node, visit, state as State)
@@ -485,18 +485,18 @@ export function forEachParserChild<State>(
 
 // As `forEachParserChild`, but stops at the first child whose visit answers
 // anything but `undefined`, and answers that.
-export function findParserChild<Result>(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, undefined, Result | undefined>,
+export function findParserChild<Parent extends ParserNode, Result>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, undefined, Result | undefined, Parent>,
 ): Result | undefined
-export function findParserChild<State, Result>(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, State, Result | undefined>,
+export function findParserChild<Parent extends ParserNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, State, Result | undefined, Parent>,
 	state: State,
 ): Result | undefined
-export function findParserChild<State, Result>(
-	node: ParserNode,
-	visit: ChildVisit<ParserNode, State, Result | undefined>,
+export function findParserChild<Parent extends ParserNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<ParserNode, State, Result | undefined, Parent>,
 	state?: State,
 ): Result | undefined {
 	return walks.findChild(node, visit, state as State)

@@ -1324,6 +1324,65 @@ describe("The child tables", () => {
 		])
 	})
 
+	// The type checker holds `field` and `container` to the walked node's
+	// fields, so a name the node can not report fails `bun run typecheck`.
+	it("type a visit's field and container by the node walked", () => {
+		let program = parseOnly(
+			[
+				"implementation {",
+				"\tif true {",
+				"\t\tconstant a = 1",
+				"\t} else {",
+				"\t\tconstant b = match 2 -> Integer {",
+				"\t\t\tcase _ {",
+				"\t\t\t\t<- 1",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+		let statement = program.implementation!.nodes[0]
+		let fields: Array<string> = []
+		let containers: Array<string | undefined> = []
+
+		if (statement.nodeType !== "IfElseStatement") {
+			throw new Error("The fixture holds an if-else Statement.")
+		}
+
+		forEachParserChild(statement, (_child, _state, field) => {
+			fields.push(field)
+			// @ts-expect-error an if-else Statement's bodies are `trueBody` and `falseBody`
+			expect(field === "body").toBe(false)
+		})
+
+		let declaration = statement.falseBody[0]
+
+		if (
+			declaration.nodeType !== "ConstantDeclarationStatement" ||
+			declaration.value.nodeType !== "Match"
+		) {
+			throw new Error("The fixture's else branch declares a match.")
+		}
+
+		forEachParserChild(
+			declaration.value,
+			(_child, _state, _field, _key, container) => {
+				containers.push(container)
+				// @ts-expect-error a Match's Handlers stand in `handlers`
+				expect(container === "arms").toBe(false)
+			},
+		)
+
+		expect(fields).toEqual(["condition", "trueBody", "falseBody"])
+		expect(containers).toEqual([
+			undefined,
+			undefined,
+			"handlers",
+			"handlers",
+		])
+	})
+
 	// A property's generator nests a generator per Record member, and each
 	// Expression in it reports the property's field as its container.
 	it("tell a nested generator's Expressions the property's field", () => {

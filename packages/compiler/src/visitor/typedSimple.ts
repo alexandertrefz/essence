@@ -321,18 +321,18 @@ export const simpleNodeKinds: ReadonlyArray<string> = Object.entries(
 // reaches them. It hands over the walker's state, the field holding the child
 // and its index or key there. A walker recurses by calling this again from
 // `visit`, and skips a subtree by not doing so.
-export function forEachSimpleChild(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, undefined, unknown>,
+export function forEachSimpleChild<Parent extends SimpleNode>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, undefined, unknown, Parent>,
 ): void
-export function forEachSimpleChild<State>(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, State, unknown>,
+export function forEachSimpleChild<Parent extends SimpleNode, State>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, State, unknown, Parent>,
 	state: State,
 ): void
-export function forEachSimpleChild<State>(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, State, unknown>,
+export function forEachSimpleChild<Parent extends SimpleNode, State>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, State, unknown, Parent>,
 	state?: State,
 ): void {
 	walks.forEachChild(node, visit, state as State)
@@ -340,18 +340,18 @@ export function forEachSimpleChild<State>(
 
 // As `forEachSimpleChild`, but stops at the first child whose visit answers
 // anything but `undefined`, and answers that.
-export function findSimpleChild<Result>(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, undefined, Result | undefined>,
+export function findSimpleChild<Parent extends SimpleNode, Result>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, undefined, Result | undefined, Parent>,
 ): Result | undefined
-export function findSimpleChild<State, Result>(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, State, Result | undefined>,
+export function findSimpleChild<Parent extends SimpleNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, State, Result | undefined, Parent>,
 	state: State,
 ): Result | undefined
-export function findSimpleChild<State, Result>(
-	node: SimpleNode,
-	visit: ChildVisit<SimpleNode, State, Result | undefined>,
+export function findSimpleChild<Parent extends SimpleNode, State, Result>(
+	node: Parent,
+	visit: ChildVisit<SimpleNode, State, Result | undefined, Parent>,
 	state?: State,
 ): Result | undefined {
 	return walks.findChild(node, visit, state as State)
