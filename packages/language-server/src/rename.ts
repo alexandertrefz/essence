@@ -1358,8 +1358,7 @@ function walkRecordMember(
 	if (
 		field === "value" &&
 		child.nodeType === "Identifier" &&
-		member.shorthand === true &&
-		member.steps === undefined
+		member.shorthand === true
 	) {
 		reference(
 			walk.scope,
@@ -1893,15 +1892,17 @@ function registerPathKeySite(
 	node: common.typed.CombinationNode,
 	context: WalkContext,
 ) {
+	let { rhs } = node
+
 	if (
-		node.rhs.nodeType !== "RecordValue" ||
-		node.rhs.memberPositions === undefined ||
+		rhs.nodeType !== "RecordValue" ||
+		rhs.memberPositions === undefined ||
 		node.lhs.type.type !== "Record"
 	) {
 		return
 	}
 
-	let positions = node.rhs.memberPositions
+	let positions = rhs.memberPositions
 	let members = Object.keys(positions)
 
 	if (members.length === 0) {
@@ -1914,7 +1915,7 @@ function registerPathKeySite(
 		members: members.map((name) => ({
 			name,
 			position: positions[name],
-			edits: null,
+			edits: barePathKeyEdits(rhs.members[name], positions[name]),
 		})),
 	})
 }
@@ -1948,9 +1949,26 @@ function registerMergedKeySite(
 		members: members.map((name) => ({
 			name,
 			position: positions[name],
-			edits: null,
+			edits: barePathKeyEdits(node.members[name], positions[name]),
 		})),
 	})
+}
+
+// A bare path key's last step is also the value it reads, at one Position.
+// Renaming the member keeps the value: `server.port` becomes
+// `server.newName = port`.
+function barePathKeyEdits(
+	value: common.typed.ExpressionNode | undefined,
+	position: common.Position,
+): Array<RenameEdit> | null {
+	if (
+		value?.nodeType !== "Identifier" ||
+		!isSamePosition(value.position, position)
+	) {
+		return null
+	}
+
+	return [{ position, text: [null, ` = ${value.content}`] }]
 }
 
 // Renaming the member at a shorthand Record Literal member keeps the value:
@@ -1962,8 +1980,9 @@ function shorthandMemberEdits(
 		return null
 	}
 
-	// A shorthand path key, recovered from the refused `{ c with server.port }`,
-	// names no binding to keep.
+	// The first step of a bare path key, as in the refused
+	// `{ c with server.port, name = 1 }`, is no value. `barePathKeyEdits` keeps
+	// the last.
 	if ("steps" in member && member.steps !== undefined) {
 		return null
 	}
@@ -1977,7 +1996,8 @@ function shorthandMemberEdits(
 }
 
 // Renaming the value at a shorthand Record Literal member keeps the member:
-// `{ width }` becomes `{ width = newName }`.
+// `{ width }` becomes `{ width = newName }`. A bare path key's value stands at
+// its last step, so `server.port` becomes `server.port = newName`.
 function shorthandValueEdits(
 	member: parser.RecordValueMemberNode,
 ): Array<RenameEdit> | null {
@@ -1985,12 +2005,9 @@ function shorthandValueEdits(
 		return null
 	}
 
-	return [
-		{
-			position: member.name.position,
-			text: [`${member.name.content} = `, null],
-		},
-	]
+	let key = member.steps?.at(-1) ?? member.name
+
+	return [{ position: key.position, text: [`${key.content} = `, null] }]
 }
 
 // A Pattern joins the member groups without declaring. `{ width }` writes the

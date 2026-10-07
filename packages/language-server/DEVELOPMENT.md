@@ -207,14 +207,16 @@ reaches every child the typed table holds, and only the kinds that bind a member
 
 ### Shorthand edits
 
-Renaming an ordinary occurrence writes the new name over its Identifier. Two shorthands write `{ width }` and mean
-two names by it, so renaming either end spells the other one out beside it:
+Renaming an ordinary occurrence writes the new name over its Identifier. A shorthand writes one name and means two
+by it, so renaming either end spells the other one out beside it:
 
 - A Pattern's binder names the Record's member and the local it binds. Renaming the local writes `{ width as w }`;
   renaming the member writes `{ w as width }`. An annotated member takes its binder after the Type, as in
   `{ width: Integer as w }`.
 - A Record Literal's member names the member it writes and the value it reads. Renaming the value writes
   `{ width = w }`; renaming the member writes `{ w = width }`.
+- A bare path key, which the enricher refuses, is its last step's member and the value it reads. Renaming the value
+  writes `server.port = p`; renaming the member writes `server.p = port`.
 
 A `RenameSite` carries these as `edits`, and null everywhere else. An edit has a Position of its own, and an empty one
 inserts. The site's `position` stays the Identifier, since it is also the hit test and the highlight and token span.

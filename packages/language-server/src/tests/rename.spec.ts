@@ -2895,6 +2895,66 @@ describe("Rename of a name a Case payload default reads", () => {
 			)
 		})
 
+		// A bare path key is refused, and its last step is also the value it
+		// reads. Renaming either end spells the other out, as a shorthand does.
+		describe("written bare", () => {
+			let bare = [
+				"implementation {",
+				"\ttype Server = { host: String, port: Integer }",
+				"\ttype Config = { name: String, server: Server }",
+				"",
+				"\tconstant port = 8080",
+				'\tconstant config: Config = { name = "a", server = { host = "h", port = 80 } }',
+				'\tconstant moved = { config with server.port, name = "b" }',
+				"}",
+			].join("\n")
+
+			it("keeps the key when the value is renamed", () => {
+				expect(rename(bare, { line: 5, column: 11 }, "chosen")).toBe(
+					bare
+						.replace("constant port", "constant chosen")
+						.replace("server.port,", "server.port = chosen,"),
+				)
+			})
+
+			it("keeps the value when the member is renamed", () => {
+				expect(rename(bare, { line: 2, column: 32 }, "chosen")).toBe(
+					bare
+						.replace("port: Integer", "chosen: Integer")
+						.replace("port = 80 }", "chosen = 80 }")
+						.replace("server.port,", "server.chosen = port,"),
+				)
+			})
+
+			it("keeps the key in an Argument merged into a default", () => {
+				let merged = [
+					"implementation {",
+					"\ttype Server = { host: String, port: Integer }",
+					"\ttype Config = { server: Server }",
+					"",
+					"\t§§ Answers the host.",
+					"\t§§",
+					"\t§§ @param using — where to connect.",
+					"\t§§ @returns — the host.",
+					"\tfunction connect(",
+					'\t\tusing config: Config = { server = { host = "h", port = 80 } },',
+					"\t) -> String {",
+					"\t\t<- config.server.host",
+					"\t}",
+					"",
+					"\tconstant port = 8080",
+					"\tconstant moved = connect(using { server.port })",
+					"}",
+				].join("\n")
+
+				expect(rename(merged, { line: 15, column: 11 }, "chosen")).toBe(
+					merged
+						.replace("constant port", "constant chosen")
+						.replace("server.port }", "server.port = chosen }"),
+				)
+			})
+		})
+
 		// An Argument merged into a default has path keys but no synthesized
 		// Lookups, so `memberPositions` alone carries every step after the
 		// first.
