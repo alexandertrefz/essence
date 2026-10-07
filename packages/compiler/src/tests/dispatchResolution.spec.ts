@@ -1373,6 +1373,54 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(["no-namespace-for-value"])
 		})
 
+		// The reader sees `ListBoxes` declare the Method, so the refusal says
+		// why it does not answer, called directly as dispatched.
+		it("names the Namespace for another application in the refusal", () => {
+			let notesOf = (receiver: string, call: string) =>
+				diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					namespace ListBoxes for Box<List<Integer>> {
+						describe() -> String {
+							<- "list box"
+						}
+					}
+
+					namespace Flags for Boolean {
+						describe() -> String {
+							<- "flag"
+						}
+					}
+
+					function show(_ value: ${receiver}) -> String {
+						<- ${call}
+					}
+				}`).map((diagnostic) => diagnostic.notes)
+			let turnedAway =
+				"'ListBoxes' declares 'describe' for Box<List<Integer>>, another application of 'Box'."
+
+			expect(
+				notesOf("Box<Integer>", "Box<Integer>#Empty::describe()"),
+			).toEqual([
+				[
+					"No Namespace in scope targets Box<Integer>#Empty.",
+					turnedAway,
+				],
+			])
+			expect(
+				notesOf("Box<Integer> | Boolean", "value::describe()"),
+			).toEqual([
+				[
+					"Every member of the Union must provide 'describe' — the receiver's Type is only known at runtime.",
+					"'describe' answers for Boolean, and not for Box<Integer>#Full and Box<Integer>#Empty.",
+					turnedAway,
+				],
+			])
+		})
+
 		// `Box<String>#Empty` carries no `Item` in its payload, so its Type
 		// Arguments bind it, called directly as dispatched.
 		it("passes the witness a payload-free Case's Type Arguments decide to a direct call", async () => {

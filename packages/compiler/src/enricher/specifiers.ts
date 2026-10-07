@@ -3,6 +3,7 @@ import type { common, enricher, parser } from "@essence-lang/interfaces"
 import { primary, reportError, secondary } from "../diagnostics/index"
 import { describeType, withArticle } from "../helpers/describe"
 import { closestMatch } from "../helpers/suggest"
+import { otherApplicationNotes } from "./otherApplications"
 import { declarationWasAbandoned, unimportedNamespacesOf } from "./scope"
 
 // The `::<Name>` specifiers the lookup in `resolvers.ts` refused. A caller
@@ -78,7 +79,10 @@ function namespaceLookupWording(
 
 	if (specifier === null) {
 		return {
-			notes: [`No Namespace in scope targets ${describeType(baseType)}.`],
+			notes: [
+				`No Namespace in scope targets ${describeType(baseType)}.`,
+				...otherApplicationNotes(node.member.content, baseType, scope),
+			],
 			helps: [],
 		}
 	}

@@ -4,30 +4,41 @@ import { describeType } from "../helpers/describe"
 import { flattenUnionMembers } from "../helpers/types"
 import { answersFor } from "./dispatchReceivers"
 import { type ArgumentTyper, joinedWithAnd } from "./enrichers"
+import { otherApplicationNotes } from "./otherApplications"
 import { compilesWithoutPick } from "./protocolPicks"
 import { reportEmptyLookup } from "./specifiers"
 
 // Which members of the Union answer the name and which do not, so the reader
-// sees how far off the call is. Empty unless both lists have a member.
+// sees how far off the call is. Said where both lists have a member. Then the
+// Namespaces a lacking member's Type Arguments turned away.
 export function dividedUnionNotes(
 	node: parser.MethodInvocationNode,
 	unionType: common.UnionType,
 	scope: enricher.Scope,
 ): Array<string> {
 	let providing: Array<string> = []
-	let lacking: Array<string> = []
+	let lacking: Array<common.Type> = []
 
 	for (let member of flattenUnionMembers(unionType)) {
-		;(answersFor(node, member, scope) ? providing : lacking).push(
-			describeType(member),
-		)
+		if (answersFor(node, member, scope)) {
+			providing.push(describeType(member))
+		} else {
+			lacking.push(member)
+		}
 	}
 
-	return providing.length === 0 || lacking.length === 0
-		? []
-		: [
-				`'${node.member.content}' answers for ${joinedWithAnd(providing)}, and not for ${joinedWithAnd(lacking)}.`,
-			]
+	let turnedAway = lacking.flatMap((member) =>
+		otherApplicationNotes(node.member.content, member, scope),
+	)
+
+	return [
+		...(providing.length === 0 || lacking.length === 0
+			? []
+			: [
+					`'${node.member.content}' answers for ${joinedWithAnd(providing)}, and not for ${joinedWithAnd(lacking.map((member) => describeType(member)))}.`,
+				]),
+		...new Set(turnedAway),
+	]
 }
 
 // A Union member a `::<Name>` specifier leaves without the Method, as

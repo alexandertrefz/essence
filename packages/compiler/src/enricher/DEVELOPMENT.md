@@ -834,7 +834,9 @@ receiver; see "Namespace targets" in `packages/compiler/src/helpers/DEVELOPMENT.
 Box<Integer>` answers no branch for `Box<String>#Empty`. Resolving every branch against its application instead
 would refuse a call whose Cases bind a Namespace's Type Parameters differently, such as `flatten()` on a
 `Result<Result<Integer, String>, Integer>`, which each Case answers on its own. The Notes of an `unknown-method` on
-a Union read each member the same way (`answersFor`). The member stays the branch's runtime test, and each branch
+a Union read each member the same way (`answersFor`). A refusal also names each Namespace in scope that declares
+the Method for another application of the receiver's Choice (`otherApplicationNotes`), since the reader sees it
+declare the Method. The member stays the branch's runtime test, and each branch
 records whether its Method takes a witness (`takesWitnesses`), for the validator's comparison of branches.
 
 At runtime `dispatchMethod` takes the first branch whose member Type the receiver matches. That match is open, so

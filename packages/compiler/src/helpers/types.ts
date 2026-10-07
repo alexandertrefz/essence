@@ -434,6 +434,31 @@ export function typeArgumentBindings(
 			)
 }
 
+// Whether a Namespace's target covers a receiver by its payloads alone, as it
+// would were the receiver's Type Arguments not asked. A Union target counts
+// whole or by a member, as the lookup counts it.
+export function coversApartFromTypeArguments(
+	pattern: NamespaceTarget,
+	subject: common.Type,
+): boolean {
+	let target = pattern.targetType
+	let members = target?.type === "UnionType" ? target.types : []
+
+	return [target, ...members].some((targetType) => {
+		if (targetType === null) {
+			return false
+		}
+
+		let renamed = renamedNamespaceTarget(targetType, pattern.generics)
+
+		return matchesTypeWithBindings(
+			renamed.target,
+			subject,
+			createInferenceContext(renamed.generics),
+		)
+	})
+}
+
 function matchNamespaceTarget(
 	pattern: NamespaceTarget,
 	subject: common.Type,
