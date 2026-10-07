@@ -115,7 +115,7 @@ function readInFunction(
 			return read
 		}
 
-		let binder = parameter.internalName ?? parameter.externalName
+		let binder = parameter.internalName
 
 		if (binder !== null) {
 			bound.push(...namesBoundBy(binder))

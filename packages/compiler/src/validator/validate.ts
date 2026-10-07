@@ -1212,7 +1212,7 @@ function validateFunctionDefinition(
 	// A written Type is never a refused Function, so a Parameter holding one
 	// took it from a value refused where it was written.
 	for (let parameter of node.parameters) {
-		let name = parameter.internalName ?? parameter.externalName
+		let name = parameter.internalName
 
 		if (name !== null) {
 			rememberRefusedValue(name.content, parameter.type)

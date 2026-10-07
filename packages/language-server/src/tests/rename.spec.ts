@@ -449,6 +449,30 @@ describe("Rename of argument labels", () => {
 		expect(rename(source, { line: 6, column: 8 }, "via")).toBe(labelRenamed)
 	})
 
+	// `using _` binds no name, so only the label is a symbol.
+	it("should rename the label of a Parameter that binds no name", () => {
+		let source = [
+			"implementation {",
+			"\tfunction apply (using _: Integer) -> Integer {",
+			"\t\t<- 1",
+			"\t}",
+			"",
+			"\tapply(using 1)",
+			"\tconstant flat = (on _: Integer) -> Integer { <- 2 }",
+			"\tflat(on 3)",
+			"}",
+		].join("\n")
+
+		let renamed = source.replaceAll("using", "via")
+
+		expect(rename(source, { line: 2, column: 18 }, "via")).toBe(renamed)
+		expect(rename(source, { line: 6, column: 8 }, "via")).toBe(renamed)
+		expect(rename(source, { line: 8, column: 7 }, "at")).toBe(
+			source.replace("(on _", "(at _").replace("(on 3", "(at 3"),
+		)
+		expect(findOccurrence(source, { line: 2, column: 24 })).toBeNull()
+	})
+
 	it("should link labels of Function Values bound to Constants", () => {
 		let source = [
 			"implementation {",

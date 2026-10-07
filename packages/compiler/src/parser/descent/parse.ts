@@ -25,6 +25,7 @@ import {
 	type MisplacedDefault,
 	reportMisplacedDefault,
 } from "./misplacedDefaults"
+import { expressionExpected, reportRedundantLabel } from "./parameterNames"
 import {
 	refusedMatcherAfterValue,
 	refusedMatcherOnExpect,
@@ -4383,10 +4384,7 @@ class DescentParser {
 			case TokenType.KeywordOtherwise:
 				return this.parseIdentifier()
 			default:
-				fail(
-					`Expected an Expression but found ${describeToken(token)}.`,
-					token.position,
-				)
+				throw expressionExpected(token)
 		}
 	}
 
@@ -6654,18 +6652,6 @@ class DescentParser {
 				)
 			}
 
-			// A bare `_` binds no name and takes its Type from the expected
-			// signature.
-			if (allowsInferredTypes && !isIdentifierToken(this.tokens.peek())) {
-				return generators.parameter(
-					null,
-					null,
-					null,
-					underscore.position,
-					documentation,
-				)
-			}
-
 			// `_: Type` has neither label nor name, while `_ name: Type` has no
 			// label.
 			if (this.tokens.peek()?.type === TokenType.SymbolColon) {
@@ -6681,6 +6667,18 @@ class DescentParser {
 						start: underscore.position.start,
 						end: type.position.end,
 					},
+					documentation,
+				)
+			}
+
+			// A bare `_` binds no name and takes its Type from the expected
+			// signature.
+			if (allowsInferredTypes && !isIdentifierToken(this.tokens.peek())) {
+				return generators.parameter(
+					null,
+					null,
+					null,
+					underscore.position,
 					documentation,
 				)
 			}
@@ -6726,38 +6724,36 @@ class DescentParser {
 			)
 		}
 
-		if (isIdentifierToken(this.tokens.peek())) {
-			let internalName = this.parseIdentifier()
+		let binder = this.tokens.peek()
+
+		// `on _: Integer` is a label that binds no name.
+		if (
+			binder !== undefined &&
+			(isIdentifierToken(binder) ||
+				binder.type === TokenType.SymbolUnderscore)
+		) {
+			let internalName = isIdentifierToken(binder)
+				? this.parseIdentifier()
+				: (this.tokens.next(), null)
 
 			// An unannotated Parameter takes its label from the expected
 			// signature, so a written label is reported and dropped.
 			if (allowsInferredTypes && !annotationFollows()) {
 				let labelPosition = {
 					start: name.position.start,
-					end: internalName.position.end,
+					end: binder.position.end,
 				}
 
-				reportError(
-					"A Parameter without a Type can not carry a label",
+				reportRedundantLabel(
 					labelPosition,
-					{
-						code: "redundant-parameter-label",
-						labels: [primary(labelPosition, "two names, no Type")],
-						notes: [
-							"Such a Parameter takes its label from the expected Function Type.",
-						],
-						helps: [`Write only '${internalName.content}'.`],
-					},
+					internalName?.content ?? "_",
 				)
 
 				return generators.parameter(
 					null,
 					internalName,
 					null,
-					{
-						start: name.position.start,
-						end: internalName.position.end,
-					},
+					labelPosition,
 					documentation,
 				)
 			}

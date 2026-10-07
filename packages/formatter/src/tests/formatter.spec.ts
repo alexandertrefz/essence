@@ -3171,6 +3171,35 @@ describe("formatter", () => {
 		})
 	})
 
+	describe("Parameters that bind no name", () => {
+		function roundTrip(source: string): string {
+			let result = format(source)
+
+			expect(result.refusal).toBeNull()
+			expect(format(result.text).text).toBe(result.text)
+
+			return result.text
+		}
+
+		it("keeps a typed `_` in a Function literal", () => {
+			expect(
+				roundTrip(
+					"implementation {\n\tconstant zero = (_: Integer) -> Integer { <- 0 }\n}\n",
+				),
+			).toContain("(_: Integer) -> Integer")
+		})
+
+		// Without its `_`, `on` would be both the label and a name.
+		it("keeps the `_` after a label", () => {
+			let formatted = roundTrip(
+				"implementation {\n\tconstant flat = (on _: Integer) -> Integer { <- 1 }\n\n\tfunction ignoring(on _: Integer, _: String) -> Integer {\n\t\t<- 9\n\t}\n}\n",
+			)
+
+			expect(formatted).toContain("(on _: Integer) -> Integer")
+			expect(formatted).toContain("ignoring(on _: Integer, _: String)")
+		})
+	})
+
 	// `= expression` after a Parameter. The safety gate runs inside `format`,
 	// so a dropped default is a refusal here.
 	describe("Default Parameter Values", () => {

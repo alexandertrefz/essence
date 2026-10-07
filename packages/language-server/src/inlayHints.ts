@@ -49,7 +49,7 @@ function addTypeHint(
 	position: common.Cursor,
 	prefix: string,
 	type: common.Type,
-	labelEdit: LabelEdit | null | "unwritable" = null,
+	labelEdit: LabelEdit | null = null,
 ) {
 	if (
 		typeContainsError(type) ||
@@ -66,7 +66,7 @@ function addTypeHint(
 			label: `${prefix}${printType(type)}`,
 			kind: "type",
 			textEdit: null,
-			...(labelEdit === "unwritable" ? {} : { unspelled: true }),
+			unspelled: true,
 		})
 
 		return
@@ -82,7 +82,7 @@ function addTypeHint(
 		label: `${prefix}${printType(type)}`,
 		kind: "type",
 		textEdit:
-			written === null || labelEdit === "unwritable"
+			written === null
 				? null
 				: {
 						position,
@@ -203,12 +203,11 @@ function hintFunctionDefinition(
 
 // `(count: Integer)` makes `count` a label, so the annotated form also writes
 // the label the Parameter took from the expected signature, or `_` for none.
-// A bare `_` has no annotated spelling, since a Function literal refuses both
-// `_: Integer` and `on _: Integer`.
+// A bare `_` keeps its `_`, as `_: Integer` or `on _: Integer`.
 function labelEditOf(
 	parameter: common.typed.ParameterNode,
 	label: string | null,
-): LabelEdit | null | "unwritable" {
+): LabelEdit | null {
 	// `on { width }` writes its label already.
 	if (parameter.externalName !== null) {
 		return null
@@ -217,7 +216,11 @@ function labelEditOf(
 	let binder = parameter.internalName
 
 	if (binder === null) {
-		return "unwritable"
+		let start = parameter.position.start
+
+		return label === null
+			? null
+			: { range: { start, end: start }, newText: `${label} ` }
 	}
 
 	let range = { start: parameter.position.start, end: binder.position.start }

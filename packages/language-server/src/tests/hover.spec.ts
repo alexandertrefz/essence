@@ -760,6 +760,19 @@ describe("Hover of declaration parts", () => {
 		)
 	})
 
+	// `_: Integer` has neither label nor name, so the Parameter answers.
+	it("should describe a Parameter that binds no name", () => {
+		let source = [
+			"implementation {",
+			"\tconstant flat = (_: Integer, on _: String) -> Integer { <- 1 }",
+			"}",
+		].join("\n")
+
+		expect(hover(source, { line: 2, column: 19 })).toBe("Integer")
+		expect(hover(source, { line: 2, column: 34 })).toBe("String")
+		expect(hover(source, { line: 2, column: 31 })).toBe("on: String")
+	})
+
 	it("should describe a Parameter the cursor sits on but not inside", () => {
 		let source = [
 			"implementation {",

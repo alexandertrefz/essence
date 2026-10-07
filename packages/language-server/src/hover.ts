@@ -910,16 +910,12 @@ function visitGenericDeclaration(
 }
 
 function visitParameter(parameter: common.typed.ParameterNode, state: State) {
-	// The Parameter as written, so a bare `_` or the `:` answers with the
-	// Parameter. Offered before the narrower names it contains.
-	let declaredType =
-		parameter.internalName?.type ?? parameter.externalName?.type ?? null
 	// On each span the Parameter offers: as written, its label, and its name.
 	let note = omittableMembersNote(parameter)
 
-	if (declaredType !== null) {
-		consider(state, parameter.position, declaredType, null, null, note)
-	}
+	// The Parameter as written, so a bare `_` or the `:` answers with the
+	// Parameter. Offered before the narrower names it contains.
+	consider(state, parameter.position, parameter.type, null, null, note)
 
 	forEachTypedChild(
 		parameter,

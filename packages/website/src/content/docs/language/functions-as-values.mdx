@@ -141,6 +141,20 @@ Leave the return type off a standalone literal and it is [`missing-return-type`]
 
 A literal cannot carry a default value. `(_ value: Integer, by step: Integer = 1) -> Integer { … }` is [`default-on-function-literal`](/docs/reference/diagnostics#default-on-function-literal). A literal is always called through a function type, and that type fixes how many arguments every call passes.
 
+A parameter the body never reads can go without a name:
+
+```essence
+implementation {
+	constant zero = (_: Integer) -> Integer { <- 0 }
+	constant flat = (on _: Integer) -> Integer { <- 1 }
+
+	Terminal.print(zero(41)) § 0
+	Terminal.print(flat(on 41)) § 1
+}
+```
+
+`zero` takes one `Integer` with no label, and its body has no name to read it by. `flat` keeps the label `on`, so a call still writes `flat(on 41)`, and the `_` after the label binds nothing either. A body that reads `_` is a [`syntax-error`](/docs/reference/diagnostics#syntax-error): the help asks for a name in its place, as in `(_ value: Integer)`.
+
 **Compared with JavaScript.**
 
 ```ts
@@ -300,7 +314,7 @@ implementation {
 }
 ```
 
-`twice` calls `rule(on 1)`. An untyped parameter, `(value)`, writes no label and receives that argument. A typed parameter writes the label itself, as `(on value: Integer)`. A label with no type, `(on value)`, is [`redundant-parameter-label`](/docs/reference/diagnostics#redundant-parameter-label), "A Parameter without a Type can not carry a label".
+`twice` calls `rule(on 1)`. An untyped parameter, `(value)`, writes no label and receives that argument. A typed parameter writes the label itself, as `(on value: Integer)`, and one the body ignores writes the label before its `_`, as `(on _: Integer)`. A label with no type, `(on value)`, is [`redundant-parameter-label`](/docs/reference/diagnostics#redundant-parameter-label), "A Parameter without a Type can not carry a label".
 
 A literal's parameter may also be a pattern that takes a record apart. [Patterns](/docs/language/patterns) covers that form.
 

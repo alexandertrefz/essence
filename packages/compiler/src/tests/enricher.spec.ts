@@ -2659,6 +2659,36 @@ describe("Enricher", () => {
 				).toEqual({ type: "List", itemType: { type: "Integer" } })
 			})
 
+			it("pairs a typed `_` with the expected Parameter", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						constant kept = [1, 2, 3]::removeEvery(
+							where (_: Integer) { <- true },
+						)
+					}`),
+				).toEqual({ type: "List", itemType: { type: "Integer" } })
+			})
+
+			it("pairs a label written before `_` with the expected label", () => {
+				expect(
+					typeOfFirstConstant(`implementation {
+						function twice(_ rule: (on: Integer) -> Integer) -> Integer {
+							<- rule(on rule(on 1))
+						}
+
+						constant twiced = twice((on _: Integer) { <- 2 })
+					}`),
+				).toEqual({ type: "Integer" })
+			})
+
+			it("refuses a label before `_` the expected signature lacks", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						constant zeros = [1, 2]::map((on _: Integer) { <- 0 })
+					}`).map((diagnostic) => diagnostic.code),
+				).toEqual(["no-matching-overload"])
+			})
+
 			it("still accepts a written return Type", () => {
 				expect(
 					typeOfFirstConstant(`implementation {

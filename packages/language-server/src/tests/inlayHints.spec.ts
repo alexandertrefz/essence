@@ -729,22 +729,16 @@ describe("Inlay Hints", () => {
 			})
 		})
 
-		// A Function literal refuses `_: Integer` and `on _: Integer`, so a
-		// bare `_` keeps its Hint and offers no edit.
-		it("should offer no edit for a bare `_` under a label", () => {
-			let source = [
-				...signatures,
-				"\tconstant x: Integer = discount(using (_) { <- 1 })",
-				"}",
-			].join("\n")
-			let parameterHint = allHintsOf(source).find(
-				(hint) => hint.label === ": Integer",
-			)
-
-			expect(parameterHint?.textEdit).toBeNull()
+		// A bare `_` keeps its `_` and binds no name, so only the label is
+		// written before it.
+		it("should label a bare `_` as the signature does", () => {
+			expect(acceptedLiteral("discount(using (_) { <- 1 })")).toEqual({
+				literal: "discount(using (on _: Integer) -> Integer { <- 1 })",
+				diagnostics: [],
+			})
 		})
 
-		it("should offer no edit for a bare `_` without a label", () => {
+		it("should keep a bare `_` without a label", () => {
 			let source = [
 				"implementation {",
 				"\tconstant ones: List<Integer> = [1]::map((_) { <- 1 })",
@@ -756,7 +750,9 @@ describe("Inlay Hints", () => {
 				": Integer",
 				" -> Integer",
 			])
-			expect(hints[0]?.textEdit).toBeNull()
+			expect(applyHints(source).split("\n")[1]).toBe(
+				"\tconstant ones: List<Integer> = [1]::map((_: Integer) -> Integer { <- 1 })",
+			)
 			expect(analyseDocument(applyHints(source)).diagnostics).toEqual([])
 		})
 	})
@@ -813,12 +809,8 @@ describe("Inlay Hints spelled on resolve", () => {
 			spelled.map((hint) => hint.label),
 		)
 		expect(unspelled.every((hint) => hint.textEdit === null)).toBe(true)
-		// A bare `_` is known to be unwritable without spelling anything.
-		expect(
-			unspelled
-				.filter((hint) => hint.unspelled !== true)
-				.map((hint) => hint.position),
-		).toEqual([{ line: 12, column: 44 }])
+		// A bare `_` is written `_: Integer` too, so every Type Hint waits.
+		expect(unspelled.every((hint) => hint.unspelled === true)).toBe(true)
 	})
 
 	it("sends a whole file unspelled and spells each Hint as it is resolved", async () => {

@@ -2267,6 +2267,113 @@ describe("Parser", () => {
 				})
 			})
 
+			describe("Parameters that bind no name", () => {
+				function parametersOf(
+					source: string,
+				): Array<parser.ParameterNode> {
+					let { program, diagnostics } = parseWithDiagnostics(
+						`implementation { constant f = ${source} }`,
+					)
+
+					expect(diagnostics).toEqual([])
+
+					let node = program.implementation.nodes[0]
+
+					if (
+						node.nodeType !== "ConstantDeclarationStatement" ||
+						node.value.nodeType !== "FunctionValue"
+					) {
+						throw new Error("Expected a Function literal")
+					}
+
+					return node.value.value.parameters
+				}
+
+				it("should parse a typed `_` in a Function literal", () => {
+					let [parameter] = parametersOf(
+						"(_: Integer) -> Integer { <- 1 }",
+					)
+
+					expect(parameter.externalName).toBeNull()
+					expect(parameter.internalName).toBeNull()
+					expect(parameter.type?.nodeType).toBe(
+						"IdentifierTypeDeclaration",
+					)
+				})
+
+				it("should parse a label before a `_`", () => {
+					let [parameter] = parametersOf(
+						"(on _: Integer) -> Integer { <- 1 }",
+					)
+
+					expect(parameter.externalName?.content).toBe("on")
+					expect(parameter.internalName).toBeNull()
+					expect(parameter.position.start.column).toBe(32)
+					expect(parameter.position.end.column).toBe(45)
+				})
+
+				it("should parse a label before a `_` in a named Function", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { function f(on _: Integer) -> Integer { <- 1 } }",
+					)
+
+					expect(diagnostics).toEqual([])
+				})
+
+				it("should reject a label on an unannotated `_`", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant kept = [1]::removeEvery(where (on _) { <- true }) }",
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.helps,
+						]),
+					).toEqual([
+						["redundant-parameter-label", ["Write only '_'."]],
+					])
+					expect(
+						compiles(
+							"implementation { constant kept = [1]::removeEvery(where (_) { <- true }) }",
+						),
+					).toBe(true)
+				})
+
+				// The Help is followed for both spellings it names.
+				it("should refuse a read of `_` with a Help that names the Parameter", () => {
+					let { diagnostics } = parseWithDiagnostics(
+						"implementation { constant f = (_: Integer) -> Integer { <- _ } }",
+					)
+
+					expect(
+						diagnostics.map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.message,
+							diagnostic.helps,
+						]),
+					).toEqual([
+						[
+							"syntax-error",
+							"Expected an Expression but found '_'.",
+							[
+								"To read a Parameter that binds no name, give it one: '_: Integer' becomes '_ value: Integer', and 'on _: Integer' becomes 'on value: Integer'.",
+							],
+						],
+					])
+					expect(
+						compiles(
+							"implementation { constant f = (_ value: Integer) -> Integer { <- value } }",
+						),
+					).toBe(true)
+					expect(
+						compiles(
+							"implementation { constant f = (on value: Integer) -> Integer { <- value } }",
+						),
+					).toBe(true)
+				})
+			})
+
 			describe("Generic Bounds", () => {
 				it("should parse a bounded Generic on a Function", () => {
 					let input: parser.Program = parse(

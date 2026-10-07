@@ -1805,10 +1805,11 @@ export class Printer {
 		} else {
 			let external = externalName === null ? "_" : externalName.content
 
+			// `on _: Integer` keeps its `_`, or the label would become a name.
 			name =
-				internalName === null
+				internalName === null && externalName === null
 					? external
-					: external + " " + internalName.content
+					: external + " " + (internalName?.content ?? "_")
 		}
 
 		let parts: Array<Doc> = [text(name + ": "), this.printType(type)]

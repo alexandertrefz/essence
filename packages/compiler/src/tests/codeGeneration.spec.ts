@@ -1127,6 +1127,31 @@ describe("Code Generation", () => {
 			expect(generated).toContain("_2")
 		})
 
+		// A Function literal binds no name for `_` or `on _`, standalone or as
+		// an Argument, and a call still writes the label.
+		it("runs Function literals whose Parameters bind no name", async () => {
+			expect(
+				await run(`implementation {
+	constant third = (_: Integer, _: Integer, at x: Integer) -> Integer { <- x }
+	constant flat = (on _: Integer) -> Integer { <- 7 }
+
+	function twice(_ rule: (on: Integer) -> Integer) -> Integer {
+		<- rule(on rule(on 1))
+	}
+
+	function ignoring(on _: Integer, _: String) -> Integer {
+		<- 9
+	}
+
+	Terminal.inspect(third(1, 2, at 3))
+	Terminal.inspect(flat(on 4))
+	Terminal.inspect([1, 2]::map((_: Integer) { <- 0 }))
+	Terminal.inspect(twice((on _: Integer) -> Integer { <- 2 }))
+	Terminal.inspect(ignoring(on 1, "x"))
+}`),
+			).toEqual(["3", "7", "[ 0, 0 ]", "2", "9"])
+		})
+
 		// A Function Type has no body, so its Parameter names are never read.
 		it("accepts a nameless Parameter in a Function Type", () => {
 			expect(() =>

@@ -383,7 +383,7 @@ Taught on [Programs and values](/docs/language/programs-and-values) and [Numbers
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| Four things. A parameter without a label, `_ value: Integer`. A digit group, `1_000`. A parameter the body ignores, `(_) { <- 0 }`. The arm for every value left, `case _`. | In those four places. | Part of a name: `constant snake_case = 1` is a syntax error. So are `1__0` and a trailing `1_`. |
+| Four things. A parameter without a label, `_ value: Integer`. A digit group, `1_000`. A parameter the body ignores, which binds no name: `(_) { <- 0 }`, `(_: Integer) -> Integer { <- 0 }`, or after a label, `on _: Integer`. The arm for every value left, `case _`. | In those four places. | Part of a name: `constant snake_case = 1` is a syntax error. So are `1__0` and a trailing `1_`. A value: a body that reads `_` is a syntax error. |
 
 </div>
 
@@ -397,6 +397,9 @@ implementation {
 	§ a digit group
 	constant amount: Integer | String = 1_000
 
+	§ a parameter the body ignores
+	constant zero = (_: Integer) -> Integer { <- 0 }
+
 	§ the arm for everything else
 	constant kind = match amount -> String {
 		case String { <- @ }
@@ -405,6 +408,7 @@ implementation {
 
 	Terminal.print(double(21)) § 42
 	Terminal.print([1, 2, 3]::map((_) { <- 0 })) § [0, 0, 0]
+	Terminal.print(zero(7)) § 0
 	Terminal.print(kind) § not text
 }
 ```

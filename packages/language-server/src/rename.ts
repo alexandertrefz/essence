@@ -1549,6 +1549,24 @@ function scopeWithGenerics(
 	return genericScope
 }
 
+// An explicit label is a symbol of its own, apart from the name.
+function declareLabel(
+	label: parser.IdentifierNode,
+	labels: Map<string, Declaration>,
+	context: WalkContext,
+) {
+	let declaration: Declaration = {
+		builtin: false,
+		kind: "label",
+		definition: label.position,
+		visibleFrom: null,
+		occurrences: [],
+	}
+
+	record(declaration, label.content, label.position, context, "write")
+	labels.set(label.content, declaration)
+}
+
 function walkFunctionDefinition(
 	definition: parser.FunctionDefinitionNode,
 	walk: Walk,
@@ -1580,8 +1598,13 @@ function walkFunctionDefinition(
 			walkNode(parameter.defaultValue, functionWalk)
 		}
 
-		// `_: Type` declares neither a name nor a label.
+		// `_: Type` declares neither a name nor a label, and `on _: Type` only
+		// its label.
 		if (parameter.internalName === null) {
+			if (parameter.externalName !== null) {
+				declareLabel(parameter.externalName, labels, context)
+			}
+
 			continue
 		}
 
@@ -1591,22 +1614,7 @@ function walkFunctionDefinition(
 			declarePattern(parameter.internalName, functionWalk, "parameter")
 
 			if (parameter.externalName !== null) {
-				let labelDeclaration: Declaration = {
-					builtin: false,
-					kind: "label",
-					definition: parameter.externalName.position,
-					visibleFrom: null,
-					occurrences: [],
-				}
-
-				record(
-					labelDeclaration,
-					parameter.externalName.content,
-					parameter.externalName.position,
-					context,
-					"write",
-				)
-				labels.set(parameter.externalName.content, labelDeclaration)
+				declareLabel(parameter.externalName, labels, context)
 			}
 
 			continue
@@ -1637,24 +1645,7 @@ function walkFunctionDefinition(
 			declaration.labelled = true
 			labels.set(parameter.internalName.content, declaration)
 		} else {
-			// An explicit label is a symbol of its own, apart from the name.
-			let labelDeclaration: Declaration = {
-				builtin: false,
-				kind: "label",
-				definition: parameter.externalName.position,
-				visibleFrom: null,
-				occurrences: [],
-			}
-
-			record(
-				labelDeclaration,
-				parameter.externalName.content,
-				parameter.externalName.position,
-				context,
-				"write",
-			)
-			labels.set(parameter.externalName.content, labelDeclaration)
-
+			declareLabel(parameter.externalName, labels, context)
 			declareInScope(
 				functionScope,
 				"values",

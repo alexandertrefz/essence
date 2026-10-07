@@ -2855,6 +2855,78 @@ implementation {
 		)
 	})
 
+	// `k _: Integer` writes a label and binds no name, so the body's `k` still
+	// reads `B.es`'s Constant and waits for it.
+	it("waits for a read of the Constant past a label that binds no name", async () => {
+		let files = {
+			"A.es": `import {
+	from "./B.es" { k }
+}
+
+implementation {
+	constant a = 1
+
+	function useK(k _: Integer) -> Integer {
+		<- k
+	}
+}
+
+export {
+	a
+	useK
+}
+`,
+			"B.es": `import {
+	from "./A.es" { a }
+}
+
+implementation {
+	function useA() -> Integer {
+		<- a
+	}
+
+	constant k = 2
+}
+
+export {
+	k
+	useA
+}
+`,
+		}
+
+		withProject(files, (directory) => {
+			expect(
+				linkedAt(directory, linkProject(directory, "B.es"), "A.es")
+					.diagnostics,
+			).toEqual([])
+		})
+
+		await withBuiltProject(
+			{
+				...files,
+				"Main.es": `import {
+	from "./A.es" { useK }
+	from "./B.es" { useA }
+}
+
+implementation {
+	Terminal.print(useK(k 7))
+	Terminal.print(useA())
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(["2", "1"])
+			},
+		)
+	})
+
 	// Which Module of a cycle loads first follows the entry, and the refusal
 	// does not.
 	it("refuses the same wait from every entry", () => {

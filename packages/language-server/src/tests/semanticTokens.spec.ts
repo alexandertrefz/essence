@@ -107,6 +107,26 @@ describe("Semantic Tokens", () => {
 		expect(use?.modifiers).not.toContain("declaration")
 	})
 
+	// `on _` binds no name, and its label colours where it is declared and
+	// where a call writes it.
+	it("should colour the label of a Parameter that binds no name", () => {
+		let source = [
+			"implementation {",
+			"\tconstant flat = (on _: Integer) -> Integer { <- 1 }",
+			"\tflat(on 2)",
+			"}",
+		].join("\n")
+
+		expect(tokenAt(source, 2, 19)).toEqual({
+			line: 2,
+			column: 19,
+			length: 2,
+			type: "parameter",
+			modifiers: ["declaration", "readonly"],
+		})
+		expect(tokenAt(source, 3, 7)?.type).toBe("parameter")
+	})
+
 	// A provided Method's body is walked as a Function Definition. A Parameter
 	// colours as a Parameter, and the Protocol an extension names as a Type.
 	it("should colour the names inside a provided Protocol Method", () => {
