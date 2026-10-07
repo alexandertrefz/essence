@@ -848,6 +848,59 @@ describe("Dispatch and Resolution", () => {
 			).toEqual([])
 		})
 
+		// Leaving `by` out keeps `step`, whose Types tell the two entries
+		// apart, so no call fits both.
+		it("should leave a default alone where the Types it keeps tell the entries apart", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Steps for Integer {
+						overload run {
+							(step f: Integer) -> String {
+								<- "int"
+							}
+
+							(step f: String, by n: Integer = 5) -> String {
+								<- "string"
+							}
+						}
+					}
+				}`),
+			).toEqual([])
+		})
+
+		// A Type Parameter may stand for anything, and two Unions sharing an
+		// arm both take a value of it. One call still fits both entries.
+		it("should refuse a default where the Types it keeps may fit one Argument", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					namespace Steps for Integer {
+						overload run {
+							(step f: Integer) -> String {
+								<- "int"
+							}
+
+							<infer T>(step f: T, by n: Integer = 5) -> String {
+								<- "any"
+							}
+						}
+
+						overload pace {
+							(step f: Integer | String) -> String {
+								<- "either"
+							}
+
+							(step f: String | Boolean, by n: Integer = 5) -> String {
+								<- "other"
+							}
+						}
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual([
+				"ambiguous-overload-default",
+				"ambiguous-overload-default",
+			])
+		})
+
 		// Pins today's behaviour of a default on a refined Parameter, which
 		// `overloadProbeOrder` probes first. The two rules have not been reconciled.
 		it("should accept a default that is its own proof of a refinement", () => {

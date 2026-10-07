@@ -1496,12 +1496,14 @@ A rule allowing defaults only at the end would refuse both.
 
 ### Defaults in an Overload
 
-A default can make two entries of one `overload` block accept the same call. `refuseAmbiguousOverloadDefaults`
-enumerates each entry's accepted shapes: the label sequences left when any subset of its defaulted Parameters is
-dropped. A shape reachable only by leaving a default out may not equal any shape of another entry, and is reported
-at that default as `ambiguous-overload-default`. Shapes reached without leaving anything out are not compared, so
-entries told apart by their Types stay legal. A signature with more defaults than `MAXIMUM_ENUMERATED_DEFAULTS` is
-not enumerated.
+A default can make two entries of one `overload` block accept the same call. `refuseAmbiguousOverloadDefaults` in
+`overloadDefaults.ts` enumerates each entry's accepted shapes: the label sequences left when any subset of its
+defaulted Parameters is dropped. A shape reachable only by leaving a default out is reported at that default as
+`ambiguous-overload-default` where it equals a shape of another entry. The Parameters both shapes keep must also
+be able to take one Argument list (`typesOverlap`). A Type Parameter may stand for anything, and two Unions overlap
+where an arm does. So `(step f: String, by n: Integer = 5)` beside `(step f: Integer)` stays legal. Shapes reached
+without leaving anything out are not compared, so entries told apart by their Types stay legal. A signature with
+more defaults than `MAXIMUM_ENUMERATED_DEFAULTS` is not enumerated.
 
 The clash is refused at the declaration rather than broken at the call. Selection takes the first entry that fits,
 in an order that already differs from the source (`overloadProbeOrder`). An entry's position is also its emitted
