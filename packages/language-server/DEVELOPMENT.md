@@ -667,7 +667,9 @@ for Completion already, so the reading is a walk, not a compile.
 - A block is a span, and the innermost span containing the cursor wins. So a Method body inside a Namespace reads as
   a Statement body, while the member list around it reads as the Namespace.
 - Some contexts exist only to refuse. A `define` arm list, a Choice's Cases, an `overload` group and a Parameter list
-  each take a shape no snippet writes. A Parameter default is a smaller span inside the list and reads as a value.
+  each take a shape no snippet writes. A Choice, an `overload` group and a Parameter list refuse whatever the text
+  says, since a name in them reads as a value position. A Parameter's or a Case's default is a smaller span inside
+  and reads as a value.
 - A signature written without a body, a native one or a Protocol requirement, has no Function literal for the walk to
   reach. Its span starts at its `(`, after any Type Parameters, and ends with its return Type. All of it reads as a
   Parameter list.

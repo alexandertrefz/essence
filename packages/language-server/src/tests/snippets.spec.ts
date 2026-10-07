@@ -545,6 +545,29 @@ describe("Snippet completion", () => {
 		expect(offered).toEqual([])
 	})
 
+	// A name the text reading calls a value position. A Case's default is a
+	// value, and keeps the values.
+	it("offers nothing on a Choice's names, and the values in a Case's default", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Shape {",
+			"\t\tCircle { radius: Integer } = { radius = 1 },",
+			"\t\tSquare,",
+			"\t}",
+			"}",
+		]
+		let offeredAt = (line: number, text: string) =>
+			snippetsAt(lines, {
+				line,
+				column: (lines[line - 1] as string).indexOf(text) + 1,
+			})
+
+		expect(offeredAt(2, "ape")).toEqual([])
+		expect(offeredAt(3, "rcle")).toEqual([])
+		expect(offeredAt(4, "uare")).toEqual([])
+		expect(offeredAt(3, "1 }")).toContain("record")
+	})
+
 	// An `overload` group takes signatures only. A member the Namespace around
 	// it offers would be a Parser Diagnostic there.
 	it("offers nothing inside an overload group", () => {
@@ -559,6 +582,24 @@ describe("Snippet completion", () => {
 				"}",
 			],
 			{ line: 4, column: 4 },
+		)
+
+		expect(offered).toEqual([])
+	})
+
+	it("offers nothing on the name of an overload function", () => {
+		let offered = snippetsAt(
+			[
+				"declarations {",
+				"\toverload function combine {",
+				"\t\t(first value: Integer) -> Integer {",
+				"\t\t\t<- value",
+				"\t\t}",
+				"\t}",
+				"}",
+			],
+			{ line: 2, column: 22 },
+			path.join(STDLIB_DIRECTORY, "Scratch.es"),
 		)
 
 		expect(offered).toEqual([])

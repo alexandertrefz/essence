@@ -16,6 +16,13 @@ type Block = {
 	method?: boolean
 }
 
+// The blocks that exist to refuse, each taking a shape no snippet writes.
+const refusingContexts: ReadonlySet<SnippetContext> = new Set([
+	"choice",
+	"overload",
+	"parameters",
+])
+
 // `atStatementStart` is `keywordCompletions`'s text reading, which tells a
 // fresh line in a `match` from the value after `case X { <- `.
 export function snippetContextAt(
@@ -46,10 +53,11 @@ export function snippetContextAt(
 
 	let block = blockAt(program, cursor)
 
-	// A Parameter list answers for both readings, since the text reading would
-	// call it a value position.
-	if (block.context === "parameters") {
-		return "parameters"
+	// A block that exists to refuse answers for both readings, since the text
+	// reading would call a name in it a value position. A value it holds, such as
+	// a default, is a smaller block of its own.
+	if (refusingContexts.has(block.context)) {
+		return block.context
 	}
 
 	// A value position is the same in every block, except a Method's own body,
@@ -243,9 +251,20 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				}
 
 				return
-			// A Choice's body is a list of Cases, so it refuses every snippet.
+			// A Choice's body is a list of Cases, so it refuses every snippet. A
+			// Case's default is a value.
 			case "ChoiceDeclarationStatement":
 				blocks.push({ position: node.position, context: "choice" })
+
+				for (let choiceCase of node.cases) {
+					if (choiceCase.defaultValue !== null) {
+						blocks.push({
+							position: choiceCase.defaultValue.position,
+							context: "expression",
+						})
+					}
+				}
+
 				return
 			case "Match":
 				blocks.push({ position: node.position, context: "match" })
