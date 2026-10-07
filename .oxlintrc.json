@@ -94,9 +94,8 @@
 			"rules": {
 				"max-lines-per-function": [
 					"error",
-					{ "max": 337, "skipComments": true, "skipBlankLines": true }
-				],
-				"complexity": ["error", { "max": 51 }]
+					{ "max": 327, "skipComments": true, "skipBlankLines": true }
+				]
 			}
 		},
 		{
@@ -105,7 +104,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 13357,
+						"max": 13222,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -118,7 +117,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 8272,
+						"max": 8236,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -148,7 +147,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 5940,
+						"max": 5816,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -180,7 +179,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 3027,
+						"max": 2921,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -200,18 +199,13 @@
 		{
 			"files": ["packages/language-server/src/completion.ts"],
 			"rules": {
-				"complexity": ["error", { "max": 94 }],
 				"max-params": ["error", { "max": 8 }]
 			}
 		},
 		{
 			"files": ["packages/language-server/src/rename.ts"],
 			"rules": {
-				"max-lines-per-function": [
-					"error",
-					{ "max": 363, "skipComments": true, "skipBlankLines": true }
-				],
-				"complexity": ["error", { "max": 88 }]
+				"complexity": ["error", { "max": 55 }]
 			}
 		},
 		{
