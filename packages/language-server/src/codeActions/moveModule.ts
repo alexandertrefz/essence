@@ -2160,7 +2160,8 @@ function moduleText(
 }
 
 // Points another Module's entries at the destination. A group of only this
-// name gets a new specifier; a shared entry moves to the destination's group.
+// name gets a new specifier, unless its block has a group for the destination
+// already. Otherwise the entry moves to the destination's group.
 function retargetEdits(
 	naming: Naming,
 	targetPath: string,
@@ -2170,7 +2171,18 @@ function retargetEdits(
 	let edits: Array<CodeActionEdit> = []
 
 	for (let named of naming.entries) {
-		if (named.group.entries.length === 1) {
+		let block =
+			named.section === "imports"
+				? naming.program.imports
+				: naming.program.exports
+		let whole = named.group.entries.length === 1
+
+		if (
+			whole &&
+			!(block?.groups ?? []).some(
+				(group) => group.source.path === specifier,
+			)
+		) {
 			edits.push({
 				range: named.group.source.position,
 				newText: `"${specifier}"`,
@@ -2180,21 +2192,25 @@ function retargetEdits(
 			continue
 		}
 
-		// The entry names the Declaration by the name it is published under.
+		// The entry names the Declaration by the name it is published under. A
+		// group that goes takes its Comments along, and leaves one after it.
 		let name = named.entry.name.content
 		let alias = named.entry.alias?.content ?? null
+		let comments = whole ? commentsInside(lines, named.group) : []
 		let insertion =
 			named.section === "imports"
-				? insertImportEdit(naming.sourceText, naming.program, {
-						name,
-						alias,
-						specifier,
-					})
+				? insertImportEdit(
+						naming.sourceText,
+						naming.program,
+						{ name, alias, specifier },
+						comments,
+					)
 				: insertExportEdit(
 						naming.sourceText,
 						naming.program,
 						{ name, alias, specifier },
 						named.entry,
+						comments,
 					)
 
 		if (insertion === null) {
@@ -2202,13 +2218,39 @@ function retargetEdits(
 		}
 
 		edits.push({
-			...removeMemberEdit(lines, named.entry.position),
+			...(whole
+				? removeLinesEdit(lines, named.group.position)
+				: removeMemberEdit(lines, named.entry.position)),
 			filePath: naming.filePath,
 		})
 		edits.push({ ...insertion, filePath: naming.filePath })
 	}
 
 	return edits
+}
+
+// The Comments written between a group's braces, each to the end of its line.
+// None can stand on the line of its `}`, which it would hide.
+function commentsInside(
+	lines: Array<string>,
+	group: parser.ImportGroupNode | parser.ExportGroupNode,
+): Array<string> {
+	let opening = group.source.position.end
+	let comments: Array<string> = []
+
+	for (let line = opening.line; line < group.position.end.line; line++) {
+		let text = lineAt(lines, line)
+		let at = text.indexOf(
+			"§",
+			line === opening.line ? opening.column - 1 : 0,
+		)
+
+		if (at !== -1) {
+			comments.push(text.slice(at).trimEnd())
+		}
+	}
+
+	return comments
 }
 
 // Every other Module that named it in an entry, re-exports included, found

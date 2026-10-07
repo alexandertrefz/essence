@@ -102,7 +102,8 @@ function sharesLine(lines: Array<string>, line: number, column: number) {
 }
 
 // `spelling` placed before `successor`, inline where `successor` shares its
-// line with other text, else after `last`.
+// line with other text, else after `last`. A spelling of several lines holds a
+// Comment, which would swallow the rest of a shared line, so it breaks the line.
 function insertAmong(
 	lines: Array<string>,
 	spelling: string,
@@ -110,32 +111,60 @@ function insertAmong(
 	last: common.Position,
 	closeLine: number,
 ): ImportEdit {
+	let inline = !spelling.includes("\n")
+
 	if (successor !== null) {
 		let line = successor.start.line
+		let indentation = indentationOf(lines, line)
+		let written = indentedLines(spelling, indentation)
 
 		if (sharesLine(lines, line, successor.start.column)) {
-			return insertionAt(line, `${spelling} `, successor.start.column)
+			return insertionAt(
+				line,
+				inline ? `${spelling} ` : `\n${written}\n${indentation}`,
+				successor.start.column,
+			)
 		}
 
-		return insertionAt(line, `${indentationOf(lines, line)}${spelling}\n`)
+		return insertionAt(line, `${written}\n`)
 	}
 
 	let line = last.end.line
+	let written = indentedLines(spelling, indentationOf(lines, line))
 
 	if (closeLine === line) {
-		return insertionAt(line, ` ${spelling}`, last.end.column)
+		return insertionAt(
+			line,
+			inline ? ` ${spelling}` : `\n${written}`,
+			last.end.column,
+		)
 	}
 
-	return insertionAt(line + 1, `${indentationOf(lines, line)}${spelling}\n`)
+	return insertionAt(line + 1, `${written}\n`)
+}
+
+// Each line of a spelling at one indentation.
+function indentedLines(spelling: string, indentation: string): string {
+	return spelling
+		.split("\n")
+		.map((line) => `${indentation}${line}`)
+		.join("\n")
+}
+
+// A name with the Comments it carries written above it.
+function spellCarried(entry: ImportEntry, comments: Array<string>): string {
+	return [...comments, spellName(entry)].join("\n")
 }
 
 // Null when the entry exists already, perhaps under an alias or in a second
 // entry, since a duplicate is worse than no fix. The name joins its Module's
-// group, or opens one at the canonical position.
+// group, or opens one at the canonical position. `comments` go above a name
+// that joins a group, as a moved entry carries them.
 export function insertImportEdit(
 	sourceText: string,
 	program: parser.Program,
 	entry: ImportEntry,
+	comments: Array<string> = [],
 ): ImportEdit | null {
 	let lines = sourceText.split("\n")
 	let section = program.imports
@@ -167,7 +196,12 @@ export function insertImportEdit(
 	)
 
 	if (group !== undefined) {
-		return insertIntoGroup(lines, group, entry)
+		return insertIntoGroup(
+			lines,
+			group,
+			entry,
+			spellCarried(entry, comments),
+		)
 	}
 
 	if (section.groups.length === 0) {
@@ -316,6 +350,8 @@ export function insertExportEdit(
 	// An entry the caller removes in the same edit, so publishing its name again
 	// is no collision. Its place still counts, so the two edits meet end to end.
 	replacing: parser.ExportNode | null = null,
+	// Written above a name that joins a group, as for `insertImportEdit`.
+	comments: Array<string> = [],
 ): ImportEdit | null {
 	let lines = sourceText.split("\n")
 	let section = program.exports
@@ -353,10 +389,14 @@ export function insertExportEdit(
 				)
 
 	if (group !== undefined) {
-		return insertIntoGroup(lines, group, {
-			...sorted,
-			specifier: group.source.path,
-		})
+		let joining = { ...sorted, specifier: group.source.path }
+
+		return insertIntoGroup(
+			lines,
+			group,
+			joining,
+			spellCarried(joining, comments),
+		)
 	}
 
 	// Bare names stand before every group, so the block ends on its last group
@@ -443,7 +483,8 @@ function insertIntoEmptyBlock(
 
 // A flat group of one name gaining a second is rewritten with one name to a
 // line, as the Formatter would. A written-out group takes the name on its own
-// line and keeps its comments. `spelling` may be a sorted run of names.
+// line and keeps its comments. `spelling` may be a sorted run of names, or a
+// name with Comments above it, which rewrites any flat group.
 function insertIntoGroup(
 	lines: Array<string>,
 	group: parser.ImportGroupNode | parser.ExportGroupNode,
@@ -454,15 +495,19 @@ function insertIntoGroup(
 
 	if (
 		position.start.line === position.end.line &&
-		group.entries.length === 1
+		(group.entries.length === 1 || spelling.includes("\n"))
 	) {
 		let indentation = indentationOf(lines, position.start.line)
-		let written = entryOf(group.entries[0]!, entry.specifier)
-		let names = (
-			compareNames(written, entry) < 0
-				? [spellName(written), spelling]
-				: [spelling, spellName(written)]
-		).map((name) => `${indentation}\t${name}`)
+		let names = [
+			...group.entries.map((node) => {
+				let written = entryOf(node, entry.specifier)
+
+				return { entry: written, spelling: spellName(written) }
+			}),
+			{ entry, spelling },
+		]
+			.sort((left, right) => compareNames(left.entry, right.entry))
+			.map((name) => indentedLines(name.spelling, `${indentation}\t`))
 
 		return {
 			range: position,

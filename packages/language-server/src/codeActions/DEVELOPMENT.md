@@ -374,7 +374,9 @@ The edits follow from who still names the Declaration:
   the Choice's derived Methods need it where the typed tree records nothing.
 - Each other Module's entry is made to name the landing Module. A group holding only this name gets its specifier
   rewritten, which keeps its `as` and Comments. A shared group loses the entry, which is added to a group for
-  the landing Module.
+  the landing Module. So does a group of only this name whose block has a group for the landing Module already,
+  rather than becoming a second group for one Module. The Comments inside that group go with the entry, written
+  above it, and a Comment after the group stays on its line.
 
 Removing the Statement also removes the one blank line that no longer separates anything. No doubled blank line,
 and no blank line against a brace, is left behind.

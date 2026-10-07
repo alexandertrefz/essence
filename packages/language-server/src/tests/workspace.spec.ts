@@ -4559,6 +4559,198 @@ describe("Workspace", () => {
 				}
 			})
 
+			// A group of only this name would otherwise be pointed at the
+			// landing Module beside a group that names it already.
+			it("should join an entry to the group already naming the landing Module", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring,
+					"B.es": target,
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" { double as twice }',
+						'\tfrom "./B.es" { one }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(twice(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+					"Forward.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./A.es" { double }',
+						'\tfrom "./B.es" { one }',
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" {',
+						"\t\tdouble as twice",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(twice(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Forward.es")]).toBe(
+					[
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./B.es" {',
+						"\t\tdouble",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				for (let name of ["B.es", "Main.es", "Forward.es"]) {
+					expect(codesAfter(workspace, texts, pathOf(name))).toEqual(
+						[],
+					)
+				}
+			})
+
+			// The Comments written inside the group go with the entry. One
+			// written after the group stays where it was.
+			it("should keep the Comments of a group it joins to another", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"A.es": declaring,
+					"B.es": target,
+					"Main.es": [
+						"import {",
+						'\tfrom "./A.es" {',
+						"\t\t§ keep this note",
+						"\t\tdouble",
+						"\t}",
+						'\tfrom "./B.es" { one }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+					"Trailing.es": [
+						"import {",
+						'\tfrom "./A.es" { double } § trailing',
+						'\tfrom "./B.es" { one }',
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+					"Forward.es": [
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./A.es" { double § forwarded',
+						"\t}",
+						'\tfrom "./B.es" {',
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				})
+
+				let declaringPath = pathOf("A.es")
+				let move = moveTo(
+					workspace,
+					declaringPath,
+					2,
+					"double",
+					"Move 'double' to ./B.es",
+				)
+				let texts = appliedAcross(workspace, declaringPath, move)
+
+				expect(texts[pathOf("Main.es")]).toBe(
+					[
+						"import {",
+						'\tfrom "./B.es" {',
+						"\t\t§ keep this note",
+						"\t\tdouble",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Trailing.es")]).toBe(
+					[
+						"import {",
+						"\t§ trailing",
+						'\tfrom "./B.es" {',
+						"\t\tdouble",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\tTerminal.inspect(double(one)::toString())",
+						"}",
+						"",
+					].join("\n"),
+				)
+				expect(texts[pathOf("Forward.es")]).toBe(
+					[
+						"implementation {",
+						"}",
+						"",
+						"export {",
+						'\tfrom "./B.es" {',
+						"\t\t§ forwarded",
+						"\t\tdouble",
+						"\t\tone",
+						"\t}",
+						"}",
+						"",
+					].join("\n"),
+				)
+
+				for (let name of [
+					"B.es",
+					"Main.es",
+					"Trailing.es",
+					"Forward.es",
+				]) {
+					expect(codesAfter(workspace, texts, pathOf(name))).toEqual(
+						[],
+					)
+				}
+			})
+
 			it("should import a Declaration published under an `as` back by that name", () => {
 				let { workspace, pathOf } = makeWorkspace({
 					"A.es": [
