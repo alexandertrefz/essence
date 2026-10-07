@@ -255,6 +255,12 @@ import {
 	refuseUndecidedTypeParameters,
 } from "./typeParameters"
 import {
+	answersStepOffTypeParameter,
+	isUnwrittenTypeParameter,
+	stepOffValueAdvice,
+	stopsAtUndecidedStep,
+} from "./typeParameterSteps"
+import {
 	markDeclaredValue,
 	reportUndecidedTypeArguments,
 } from "./undecidedCases"
@@ -2929,7 +2935,7 @@ function fabricatedMember(
 // position the path stands in. See "Member paths" in DEVELOPMENT.md.
 function enrichMemberPath(
 	node: parser.MemberPathNode,
-	_scope: enricher.Scope,
+	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
 ): common.typed.FunctionValueNode {
 	// An Argument is matched in one pass and enriched in another, so a path
@@ -2953,7 +2959,7 @@ function enrichMemberPath(
 	return memberPathFunction(
 		node,
 		rootType,
-		memberPathStepTypes(node, rootType),
+		memberPathStepTypes(node, rootType, scope),
 	)
 }
 
@@ -2976,13 +2982,20 @@ function memberPathRootType(expected: common.Type | null): common.Type | null {
 function memberPathStepTypes(
 	node: parser.MemberPathNode,
 	rootType: common.Type,
+	scope: enricher.Scope,
 ): Array<common.Type> {
 	let stepTypes: Array<common.Type> = []
 	let baseType = rootType
 	let basePosition = node.position
 
 	for (let step of node.steps) {
-		let stepType = memberPathStepType(step, baseType, basePosition)
+		let stepType = memberPathStepType(
+			node,
+			step,
+			baseType,
+			basePosition,
+			scope,
+		)
 
 		stepTypes.push(stepType)
 		baseType = stepType
@@ -2993,9 +3006,11 @@ function memberPathStepTypes(
 }
 
 function memberPathStepType(
+	node: parser.MemberPathNode,
 	step: parser.IdentifierNode,
 	baseType: common.Type,
 	basePosition: common.Position,
+	scope: enricher.Scope,
 ): common.Type {
 	if (baseType.type === "Record" || baseType.type === "Case") {
 		return lookupTypeOf(baseType, step.content, {
@@ -3004,12 +3019,13 @@ function memberPathStepType(
 		})
 	}
 
-	// Silent on an Error, and on an Unknown or an unbound Type Parameter, which
-	// the Invocation reports itself.
+	// Silent on an Error and an Unknown, which the Invocation reports itself.
+	// A Type Parameter the reader wrote has no members.
 	if (
 		baseType.type === "Error" ||
 		baseType.type === "Unknown" ||
-		baseType.type === "GenericUse"
+		(baseType.type === "GenericUse" &&
+			answersStepOffTypeParameter(node, step, baseType, scope))
 	) {
 		return { type: "Error" }
 	}
@@ -3022,12 +3038,7 @@ function memberPathStepType(
 				`read off ${withArticle(describeType(baseType))}`,
 			),
 		],
-		notes: [
-			"Only a Record or a Case has members a path can step through. An Optional, a Union, a Choice or a List is decided before it is read, and deciding it is a Match rather than a dot.",
-		],
-		helps: [
-			"Write the Function literal instead, and decide the value the way its Type asks to be decided.",
-		],
+		...stepOffValueAdvice(baseType, step.content),
 	})
 
 	return { type: "Error" }
@@ -9811,12 +9822,16 @@ function makeArgumentTyper(
 			return { type: "Error" }
 		}
 
-		recordContextualMemberPathType(node, { expectedType, bindings })
-
 		let { result: stepTypes } = collectDiagnostics(() =>
-			memberPathStepTypes(node, rootType),
+			memberPathStepTypes(node, rootType, scope),
 		)
 		let returnType = stepTypes[stepTypes.length - 1] ?? { type: "Error" }
+
+		// A path stopped by a Type Parameter the call has not decided keeps
+		// that reading, which the Error answered here would otherwise bind.
+		let kept = stopsAtUndecidedStep(rootType, stepTypes) ? null : bindings
+
+		recordContextualMemberPathType(node, { expectedType, bindings: kept })
 
 		if (stepTypes.some((stepType) => stepType.type === "Error")) {
 			return { type: "Error" }
@@ -12392,31 +12407,6 @@ function unboundedParameterHelps(
 		(protocolName) =>
 			`Bound the Type Parameter by a Protocol that declares '${methodName}' — '<infer ${baseType.name} is ${protocolName}>' at the Declaration that introduces it.`,
 	)
-}
-
-// A Type Parameter no Scope here declares. It comes from a callee's signature:
-// a call that selected no Overload types a Function literal by its last
-// candidate. The failed call already reported, so this stays silent; a Type
-// Parameter the reader wrote still reports.
-function isUnwrittenTypeParameter(
-	type: common.Type,
-	scope: enricher.Scope,
-): boolean {
-	if (type.type !== "GenericUse") {
-		return false
-	}
-
-	for (
-		let current: enricher.Scope | null = scope;
-		current !== null;
-		current = current.parent
-	) {
-		if (current.types[type.name] !== undefined) {
-			return false
-		}
-	}
-
-	return true
 }
 
 export function resolveMethodInvocation(

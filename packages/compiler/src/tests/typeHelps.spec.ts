@@ -114,6 +114,64 @@ describe("A member path with no Function around it", () => {
 	})
 })
 
+describe("A member path off a Type Parameter", () => {
+	let undecided = `implementation {
+		function apply<infer T>(_ by: (_ item: T) -> Integer) -> Integer {
+			<- 1
+		}
+
+		constant applied = apply(.price)
+	}`
+
+	it("writes the literal a path the call decides nothing for stands for", () => {
+		expect(codesOfSource(undecided)).toEqual(["path-without-context"])
+		expect(helpsOfCode(undecided, "path-without-context")).toEqual([
+			"Write the Function literal instead, with the Parameter and return Types a path leaves out — '(_ item: <Type>) -> <Type> { <- item.price }', filling each '<Type>' in.",
+		])
+		expect(
+			compiles(
+				undecided.replace(
+					"apply(.price)",
+					"apply((_ item: { price: Integer }) -> Integer { <- item.price })",
+				),
+			),
+		).toBe(true)
+	})
+
+	// The literal decides `T` where `5` did not, so what is left is the
+	// Argument that bound nothing.
+	it("leaves the call's own mismatch once the literal is written", () => {
+		let followed = `implementation {
+		function free<infer T>(_ items: List<T>, _ by: (_ item: T) -> Integer) -> Integer {
+			<- items::length()
+		}
+
+		constant freed = free(5, (_ item: { price: Integer }) -> Integer { <- item.price })
+	}`
+
+		expect(codesOfSource(followed)).toEqual(["argument-type-mismatch"])
+	})
+
+	let written = `implementation {
+		function total<infer T is Printable>(_ items: List<T>) -> Integer {
+			constant priceOf: (_ item: T) -> Integer = .price
+			<- items::length()
+		}
+	}`
+
+	it("names a Type with the member in place of a declared one", () => {
+		expect(codesOfSource(written)).toEqual(["path-step-not-a-record"])
+		expect(helpsOfCode(written, "path-step-not-a-record")).toEqual([
+			"Name a Type with the member in place of 'T' — '{ price: <Type> }', filling the '<Type>' in.",
+		])
+		expect(
+			compiles(
+				written.replace("(_ item: T)", "(_ item: { price: Integer })"),
+			),
+		).toBe(true)
+	})
+})
+
 describe("A Method that can not be dispatched", () => {
 	let source = `implementation {
 		function describe<infer First is Printable, infer Second is Printable>(_ value: First | Second) -> String {

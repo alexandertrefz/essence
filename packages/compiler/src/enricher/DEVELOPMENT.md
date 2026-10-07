@@ -211,8 +211,17 @@ same rule a bare `#Case` follows. An Argument is matched in one pass and enriche
 an Argument reads back the Type the matching recorded (`recordedMemberPathType`).
 
 Each step reads a member off a Record or a Case. An Optional, a Union, a Choice or a List has to be decided by a
-Match before it is read. A step off one reports `path-step-not-a-record`. A step off an Error, an Unknown or an
-unbound Type Parameter stays silent: the Invocation reports an undecided Type Parameter itself.
+Match before it is read. A step off one reports `path-step-not-a-record`. So does a step off a Type Parameter the
+reader wrote, which stands for any Type and has no members. A step off an Error or an Unknown stays silent. So does
+a step off a Type Parameter inside a refused call, whose own refusal is the mistake.
+
+A step off any other Type Parameter, one no Scope declares, is the call's, which has not decided it
+(`answersStepOffTypeParameter`). It reports `path-without-context` itself, as a construction reports
+`undecided-type-arguments`: no Type names the member. In `free(5, .price)` the `5` binds no `T`. Its Error
+would bind `T`, which then reads as decided, so the probe records such a reading without the call's bindings
+(`stopsAtUndecidedStep`). The Error it answers keeps the call from reporting `T` a second time. A lone signature
+leaves its mismatch to the validator, which stands down over the path's Error, so the path's report is the one the
+reader sees.
 
 The synthesized Parameter is named `_0`. The grammar reads `_` as a Symbol, so no source can spell that name and no
 binding of the author's can capture it. It is also the name `simplifyParameter` gives an unnamed Parameter.
@@ -628,7 +637,8 @@ recording either. So a candidate it does not fit can not decide it.
 
 A member path records any position that names a Function of one Parameter, even where its steps do not read there.
 The enrichment then reports about the steps rather than about a missing context. A path whose steps do not read
-answers an Error, which matches every Parameter, so the readable Arguments decide the candidate.
+answers an Error, which matches every Parameter, so the readable Arguments decide the candidate. A path stopped by a
+Type Parameter the call has not decided is recorded without the call's bindings; see "Member paths".
 
 ### Probe recordings
 

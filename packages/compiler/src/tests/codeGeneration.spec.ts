@@ -1729,6 +1729,78 @@ describe("Code Generation", () => {
 			])
 		})
 
+		// `5` binds no `T`, so no Type names the member the path reads. A
+		// bound changes nothing, though it makes the call answer an Error.
+		it("refuses a path the call decides no Type for", () => {
+			for (let bound of ["", " is Printable"]) {
+				let diagnostics = diagnosticsOf(`implementation {
+					function free<infer T${bound}>(
+						_ items: List<T>,
+						_ by: (_ item: T) -> Integer,
+					) -> Integer {
+						<- items::length()
+					}
+
+					Terminal.inspect(free(5, .price))
+				}`)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.code),
+				).toEqual(["path-without-context"])
+				expect(diagnostics[0].labels[0]?.message).toBe(
+					"'price' is read off 'T', which nothing here decides",
+				)
+			}
+		})
+
+		// Arguments that do not pair are a refused call's, so the count is the
+		// one report and the path stays silent.
+		it("reports only the count where a lone signature's Arguments do not pair", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				function free<infer T>(_ items: List<T>, _ by: (_ item: T) -> Integer) -> Integer {
+					<- items::length()
+				}
+
+				Terminal.inspect(free(5, .price, 3))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"argument-count-mismatch",
+			])
+		})
+
+		// The path's own Error would bind `T`, which then reads as decided.
+		it("refuses a path no Argument decides the Type of", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				function apply<infer T>(_ by: (_ item: T) -> Integer) -> Integer {
+					<- 1
+				}
+
+				Terminal.inspect(apply(.price))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"path-without-context",
+			])
+		})
+
+		// A Type Parameter the Function declares stands for any Type, so the
+		// emitted read would find no member.
+		it("refuses a step read off a Type Parameter the Function declares", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				function prices<infer T>(_ items: List<T>) -> List<Integer> {
+					<- items::map(.price)
+				}
+
+				Terminal.inspect(prices([1, 2]))
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"path-step-not-a-record",
+			])
+			expect(diagnostics[0].labels[0]?.message).toBe("read off a T")
+		})
+
 		it("refuses a step read off a List", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				type Basket = { lines: List<Integer> }

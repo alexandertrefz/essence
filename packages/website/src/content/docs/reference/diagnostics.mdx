@@ -4249,6 +4249,8 @@ Error: A member path stands where no Function is expected
 
 Pass the path where a function is expected, as in `products::map(.price)`, or write a function literal. Outside argument position a literal takes no types from around it, so it has to write both of its own: `(_ item: Product) -> Integer { <- item.price }`. The help writes each of them as `<Type>` rather than naming one — a type is exactly what this position does not name, which is why the path was refused. Where the position names a type that is not a function at all the help changes — nothing a function literal can say fits an `Integer`, so it offers the member read instead, and the `::map` clause goes with it.
 
+The same code refuses a path passed where a function of one parameter is expected, but whose parameter the call leaves undecided. In `free(5, .price)` against `free<infer T>(_ items: List<T>, _ by: (_ item: T) -> Integer)`, the `5` binds no `T`, so no type says what `price` is. The help writes the function literal, whose parameter type then decides `T`.
+
 Taught on: [Functions as values › Member paths](/docs/language/functions-as-values#member-paths)
 
 ### `uninferable-item-type`
