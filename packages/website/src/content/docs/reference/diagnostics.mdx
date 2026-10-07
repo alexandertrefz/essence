@@ -1015,9 +1015,9 @@ Error: The 'export { … }' block belongs below the implementation
 
 </div>
 
-Move the block to its place.
+Move the block to its place. Where a block of its kind already stands there, move its entries into that one instead, since a file holds one of each.
 
-Quick Fix: **Move the 'export \{ … \}' block below the implementation**, or **Move the 'import \{ … \}' block above the implementation**.
+Quick Fix: **Move the 'export \{ … \}' block below the implementation**, or **Move the 'import \{ … \}' block above the implementation**. Where a block of its kind already stands there: **Move the entries into the 'import \{ … \}' block above the implementation**, or the same for `export`.
 
 Taught on: [Modules › The four blocks of a file](/docs/language/modules#the-four-blocks-of-a-file)
 

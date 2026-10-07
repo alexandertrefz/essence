@@ -1886,16 +1886,7 @@ function moveBlockEdits(
 ): Array<CodeActionEdit> | null {
 	let first = commentRunAbove(lines, block.start.line)
 	let last = block.end.line
-	let cutFirst = first
-	let cutLast = last
-
-	// The blank line after it, else the one before, but not both, or the
-	// neighbours would close up.
-	if (last < lines.length && lineAt(lines, last + 1).trim() === "") {
-		cutLast = last + 1
-	} else if (first > 1 && lineAt(lines, first - 1).trim() === "") {
-		cutFirst = first - 1
-	}
+	let { cutFirst, cutLast } = cutLines(lines, first, last)
 
 	// Already in place: nothing to move.
 	if (
@@ -1933,6 +1924,104 @@ function moveBlockEdits(
 	return cursor.line < cutFirst ? [written, removal] : [removal, written]
 }
 
+// The lines a block leaves, with one blank line beside it. The one after it
+// goes, else the one before, but not both, or the neighbours would close up.
+function cutLines(
+	lines: Array<string>,
+	first: number,
+	last: number,
+): { cutFirst: number; cutLast: number } {
+	if (last < lines.length && lineAt(lines, last + 1).trim() === "") {
+		return { cutFirst: first, cutLast: last + 1 }
+	}
+
+	if (first > 1 && lineAt(lines, first - 1).trim() === "") {
+		return { cutFirst: first - 1, cutLast: last }
+	}
+
+	return { cutFirst: first, cutLast: last }
+}
+
+// Moves a misplaced block's entries into the block of its kind on the right
+// side, since a Program holds one. The Comment lines before it go too.
+function mergeBlockEdits(
+	lines: Array<string>,
+	block: common.Position,
+	into: common.Position,
+): Array<CodeActionEdit> | null {
+	let entries = entryLines(lines, block)
+
+	if (entries === null) {
+		return null
+	}
+
+	let first = commentRunAbove(lines, block.start.line)
+	let moved = [
+		...lines
+			.slice(first - 1, block.start.line - 1)
+			.map((line) => `\t${line.trim()}`),
+		...entries,
+	]
+	let { cutFirst, cutLast } = cutLines(lines, first, block.end.line)
+	let removal = { range: wholeLines(lines, cutFirst, cutLast), newText: "" }
+	let written: CodeActionEdit
+
+	if (moved.length === 0) {
+		return [removal]
+	} else if (
+		into.start.line !== into.end.line &&
+		lineAt(lines, into.end.line).trim() === "}"
+	) {
+		let cursor = { line: into.end.line, column: 1 }
+
+		written = {
+			range: { start: cursor, end: cursor },
+			newText: `${moved.join("\n")}\n`,
+		}
+	} else if (moved.length === 1) {
+		// A block written on one line takes the entry before its `}`.
+		let cursor = { line: into.end.line, column: into.end.column - 1 }
+
+		written = {
+			range: { start: cursor, end: cursor },
+			newText: `${moved[0]!.trim()} `,
+		}
+	} else {
+		return null
+	}
+
+	// In document order.
+	return into.start.line < block.start.line
+		? [written, removal]
+		: [removal, written]
+}
+
+// The lines a block's entries stand on. A block on one line gives its entries
+// one level in, and one across lines gives its inner lines as written. Null
+// where a brace shares a line with an entry across lines.
+function entryLines(
+	lines: Array<string>,
+	block: common.Position,
+): Array<string> | null {
+	let opening = lineAt(lines, block.start.line)
+	let brace = opening.indexOf("{", block.start.column - 1)
+	let closing = lineAt(lines, block.end.line).slice(0, block.end.column - 2)
+
+	if (block.start.line === block.end.line) {
+		let inner = opening.slice(brace + 1, block.end.column - 2).trim()
+
+		return inner === "" ? [] : [`\t${inner}`]
+	}
+
+	if (opening.slice(brace + 1).trim() !== "" || closing.trim() !== "") {
+		return null
+	}
+
+	return lines
+		.slice(block.start.line, block.end.line - 1)
+		.filter((line) => line.trim() !== "")
+}
+
 // Where a section belongs in the order import, implementation, export, tests,
 // worked out from the blocks in place. A tests-only file's implementation
 // spans its tests, so its export goes after them.
@@ -1960,8 +2049,9 @@ function sectionSlot(
 }
 
 // Moves an `import` or `export` block written on the wrong side of the
-// implementation. Its order is the mistake the Diagnostic names, so the fix is
-// preferred.
+// implementation. Where a block of its kind stands on the right side, its
+// entries move into that one. Its order is the mistake the Diagnostic names,
+// so the fix is preferred.
 export function moveModuleSectionAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -1971,16 +2061,16 @@ export function moveModuleSectionAction(
 		return null
 	}
 
-	let section = diagnostic.data.section
+	let { section, block, into } = diagnostic.data
 	if (sliceOf(lines, diagnostic.position) !== section) {
 		return null
 	}
 
-	let edits = moveBlockEdits(
-		lines,
-		diagnostic.data.block,
-		sectionSlot(program, lines, section),
-	)
+	let side = section === "import" ? "above" : "below"
+	let edits =
+		into === null
+			? moveBlockEdits(lines, block, sectionSlot(program, lines, section))
+			: mergeBlockEdits(lines, block, into)
 
 	if (edits === null) {
 		return null
@@ -1988,9 +2078,9 @@ export function moveModuleSectionAction(
 
 	return {
 		title:
-			section === "import"
-				? "Move the 'import { … }' block above the implementation"
-				: "Move the 'export { … }' block below the implementation",
+			into === null
+				? `Move the '${section} { … }' block ${side} the implementation`
+				: `Move the entries into the '${section} { … }' block ${side} the implementation`,
 		kind: "quickfix",
 		diagnosticCode: diagnostic.code,
 		diagnosticPosition: diagnostic.position,

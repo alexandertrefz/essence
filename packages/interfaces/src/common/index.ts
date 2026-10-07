@@ -191,12 +191,13 @@ export type DiagnosticData =
 			// the fix is offered but not preferred.
 			partial?: true
 	  }
-	// A misplaced Module section and the span of its block, which the Parser
-	// dropped.
+	// A misplaced Module section and the span of its block. `into` is the
+	// block of its kind on the right side, where one stands.
 	| {
 			kind: "section-order"
 			section: "import" | "export"
 			block: Position
+			into: Position | null
 	  }
 	// A mismatch that a `complete` in front of the value fixes. `unstarted` is
 	// a `Future<T>` where `T` was wanted, and `in-flight` a `Started<T>`.

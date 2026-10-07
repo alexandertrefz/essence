@@ -5269,6 +5269,73 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("misplaced-module-section")
 		})
 
+		// A Program holds one import block, so a second one's entries, with
+		// the Comment before it, join the block written first.
+		it("should merge an import block into the one above the implementation", () => {
+			let lines = [
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+				"",
+				"§ the rest",
+				"import {",
+				'\tfrom "./More.es" {',
+				"\t\tother",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix)
+
+			expect(fix.title).toBe(
+				"Move the entries into the 'import { … }' block above the implementation",
+			)
+			expect(result).toEqual([
+				"import {",
+				'\tfrom "./Other.es" { thing }',
+				"\t§ the rest",
+				'\tfrom "./More.es" {',
+				"\t\tother",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		it("should merge an export block into one written on one line", () => {
+			let lines = [
+				"export { a }",
+				"",
+				"implementation {",
+				"\tconstant a = 1",
+				"\tconstant b = 2",
+				"}",
+				"",
+				"export { b }",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0]!)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant a = 1",
+				"\tconstant b = 2",
+				"}",
+				"",
+				"export { b a }",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
 		// A Comment set apart from the block after it is about the file, so the
 		// import block goes after it.
 		it("should leave a file's own header above the import block", () => {

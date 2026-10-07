@@ -27,6 +27,10 @@ import {
 	reportMisplacedDefault,
 } from "./misplacedDefaults"
 import {
+	type ModuleSectionRead,
+	reportMisplacedSection,
+} from "./moduleSections"
+import {
 	expressionExpected,
 	parameterLabel,
 	reportRedundantLabel,
@@ -757,15 +761,6 @@ export type ParserOptions = {
 	allowDeclarationsHeader?: boolean
 }
 
-// One `import { … }` or `export { … }` block as read, with the side of the
-// implementation it stood on. A Diagnostic about the side points at the
-// Keyword alone.
-type ModuleSectionRead = {
-	node: parser.ImportSectionNode | parser.ExportSectionNode
-	keywordPosition: common.Position
-	side: "above" | "below"
-}
-
 // The closing brackets. After a `,` one of these says the list is short of
 // its own closing bracket. See `refuseListContinuation`.
 const closingBracketTokenTypes = new Set([
@@ -1042,12 +1037,24 @@ class DescentParser {
 		let imports: parser.ImportSectionNode | null = null
 		let exports: parser.ExportSectionNode | null = null
 
+		let rightSide = (kind: string) =>
+			sections.find(
+				(other) =>
+					other.node.nodeType === kind &&
+					other.side ===
+						(kind === "ImportSection" ? "above" : "below"),
+			)?.node.position ?? null
+
 		for (let section of sections) {
 			let isImport = section.node.nodeType === "ImportSection"
 			let placed = section.side === (isImport ? "above" : "below")
 
-			if (!placed) {
-				this.reportMisplacedSection(section, implementationPosition)
+			if (!placed && !this.suppressDiagnostics) {
+				reportMisplacedSection(
+					section,
+					implementationPosition,
+					rightSide(section.node.nodeType),
+				)
 			}
 
 			if (section.node.nodeType === "ImportSection") {
@@ -1058,50 +1065,6 @@ class DescentParser {
 		}
 
 		return { imports, exports }
-	}
-
-	protected reportMisplacedSection(
-		section: ModuleSectionRead,
-		implementationPosition: common.Position,
-	): void {
-		if (this.suppressDiagnostics) {
-			return
-		}
-
-		let isImport = section.node.nodeType === "ImportSection"
-		let keyword = isImport ? "import" : "export"
-		let expectedSide = isImport ? "above" : "below"
-
-		reportError(
-			`The '${keyword} { … }' block belongs ${expectedSide} the implementation`,
-			section.keywordPosition,
-			{
-				code: "misplaced-module-section",
-				// The whole block's span for the Quick Fix that moves it, since
-				// the Diagnostic underlines the Keyword.
-				data: {
-					kind: "section-order",
-					section: isImport ? "import" : "export",
-					block: section.node.position,
-				},
-				labels: [
-					primary(
-						section.keywordPosition,
-						`this block is written ${section.side} the implementation`,
-					),
-					secondary(
-						implementationPosition,
-						"the implementation block is here",
-					),
-				],
-				notes: [
-					"A Program reads top to bottom: what it imports, what it does, what it exports.",
-				],
-				helps: [
-					`Move the '${keyword} { … }' block ${expectedSide} 'implementation { … }'.`,
-				],
-			},
-		)
 	}
 
 	// An import block holds only groups, since every name comes from a `from`.

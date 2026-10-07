@@ -4006,7 +4006,55 @@ import { from "./Geometry.es" { Rectangle } }`,
 						start: { line: 3, column: 1 },
 						end: { line: 3, column: 46 },
 					},
+					into: null,
 				})
+			})
+
+			// The Program holds one block of a kind, so where one stands on the
+			// right side the misplaced block's entries move into it.
+			it("should point a misplaced block at the one on the right side", () => {
+				let { diagnostics } = parseWithDiagnostics(
+					`import { from "./Geometry.es" { Rectangle } }
+
+implementation { }
+
+import { from "./Shapes.es" { Circle } }`,
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.helps),
+				).toEqual([
+					[
+						"Move the entries of this 'import { … }' block into the one above 'implementation { … }'.",
+					],
+				])
+				expect(diagnostics[0].data).toMatchObject({
+					into: {
+						start: { line: 1, column: 1 },
+						end: { line: 1, column: 46 },
+					},
+				})
+			})
+
+			it("should compile once a misplaced block's entries join the placed one", () => {
+				let implementation = `implementation {
+					constant x = 1
+					constant y = 2
+				}`
+				let { diagnostics } = parseWithDiagnostics(
+					`export { x }\n\n${implementation}\n\nexport { y }`,
+				)
+
+				expect(
+					diagnostics.map((diagnostic) => diagnostic.helps),
+				).toEqual([
+					[
+						"Move the entries of this 'export { … }' block into the one below 'implementation { … }'.",
+					],
+				])
+				expect(
+					compiles(`${implementation}\n\nexport {\n\tx\n\ty\n}`),
+				).toBe(true)
 			})
 
 			// A misplaced block is still parsed where it stands, so its contents
