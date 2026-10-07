@@ -52,7 +52,9 @@ to spell something rather than a repair:
   Statement and leaves the Constant's name where it stood. The name is derived
   from what the Expression is about — the Method a call invokes, the member a
   lookup reads — and is a placeholder: rename opens on it as soon as the edits
-  land.
+  land. Where the position decided the Expression's Type, as it does for a
+  bare `#Case` or a written List a Parameter admits to a `NonEmptyList`, the
+  Constant writes that Type.
 - **Inline 'x'** is the other direction. A local Constant's value is written
   into every read and the declaration goes, offered from the declaration and
   from any read of it.

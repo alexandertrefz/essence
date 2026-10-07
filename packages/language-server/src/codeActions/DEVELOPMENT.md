@@ -126,35 +126,35 @@ It is safe only because the Expression is still evaluated exactly where it was. 
 lifted Expression would run where the Program ran it only sometimes. So is one that would read a name out of scope.
 
 The Expression is the smallest one that contains the trimmed selection, not one whose Position matches it exactly.
-A reader dragging over characters is often off by one, and still means the same Node. A selection that starts past a
-Match's head finds the Match when it stands on no Expression, such as on a Pattern's member name. Lifting the whole
-Match is not what was meant, so `isAmongHandlers` turns it away.
+A reader dragging over characters is often off by one, and still means the same Node. A selection that starts past the
+head of a Match, a `define` or a Function literal finds that value when it stands on no Expression inside it. It stands
+on what the value declares, such as a Pattern's member name, a Parameter's Type or a Comment. Lifting the whole value is
+not what was meant, so `startsPastItsHead` turns it away. A Function literal's head is its first character, since all
+it writes before its body declares.
 
 Only some Expressions are worth naming, and `isExtractable` lists them. A bare Identifier already has a name, and
-a scalar Literal reads as its own value. Others take their meaning from where they are written and would lose it.
-A Function literal and a bare `#Case` take their Type from their position. So does a value holding a bare `#Case`,
-as `[#Value(1), #Empty]` does, which `holdsBareCase` finds. It does not search a call: an Argument resolves against its
-Parameter, and a receiver or a callee against nothing the position decides. Nor does it search the answers of a Match,
-of a `define` with a `-> Type`, or of a Function literal that writes its return Type, which resolve against that Type.
-A member path stands for a Function of the Argument it is handed. A Record written with a path key reaches into a value
-its position supplies: the value a `with` updates, or a Parameter's default.
+a scalar Literal reads as its own value. A Record written with a path key reaches into a value its position supplies:
+the value a `with` updates, or a Parameter's default. So it is not lifted.
 
 `collectEager` collects the Expressions a Statement reads every time it is reached, which are the ones a Constant
 before it may hold. Its walk stops at anything that opens a body of its own, such as a Function literal or a Match
 Handler. A selection inside such a body is lifted within it instead, as `enclosingStatementOf` finds it. The walk
-also stops at forms read only conditionally: a `define` arm, a Match Guard, and a Parameter's or Case's default.
-Some parts are no value of their own, so `collectParts` enters them without collecting them. A `with` key list such as
-`column = 1` would otherwise be written as a Constant's value, and so would a path key's member list. A callee written
-as a name or a Lookup is entered too: a Method taken as a value loses its defaults, and one with Protocol-bound Type
-Parameters is refused as a value. A callee that a call answers, as `adder(1)` in `adder(1)(2)`, is a Function value
-already, and is collected.
+also stops at forms read only conditionally: a `define` arm, a Match Guard, and a Parameter's or Case's default. A
+`define` asks its first arm's condition whenever it is read, so that one is collected. Some parts are no value of their
+own, so `collectParts` enters them without collecting them. A `with` key list such as `column = 1` would otherwise be
+written as a Constant's value, and so would a path key's member list. A callee is collected, and the typed Program
+decides whether it may be a value.
 
-An `if` condition narrows the names it proves something about, and a Constant holding its answer proves nothing. So
-`collectCondition` leaves out a condition that may prove something, each `::and` holding such a conjunct, and the
-conjunct itself. `mayNarrow` reads the shape `conditionEvidence` reads: a Method call on a name, `@` or a member of
-`@`, with literal Arguments. It cannot tell a Constant from a Variable, or which Namespace answered, so it leaves a
-condition alone whenever the Enricher might narrow on it. See "Narrowing" in
-packages/compiler/src/enricher/DEVELOPMENT.md.
+An `if` condition narrows the names it proves something about, and a Constant holding its answer proves nothing.
+The Enricher records whether it does, as `narrows` and `narrowsFalse`, and a `define` arm as `narrows` and
+`narrowsBelow`. See "Narrowing records" in packages/interfaces/DEVELOPMENT.md. A condition that narrows nothing is
+collected like any value. Where one narrows, `collectConjuncts` leaves out each conjunct that may be what narrows,
+and each `::and` holding one. `mayNarrow` reads the shape `conditionEvidence` reads: a Method call on a name, `@` or
+a member of `@`, with literal Arguments. See "Narrowing" in packages/compiler/src/enricher/DEVELOPMENT.md.
+
+The Enricher reads some conditions as written. `redundant-key-check` warns about a `hasKey` on a name whose branch
+opens by looking the same key up, and a Constant would hold the check out of its sight. So `isKeyCheck` keeps such a
+condition, and its key, where they stand.
 
 A Method written to answer a `Boolean`, whose whole body asks one question of `@`, is read as asking that question.
 `isAtLeast` with the body `<- @::isGreaterThanOrEqualTo(count)` is one. A condition calling it narrows, and a refinement
@@ -167,6 +167,46 @@ packages/compiler/src/enricher/DEVELOPMENT.md.
 Constants and Variables are not hoisted. A name declared inside the Expression travels with it, so a whole Match
 with a `case #Value(item)` can be lifted. Every Expression `collectEager` reaches is read where the Statement
 stands, so the check holds for all of them today. It guards against a form added to that walk that does not.
+
+### The Type the Constant holds
+
+An unannotated Constant types its value bottom-up, but a position can hand a value a Type of its own.
+`constantAnnotation` asks the typed Program whether the value would mean the same in the Constant, and with which
+annotation. It is offered only where the enriched Program is at hand.
+
+A Function literal or a member path without written Types takes them from the Function its position expects. An
+annotation on the Constant would not hand them over, since a Constant's declared Type does not type a literal's
+Parameters. So `needsAPosition` turns away a value holding one, unless it is passed to a call inside the value, where it
+reads that call's Parameter.
+
+Other values read the Type their position expects, which `readsItsPosition` finds. These are a bare `#Case`, a generic
+Choice's Case without written Type Arguments, an empty List or Dictionary, and a `define` without `-> Type`. An Argument
+resolves against its Parameter, so a call is searched only for an empty List or Dictionary. Its Type Arguments may be
+decided by the position the call stands in. See "Seeds an Invocation decides" in
+packages/compiler/src/enricher/DEVELOPMENT.md.
+
+A written value proves more than its Type. A List, a Dictionary, a Record, an update or a Case is admitted to a
+refinement on what its text proves, and a Record Literal may leave members to a Parameter's or a payload's default. A
+name holding it proves only its Type. A written receiver is refined the same way, so `[1, 2]::average()` answers an
+Integer. See "Written receivers" in packages/compiler/src/enricher/DEVELOPMENT.md.
+
+Where the value reads its position, or is written and its own Type does not fit there, the Constant writes the Type
+the position gave it. `expectationAt` reads that Type off the parent: a declared Constant's Type, a Parameter's with
+the receiver's bindings, a return Type, a Case's payload, or the member or item a containing Literal expects. A `<-` in
+a completing Function answers the Type its Future completes with. A written receiver keeps the refinement it proved. A
+Record Literal that leaves members to a default has nothing to merge into in a Constant, so it is not offered. Nor is a
+Type that can not be spelled where the Constant stands.
+
+Some positions expect nothing, such as a Statement's own value, a condition, a scrutinee or an interpolated value. A
+value is typed bottom-up there too. A Parameter whose Type Parameters only this Argument mentions takes the
+Argument's own Type, unless it holds a refinement or a default. It expects nothing more, except that the call's own
+position may decide those Type Parameters for a value that reads its position. A position the typed tree says nothing
+about, such as a Parameter whose Type Parameter another Argument decides, or a `<-` in a Function literal that wrote no
+return Type, turns away every value that reads its position or is written.
+
+A callee lifted into a Constant becomes a Function value. That is offered only for a Function or a static Method with
+one signature, no Protocol-bound Type Parameters and no defaults. A Function value loses its defaults, so a partial
+Record Argument would have nothing to merge into. An overloaded or a bounded Function is refused as a value.
 
 ## Retyping structure
 

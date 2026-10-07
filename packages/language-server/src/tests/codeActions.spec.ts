@@ -8569,7 +8569,7 @@ describe("Extract to a Constant", () => {
 
 	// `#Empty` resolves against the Type its position expects, and a Constant
 	// with no written Type expects none. A Match writes its own.
-	it("offers nothing for a value holding a bare Case", () => {
+	it("writes the Type a value holding a bare Case resolved against", () => {
 		let lines = [
 			"implementation {",
 			"\tconstant held: List<Optional<Integer>> = [#Value(1), #Empty]",
@@ -8587,20 +8587,31 @@ describe("Extract to a Constant", () => {
 			"}",
 		]
 
-		expect(refactoredCodesOf(lines)).toEqual([])
-		expect(
-			extractions(lines, rangeOf(lines, "[#Value(1), #Empty]")),
-		).toEqual([])
-		expect(
-			extractions(lines, rangeOf(lines, "{ url, code = #Empty }")),
-		).toEqual([])
-
-		let [action] = extractions(
+		let [held] = extractions(lines, rangeOf(lines, "[#Value(1), #Empty]"))
+		let [report] = extractions(
+			lines,
+			rangeOf(lines, "{ url, code = #Empty }"),
+		)
+		let [checked] = extractions(
 			lines,
 			rangeFrom(lines, "match code", "\t\t}"),
 		)
 
-		expectRefactored(lines, applied(lines, action))
+		expect(applied(lines, held).slice(1, 3)).toEqual([
+			"\tconstant value: List<Optional<Integer>> = [#Value(1), #Empty]",
+			"\tconstant held: List<Optional<Integer>> = value",
+		])
+		expect(applied(lines, report).slice(4, 6)).toEqual([
+			"\t\tconstant value: { url: String, code: Optional<Integer> } = { url, code = #Empty }",
+			"\t\t<- value",
+		])
+		expect(applied(lines, checked)[8]).toBe(
+			"\t\tconstant value = match code -> Optional<Integer> {",
+		)
+
+		for (let action of [held, report, checked]) {
+			expectRefactored(lines, applied(lines, action))
+		}
 	})
 
 	// The arrow is the Type `#Empty` resolves against.
@@ -8778,6 +8789,206 @@ describe("Extract to a Constant", () => {
 		).toEqual([])
 	})
 
+	// The brackets prove the List is not empty, which a name holding it does
+	// not. The Constant writes the refinement the Parameter admitted it to.
+	it("writes the refinement a Parameter admitted a written List to", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction first(_ items: NonEmptyList<Integer>) -> Integer {",
+			"\t\t<- items::firstItem()",
+			"\t}",
+			"",
+			"\tconstant one = first([1, 2])",
+			"\tconstant mean = Number.average([1, 1/2])",
+			"}",
+		]
+
+		let [admitted] = extractions(lines, rangeOf(lines, "[1, 2]"))
+		let [chosen] = extractions(lines, rangeOf(lines, "[1, 1/2]"))
+
+		expect(applied(lines, admitted).slice(5, 7)).toEqual([
+			"\tconstant value: NonEmptyList<Integer> = [1, 2]",
+			"\tconstant one = first(value)",
+		])
+		// The Overload taking a `NonEmptyList` answers a Rational, where the
+		// one taking a List answers an Optional.
+		expect(applied(lines, chosen)[6]).toBe(
+			"\tconstant value: NonEmptyList<Scalar> = [1, 1/2]",
+		)
+
+		for (let action of [admitted, chosen]) {
+			expectRefactored(lines, applied(lines, action))
+		}
+	})
+
+	it("keeps the refinement a written receiver proved", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant mean = [1, 2]::average()",
+			"\tconstant doubled = mean::multiply(with 2)",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "[1, 2]"))
+		let result = applied(lines, action)
+
+		expect(result.slice(1, 3)).toEqual([
+			"\tconstant value: NonEmptyList<Integer> = [1, 2]",
+			"\tconstant mean = value::average()",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// A Constant annotated with the whole Record would lack the members the
+	// default supplies, and an unannotated one merges nothing into it.
+	it("offers nothing for a Record Literal that leaves members to a default", () => {
+		let lines = [
+			"implementation {",
+			'\tfunction greet(_ person: { name: String, title: String } = { title = "Dr" }) -> String {',
+			"\t\t<- person.title::append(person.name)",
+			"\t}",
+			"",
+			"\tchoice Key {",
+			"\t\tTyped { text: String, repeats: Integer } = { repeats = 1 },",
+			"\t}",
+			"",
+			'\tconstant greeting = greet({ name = "Kim" })',
+			'\tconstant key = Key#Typed({ text = "a" })',
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(extractions(lines, rangeOf(lines, '{ name = "Kim" }'))).toEqual(
+			[],
+		)
+		expect(extractions(lines, rangeOf(lines, '{ text = "a" }'))).toEqual([])
+	})
+
+	// Nothing but the annotation decides the Choice's Type Arguments.
+	it("writes the Type that decided a generic Choice's Case", () => {
+		let lines = [
+			"implementation {",
+			"\tchoice Box<Item> {",
+			"\t\tFull { item: Item },",
+			"\t\tEmpty,",
+			"\t}",
+			"",
+			"\tconstant box: Box<Integer> = Box#Empty",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "Box#Empty"))
+		let result = applied(lines, action)
+
+		expect(result.slice(6, 8)).toEqual([
+			"\tconstant empty: Box<Integer> = Box#Empty",
+			"\tconstant box: Box<Integer> = empty",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// `inspect` has one signature, no bound and no default, so it means the
+	// same as a value.
+	it("lifts a callee that is a Function value", () => {
+		let lines = ["implementation {", "\tTerminal.inspect([1, 2])", "}"]
+
+		let [action] = extractions(lines, rangeOf(lines, "Terminal.inspect"))
+		let result = applied(lines, action)
+
+		expect(result.slice(1, 3)).toEqual([
+			"\tconstant inspect = Terminal.inspect",
+			"\tinspect([1, 2])",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// `count` is a Variable, which no condition narrows, and `isEven` answers
+	// nothing a refinement could be written with.
+	it("lifts a condition that narrows nothing, and a `define`'s first one", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction label(_ start: Integer) -> String {",
+			"\t\tvariable count = start",
+			"",
+			"\t\tif count::is(1) {",
+			'\t\t\t<- "one"',
+			"\t\t}",
+			"",
+			"\t\t<- define {",
+			'\t\t\tas "even" if start::isEven()',
+			'\t\t\tas "odd" otherwise',
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		let [narrowsNothing] = extractions(
+			lines,
+			rangeOf(lines, "count::is(1)"),
+		)
+		let [first] = extractions(lines, rangeOf(lines, "start::isEven()"))
+
+		expect(applied(lines, narrowsNothing).slice(4, 6)).toEqual([
+			"\t\tconstant is = count::is(1)",
+			"\t\tif is {",
+		])
+		expect(applied(lines, first).slice(8, 11)).toEqual([
+			"\t\tconstant isEven = start::isEven()",
+			"\t\t<- define {",
+			'\t\t\tas "even" if isEven',
+		])
+
+		for (let action of [narrowsNothing, first]) {
+			expectRefactored(lines, applied(lines, action))
+		}
+	})
+
+	// `map` decides only its answer from the literal, and the literal's
+	// Parameter from the receiver. A written Function Type is its own.
+	it("lifts a Function literal only where it writes its Types", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant scores = [1, 2]",
+			"\tconstant raised = scores::map((score) { <- score::add(1) })",
+			"\tconstant doubled = scores::map((_ score: Integer) -> Integer { <- score::multiply(with 2) })",
+			"}",
+		]
+
+		expect(
+			extractions(lines, rangeOf(lines, "(score) { <- score::add(1) }")),
+		).toEqual([])
+
+		let [written] = extractions(
+			lines,
+			rangeOf(
+				lines,
+				"(_ score: Integer) -> Integer { <- score::multiply(with 2) }",
+			),
+		)
+		let result = applied(lines, written)
+
+		expect(result.slice(3, 5)).toEqual([
+			"\tconstant value = (_ score: Integer) -> Integer { <- score::multiply(with 2) }",
+			"\tconstant doubled = scores::map(value)",
+		])
+		expectRefactored(lines, result)
+	})
+
+	// `inspect` takes any Type, decided by its Argument alone, so the List's
+	// own Type is all it asks.
+	it("lifts a written Argument whose Type decides the Parameter's", () => {
+		let lines = ["implementation {", "\tTerminal.inspect([1, 2])", "}"]
+
+		let [action] = extractions(lines, rangeOf(lines, "[1, 2]"))
+		let result = applied(lines, action)
+
+		expect(result.slice(1, 3)).toEqual([
+			"\tconstant value = [1, 2]",
+			"\tTerminal.inspect(value)",
+		])
+		expectRefactored(lines, result)
+	})
+
 	// A Pattern's member name is no Expression, so the selection finds the
 	// Match around it.
 	it("offers nothing for a selection in a Matcher", () => {
@@ -8795,6 +9006,110 @@ describe("Extract to a Constant", () => {
 		expect(refactoredCodesOf(lines)).toEqual([])
 		expect(extractions(lines, spanOf(lines, 4, "width"))).toEqual([])
 		expect(extractions(lines, spanOf(lines, 4, "case"))).toEqual([])
+	})
+
+	// A Parameter's Pattern and Type, and a Comment, stand on no Expression,
+	// so the selection finds the literal around them.
+	it("offers nothing for a selection in a Function literal's declarations", () => {
+		let lines = [
+			"implementation {",
+			"\ttype Rect = { width: Integer, height: Integer }",
+			"",
+			"\tconstant rects: List<Rect> = [{ width = 1, height = 2 }]",
+			"\tconstant measured = rects::map((_ { width }: Rect) -> Integer {",
+			"\t\t§ the width alone",
+			"\t\t<- width",
+			"\t})",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(extractions(lines, spanOf(lines, 5, "width"))).toEqual([])
+		expect(extractions(lines, spanOf(lines, 5, "Rect"))).toEqual([])
+		expect(extractions(lines, rangeOf(lines, "the width alone"))).toEqual(
+			[],
+		)
+		expect(
+			extractions(lines, rangeFrom(lines, "(_ { width }", "\t}")),
+		).toHaveLength(1)
+	})
+
+	// A Comment stands on no Expression, so the selection finds the `define`
+	// around it.
+	it("offers nothing for a Comment inside a `define`", () => {
+		let lines = [
+			"implementation {",
+			"\tconstant count = 3",
+			"\tconstant label = define -> String {",
+			"\t\t§ a comment in a define",
+			'\t\tas "many" if count::isGreaterThan(1)',
+			'\t\tas "few" otherwise',
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "a comment in a define")),
+		).toEqual([])
+		expect(
+			extractions(lines, rangeFrom(lines, "define -> String", "\t}")),
+		).toHaveLength(1)
+	})
+
+	// The Warning reads the condition as written, which a Constant would hold
+	// out of its sight.
+	it("offers nothing for a key check `redundant-key-check` reads", () => {
+		let lines = [
+			"implementation {",
+			'\tconstant ages = ["ada" = 36, "alan" = 41]',
+			'\tconstant name = "alan"',
+			"",
+			'\tif ages::hasKey("ada") {',
+			'\t\tTerminal.inspect(ages::value(at "ada"))',
+			"\t}",
+			"",
+			"\tif ages::hasKey(name) {",
+			"\t\tTerminal.inspect(ages::value(at name))",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([
+			"redundant-key-check",
+			"redundant-key-check",
+		])
+		expect(
+			extractions(lines, rangeOf(lines, 'ages::hasKey("ada")')),
+		).toEqual([])
+		expect(
+			extractions(lines, rangeOf(lines, "ages::hasKey(name)")),
+		).toEqual([])
+	})
+
+	// A completing Function's `<-` answers the value its Future completes
+	// with, so that is the Type the position gave.
+	it("writes the Type a completing Function's answer resolved against", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction maybe(_ number: Integer) -> Future<Optional<NonEmptyList<Integer>>> {",
+			"\t\tconstant held = complete Async.deferred(() { <- number })",
+			"",
+			"\t\t<- #Value([held])",
+			"\t}",
+			"",
+			"\tTerminal.inspect(complete maybe(3))",
+			"}",
+		]
+
+		let [action] = extractions(lines, rangeOf(lines, "#Value([held])"))
+		let result = applied(lines, action)
+
+		expect(result.slice(4, 6)).toEqual([
+			"\t\tconstant value: Optional<NonEmptyList<Integer>> = #Value([held])",
+			"\t\t<- value",
+		])
+		expectRefactored(lines, result)
 	})
 
 	it("offers nothing where the Statement does not open its line", () => {

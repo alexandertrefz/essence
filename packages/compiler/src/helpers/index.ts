@@ -87,6 +87,7 @@ export {
 	type GenericInferenceContext,
 	genericNamesMentioned,
 	impliedConjunctKeys,
+	isFunctionRefusedAsValue,
 	isMergedLevel,
 	isPartialOf,
 	isUnitType,

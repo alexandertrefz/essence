@@ -275,6 +275,7 @@ export function findCodeActions(
 		entries.push(
 			...extractConstantActions(
 				program,
+				enrichedProgram,
 				lines,
 				range,
 				indexed,

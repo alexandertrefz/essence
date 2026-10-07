@@ -1,7 +1,3 @@
-import {
-	findParserChild,
-	type ParserNode,
-} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -10,6 +6,7 @@ import {
 	type RenameIndex,
 	scopeAt,
 } from "../rename"
+import { conditionNarrows, constantAnnotation } from "./constantAnnotation"
 import {
 	containsRange,
 	indentationOf,
@@ -33,6 +30,7 @@ import { renameCommand } from "./renameCommand"
 
 export function extractConstantActions(
 	program: parser.Program,
+	enrichedProgram: common.typed.Program | null,
 	lines: Array<string>,
 	range: common.Position,
 	indexOf: () => ProgramIndex,
@@ -40,7 +38,7 @@ export function extractConstantActions(
 ): Array<CodeActionEntry> {
 	let selection = trimmedRange(lines, range)
 
-	if (selection === null) {
+	if (selection === null || enrichedProgram === null) {
 		return []
 	}
 
@@ -49,8 +47,7 @@ export function extractConstantActions(
 	if (
 		expression === null ||
 		!isExtractable(expression) ||
-		holdsBareCase(expression) ||
-		isAmongHandlers(expression, selection)
+		startsPastItsHead(expression, selection)
 	) {
 		return []
 	}
@@ -66,7 +63,7 @@ export function extractConstantActions(
 	// Only an Expression the Statement always evaluates, as `collectEager`
 	// finds them.
 	if (
-		!collectEager(statement).has(expression) ||
+		!collectEager(statement, enrichedProgram).has(expression) ||
 		isForwardedQuestion(program, enclosing.body, expression)
 	) {
 		return []
@@ -86,16 +83,29 @@ export function extractConstantActions(
 		return []
 	}
 
+	// The Type the position gave the value, where the Constant would type it
+	// otherwise.
+	let typed = constantAnnotation(
+		enrichedProgram,
+		expression,
+		statement.position.start,
+	)
+
+	if (typed === null) {
+		return []
+	}
+
 	let indentation = indentationOf(lines, statement.position.start.line)
 	let name = availableName(
 		derivedName(expression),
 		scopeAt(scopes, statement.position.start),
 	)
+	let annotation = typed.annotation === null ? "" : `: ${typed.annotation}`
 	let insertion = { line: statement.position.start.line, column: 1 }
 	let edits: Array<CodeActionEdit> = [
 		{
 			range: { start: insertion, end: insertion },
-			newText: `${indentation}constant ${name} = ${sliceOf(
+			newText: `${indentation}constant ${name}${annotation} = ${sliceOf(
 				lines,
 				expression.position,
 			)}\n`,
@@ -120,7 +130,8 @@ export function extractConstantActions(
 	]
 }
 
-// What is worth naming; anything else is turned away. See "Extracting a
+// What is worth naming; anything else is turned away. Whether the value means
+// the same in a Constant is the typed Program's to say. See "Extracting a
 // Constant" in DEVELOPMENT.md.
 function isExtractable(
 	node: parser.ImplementationNode,
@@ -135,14 +146,14 @@ function isExtractable(
 		case "ListValue":
 		case "DictionaryValue":
 		case "InterpolatedStringValue":
+		case "CaseValue":
+		case "FunctionValue":
 			return true
 		// Ordinary values. The Constant stays in the same body, so a lifted
 		// `complete` still suspends that body.
 		case "Start":
 		case "Complete":
 			return true
-		case "CaseValue":
-			return node.choice !== null
 		// A path key reaches into a value its position supplies.
 		case "RecordValue":
 			return Object.values(node.members).every(
@@ -153,73 +164,61 @@ function isExtractable(
 	}
 }
 
-// A selection past a Match's head stands among its Handlers, such as on a
-// Pattern's member name, which is no Expression. The Match around it is not
-// what was meant.
-function isAmongHandlers(
+// A selection past a value's head that finds no Expression inside it stands
+// on what the value declares. A Pattern's member name, a Parameter's Type and
+// a Comment are such, and none of them means the value.
+function startsPastItsHead(
 	expression: parser.ExpressionNode,
 	selection: common.Position,
 ): boolean {
-	return (
-		expression.nodeType === "Match" &&
-		!isBefore(selection.start, expression.returnType.position.end)
-	)
+	let head = headEnd(expression)
+
+	return head !== null && !isBefore(selection.start, head)
 }
 
-// Whether a bare `#Case` inside the value resolves against the Type its
-// position expects. See "Extracting a Constant" in DEVELOPMENT.md.
-function holdsBareCase(node: ParserNode): boolean {
-	switch (node.nodeType) {
-		case "CaseValue":
-			if (node.choice === null) {
-				return true
-			}
+// A Function literal's head is its first character, since everything after
+// it up to the body declares.
+function headEnd(expression: parser.ExpressionNode): common.Cursor | null {
+	let { start } = expression.position
 
-			break
-		// An Argument resolves against its Parameter, and a receiver or a
-		// callee against nothing the position decides.
-		case "MethodInvocation":
-		case "FunctionInvocation":
-			return false
-		case "FunctionValue":
-			if (node.value.returnType !== null) {
-				return false
-			}
-
-			break
-		case "Define":
-			if (node.returnType !== null) {
-				return false
-			}
-
-			break
+	switch (expression.nodeType) {
 		case "Match":
-			return holdsBareCase(node.value)
+			return expression.returnType.position.end
+		case "Define":
+			return (
+				expression.returnType?.position.end ?? {
+					line: start.line,
+					column: start.column + "define".length,
+				}
+			)
+		case "FunctionValue":
+			return { line: start.line, column: start.column + 1 }
+		default:
+			return null
 	}
+}
 
-	return (
-		findParserChild(node, (child) =>
-			holdsBareCase(child) ? true : undefined,
-		) === true
-	)
+// What `collectEager` gathers, with the typed Program that says whether a
+// condition narrows.
+type Eager = {
+	found: Set<parser.ImplementationNode>
+	program: common.typed.Program
 }
 
 // The Expressions a Statement reads every time it is reached. See
 // "Extracting a Constant" in DEVELOPMENT.md.
 function collectEager(
 	statement: parser.ImplementationNode,
+	program: common.typed.Program,
 ): Set<parser.ImplementationNode> {
-	let found = new Set<parser.ImplementationNode>()
+	let eager: Eager = { found: new Set(), program }
 
-	collectInto(statement, found)
+	collectInto(statement, eager)
 
-	return found
+	return eager.found
 }
 
-function collectInto(
-	node: parser.ImplementationNode,
-	found: Set<parser.ImplementationNode>,
-) {
+function collectInto(node: parser.ImplementationNode, eager: Eager) {
 	switch (node.nodeType) {
 		// Statements are not candidates, and the bodies they open are not
 		// walked.
@@ -228,14 +227,19 @@ function collectInto(
 		case "VariableAssignmentStatement":
 		case "ExpectStatement":
 		case "RequireStatement":
-			collectInto(node.value, found)
+			collectInto(node.value, eager)
 			return
 		case "ReturnStatement":
-			collectInto(node.expression, found)
+			collectInto(node.expression, eager)
 			return
+		// `redundant-key-check` reads the written key check, which a Constant
+		// would hold out of its sight.
 		case "IfStatement":
 		case "IfElseStatement":
-			collectCondition(node.condition, found)
+			if (!isKeyCheck(node.condition)) {
+				collectCondition(node.condition, node.position, eager)
+			}
+
 			return
 		// A declaration evaluates nothing where it stands.
 		case "FunctionStatement":
@@ -247,99 +251,95 @@ function collectInto(
 			return
 	}
 
-	found.add(node)
-	collectParts(node, found)
+	eager.found.add(node)
+	collectParts(node, eager)
 }
 
 // What an Expression reads besides itself. A part that is no value of its
-// own is entered but not collected: a named callee, a `with` key list, a
-// path key's members.
-function collectParts(
-	node: parser.ImplementationNode,
-	found: Set<parser.ImplementationNode>,
-) {
+// own is entered but not collected: a `with` key list, a path key's members.
+function collectParts(node: parser.ImplementationNode, eager: Eager) {
 	switch (node.nodeType) {
 		case "MethodInvocation":
-			collectInto(node.base, found)
-			collectArguments(node.arguments, found)
+			collectInto(node.base, eager)
+			collectArguments(node.arguments, eager)
 			return
-		// A callee a call answers, as `adder(1)` in `adder(1)(2)`, is a
-		// Function value already.
 		case "FunctionInvocation":
-			if (
-				node.name.nodeType === "Identifier" ||
-				node.name.nodeType === "Lookup"
-			) {
-				collectParts(node.name, found)
-			} else {
-				collectInto(node.name, found)
-			}
-
-			collectArguments(node.arguments, found)
+			collectInto(node.name, eager)
+			collectArguments(node.arguments, eager)
 			return
 		case "Combination":
-			collectInto(node.lhs, found)
+			collectInto(node.lhs, eager)
 
 			if (node.bare === true) {
-				collectParts(node.rhs, found)
+				collectParts(node.rhs, eager)
 			} else {
-				collectInto(node.rhs, found)
+				collectInto(node.rhs, eager)
 			}
 
 			return
 		case "Lookup":
-			collectInto(node.base, found)
+			collectInto(node.base, eager)
 			return
 		case "Start":
 		case "Complete":
-			collectInto(node.expression, found)
+			collectInto(node.expression, eager)
 			return
 		case "RefusedValue":
-			collectInto(node.base, found)
+			collectInto(node.base, eager)
 			return
 		case "CaseValue":
 			if (node.value !== null) {
-				collectInto(node.value, found)
+				collectInto(node.value, eager)
 			}
 
 			return
 		case "RecordValue":
 			for (let member of Object.values(node.members)) {
 				if (member.value !== null) {
-					collectInto(member.value, found)
+					collectInto(member.value, eager)
 				}
 
 				if (member.group !== undefined) {
-					collectParts(member.group, found)
+					collectParts(member.group, eager)
 				}
 			}
 
 			return
 		case "ListValue":
 			for (let value of node.values) {
-				collectInto(value, found)
+				collectInto(value, eager)
 			}
 
 			return
 		case "DictionaryValue":
 			for (let entry of node.entries) {
-				collectInto(entry.key, found)
-				collectInto(entry.value, found)
+				collectInto(entry.key, eager)
+				collectInto(entry.value, eager)
 			}
 
 			return
 		case "InterpolatedStringValue":
 			for (let segment of node.segments) {
 				if (segment.kind === "expression") {
-					collectInto(segment.expression, found)
+					collectInto(segment.expression, eager)
 				}
 			}
 
 			return
 		// Only the scrutinee is always read.
 		case "Match":
-			collectInto(node.value, found)
+			collectInto(node.value, eager)
 			return
+		// The first arm's condition is asked whenever the `define` is.
+		case "Define": {
+			let [first] = node.arms
+
+			if (first !== undefined) {
+				collectCondition(first.condition, node.position, eager)
+			}
+
+			return
+		}
 		default:
 			return
 	}
@@ -347,10 +347,10 @@ function collectParts(
 
 function collectArguments(
 	nodeArguments: Array<parser.ArgumentNode>,
-	found: Set<parser.ImplementationNode>,
+	eager: Eager,
 ) {
 	for (let argument of nodeArguments) {
-		collectInto(argument.value, found)
+		collectInto(argument.value, eager)
 	}
 }
 
@@ -475,19 +475,66 @@ function answersBoolean(body: Array<parser.ImplementationNode>): boolean {
 }
 
 // A condition narrows the names it proves something about, and a Constant
-// holding its answer proves nothing. See "Extracting a Constant" in
-// DEVELOPMENT.md.
+// holding its answer proves nothing. The typed Program says whether the whole
+// condition narrows. See "Extracting a Constant" in DEVELOPMENT.md.
 function collectCondition(
 	condition: parser.ExpressionNode,
-	found: Set<parser.ImplementationNode>,
+	conditional: common.Position,
+	eager: Eager,
 ) {
-	if (!mayNarrow(condition)) {
-		collectInto(condition, found)
-	} else if (isConjunction(condition)) {
-		collectCondition(condition.base, found)
-		collectCondition(condition.arguments[0].value, found)
+	if (conditionNarrows(eager.program, conditional)) {
+		collectConjuncts(condition, eager)
 	} else {
-		collectParts(condition, found)
+		collectInto(condition, eager)
+	}
+}
+
+// A `hasKey` on a name, its key written as a literal, a name, a bare Case or
+// a member path. The Enricher's `writtenKeyCheck` reads the same shape.
+function isKeyCheck(condition: parser.ExpressionNode): boolean {
+	let [key] =
+		condition.nodeType === "MethodInvocation" ? condition.arguments : []
+
+	return (
+		condition.nodeType === "MethodInvocation" &&
+		condition.member.content === "hasKey" &&
+		condition.base.nodeType === "Identifier" &&
+		condition.arguments.length === 1 &&
+		key !== undefined &&
+		isWrittenKey(key.value)
+	)
+}
+
+function isWrittenKey(key: parser.ExpressionNode): boolean {
+	switch (key.nodeType) {
+		case "StringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
+		case "Identifier":
+			return true
+		case "CaseValue":
+			return key.value === null
+		case "Lookup":
+			return (
+				(key.base.nodeType === "Identifier" ||
+					key.base.nodeType === "Lookup") &&
+				isWrittenKey(key.base)
+			)
+		default:
+			return false
+	}
+}
+
+// Where the condition narrows, the conjuncts that may be what does it.
+function collectConjuncts(condition: parser.ExpressionNode, eager: Eager) {
+	if (!mayNarrow(condition)) {
+		collectInto(condition, eager)
+	} else if (isConjunction(condition)) {
+		collectConjuncts(condition.base, eager)
+		collectConjuncts(condition.arguments[0].value, eager)
+	} else {
+		collectParts(condition, eager)
 	}
 }
 
