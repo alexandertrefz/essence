@@ -374,13 +374,20 @@ export function annotateAtChoiceHelp(
 	scope: enricher.Scope,
 	joiner: ":" | ", since",
 	continues: boolean = false,
+	// The Protocol a Namespace for the Choice must also be declared for, where
+	// none conforms it.
+	conforming: string | null = null,
 ): string {
 	let foreign = unboundForeignChoice(caseType, scope)
 	let foreigns = foreign === null ? [] : [foreign]
 	let choice = spellChoiceName(caseType, spellingAfterImport(scope, foreigns))
+	let declaring =
+		conforming === null
+			? ""
+			: `, and declare a Namespace for ${choice} that conforms to '${conforming}'`
 	let help = withImportOf(
 		foreigns,
-		`Annotate the value at '${choice}'${joiner} a bare Case binds the Case, not the Choice.`,
+		`Annotate the value at '${choice}'${joiner} a bare Case binds the Case, not the Choice${declaring}.`,
 	)
 
 	return continues ? `or ${help[0].toLowerCase()}${help.slice(1)}` : help

@@ -3732,6 +3732,99 @@ describe("Enricher", () => {
 			).toEqual([])
 		})
 
+		// `next()` answers `Self` at the Union the Namespace covers, but not at
+		// the Integer the call binds. A Namespace of its own answers there.
+		it("should say where a written Method fits its requirement only at the covered Union", () => {
+			let program = (declared: string): string => `implementation {
+				protocol Cycled {
+					next() -> Self
+				}
+
+				namespace Cyc for Integer | String is Cycled {
+					next() -> Integer | String {
+						<- 1
+					}
+				}
+${declared}
+				function step<infer T is Cycled>(_ a: T) -> T {
+					<- a::next()
+				}
+
+				Terminal.inspect(step(5))
+			}`
+			let [refusal] = diagnosticsFor(program(""))
+
+			expect(refusal.code).toBe("nonconforming-namespace")
+			expect(refusal.notes).toEqual([
+				"'next' in 'Cyc' answers an Integer | String at Integer, where 'Cycled' answers an Integer.",
+			])
+			expect(refusal.helps).toEqual([
+				"Declare a Namespace for Integer that conforms to 'Cycled'.",
+			])
+			expect(
+				compiles(
+					program(`
+				namespace IntegerCycle for Integer is Cycled {
+					next() -> Integer {
+						<- 2
+					}
+				}
+`),
+				),
+			).toBe(true)
+		})
+
+		// Annotated at `Colour`, the value still meets a Namespace that covers
+		// `Integer` too, whose `next()` answers no `Self` of `Colour`. Both edits
+		// are needed.
+		it("should ask a bare Case under a covering target for the annotation and a Namespace", () => {
+			let program = (
+				declared: string,
+				value: string,
+			): string => `implementation {
+				choice Colour { Red, Green }
+
+				protocol Cycled {
+					next() -> Self
+				}
+
+				namespace Cyc for Colour | Integer is Cycled {
+					next() -> Colour | Integer {
+						<- 1
+					}
+				}
+${declared}
+				function step<infer T is Cycled>(_ a: T) -> T {
+					<- a::next()
+				}
+
+				constant red = Colour#Red
+				${value}
+			}`
+			let [refusal] = diagnosticsFor(
+				program("", "Terminal.inspect(step(red))"),
+			)
+
+			expect(refusal.code).toBe("nonconforming-namespace")
+			expect(refusal.helps).toEqual([
+				"Annotate the value at 'Colour', since a bare Case binds the Case, not the Choice, and declare a Namespace for Colour that conforms to 'Cycled'.",
+			])
+			expect(
+				compiles(
+					program(
+						`
+				namespace ColourCycle for Colour is Cycled {
+					next() -> Colour {
+						<- #Green
+					}
+				}
+`,
+						"constant colour: Colour = red\n\t\t\t\tTerminal.inspect(step(colour))",
+					),
+				),
+			).toBe(true)
+		})
+
 		// A fulfilling Method declares the requirement's Parameters. It may give
 		// one a default, but a Parameter it adds is refused, defaulted or not.
 		it("should accept a default the requirement lacks but no added Parameter", () => {

@@ -12107,6 +12107,74 @@ ${annotated}`,
 		).toEqual([])
 	})
 
+	// `next() -> Colour` answers `Self` at `Colour`, but not at the bare Case
+	// `red` holds. Annotated at the Choice, which `Main.es` imports first, the
+	// value binds `Self` to `Colour`.
+	it("leads a written Method's narrowed conformance with the import and the annotation", () => {
+		let stepped = (entries: string, body: string) =>
+			withProject(
+				{
+					"Main.es": `import {
+	from "./Shelf.es" {
+		${entries}
+	}
+}
+
+implementation {
+	function step<infer T is Cycled>(_ a: T) -> T {
+		<- a::next()
+	}
+${body}
+}
+`,
+					"Shelf.es": `implementation {
+	choice Colour { Red, Green }
+
+	protocol Cycled {
+		next() -> Self
+	}
+
+	namespace ColourCycle for Colour is Cycled {
+		next() -> Colour {
+			<- #Green
+		}
+	}
+
+	constant red = Colour#Red
+}
+
+export {
+	Colour
+	ColourCycle
+	Cycled
+	red
+}
+`,
+				},
+				(directory) => analysedAt(directory, "Main.es", "Main.es"),
+			)
+		let [refusal] = stepped(
+			"ColourCycle\n\t\tCycled\n\t\tred",
+			"\tTerminal.inspect(step(red))",
+		)
+
+		expect(refusal?.code).toBe("nonconforming-namespace")
+		expect(refusal?.notes).toEqual([
+			"'next' in 'ColourCycle' answers a Colour at Colour#Red, where 'Cycled' answers a Colour#Red.",
+		])
+		expect(refusal?.helps).toEqual([
+			"'Colour' is declared in Shelf.es — import it here, and annotate the value at 'Colour', since a bare Case binds the Case, not the Choice.",
+		])
+		expect(
+			codesOf(
+				stepped(
+					"Colour\n\t\tColourCycle\n\t\tCycled\n\t\tred",
+					"\tconstant colour: Colour = red\n\n\tTerminal.inspect(step(colour))",
+				),
+			),
+		).toEqual([])
+	})
+
 	let shelfModule = `implementation {
 	choice Box<Value> { Full { value: Value }, Empty }
 	choice Light { Red, Green }

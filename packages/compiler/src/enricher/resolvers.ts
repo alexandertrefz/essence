@@ -87,7 +87,7 @@ import {
 import { recordAnnotation } from "./annotations"
 import { derivesWithImports } from "./derivedImports"
 import { reportTypeWithoutMembers } from "./memberHelps"
-import { narrowedBodyReport } from "./narrowedMethods"
+import { narrowedBodyReport, narrowedMethodReport } from "./narrowedMethods"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
 import {
 	bodyCanWait,
@@ -5329,15 +5329,23 @@ function solveNamespaceConformance(
 				? `Method '${result.methodName}' needs '${result.genericName} is ${describeProtocol(result.protocolName, scope)}'`
 				: `this needs ${describeType(binding)} to conform`
 		let narrowed =
-			result.kind === "mismatched" && result.provider !== undefined
-				? narrowedBodyReport(
-						protocol,
-						result.methodName,
-						result.provider,
-						binding,
-						scope,
-					)
-				: { notes: [], helps: [] }
+			result.kind !== "mismatched"
+				? { notes: [], helps: [] }
+				: result.provider === undefined
+					? narrowedMethodReport(
+							protocol,
+							result.methodName,
+							candidate,
+							binding,
+							scope,
+						)
+					: narrowedBodyReport(
+							protocol,
+							result.methodName,
+							result.provider,
+							binding,
+							scope,
+						)
 
 		reportError(
 			`Namespace '${candidate.name}' does not conform to '${describeProtocol(protocolName, scope)}'`,
