@@ -14869,12 +14869,15 @@ export {
 				(directory) => analysedAt(directory, "Main.es", "Main.es"),
 			)
 
-		expect(
-			checked("static ").find(
-				(diagnostic) => diagnostic.code === "static-method-on-value",
-			)?.helps,
-		).toEqual([
+		let refused = checked("static ").find(
+			(diagnostic) => diagnostic.code === "static-method-on-value",
+		)
+
+		expect(refused?.helps).toEqual([
 			"Declare 'isSmall' in 'Sizes', which this file imports as 'S', without 'static' — a predicate asks a Method of '@', and a static Method has no receiver.",
+		])
+		expect(refused?.notes).toEqual([
+			"'Sizes', which this file imports as 'S', declares 'isSmall' as static.",
 		])
 		expect(codesOf(checked(""))).toEqual([])
 	})

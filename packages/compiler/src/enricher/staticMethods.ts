@@ -21,12 +21,15 @@ export function reportStaticMethodOnValue(
 		node.arguments.length,
 	)
 	let predicate = inRefinementPredicate(scope)
-	// The Declaration is edited where it was written, under the name it was
-	// declared with there.
-	let declaration =
-		owner?.declaredName === undefined
-			? `'${namespaceNames[0]}'`
-			: `'${owner.declaredName}', which this file imports as '${namespaceNames[0]}',`
+	// A Declaration is named as it was written, since the Help edits it there.
+	let declarationOf = (name: string): string => {
+		let declared = staticNamespaces.get(name)?.declaredName
+
+		return declared === undefined
+			? `'${name}'`
+			: `'${declared}', which this file imports as '${name}',`
+	}
+	let declaration = declarationOf(namespaceNames[0])
 
 	reportError(
 		memberType === null
@@ -47,7 +50,7 @@ export function reportStaticMethodOnValue(
 			],
 			notes: namespaceNames.map(
 				(name) =>
-					`'${name}' declares '${node.member.content}' as static.`,
+					`${declarationOf(name)} declares '${node.member.content}' as static.`,
 			),
 			// A static takes no receiver, so the arity decides whether the
 			// value belongs among the Arguments. The Help and both Quick Fixes
