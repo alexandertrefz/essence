@@ -4581,7 +4581,7 @@ function providedMethodsOf(result: {
 
 // Whether conforming to `declared` also conforms to `wanted`, as
 // `is Orderable` answers an `is Comparable` bound.
-function protocolGrants(
+export function protocolGrants(
 	declared: string,
 	wanted: string,
 	scope: enricher.Scope,
@@ -4604,7 +4604,7 @@ function conformanceGrantsIn(
 // Whose body answers a name `solving` requires, of everything the conformer
 // conforms to. One that fulfils the requirement wins, then the more derived
 // Protocol, then the first the clauses reach.
-function conformanceProvidersIn(
+export function conformanceProvidersIn(
 	identities: Iterable<string>,
 	solving: common.ProtocolType,
 	// The conformer's declared target, never a narrower value, so every
@@ -4760,7 +4760,7 @@ function narrowedBodyReport(
 
 // One source of a receiver's conformance: a Namespace declaring it, or a
 // derive. See "Provided Methods at a call" in DEVELOPMENT.md.
-type ConformanceSourceNamespace = {
+export type ConformanceSourceNamespace = {
 	// The Namespace's name, or the Protocol's for a derive.
 	name: string
 	// The target specialized against the receiver, which `Self` binds to.
@@ -5097,6 +5097,8 @@ export function solveConformance(
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
+	// The one Namespace to ask, which the memo does not key.
+	only?: string,
 ): ConformanceSolveResult {
 	if (binding.type === "GenericUse") {
 		// A bound answers for every Protocol it extends too, since a
@@ -5131,6 +5133,18 @@ export function solveConformance(
 	}
 
 	let protocol = protocolOf(protocolName, scope)
+
+	if (only !== undefined) {
+		return solveNamespaceConformance(
+			binding,
+			protocol,
+			protocolName,
+			scope,
+			position,
+			only,
+		)
+	}
+
 	let key = conformanceKey(protocolName, binding)
 	let state = conformanceStateFor(scope)
 
@@ -5191,11 +5205,13 @@ function solveNamespaceConformance(
 	protocolName: string,
 	scope: enricher.Scope,
 	position: common.Position,
+	only?: string,
 ): ConformanceSolveResult {
 	let candidates: Array<ConformanceCandidate> = []
 
 	for (let [name, namespace] of getAllNamespacesInScope(scope, null)) {
 		if (
+			(only !== undefined && name !== only) ||
 			namespace.conformsTo === undefined ||
 			!namespace.conformsTo.includes(protocolName) ||
 			namespace.targetType === null
@@ -6942,6 +6958,7 @@ export function resolveConformances(
 			generic.constraint,
 			scope,
 			position,
+			generic.witnessFrom,
 		)
 
 		if (result.ok) {

@@ -766,6 +766,9 @@ export type GenericDeclaration = {
 	// The identity of the Protocol bound of `<infer Item is Comparable>`,
 	// null when the Type Parameter is unbounded or its bound named no Protocol.
 	constraint?: string | null
+	// The Namespace whose conformance gives this witness, for a Protocol pick
+	// that chose it. Other conformances of the Type in Scope are not asked.
+	witnessFrom?: string
 }
 
 export type GenericUse = {

@@ -16,9 +16,12 @@ import {
 	underRefusedCall,
 } from "./enrichers"
 import {
+	type ConformanceSourceNamespace,
+	conformanceProvidersIn,
 	conformanceSourcesFor,
 	namespacesDeclaringMethod,
 	partitionInstanceMethodNamespaces,
+	protocolGrants,
 	protocolOf,
 	providedMethodNamespaceFor,
 	resolveMethodLookupNamespacesForReceiverType,
@@ -47,11 +50,10 @@ export function answeringNamespaces(
 	).instanceNamespaces
 }
 
-// `value::<Name>method()` naming a Protocol, which settles two Protocols
-// providing one name. It calls the body the Protocol sees, its own or one it
-// inherits, through every source of the receiver's conformance to it. So
-// `5::<Orderable>isBetween(1, and 3/2)` still falls to Number's. A requirement
-// is reached through the Namespace that writes it.
+// `value::<Name>method()` naming a Protocol. A pick says which conformance
+// answers. Each source of the receiver's conformance to the Protocol answers
+// with what that conformance runs, as a bound's witness does. See "Provided
+// Methods at a call" in DEVELOPMENT.md.
 export function providedMethodNamespacesNamed(
 	specifier: parser.IdentifierNode,
 	methodName: string,
@@ -61,42 +63,108 @@ export function providedMethodNamespacesNamed(
 ): Map<string, common.NamespaceType> {
 	let named = new Map<string, common.NamespaceType>()
 	let protocol = resolveWrittenProtocol(specifier, scope)
-	let seen =
-		protocol === null ? null : providedMethodProtocol(protocol, methodName)
 
-	if (protocol === null || seen === null) {
+	if (
+		protocol === null ||
+		providedMethodProtocol(protocol, methodName) === null
+	) {
 		return named
 	}
 
-	let namespaces = resolveMethodLookupNamespacesForReceiverType(
-		baseType,
-		null,
-		scope,
-	)
+	let namespaces = [
+		...resolveMethodLookupNamespacesForReceiverType(baseType, null, scope),
+	]
 
 	for (let source of conformanceSourcesFor(
 		protocol,
 		baseType,
-		[...namespaces.values()],
+		namespaces.map(([, namespace]) => namespace),
 		scope,
 		position,
 	)) {
-		// Solved through the picked Protocol, whose conformance the source
-		// declares, though an ancestor may write the body.
-		let namespace = providedMethodNamespaceFor(
-			protocolOf(seen, scope),
+		let [key, conformer] = namespaces.find(
+			([, namespace]) =>
+				namespace.name === source.name &&
+				namespace.conformsTo?.includes(protocol.identity) === true,
+		) ?? [source.name, null]
+		let answer = conformanceAnswer(
+			protocol,
 			methodName,
 			source,
-			protocol,
+			conformer,
+			scope,
 		)
 
-		// A Namespace writing the name replaces the body for its own source.
-		if (namespace !== null && !source.writes.has(methodName)) {
-			named.set(source.name, namespace)
+		if (answer !== null) {
+			named.set(key, answer)
 		}
 	}
 
 	return named
+}
+
+// What the source's conformance to `protocol` runs for the name. That is the
+// Namespace's own Method, or a body its witness takes that overrides the one
+// the Protocol sees. A body that wins only by clause order overrides nothing,
+// so the Protocol's own runs, as it does for a derive.
+function conformanceAnswer(
+	protocol: common.ProtocolType,
+	methodName: string,
+	source: ConformanceSourceNamespace,
+	conformer: common.NamespaceType | null,
+	scope: enricher.Scope,
+): common.NamespaceType | null {
+	if (conformer !== null && source.writes.has(methodName)) {
+		return conformer
+	}
+
+	let seen = providedMethodProtocol(protocol, methodName)
+	let overriding = (conformer?.conformsTo ?? []).filter((identity) => {
+		let body = providedMethodProtocol(
+			protocolOf(identity, scope),
+			methodName,
+		)
+
+		return (
+			body !== null && seen !== null && protocolGrants(body, seen, scope)
+		)
+	})
+	let body =
+		conformer === null
+			? seen
+			: conformanceProvidersIn(
+					overriding,
+					protocol,
+					source.targetType,
+					scope,
+				)(methodName)
+
+	if (body === null) {
+		return null
+	}
+
+	// The picked Protocol's witness carries every Method of a body it extends.
+	// A body it does not extend reads Methods only its own Protocol has. Either
+	// witness comes from the source's own conformance, as a bound's does.
+	let answer = providedMethodNamespaceFor(
+		protocolOf(body, scope),
+		methodName,
+		source,
+		protocolGrants(protocol.identity, body, scope)
+			? protocol
+			: protocolOf(body, scope),
+	)
+	let method = answer?.methods[methodName]
+
+	if (method?.type === "SimpleMethod" && conformer !== null) {
+		method.generics = method.generics.map((generic) =>
+			generic.name === "Self"
+				? { ...generic, witnessFrom: conformer.name }
+				: generic,
+		)
+	}
+
+	return answer
 }
 
 // `value::<Protocol>method()` where the Protocol declares the Method without a

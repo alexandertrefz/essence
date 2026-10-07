@@ -711,9 +711,10 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["false", "true", "false"])
 		})
 
-		// `Big` provides `describe` again. A call without a pick takes the more
-		// derived body, and a pick takes the body its Protocol sees.
-		it("should answer a pick with the body the picked Protocol sees", async () => {
+		// `Big` provides `describe` again. A pick says which conformance answers,
+		// and `Boxes`'s conformance to `Sized` runs `Big`'s body, as the bound
+		// in `viaSized` does.
+		it("should answer a pick with the body the picked conformance runs", async () => {
 			expect(
 				await run(
 					[
@@ -727,8 +728,12 @@ describe("Protocol-provided Methods", () => {
 						"\t}",
 						"",
 						"\tprotocol Big is Sized {",
+						"\t\textra() -> Integer {",
+						"\t\t\t<- 1",
+						"\t\t}",
+						"",
 						"\t\tdescribe() -> String {",
-						'\t\t\t<- "big {@::size()}"',
+						'\t\t\t<- "big {@::size()::add(@::extra())}"',
 						"\t\t}",
 						"\t}",
 						"",
@@ -740,15 +745,172 @@ describe("Protocol-provided Methods", () => {
 						"\t\t}",
 						"\t}",
 						"",
+						"\tfunction viaSized<infer Item is Sized>(_ item: Item) -> String {",
+						"\t\t<- item::<Sized>describe()",
+						"\t}",
+						"",
 						"\tconstant box: Box = { v = 3 }",
 						"",
 						"\tTerminal.inspect(box::describe())",
 						"\tTerminal.inspect(box::<Big>describe())",
 						"\tTerminal.inspect(box::<Sized>describe())",
+						"\tTerminal.inspect(viaSized(box))",
 						"}",
 					].join("\n"),
 				),
-			).toEqual(['"big 3"', '"big 3"', '"sized 3"'])
+			).toEqual(['"big 4"', '"big 4"', '"big 4"', '"big 4"'])
+		})
+
+		// `Both` extends `Left` and `Right`, and only `Right` provides
+		// `describe` again. The conformance to `Left` runs that body, so the
+		// concrete picks agree with the bounded calls.
+		it("should answer a pick on a diamond as the bounds do", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Base {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "base {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Left is Base {}",
+						"",
+						"\tprotocol Right is Base {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "right {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Both is Left, is Right {}",
+						"",
+						"\ttype Crate = { w: Integer }",
+						"",
+						"\tnamespace Crates for Crate is Both {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.w",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction viaLeft<infer Item is Left>(_ item: Item) -> String {",
+						"\t\t<- item::<Left>describe()",
+						"\t}",
+						"",
+						"\tfunction viaBase<infer Item is Base>(_ item: Item) -> String {",
+						"\t\t<- item::describe()",
+						"\t}",
+						"",
+						"\tconstant crate: Crate = { w = 7 }",
+						"",
+						"\tTerminal.inspect(crate::<Left>describe())",
+						"\tTerminal.inspect(viaLeft(crate))",
+						"\tTerminal.inspect(crate::<Base>describe())",
+						"\tTerminal.inspect(viaBase(crate))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"right 7"', '"right 7"', '"right 7"', '"right 7"'])
+		})
+
+		// `RightCrates` gives `Crate` a second conformance to `Right`. The pick
+		// takes the witness of `Crates`, whose conformance it chose, as the
+		// bound does, rather than asking every conformance in Scope.
+		it("should take a pick's witness from the conformance it chose", async () => {
+			let crates = (clauses: string) =>
+				[
+					"implementation {",
+					"\tprotocol Base {",
+					"\t\tsize() -> Integer",
+					"",
+					"\t\tdescribe() -> String {",
+					'\t\t\t<- "base {@::size()}"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tprotocol Left is Base {}",
+					"",
+					"\tprotocol Right is Base {",
+					"\t\tdescribe() -> String {",
+					'\t\t\t<- "right {@::size()}"',
+					"\t\t}",
+					"\t}",
+					"",
+					"\tprotocol Both is Left, is Right {}",
+					"",
+					"\ttype Crate = { w: Integer }",
+					"",
+					`\tnamespace Crates for Crate ${clauses} {`,
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- 7",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tnamespace RightCrates for Crate is Right {",
+					"\t\tsize() -> Integer {",
+					"\t\t\t<- 99",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tfunction viaLeft<infer Item is Left>(_ item: Item) -> String {",
+					"\t\t<- item::<Left>describe()",
+					"\t}",
+					"",
+					"\tconstant crate: Crate = { w = 0 }",
+					"",
+					"\tTerminal.inspect(crate::<Left>describe())",
+					"\tTerminal.inspect(viaLeft(crate))",
+					"}",
+				].join("\n")
+
+			expect(await run(crates("is Both"))).toEqual([
+				'"right 7"',
+				'"right 7"',
+			])
+			expect(await run(crates("is Left, is Right"))).toEqual([
+				'"right 7"',
+				'"right 7"',
+			])
+		})
+
+		// A pick through a Protocol the Namespace conforms to reaches the
+		// Method the Namespace writes, which its conformance runs.
+		it("should answer a pick with the Method the conforming Namespace writes", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Base {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "base"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Left is Base {}",
+						"",
+						"\ttype Box = { v: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Left {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "written"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tfunction viaBase<infer Item is Base>(_ item: Item) -> String {",
+						"\t\t<- item::describe()",
+						"\t}",
+						"",
+						"\tconstant box: Box = { v = 3 }",
+						"",
+						"\tTerminal.inspect(box::<Left>describe())",
+						"\tTerminal.inspect(box::<Base>describe())",
+						"\tTerminal.inspect(viaBase(box))",
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"written"', '"written"', '"written"'])
 		})
 
 		// `Box` conforms to `Base` through two Namespaces, each by a Protocol of

@@ -7834,6 +7834,112 @@ export {
 		)
 	})
 
+	// The Protocols, the conformances and the calls stand in three Modules. A
+	// pick says which conformance answers, so each concrete pick runs what the
+	// bound beside it runs.
+	it("answers a pick across Modules as the bound through the same conformance", async () => {
+		await withBuiltProject(
+			{
+				"Protocols.es": `implementation {
+	protocol Base {
+		size() -> Integer
+
+		describe() -> String {
+			<- "base {@::size()}"
+		}
+	}
+
+	protocol Left is Base {}
+
+	protocol Right is Base {
+		describe() -> String {
+			<- "right {@::size()}"
+		}
+	}
+
+	protocol Both is Left, is Right {}
+}
+
+export {
+	Base
+	Both
+	Left
+	Right
+}
+`,
+				"Boxes.es": `import {
+	from "./Protocols.es" { Both Left }
+}
+
+implementation {
+	type Box = { v: Integer }
+
+	namespace LeftBoxes for Box is Left {
+		size() -> Integer {
+			<- 10
+		}
+	}
+
+	type Crate = { w: Integer }
+
+	namespace Crates for Crate is Both {
+		size() -> Integer {
+			<- @.w
+		}
+	}
+}
+
+export {
+	Box
+	Crate
+	Crates
+	LeftBoxes
+}
+`,
+				"Main.es": `import {
+	from "./Protocols.es" { Both Left }
+	from "./Boxes.es" { Box Crate Crates LeftBoxes }
+}
+
+implementation {
+	function viaLeft<infer Item is Left>(_ item: Item) -> String {
+		<- item::<Left>describe()
+	}
+
+	function viaBoth<infer Item is Both>(_ item: Item) -> String {
+		<- item::<Both>describe()
+	}
+
+	constant box: Box = { v = 3 }
+	constant crate: Crate = { w = 7 }
+
+	Terminal.inspect(box::<Left>describe())
+	Terminal.inspect(viaLeft(box))
+	Terminal.inspect(crate::<Left>describe())
+	Terminal.inspect(viaLeft(crate))
+	Terminal.inspect(crate::<Both>describe())
+	Terminal.inspect(viaBoth(crate))
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual([
+					'"base 10"',
+					'"base 10"',
+					'"right 7"',
+					'"right 7"',
+					'"right 7"',
+					'"right 7"',
+				])
+			},
+		)
+	})
+
 	it("reaches a `constructor` a Protocol of another Module provides through a bound", async () => {
 		await withBuiltProject(
 			{

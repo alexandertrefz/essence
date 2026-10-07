@@ -988,8 +988,8 @@ a Pattern's bindings are refused there, and the report asks what the name means 
 
 A Program's tests section is enriched at the end of the first round of turns that finds its Statements done and
 none of its names waiting. Once every Program's Statements are done, the names that never bound are given up and
-the sections still waiting follow. Without waiting names, each Program is enriched whole and then its tests. When every unfinished
-Program waits, `refuse` gives one name up and the turns go on. See "Constants across a cycle" in
+the sections still waiting follow. Without waiting names, each Program is enriched whole and then its tests. When
+every unfinished Program waits, `refuse` gives one name up and the turns go on. See "Constants across a cycle" in
 packages/compiler/src/modules/DEVELOPMENT.md.
 
 ### Static Properties while hoisting
@@ -1191,11 +1191,16 @@ witness from it. A Namespace that writes the name replaces the provided Method f
 Protocols provide one name through one source, the more derived one answers, and two unrelated ones are
 `ambiguous-namespace`.
 
-A pick, `value::<P>m()`, calls the body `P` sees: its own, or the one it inherits (`providedMethodProtocol`).
-`providedMethodNamespacesNamed` in `protocolPicks.ts` offers it once per source of the receiver's conformance to `P`,
-so a value that does not conform to `P` gets none. A descendant of `P` that provides the name again does not replace
-the body there. The witness is solved through `P` even where an ancestor writes the body. Two Namespaces may give
-the ancestor, each through a Protocol of its own, and only `P` tells them apart.
+A pick, `value::<P>m()`, says which conformance answers. `providedMethodNamespacesNamed` in `protocolPicks.ts`
+offers each source of the receiver's conformance to `P`, so a value that does not conform to `P` gets none. A source
+answers with what its conformance runs where that overrides the body `P` sees: the Method the Namespace writes, or
+a body of a Protocol extending the one `P` sees, chosen as `conformanceProvidersIn` chooses for a witness. So a
+concrete pick runs what a bound through `P` runs. A body that wins only by clause order, from a Protocol unrelated to
+`P`'s, overrides nothing, and the pick runs `P`'s own.
+
+The witness is `P`'s where `P` extends the body's Protocol, and otherwise the body's own, whose Methods the body
+reads. Either is solved from the source's conformance alone (`witnessFrom` on the `Self` Type Parameter), as a
+bound's witness is. Another Namespace giving the Type the same Protocol is never asked.
 
 The standard library's `Record` Namespace conforms for the top Record, conditionally on the receiver's members. So
 its witness is solved for the receiver itself (`witnessType`). A derive's `Self` is the whole Choice, so a sibling
