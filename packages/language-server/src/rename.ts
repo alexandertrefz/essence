@@ -11,6 +11,7 @@ import {
 	patternBindings,
 } from "@essence-lang/compiler/helpers"
 import {
+	type FieldsHolding,
 	forEachParserChild,
 	forEachTypedChild,
 	type ParserNode,
@@ -1327,25 +1328,136 @@ function walkNode(node: ParserNode, walk: Walk) {
 			break
 	}
 
-	forEachParserChild(node, walkChild, walk)
+	walkChildren(node, walk)
 }
 
-// The fields whose Identifier names a Type: a written Type's name, and the
-// Choice of `Choice#Case`.
-const typeNameFields = new Set(["type", "choice"])
+// The kinds `walkNode` walks by a case of its own. A Record literal is not
+// among them, since its members reach `walkChild`.
+export const walkedKinds = [
+	"ConstantDeclarationStatement",
+	"VariableDeclarationStatement",
+	"VariableAssignmentStatement",
+	"FunctionStatement",
+	"OverloadedFunctionStatement",
+	"NamespaceDefinitionStatement",
+	"ProtocolDeclarationStatement",
+	"ChoiceDeclarationStatement",
+	"TypeAliasStatement",
+	"IfStatement",
+	"IfElseStatement",
+	"ExpectStatement",
+	"RequireStatement",
+	"Identifier",
+	"FunctionInvocation",
+	"Match",
+	"FunctionValue",
+] as const
 
-// The fields whose Identifier names no Declaration a Scope holds. The typed
-// pass resolves a member or a path step. A Case resolves through its Choice,
-// and a label through the Function or Method it labels. A Pattern's binder is
-// declared by the case of the node holding the Pattern.
-const unscopedNameFields = new Set([
-	"member",
-	"steps",
-	"caseName",
-	"name",
-	"externalName",
-	"binder",
-])
+type WalkedKind = (typeof walkedKinds)[number]
+
+type ReachedNode = Exclude<ParserNode, { nodeType: WalkedKind }>
+
+type ReachedKind = ReachedNode["nodeType"]
+
+// How `walkChild` reads an Identifier: as a value, as a Type, or as no name a
+// Scope holds. See "The parser walk" in DEVELOPMENT.md.
+type IdentifierRole = "value" | "type" | "unscoped"
+
+// Every field of a reached kind whose visit can hand `walkChild` an
+// Identifier. Read off the union of kinds at once, which costs the type
+// checker far less than reading it kind by kind.
+type IdentifierField = FieldsHolding<ReachedNode, parser.IdentifierNode>
+
+type IdentifierRoles = {
+	[Kind in IdentifierField["kind"]]: Record<
+		Extract<Extract<IdentifierField, { kind: Kind }>["field"], string>,
+		IdentifierRole
+	>
+}
+
+// The role of every field that can hand `walkChild` an Identifier, per kind.
+// The type checker refuses a kind or a field left out.
+export const identifierRoles: IdentifierRoles = {
+	ImplementationSection: { nodes: "value" },
+	TestsSection: { nodes: "value" },
+	Test: { body: "value" },
+	Suite: { nodes: "value" },
+	TestTable: { value: "value" },
+	TestModifier: { name: "unscoped", arguments: "unscoped" },
+	Import: { name: "unscoped", alias: "unscoped" },
+	Export: { name: "unscoped", alias: "unscoped" },
+	MethodInvocation: {
+		base: "value",
+		namespaceSpecifier: "value",
+		member: "unscoped",
+	},
+	RecordValue: { name: "unscoped", steps: "unscoped", value: "value" },
+	InterpolatedStringValue: { expression: "value" },
+	ListValue: { values: "value" },
+	DictionaryValue: { key: "value", value: "value" },
+	Lookup: { base: "value", member: "unscoped" },
+	MemberPath: { steps: "unscoped" },
+	Combination: { lhs: "value", rhs: "value" },
+	Define: { value: "value", condition: "value" },
+	CaseValue: { choice: "type", caseName: "unscoped", value: "value" },
+	Start: { expression: "value" },
+	Complete: { expression: "value" },
+	RefusedValue: { base: "value" },
+	CaseMatcher: { choice: "type", caseName: "unscoped", binding: "unscoped" },
+	Pattern: { name: "unscoped", binder: "unscoped" },
+	SimpleMethod: { name: "unscoped" },
+	StaticMethod: { name: "unscoped" },
+	OverloadedMethod: { name: "unscoped" },
+	OverloadedStaticMethod: { name: "unscoped" },
+	SimpleMethodSignature: { name: "unscoped" },
+	StaticMethodSignature: { name: "unscoped" },
+	OverloadedMethodSignatures: { name: "unscoped" },
+	OverloadedStaticMethodSignatures: { name: "unscoped" },
+	ConformanceClause: { protocol: "type" },
+	WhereCondition: { generic: "type", protocol: "type" },
+	SimpleProtocolMethod: { name: "unscoped" },
+	StaticProtocolMethod: { name: "unscoped" },
+	OverloadedProtocolMethod: { name: "unscoped" },
+	OverloadedStaticProtocolMethod: { name: "unscoped" },
+	ReturnStatement: { expression: "value" },
+	GenericDeclarationNode: { name: "unscoped", constraint: "type" },
+	IdentifierTypeDeclaration: { type: "type" },
+	RecordTypeDeclaration: { name: "unscoped" },
+	FunctionTypeParameter: { externalName: "unscoped" },
+	FunctionDefinition: { body: "value" },
+	Parameter: {
+		externalName: "unscoped",
+		internalName: "unscoped",
+		defaultValue: "value",
+	},
+	Argument: { name: "unscoped", value: "value" },
+}
+
+type RoleOfField = Partial<Record<string, IdentifierRole>>
+
+// One visit per kind, built once, so a walk allocates none per node.
+const childVisits: Partial<
+	Record<ReachedKind, (child: ParserNode, walk: Walk, field: string) => void>
+> = Object.fromEntries(
+	Object.entries(identifierRoles).map(
+		([kind, roles]: [string, RoleOfField]) => [
+			kind,
+			(child: ParserNode, walk: Walk, field: string) =>
+				walkChild(child, walk, roles[field]),
+		],
+	),
+)
+
+// A kind with no field that holds an Identifier.
+function walkChildNode(child: ParserNode, walk: Walk) {
+	walkChild(child, walk, undefined)
+}
+
+function walkChildren(node: ReachedNode, walk: Walk) {
+	forEachParserChild(node, childVisits[node.nodeType] ?? walkChildNode, walk)
+}
+
+const recordMemberRoles: RoleOfField = identifierRoles.RecordValue
 
 // A child of a Record literal's member. A shorthand member's value shares the
 // member's Position, so it is referenced with edits that spell the member out.
@@ -1369,18 +1481,22 @@ function walkRecordMember(
 			shorthandValueEdits(member),
 		)
 	} else {
-		walkChild(child, walk, field)
+		walkChild(child, walk, recordMemberRoles[field])
 	}
 }
 
-// A child reached through `forEachParserChild`. An Identifier there names a
-// value, unless the field holding it says otherwise.
-function walkChild(child: ParserNode, walk: Walk, field: string) {
+// A child reached through `forEachParserChild`. An Identifier there is read
+// as the role of the field holding it says.
+function walkChild(
+	child: ParserNode,
+	walk: Walk,
+	role: IdentifierRole | undefined,
+) {
 	if (child.nodeType !== "Identifier") {
 		walkNode(child, walk)
-	} else if (typeNameFields.has(field)) {
+	} else if (role === "type") {
 		reference(walk.scope, "types", child, walk.context)
-	} else if (!unscopedNameFields.has(field)) {
+	} else if (role === "value") {
 		reference(walk.scope, "values", child, walk.context)
 	}
 }

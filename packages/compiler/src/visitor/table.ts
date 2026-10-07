@@ -174,6 +174,21 @@ export type FieldOf<Node> = Places<Node, undefined, []>["field"]
 // undefined for a child in a field of `Node` itself.
 export type ContainerOf<Node> = Places<Node, undefined, []>["container"]
 
+// Each field of each kind of `Node` whose visit can hand on a `Child`, as
+// `{ kind, field }`, for a table keyed by kind and field.
+export type FieldsHolding<Node, Child> = Node extends NodeLike
+	? KindFieldsHolding<Places<Node, undefined, []>, Node["nodeType"], Child>
+	: never
+
+type KindFieldsHolding<Place, Kind, Child> = Place extends {
+	field: infer Field
+	child: infer Held
+}
+	? Child extends Held
+		? { kind: Kind; field: Field }
+		: never
+	: never
+
 export type Key = number | string | undefined
 
 // Where a child stands. `container` is the node's own field holding the

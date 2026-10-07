@@ -1,7 +1,14 @@
 import { describe, expect, it } from "bun:test"
+import { readdirSync, readFileSync } from "node:fs"
+import * as path from "node:path"
 
 import { enrich } from "@essence-lang/compiler/enricher"
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
+import {
+	forEachParserChild,
+	type ParserNode,
+} from "@essence-lang/compiler/visitor"
+import { FIXTURES_DIRECTORY, fixturePath } from "@essence-lang/fixtures"
 import type { common } from "@essence-lang/interfaces"
 
 import {
@@ -10,10 +17,12 @@ import {
 	findOccurrences,
 	findRenameableOccurrence,
 	identifierPattern,
+	identifierRoles,
 	isValidIdentifierName,
 	isValidBindingLabelName,
 	isValidLabelName,
 	renameEdits,
+	walkedKinds,
 } from "../rename"
 
 function findOccurrence(source: string, cursor: common.Cursor) {
@@ -3290,5 +3299,40 @@ describe("Rename of a Method called inside a value", () => {
 		expect(rename(source, { line: 3, column: 3 }, "twice")).toBe(
 			source.replaceAll("doubled", "twice"),
 		)
+	})
+})
+
+// The type checker holds `identifierRoles` to the node types. A tree the
+// Parser recovers, as a showcase's is, is held to it here.
+describe("Rename's Identifier roles", () => {
+	it("give a role to every Identifier the parser walk hands on, in every fixture", () => {
+		let walked = new Set<string>(walkedKinds)
+		let roles: Partial<Record<string, Partial<Record<string, string>>>> =
+			identifierRoles
+		let missing = new Set<string>()
+		let visit = (node: ParserNode) =>
+			forEachParserChild(node, (child, _state, field) => {
+				if (
+					child.nodeType === "Identifier" &&
+					!walked.has(node.nodeType) &&
+					roles[node.nodeType]?.[field] === undefined
+				) {
+					missing.add(`${node.nodeType}.${field}`)
+				}
+
+				visit(child)
+			})
+		let files = [FIXTURES_DIRECTORY, fixturePath("diagnostics")].flatMap(
+			(directory) =>
+				readdirSync(directory)
+					.filter((name) => name.endsWith(".es"))
+					.map((name) => path.join(directory, name)),
+		)
+
+		for (let file of files) {
+			visit(parseWithDiagnostics(readFileSync(file, "utf-8")).program)
+		}
+
+		expect([...missing]).toEqual([])
 	})
 })

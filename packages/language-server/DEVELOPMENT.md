@@ -181,12 +181,19 @@ members for `resolveRecordMembers` before it descends. A Record literal walks it
 are the definitions its own join, and keeps the edits of a shorthand member.
 
 Every other kind descends through `forEachParserChild`, so a field the parser table learns is reached at once.
-`walkChild` decides what an Identifier met there names, by the field holding it:
+`walkChild` reads an Identifier met there by the role `identifierRoles` gives its kind and field:
 
-- In a `type` field, or the `choice` of `Choice#Case`, it names a Type.
-- A member, a path step, a Case name, a label or a Pattern's binder names nothing a Scope holds. The typed pass binds
-  a member, a Function call's case links its labels, and the case holding a Pattern declares its binders.
-- Anywhere else it reads a value.
+- `"type"`: it names a Type, as a written Type's name, the `choice` of `Choice#Case` or a Protocol bound does.
+- `"unscoped"`: it names nothing a Scope holds. The typed pass binds a member or a path step, and a Function call's
+  case links its labels. The case of the node that declares a name, such as a Pattern's binder, declares it.
+- `"value"`: it reads a value.
+
+The table's type lists every field of every kind outside `WalkedKind` that can hold an Identifier, so a new kind or
+field fails `bun run typecheck` until it has a role. `walkChildren` takes only the kinds outside `WalkedKind`, so a
+kind that loses its case in `walkNode` fails too. Some kinds in the table, such as an import or a Parameter, are read
+by a walk of their own and never reach `walkChild`, and their roles say what their names mean all the same. A tree the
+Parser recovers could hold an Identifier its type does not allow, so `rename.spec.ts` checks every fixture's tree for
+an Identifier the table gives no role.
 
 ### Names the typed Program resolves
 

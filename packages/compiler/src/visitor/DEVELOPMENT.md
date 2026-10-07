@@ -159,7 +159,9 @@ property's `parameters`, where the typed table's report `generator`.
 The type checker reads `field` and `container` off the walked node's type, with `FieldOf` and `ContainerOf` in
 `table.ts`. They search the node's fields as the table's checks do, so a field the table skips is among them. A walk
 of an `IfElseStatement` gets `"condition" | "trueBody" | "falseBody"` as its `field`, and a walk of any `TypedNode`
-gets every name the typed tree can report. So `field === "trueBodies"` fails `bun run typecheck`.
+gets every name the typed tree can report. So `field === "trueBodies"` fails `bun run typecheck`. `FieldsHolding`
+lists each kind and field whose visit can hand on a given node, for a table keyed by both, such as rename's
+`identifierRoles`.
 
 A walker that enters at a Program's root also meets each property test's generator Expressions, through
 `TestProperty.generator`. They are Expressions of the Module, but synthesized ones with borrowed Positions. A language
