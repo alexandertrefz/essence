@@ -390,10 +390,8 @@ export function compilesWithSpecifier(
 		),
 	)
 
-	return (
-		result.result.type.type !== "Error" &&
-		!containsErrors(result.diagnostics)
-	)
+	// A call a hole decided answers an Error, yet resolved.
+	return result.result.failed !== true && !containsErrors(result.diagnostics)
 }
 
 // The Protocol among those a pick reaches that declares the requirement

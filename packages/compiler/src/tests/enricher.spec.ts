@@ -5853,6 +5853,62 @@ ${declared}
 				})
 			})
 
+			// An Argument holding an Error may be what chose the entry, so the
+			// call answers the hole, and its use reports nothing more.
+			it("should answer the hole where an Argument holding an Error chose the entry", () => {
+				expect(
+					codesOfSource(`implementation {
+						namespace Pick for Integer {
+							overload static pick {
+								(_ v: Integer) -> Integer {
+									<- 1
+								}
+								(_ v: String) -> String {
+									<- "s"
+								}
+							}
+						}
+
+						function held(_ value: Colr | Integer) -> String {
+							<- Pick.pick(value)
+						}
+
+						constant named: String = Pick.pick(undeclared)
+					}`),
+				).toEqual(["unknown-type", "unknown-name"])
+			})
+
+			// One entry taking the call's labels, or a lone signature, is no
+			// choice, so what it answers is still measured.
+			it("should measure what the one entry taking the labels answers", () => {
+				expect(
+					codesOfSource(`implementation {
+						namespace Pick for Integer {
+							overload twice {
+								(with v: Integer) -> Integer {
+									<- 1
+								}
+								(by v: String) -> String {
+									<- "s"
+								}
+							}
+						}
+
+						function one(_ v: Integer) -> Integer {
+							<- v
+						}
+
+						constant labelled: String = 1::twice(with undeclared)
+						constant lone: String = one(missing)
+					}`),
+				).toEqual([
+					"assignment-type-mismatch",
+					"unknown-name",
+					"assignment-type-mismatch",
+					"unknown-name",
+				])
+			})
+
 			// A callback's body with mistakes of its own under one entry does
 			// not fit that entry while a later entry reads it cleanly.
 			describe("told apart by a callback's body", () => {

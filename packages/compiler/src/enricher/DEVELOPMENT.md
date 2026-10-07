@@ -780,6 +780,11 @@ its Overloads were written in. The probe's conformances are kept, so the winner'
 When no candidate holds up, the first one whose Arguments matched is selected anyway. Its Diagnostics say which
 bound failed, which helps more than a report that no Overload accepts the Arguments.
 
+An Argument holding an Error anywhere, as `Colr | Integer` does, is an Error Argument too. Where one is why no
+candidate held up, and several candidates take the call's labels, the selection may be the hole's. The call then
+answers an Error (`holeDecided`), so nothing is measured against a Type it may not have. One candidate taking the
+labels, or a lone signature, is no choice, so its declared Type is still measured.
+
 Up to and including that first match, a probe reports and records where it stands, since each Argument is enriched
 once. Probes after it are speculative: an unannotated Function literal is re-resolved for each candidate and
 reports from inside its body. So their reports and recordings are held, and only the committed candidate hands them

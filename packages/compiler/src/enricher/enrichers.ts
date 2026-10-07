@@ -116,6 +116,7 @@ import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
 	enteringCall,
 	holdLiteralReports,
+	holeDecided,
 	needsContext,
 	probingCandidate,
 	probingCandidates,
@@ -9652,13 +9653,15 @@ function makeArgumentTyper(
 	>()
 	let sawErrorArgument = false
 
-	// A Function literal whose body was refused counts too: it is typed with an
-	// Error return Type. Only the return position counts, since an Error
+	// A value holding an Error anywhere counts, as `Colr | Integer` does. A
+	// Function literal counts where its body was refused, which types its
+	// return as an Error. Only the return position counts, since an Error
 	// elsewhere was not reported about this Argument.
 	function noteErrors(type: common.Type): common.Type {
 		if (
-			type.type === "Error" ||
-			(type.type === "Function" && type.returnType.type === "Error")
+			type.type === "Function"
+				? type.returnType.type === "Error"
+				: typeContainsError(type)
 		) {
 			sawErrorArgument = true
 		}
@@ -10639,7 +10642,7 @@ function selectFittingOverload(
 		typer.noteErrorArgument()
 	}
 
-	return firstArgumentMatch.selected
+	return holeDecided(firstArgumentMatch)
 }
 
 // The one written Argument that is a Function literal without `-> Type`. Null

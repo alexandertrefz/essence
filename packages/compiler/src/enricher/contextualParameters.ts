@@ -151,6 +151,22 @@ export function probingCandidates<T extends { index: number }>(
 	return selected
 }
 
+// The candidate selected over an Argument holding an Error. Where several take
+// the call's labels, the hole may be what chose it. The call then answers the
+// hole. See "Choosing an Overload" in DEVELOPMENT.md.
+export function holeDecided<
+	Selected extends { inferred: { returnType: common.Type } },
+>(match: { selected: Selected; sawErrorArgument: boolean }): Selected {
+	if (!match.sawErrorArgument || heldReports.at(-1)?.several !== true) {
+		return match.selected
+	}
+
+	return {
+		...match.selected,
+		inferred: { ...match.selected.inferred, returnType: { type: "Error" } },
+	}
+}
+
 // Whether a candidate pairs every Argument with a Parameter of its label.
 function pairsLabels(
 	parameters: common.BaseFunction["parameterTypes"],
