@@ -236,50 +236,16 @@ export function visitChild(
 	return stops ? result : undefined
 }
 
-// A reach compiled with its Place, so a visit passes only what changes.
-type Reacher = (
-	value: unknown,
+// An entry compiled to a function of the node or container it describes.
+// `key` is the index or key in the outermost collection between the node and
+// the container. So every field of a Handler carries the Handler's index.
+export type CompiledEntry = (
 	owner: unknown,
 	visit: Visit,
 	state: unknown,
 	stops: boolean,
 	key: Key,
 ) => unknown
-
-export type CompiledEntry = {
-	keys: Array<string>
-	reachers: Array<Reacher>
-}
-
-// `key` is the index or key in the outermost collection between the node and
-// the container. So every field of a Handler carries the Handler's index.
-export function applyEntry(
-	entry: CompiledEntry,
-	container: unknown,
-	visit: Visit,
-	state: unknown,
-	stops: boolean,
-	key: Key,
-): unknown {
-	let fields = container as Record<string, unknown>
-
-	for (let index = 0; index < entry.keys.length; index++) {
-		let result = entry.reachers[index](
-			fields[entry.keys[index]],
-			container,
-			visit,
-			state,
-			stops,
-			key,
-		)
-
-		if (result !== undefined) {
-			return result
-		}
-	}
-
-	return undefined
-}
 
 type Section = NodeLike & { position: common.Position }
 
@@ -407,7 +373,7 @@ function visitProperties(
 			continue
 		}
 
-		let result = applyEntry(property, written, visit, state, stops, name)
+		let result = property(written, visit, state, stops, name)
 
 		if (result !== undefined) {
 			return result
@@ -415,123 +381,6 @@ function visitProperties(
 	}
 
 	return undefined
-}
-
-function reachNode(place: Place): Reacher {
-	return (value, _owner, visit, state, stops, key) =>
-		value === null || value === undefined
-			? undefined
-			: visitChild(value as NodeLike, visit, state, stops, key, place)
-}
-
-function reachNodes(place: Place): Reacher {
-	return (value, _owner, visit, state, stops, key) => {
-		if (value === null || value === undefined) {
-			return undefined
-		}
-
-		let nodes = value as ReadonlyArray<NodeLike>
-
-		for (let index = 0; index < nodes.length; index++) {
-			let result = visitChild(
-				nodes[index],
-				visit,
-				state,
-				stops,
-				key ?? index,
-				place,
-			)
-
-			if (result !== undefined) {
-				return result
-			}
-		}
-
-		return undefined
-	}
-}
-
-// A `for … in` rather than `Object.values`, which would build an Array per
-// visited node.
-function reachValues(place: Place): Reacher {
-	return (value, _owner, visit, state, stops, key) => {
-		if (value === null || value === undefined) {
-			return undefined
-		}
-
-		let record = value as Record<string, NodeLike>
-
-		for (let name in record) {
-			let result = visitChild(
-				record[name],
-				visit,
-				state,
-				stops,
-				key ?? name,
-				place,
-			)
-
-			if (result !== undefined) {
-				return result
-			}
-		}
-
-		return undefined
-	}
-}
-
-function reachEach(entry: CompiledEntry): Reacher {
-	return (value, _owner, visit, state, stops, key) => {
-		if (value === null || value === undefined) {
-			return undefined
-		}
-
-		let items = value as ReadonlyArray<unknown>
-
-		for (let index = 0; index < items.length; index++) {
-			let result = applyEntry(
-				entry,
-				items[index],
-				visit,
-				state,
-				stops,
-				key ?? index,
-			)
-
-			if (result !== undefined) {
-				return result
-			}
-		}
-
-		return undefined
-	}
-}
-
-function reachEachValue(entry: CompiledEntry): Reacher {
-	return (value, _owner, visit, state, stops, key) => {
-		if (value === null || value === undefined) {
-			return undefined
-		}
-
-		let record = value as Record<string, unknown>
-
-		for (let name in record) {
-			let result = applyEntry(
-				entry,
-				record[name],
-				visit,
-				state,
-				stops,
-				key ?? name,
-			)
-
-			if (result !== undefined) {
-				return result
-			}
-		}
-
-		return undefined
-	}
 }
 
 type AnyReach =
@@ -546,69 +395,126 @@ type AnyReach =
 
 type AnyEntry = Record<string, AnyReach>
 
-// A container's entry is compiled with the node's field holding it, which
-// every child inside it reports as its container.
-function compileReach(reach: AnyReach, place: Place): Reacher {
+// The values a compiled function's source reads, such as a custom reach and
+// its Place. Each is passed in as a parameter of the function that builds it.
+type Bindings = { names: Array<string>; values: Array<unknown> }
+
+function bind(bindings: Bindings, value: unknown): string {
+	let name = `bound${bindings.names.length}`
+
+	bindings.names.push(name)
+	bindings.values.push(value)
+
+	return name
+}
+
+// `label` names the built function in a stack trace, as the script
+// `essence-visitor/<label>.js`, and its last part names the function itself.
+function build<Built>(
+	bindings: Bindings,
+	label: string,
+	parameters: string,
+	body: Array<string>,
+): Built {
+	let name = label
+		.slice(label.lastIndexOf("/") + 1)
+		.replaceAll(/[^\w$]/g, "_")
+	let source = [
+		`return function ${name}(${parameters}) {`,
+		...body,
+		"}",
+		`//# sourceURL=essence-visitor/${label}.js`,
+	]
+	let builder = new Function(...bindings.names, source.join("\n")) as (
+		...values: Array<unknown>
+	) => Built
+
+	return builder(...bindings.values)
+}
+
+const stopAtVisit = "if (stops && result !== undefined) return result"
+
+const stopAtEntry = "if (result !== undefined) return result"
+
+// Runs `body` on each item of the Array or Record in `value`, whose index or
+// key is `at`.
+function eachSource(record: boolean, body: string): string {
+	let loop = record
+		? "for (let at in value)"
+		: "for (let at = 0; at < value.length; at++)"
+
+	return `if (value != null) ${loop} { ${body} }`
+}
+
+// The statements that visit what one field holds, read into `value` from
+// `owner`, the node or container holding it. `label` is the owner's.
+function reachSource(
+	reach: Exclude<AnyReach, "skip">,
+	place: Place,
+	label: string,
+	bindings: Bindings,
+): string {
+	let visit = (child: string, key: string) =>
+		`result = visit(${child}, state, ${JSON.stringify(place.field)}, ${key}, ${JSON.stringify(place.container) ?? "undefined"}); ${stopAtVisit}`
+
 	if (reach === "node") {
-		return reachNode(place)
+		return `if (value != null) { ${visit("value", "key")} }`
 	}
 
-	if (reach === "nodes") {
-		return reachNodes(place)
-	}
-
-	if (reach === "values") {
-		return reachValues(place)
-	}
-
-	if (reach === "skip") {
-		throw new Error("A skipped field has no reacher.")
+	if (reach === "nodes" || reach === "values") {
+		return eachSource(reach === "values", visit("value[at]", "key ?? at"))
 	}
 
 	if ("custom" in reach) {
-		let custom = reach.custom
-
-		return (value, owner, visit, state, stops, key) =>
-			custom(value, owner, visit, state, stops, key, place)
+		return `result = ${bind(bindings, reach.custom)}(value, owner, visit, state, stops, key, ${bind(bindings, place)}); ${stopAtEntry}`
 	}
 
 	let container = place.container ?? place.field
+	let compiled = (entry: AnyEntry) =>
+		bind(
+			bindings,
+			compileEntry(entry, container, `${label}.${place.field}`),
+		)
+	let apply = (entry: AnyEntry, item: string, key: string) =>
+		`result = ${compiled(entry)}(${item}, visit, state, stops, ${key}); ${stopAtEntry}`
 
 	if ("each" in reach) {
-		return reachEach(compileEntry(reach.each, container))
+		return eachSource(false, apply(reach.each, "value[at]", "key ?? at"))
 	}
 
 	if ("values" in reach) {
-		return reachEachValue(compileEntry(reach.values, container))
+		return eachSource(true, apply(reach.values, "value[at]", "key ?? at"))
 	}
 
-	let entry = compileEntry(reach.fields, container)
-
-	return (value, _owner, visit, state, stops, key) =>
-		value === null || value === undefined
-			? undefined
-			: applyEntry(entry, value, visit, state, stops, key)
+	return `if (value != null) { ${apply(reach.fields, "value", "key")} }`
 }
 
 // `container` is the node's field holding the container this entry describes,
-// and undefined for a node's own entry.
+// and undefined for a node's own entry. `label` names the tree and the kind,
+// as `parser/Match`, and a container's field after them, as
+// `parser/Match.handlers`. See "Compiled entries" in DEVELOPMENT.md.
 export function compileEntry(
 	entry: object,
 	container: string | undefined,
+	label: string,
 ): CompiledEntry {
-	let keys: Array<string> = []
-	let reachers: Array<Reacher> = []
+	let bindings: Bindings = { names: [], values: [] }
+	let statements: Array<string> = []
 
-	for (let [key, reach] of Object.entries(entry as AnyEntry)) {
-		if (reach === "skip") {
-			continue
+	for (let [field, reach] of Object.entries(entry as AnyEntry)) {
+		if (reach !== "skip") {
+			statements.push(
+				`value = owner[${JSON.stringify(field)}]`,
+				reachSource(reach, { field, container }, label, bindings),
+			)
 		}
-
-		keys.push(key)
-		reachers.push(compileReach(reach, { field: key, container }))
 	}
 
-	return { keys, reachers }
+	return build(bindings, label, "owner, visit, state, stops, key", [
+		"let value, result",
+		...statements,
+		"return undefined",
+	])
 }
 
 // What a walker's visit receives. Beside the child and the walker's state, it
@@ -638,71 +544,65 @@ export type ChildWalks<Node extends NodeLike> = {
 	): Result | undefined
 }
 
+type Dispatch = (
+	node: NodeLike,
+	visit: Visit,
+	state: unknown,
+	stops: boolean,
+) => unknown
+
+// One `switch` over the table's kinds, and over the `kind`s of a kind told
+// apart by them, which calls the kind's compiled entry. `tree` names the
+// tree in each function's label.
+function compileDispatch(
+	table: Record<string, object>,
+	tree: string,
+): Dispatch {
+	let bindings: Bindings = { names: [], values: [] }
+	let call = (entry: object, label: string) =>
+		`return ${bind(bindings, compileEntry(entry, undefined, label))}(node, visit, state, stops, undefined)`
+	let cases = Object.entries(table).map(([nodeType, entry]) => {
+		let label = `${tree}/${nodeType}`
+
+		if (!("kinds" in entry)) {
+			return `case ${JSON.stringify(nodeType)}: ${call(entry, label)}`
+		}
+
+		let kinds = Object.entries(entry.kinds as Record<string, object>).map(
+			([kind, kindEntry]) =>
+				`case ${JSON.stringify(kind)}: ${call(kindEntry, `${label}.${kind}`)}`,
+		)
+
+		return `case ${JSON.stringify(nodeType)}: switch (node.kind) { ${kinds.join("\n")} } break`
+	})
+
+	return build(bindings, `${tree}/dispatch`, "node, visit, state, stops", [
+		"switch (node.nodeType) {",
+		...cases,
+		"}",
+		"throw new Error(`No child table entry for '${node.nodeType}'.`)",
+	])
+}
+
+// `tree` names the tree, as `parser`, in the stack traces of its walks.
 export function childWalks<Node extends NodeLike, ByKind extends string>(
 	table: Table<Node, ByKind>,
+	tree: string,
 ): ChildWalks<Node> {
-	let entries: Record<string, CompiledEntry | undefined> = Object.create(null)
-	let kindEntries: Record<
-		string,
-		Record<string, CompiledEntry | undefined> | undefined
-	> = Object.create(null)
-
-	for (let [nodeType, entry] of Object.entries(
-		table as Record<string, object>,
-	)) {
-		if (!("kinds" in entry)) {
-			entries[nodeType] = compileEntry(entry, undefined)
-
-			continue
-		}
-
-		let compiled: Record<string, CompiledEntry> = Object.create(null)
-
-		for (let [kind, kindEntry] of Object.entries(
-			entry.kinds as Record<string, object>,
-		)) {
-			compiled[kind] = compileEntry(kindEntry, undefined)
-		}
-
-		kindEntries[nodeType] = compiled
-	}
-
-	function entryOf(node: Node): CompiledEntry {
-		let entry =
-			entries[node.nodeType] ??
-			kindEntries[node.nodeType]?.[(node as { kind?: string }).kind ?? ""]
-
-		if (entry === undefined) {
-			throw new Error(`No child table entry for '${node.nodeType}'.`)
-		}
-
-		return entry
-	}
+	let dispatch = compileDispatch(table as Record<string, object>, tree)
 
 	return {
 		forEachChild(node, visit, state) {
-			applyEntry(
-				entryOf(node),
-				node,
-				visit as Visit,
-				state,
-				false,
-				undefined,
-			)
+			dispatch(node, visit as Visit, state, false)
 		},
 		findChild<State, Result>(
 			node: Node,
 			visit: ChildVisit<Node, State, Result | undefined>,
 			state: State,
 		) {
-			return applyEntry(
-				entryOf(node),
-				node,
-				visit as Visit,
-				state,
-				true,
-				undefined,
-			) as Result | undefined
+			return dispatch(node, visit as Visit, state, true) as
+				| Result
+				| undefined
 		},
 	}
 }

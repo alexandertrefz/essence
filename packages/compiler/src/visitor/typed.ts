@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import {
-	applyEntry,
 	type ChildVisit,
 	childWalks,
 	type CompiledEntry,
@@ -55,14 +54,7 @@ const generator = {
 		stops: boolean,
 		key: Key,
 	): unknown {
-		return applyEntry(
-			compiledGenerators[value.kind],
-			value,
-			visit,
-			state,
-			stops,
-			key,
-		)
+		return compiledGenerators[value.kind](value, visit, state, stops, key)
 	},
 }
 
@@ -117,7 +109,7 @@ const generatorEntries: {
 const compiledGenerators: Record<string, CompiledEntry> = Object.fromEntries(
 	Object.entries(generatorEntries).map(([kind, entry]) => [
 		kind,
-		compileEntry(entry, "generator"),
+		compileEntry(entry, "generator", `typed/TestGenerator.${kind}`),
 	]),
 )
 
@@ -138,7 +130,11 @@ const propertyEntry: Entry<common.typed.NamespaceProperty> = {
 	value: "node",
 }
 
-const namespaceProperty = compileEntry(propertyEntry, "properties")
+const namespaceProperty = compileEntry(
+	propertyEntry,
+	"properties",
+	"typed/NamespaceDefinitionStatement.properties",
+)
 
 const namespaceMembers = {
 	custom(
@@ -273,7 +269,7 @@ const typedTable: Table<TypedNode> = {
 	Argument: { value: "node" },
 }
 
-const walks = childWalks(typedTable)
+const walks = childWalks(typedTable, "typed")
 
 // Every kind the table names, which is every kind of the tree.
 export const typedNodeKinds: ReadonlyArray<string> = Object.keys(typedTable)

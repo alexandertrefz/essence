@@ -239,7 +239,11 @@ const propertyEntry: Entry<parser.NamespacePropertyNode> = {
 	value: "node",
 }
 
-const namespaceProperty = compileEntry(propertyEntry, "properties")
+const namespaceProperty = compileEntry(
+	propertyEntry,
+	"properties",
+	"parser/NamespaceDefinitionStatement.properties",
+)
 
 const namespaceMembers = {
 	custom(
@@ -453,7 +457,7 @@ const parserTable: Table<ParserNode> = {
 	Argument: { name: "node", value: "node" },
 }
 
-const walks = childWalks(parserTable)
+const walks = childWalks(parserTable, "parser")
 
 // Every kind the table names, which is every kind of the tree.
 export const parserNodeKinds: ReadonlyArray<string> = Object.keys(parserTable)

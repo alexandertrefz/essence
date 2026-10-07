@@ -1346,6 +1346,45 @@ describe("The child tables", () => {
 		expect(places).toEqual(["checks 0 generator"])
 	})
 
+	// Each compiled entry is named after its kind, and a container's after its
+	// kind and field. So a stack trace through a walk says where it was.
+	it("name the kind a walk was visiting in a stack trace", () => {
+		let program = parseOnly(
+			[
+				"implementation {",
+				"\tconstant a = match 1 -> Integer {",
+				"\t\tcase _ {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"}",
+			].join("\n"),
+		)
+		let stack = ""
+		let walk = (node: ParserNode): void =>
+			forEachParserChild(node, (child) => {
+				if (child.nodeType === "ReturnStatement") {
+					throw new Error("A visit failed.")
+				}
+
+				walk(child)
+			})
+
+		try {
+			walk(program)
+		} catch (error) {
+			stack = (error as Error).stack ?? ""
+		}
+
+		expect(stack).toContain(
+			"at Match_handlers (essence-visitor/parser/Match.handlers.js:",
+		)
+		expect(stack).toContain("at Match (essence-visitor/parser/Match.js:")
+		expect(stack).toContain(
+			"at dispatch (essence-visitor/parser/dispatch.js:",
+		)
+	})
+
 	it("stop at the first child whose visit answers, and answer that", () => {
 		let program = parseOnly(
 			"implementation {\n\tconstant a = f(b, c, d)\n}",

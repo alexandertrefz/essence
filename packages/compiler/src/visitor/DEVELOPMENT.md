@@ -24,8 +24,8 @@ A kind whose nodes share a `nodeType` and differ by `kind`, such as the simplifi
 `Table<SimpleNode, "Intrinsic" | "IntrinsicStatement">`, and a visit picks the entry by the node's `kind`.
 
 The order of an entry's keys is the order its children are visited in, which is the order they were written in, or
-for the simplified tree the order they run in. Each table is compiled once into arrays of fields. A visit allocates
-nothing: Records are read with `for … in`, and the custom reaches scan rather than build lists.
+for the simplified tree the order they run in. Each table is compiled once into functions, as "Compiled entries" tells.
+A visit allocates nothing: Records are read with `for … in`, and the custom reaches scan rather than build lists.
 
 ### What the type checker holds a table to
 
@@ -65,6 +65,24 @@ Each custom reach names a field the entry lists, and its inside is checked by th
 - `generator` and `generators` in `typed.ts` and `typedSimple.ts` reach a nested test generator. Each kind of
   generator has a typed entry of its own in `generatorEntries`, so a new kind or a new Expression in one fails the
   type check as a node's does.
+
+### Compiled entries
+
+`compileEntry` writes the source of one function per entry and builds it with `new Function`. The function reads each
+field by its name, written as a constant, and hands each visit its `field` and `container` as constants. An engine
+caches a read by a constant name for the few kinds of object that reach it. A loop over an entry's keys would read
+each field by a name it holds in a variable, which the engine looks up anew on every node, and every walker's visit
+would go through one shared call. `compileDispatch` writes one `switch` over a table's kinds, which calls each kind's
+function.
+
+The source holds only what the tables name: field names and `kind`s, quoted by `JSON.stringify`. The custom reaches,
+their Places and the nested entries' functions are passed in as parameters. The tables are constants of their
+modules, so nothing a program says reaches the source.
+
+Each function is named after the kind it walks, and a container's after its kind and field, and its source ends in a
+`sourceURL` comment. So a stack trace through a walk reads
+`at Match_handlers (essence-visitor/parser/Match.handlers.js)` above `at Match (essence-visitor/parser/Match.js)` and
+the tree's `dispatch`, in Bun and in Node alike.
 
 ### Every node once
 

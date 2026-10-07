@@ -1,7 +1,6 @@
 import type { common } from "@essence-lang/interfaces"
 
 import {
-	applyEntry,
 	type ChildVisit,
 	childWalks,
 	type CompiledEntry,
@@ -50,14 +49,7 @@ const generator = {
 		stops: boolean,
 		key: Key,
 	): unknown {
-		return applyEntry(
-			compiledGenerators[value.kind],
-			value,
-			visit,
-			state,
-			stops,
-			key,
-		)
+		return compiledGenerators[value.kind](value, visit, state, stops, key)
 	},
 }
 
@@ -110,7 +102,7 @@ const generatorEntries: {
 const compiledGenerators: Record<string, CompiledEntry> = Object.fromEntries(
 	Object.entries(generatorEntries).map(([kind, entry]) => [
 		kind,
-		compileEntry(entry, "parameters"),
+		compileEntry(entry, "parameters", `simple/TestGenerator.${kind}`),
 	]),
 )
 
@@ -311,7 +303,7 @@ const simpleTable: Table<SimpleNode, ByKind> = {
 	Argument: { value: "node" },
 }
 
-const walks = childWalks(simpleTable)
+const walks = childWalks(simpleTable, "simple")
 
 // Every kind the table names, which is every kind of the tree. A kind told
 // apart by `kind` is spelled with it, as `Intrinsic tag-test`.
