@@ -3004,7 +3004,7 @@ function declaredChoiceAliasOf(
 // The Choice a receiver belongs to, or null. A receiver narrowed to one Case
 // answers its whole Choice, so `is` reads the same inside a `case #Red`. For
 // a generic Choice it is the receiver's applied Union.
-export function choiceTypeOf(
+function choiceTypeOf(
 	baseType: common.Type,
 	scope: enricher.Scope,
 ): common.Type | null {

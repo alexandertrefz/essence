@@ -378,7 +378,8 @@ Leaving the named ones to the payload keeps `flatten()` on a `Result<Result<Inte
 
 A Generic the Type Arguments decide binds where every Case of the subject that decides it agrees.
 `[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and `disagreeingTypeArguments` says
-why.
+why. `typeArgumentBindings` answers the Generics bound this way, which a `::` call pins before it matches its
+Arguments.
 
 ### Specificity
 

@@ -122,7 +122,6 @@ import {
 } from "./contextualParameters"
 import {
 	branchNamespaces,
-	resolveBranch,
 	takesWitnesses,
 	unboundToReport,
 } from "./dispatchReceivers"
@@ -148,6 +147,7 @@ import {
 	recordWrittenConstant,
 	reportConstantReassignment,
 } from "./reassignment"
+import { pinnedForReceiver } from "./receiverPins"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import {
 	insideRefusedCall,
@@ -10882,7 +10882,8 @@ function resolveInvokedMethodInNamespace(
 			selectionDiagnostics: Array<common.Diagnostic>
 	  }
 	| undefined {
-	let methodType = resolvedNamespace.methods[node.member.content]
+	let receiver = receiverType ?? baseType
+	let methodType = pinnedForReceiver(resolvedNamespace, node, receiver)
 
 	// A static Method has no receiver Parameter for `value::method(…)`. Static
 	// Methods are filtered out earlier, and refusing them here keeps that
@@ -10929,7 +10930,7 @@ function resolveInvokedMethodInNamespace(
 	let { diagnostics: nestingDiagnostics } = collectDiagnostics(() =>
 		reportAmbiguousNestingLevel(
 			node,
-			receiverType ?? baseType,
+			receiver,
 			overloads,
 			selected,
 			matchableArguments,
@@ -12808,19 +12809,13 @@ function resolveUnionMethodDispatch(
 		for (let [namespaceName, namespaceType] of matchingNamespaces) {
 			let { result: resolvedMethod, recording } =
 				probeContextualFunctionTypes(() =>
-					resolveBranch(
-						memberType,
+					resolveInvokedMethodInNamespace(
+						node,
 						namespaceType,
+						unionType,
 						scope,
-						(receiver) =>
-							resolveInvokedMethodInNamespace(
-								node,
-								namespaceType,
-								unionType,
-								scope,
-								typer,
-								receiver,
-							),
+						typer,
+						memberType,
 					),
 				)
 

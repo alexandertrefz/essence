@@ -413,6 +413,34 @@ export function bindNamespaceTarget(
 	pattern: NamespaceTarget,
 	subject: common.Type,
 ): GenericBindings | null {
+	return matchNamespaceTarget(pattern, subject)?.bindings ?? null
+}
+
+// The bindings of `bindNamespaceTarget` that only the receiver's Type
+// Arguments decide, since no payload names them. Null where the target does
+// not cover the receiver.
+export function typeArgumentBindings(
+	pattern: NamespaceTarget,
+	subject: common.Type,
+): GenericBindings | null {
+	let matched = matchNamespaceTarget(pattern, subject)
+
+	return matched === null
+		? null
+		: new Map(
+				[...matched.bindings].filter(([name]) =>
+					matched.fromTypeArguments.has(name),
+				),
+			)
+}
+
+function matchNamespaceTarget(
+	pattern: NamespaceTarget,
+	subject: common.Type,
+): {
+	bindings: GenericBindings
+	fromTypeArguments: Set<common.GenericName>
+} | null {
 	if (pattern.targetType === null) {
 		return null
 	}
@@ -423,34 +451,42 @@ export function bindNamespaceTarget(
 				pattern.targetType,
 				subject,
 				createInferenceContext([]),
-			)
-			? new Map()
+			) !== null
+			? { bindings: new Map(), fromTypeArguments: new Set() }
 			: null
 	}
 
 	let renamed = renamedNamespaceTarget(pattern.targetType, pattern.generics)
 	let context = createInferenceContext(renamed.generics)
 
-	if (
-		!matchesTypeWithBindings(renamed.target, subject, context) ||
-		!bindCaseTypeArguments(renamed.target, subject, context)
-	) {
+	if (!matchesTypeWithBindings(renamed.target, subject, context)) {
+		return null
+	}
+
+	let bound = bindCaseTypeArguments(renamed.target, subject, context)
+
+	if (bound === null) {
 		return null
 	}
 
 	settleErrorBindings(context)
 
-	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
+	return {
+		bindings: unfreshenBindings(context.bindings, renamed.freshToOriginal),
+		fromTypeArguments: new Set(
+			[...bound].map((name) => renamed.freshToOriginal.get(name) ?? name),
+		),
+	}
 }
 
 // Binds the Generics a subject Case's payload leaves to its Type Arguments,
-// where every such Case agrees. False where a Case's Type Arguments fit no Case
-// of the same tag in the pattern.
+// where every such Case agrees, and answers their names. Null where a Case's
+// Type Arguments fit no Case of the same tag in the pattern.
 function bindCaseTypeArguments(
 	pattern: common.Type,
 	subject: common.Type,
 	context: GenericInferenceContext,
-): boolean {
+): Set<common.GenericName> | null {
 	let arms = choiceCasesOf(pattern)
 	let decided = new Map<common.GenericName, Array<common.Type>>()
 
@@ -473,13 +509,15 @@ function bindCaseTypeArguments(
 			.find((bindings): bindings is GenericBindings => bindings !== null)
 
 		if (fitting === undefined) {
-			return false
+			return null
 		}
 
 		for (let [name, type] of fitting) {
 			decided.set(name, [...(decided.get(name) ?? []), type])
 		}
 	}
+
+	let bound = new Set<common.GenericName>()
 
 	for (let [name, [first, ...rest]] of decided) {
 		let agreed = rest.every(
@@ -488,10 +526,11 @@ function bindCaseTypeArguments(
 
 		if (agreed && !context.bindings.has(name)) {
 			context.bindings.set(name, first)
+			bound.add(name)
 		}
 	}
 
-	return true
+	return bound
 }
 
 // What a pattern's Case binds from a subject Case's Type Arguments, or null

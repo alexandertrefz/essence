@@ -5387,6 +5387,86 @@ export {
 		)
 	})
 
+	// The Type Arguments bind `Item` through `Tags`' own target, so `Main.es`
+	// needs no name for `Tag`, called directly as dispatched.
+	it("binds a Type Parameter a receiver's Type Arguments decide in a Module that never imported its Choice", async () => {
+		await withBuiltProject(
+			{
+				"Main.es": `import {
+	from "./Tag.es" {
+		Tags
+		StringDefaults
+		StringTag
+		on
+	}
+}
+
+implementation {
+	namespace Flags for Boolean {
+		fallback() -> Boolean {
+			<- @
+		}
+	}
+
+	function show(_ value: StringTag | Boolean) -> String | Boolean {
+		<- value::fallback()
+	}
+
+	Terminal.inspect(on::fallback())
+	Terminal.inspect(show(on))
+	Terminal.inspect(on::wrap("a"))
+}
+`,
+				"Tag.es": `implementation {
+	protocol Defaultable {
+		static default() -> Self
+	}
+
+	namespace StringDefaults for String is Defaultable {
+		static default() -> String {
+			<- "none"
+		}
+	}
+
+	choice Tag<Item> {
+		On,
+		Off,
+	}
+
+	namespace Tags<infer Item> for Tag<Item> {
+		fallback<Item is Defaultable>() -> Item {
+			<- Item.default()
+		}
+
+		wrap(_ x: Item) -> List<Item> {
+			<- [x]
+		}
+	}
+
+	type StringTag = Tag<String>
+
+	constant on: StringTag = #On
+}
+
+export {
+	StringDefaults
+	StringTag
+	Tags
+	on
+}
+`,
+			},
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"none"', '"none"', '[ "a" ]'])
+			},
+		)
+	})
+
 	// `Main.es` names no `Tag`, and `Lists` targets another application of it,
 	// so neither the direct call nor the dispatch reaches `Lists`.
 	it("runs no Namespace for another application of a Choice the calling Module never imported", () => {

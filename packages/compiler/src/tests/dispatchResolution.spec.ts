@@ -1373,6 +1373,187 @@ describe("Dispatch and Resolution", () => {
 			).toEqual(["no-namespace-for-value"])
 		})
 
+		// `Box<String>#Empty` carries no `Item` in its payload, so its Type
+		// Arguments bind it, called directly as dispatched.
+		it("passes the witness a payload-free Case's Type Arguments decide to a direct call", async () => {
+			expect(
+				await run(`implementation {
+					${defaults}
+					${boxes}
+
+					namespace Numbers for Integer {
+						fallback() -> Integer {
+							<- @
+						}
+					}
+
+					function show(_ box: Box<String> | Integer) -> String | Integer {
+						<- box::fallback()
+					}
+
+					constant empty = Box<String>#Empty
+					constant counted = Box<Integer>#Count({ n = 1 })
+
+					Terminal.inspect(empty::fallback())
+					Terminal.inspect(show(empty))
+					Terminal.inspect(counted::fallback())
+				}`),
+			).toEqual(['"none"', '"none"', "0"])
+		})
+
+		// Inside `Boxes`, `Box<Item>#Empty` pins the Namespace's `Item` to the
+		// caller's `Item`, the same name. The pin is borrowed, so freshening
+		// does not rename it into a Parameter bound to itself.
+		it("pins a receiver's Type Argument that names the Namespace's own Type Parameter", async () => {
+			expect(
+				await run(`implementation {
+					${defaults}
+
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					namespace Boxes<infer Item> for Box<Item> {
+						fallback<Item is Defaultable>() -> Item {
+							<- Item.default()
+						}
+
+						again<Item is Defaultable>() -> Item {
+							<- Box<Item>#Empty::fallback()
+						}
+					}
+
+					function generic<infer Item is Defaultable>(_ item: Item) -> Item {
+						<- Box<Item>#Empty::fallback()
+					}
+
+					Terminal.inspect(Box<String>#Empty::again())
+					Terminal.inspect(Box<Integer>#Full({ item = 2 })::again())
+					Terminal.inspect(generic("s"))
+				}`),
+			).toEqual(['"none"', "0", '"none"'])
+		})
+
+		// A branch's Method is read once, against its member, so what reading
+		// an Argument reports is never dropped with an attempt not taken.
+		it("reports an undeclared name in an Argument of a dispatched call", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					namespace Boxes<infer Item> for Box<Item> {
+						size(_ x: Integer) -> Integer {
+							<- x
+						}
+					}
+
+					namespace Flags for Boolean {
+						size(_ x: Integer) -> Integer {
+							<- 0
+						}
+					}
+
+					function show(_ v: Box<String> | Boolean) -> Integer {
+						<- v::size(nope)
+					}
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-name"])
+		})
+
+		// A whole `Tag<String>` holds no payload at all. Its Type Argument binds
+		// `Item` before the Arguments are matched, so they are read against it.
+		describe("a Type Parameter only the receiver's Type Arguments decide", () => {
+			let tags = (body: string) => `implementation {
+				protocol Named {
+					static label() -> String
+				}
+
+				namespace StringNames for String is Named {
+					static label() -> String {
+						<- "string"
+					}
+				}
+
+				choice Tag<Item> {
+					On,
+					Off,
+				}
+
+				namespace Tags<infer Item> for Tag<Item> {
+					wrap(_ x: Item) -> List<Item> {
+						<- [x]
+					}
+
+					apply<Item is Named>(_ change: (_: Item) -> String) -> String {
+						<- Item.label()
+					}
+				}
+
+				namespace Flags for Boolean {
+					wrap(_ x: Integer) -> List<Integer> {
+						<- [x]
+					}
+
+					apply(_ change: (_: Integer) -> String) -> String {
+						<- change(1)
+					}
+				}
+
+				constant on: Tag<String> = #On
+
+				${body}
+			}`
+			let codesOf = (body: string) =>
+				diagnosticsFor(tags(body)).map((diagnostic) => diagnostic.code)
+
+			it("refuses an Argument of another Type, called directly or dispatched", () => {
+				expect(codesOf("Terminal.inspect(on::wrap(1))")).toEqual([
+					"no-matching-overload",
+				])
+				expect(
+					codesOf("Terminal.inspect(Tag<String>#On::wrap(1))"),
+				).toEqual(["no-matching-overload"])
+				expect(
+					codesOf(`function show(_ value: Tag<String> | Boolean) -> List<String> | List<Integer> {
+						<- value::wrap(1)
+					}`),
+				).toEqual(["no-matching-overload"])
+			})
+
+			// Each branch reads the literal against its own Method, so the
+			// Tag branch never reads it against `Flags`' Integer.
+			it("reads an unannotated literal's Parameter as the Type Argument", async () => {
+				let show = (
+					literal: string,
+				) => `function show(_ value: Tag<String> | Boolean) -> String {
+					<- value::apply(${literal})
+				}`
+
+				expect(
+					await run(
+						tags(`${show("(x) { <- x::toString() }")}
+
+						Terminal.inspect(on::apply((x) { <- x::toString() }))
+						Terminal.inspect(show(on))
+						Terminal.inspect(show(true))
+						Terminal.inspect(on::wrap("a"))`),
+					),
+				).toEqual(['"string"', '"string"', '"1"', '[ "a" ]'])
+				expect(
+					codesOf(show("(x) { <- x::add(1)::toString() }")),
+				).toEqual(["unknown-method"])
+				expect(
+					codesOf(
+						"Terminal.inspect(on::apply((x) { <- x::add(1)::toString() }))",
+					),
+				).toEqual(["unknown-method"])
+			})
+		})
+
 		// The Help the refusal gives: the receiver as one application.
 		it("runs the Method once the receiver is one application", async () => {
 			expect(

@@ -558,6 +558,22 @@ written on one.
 The receiver proves nothing while `erasingRefinementProof` is set. `fallback-never-used` asks what a call would
 answer with no proof at all, and a written receiver's proof is what that probe takes away.
 
+## Receiver Type Arguments
+
+Matching reads a Case's payload and nothing else. So `Box<String>#Empty` binds no `Item` of `namespace
+Boxes<infer Item> for Box<Item>`, and a whole `Tag<String>`, whose Cases carry no payload, binds none of `namespace
+Tags<infer Item> for Tag<Item>`. The receiver's Type Arguments decide it instead, through the target's Case of the
+same tag (`typeArgumentBindings`; see "Namespace targets" in `packages/compiler/src/helpers/DEVELOPMENT.md`).
+
+`pinnedForReceiver` pins each Type Parameter they decide to its Type Argument before the call is matched, as a
+default that inference seeds. So `Tag<String>#Empty::wrap(1)` is refused against `wrap(_ x: Item)`, an unannotated
+literal reads `Item` as `String`, and a bound on `Item` is solved for `String`. A dispatch branch is matched the same
+way against its member, so a direct call and a dispatch of one value agree.
+
+The pinned Type Parameter is renamed to a borrowed name, as a derived Method's are (`borrowedGenericName`). A pin
+is a caller-side Type, and inside the Namespace's own body it names the Namespace's `Item`. Freshening renames a
+default along with its Parameter, so under the declared name the pin would bind `Item` to itself.
+
 ## Return Type inference from a body
 
 A Function literal without `-> Type` takes its return Type from its body (`inferReturnTypeFromBody`). The Type of
@@ -805,16 +821,10 @@ Method is an error about the call. A fault every branch shares is reported once,
 Unbound Type Parameters depend on the shared Arguments, so the first member reports them all. A later member reports
 only those its Method takes a witness for, since its branch would run without one.
 
-A member that is a Case of a generic Choice, such as `Box<String>#Empty`, binds no Type Parameter its payload leaves
-out, so `namespace Boxes<infer Item> for Box<Item>` would leave `Item` and its witness unbound. Where the Case's
-resolution is refused or leaves a Type Parameter unbound, it is resolved again against the Case's application
-(`resolveBranch`). The application is the Namespace's own target, its Case of the same tag matched against the
-Case's Type Arguments, so the calling Module needs no name for the Choice. It counts only where every Type Parameter
-gets one binding and the applied Case takes the Case's Type Arguments, so `Pair<Item, Item>` binds nothing from a
-`Pair<Integer, String>`. Where that leaves a Type Parameter unbound, the Choice is looked up by its name instead. A
-lookup that is refused is asked again for the application too (`branchNamespaces`). A Protocol's provided Method is
-built for the receiver it was looked up for, so it is always looked up again. Each attempt's Diagnostics are
-reported only once it is taken.
+A member that is a Case of a generic Choice, such as `Box<String>#Empty`, is resolved as a receiver of that Type is.
+Its Type Arguments bind the Type Parameters its payload leaves out, so `namespace Boxes<infer Item> for Box<Item>`
+passes the witness for `String`; see "Receiver Type Arguments". They are read through the Namespace's own target,
+so the calling Module needs no name for the Choice.
 
 A Namespace whose target's Case of the same tag names another application covers no member, as it covers no
 receiver; see "Namespace targets" in `packages/compiler/src/helpers/DEVELOPMENT.md`. So a Namespace `for
