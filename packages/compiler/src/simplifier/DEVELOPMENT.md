@@ -81,6 +81,12 @@ The filled values are built afresh for each site, so no two constructions share 
 construction's Position, where a debugger step should stop. The default itself may be written in another
 file.
 
+A filled payload prints in the order its Case declares, as a Parameter's rebuilt Record default does and as the
+client's marshaller builds a payload from a host. `inDeclaredOrder` places each defaulted member before the first
+written member declared after it, at every level a path key fills. The written members keep the order they were
+written in, because a Record Literal evaluates its members in that order. So a payload written out of declared
+order keeps that order when it prints.
+
 ## Test lowering
 
 A `tests` block is lowered here rather than in a stage of its own, because by emission a test is

@@ -5020,6 +5020,45 @@ describe("Choices", () => {
 			).toEqual(['Fetch#Get { url = "/x", retries = 0 }'])
 		})
 
+		// `Call#Post { host = …, body = "x" }`, as the Case declares it, alone
+		// and as a member.
+		it("prints a defaulted member in its declared place", async () => {
+			expect(
+				await run(`implementation {
+					choice Call {
+						Post { host: String, body: String, port: Integer } = {
+							host = "h",
+							port = 80,
+						},
+					}
+
+					constant call = Call#Post({ body = "x" })
+
+					Terminal.inspect(call)
+					Terminal.inspect({ call })
+				}`),
+			).toEqual([
+				'Call#Post { host = "h", body = "x", port = 80 }',
+				'{ call = Call#Post { host = "h", body = "x", port = 80 } }',
+			])
+		})
+
+		// A Record Literal evaluates its members as written, so a payload
+		// written out of declared order keeps its order.
+		it("keeps the order of the written members", async () => {
+			expect(
+				await run(`implementation {
+					choice Call {
+						Post { server: String, body: String, port: Integer } = {
+							port = 80,
+						},
+					}
+
+					Terminal.inspect(Call#Post({ body = "x", server = "s" }))
+				}`),
+			).toEqual(['Call#Post { body = "x", server = "s", port = 80 }'])
+		})
+
 		it("leaves a member the payload wrote alone", async () => {
 			expect(
 				await run(`implementation { ${fetchChoice}
@@ -5053,8 +5092,7 @@ describe("Choices", () => {
 				])
 			})
 
-			// Written members come first and defaulted ones follow, at every
-			// level.
+			// A defaulted member takes its declared place at every level.
 			it("takes a braced descend the same way", async () => {
 				expect(
 					await run(`implementation { ${limited}
@@ -5063,7 +5101,7 @@ describe("Choices", () => {
 						Terminal.inspect(call)
 					}`),
 				).toEqual([
-					'Fetch#Get { url = "/x", limits = { burst = 9, calls = 1 } }',
+					'Fetch#Get { url = "/x", limits = { calls = 1, burst = 9 } }',
 				])
 			})
 
@@ -5245,7 +5283,7 @@ describe("Choices", () => {
 					Terminal.inspect(call)
 				}`),
 			).toEqual([
-				'Call#Post { body = "x", server = { port = 80, host = "a" } }',
+				'Call#Post { server = { port = 80, host = "a" }, body = "x" }',
 			])
 			expect(
 				codesOf(`implementation {

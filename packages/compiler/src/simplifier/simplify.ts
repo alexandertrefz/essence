@@ -397,14 +397,55 @@ function filledPayloadLevel(
 		}
 	}
 
+	let defaulted = new Set<string>()
+
 	for (let [name, member] of Object.entries(values)) {
 		if (!Object.hasOwn(members, name)) {
 			members[name] = writtenAt(simplifyExpression(member), position)
+			defaulted.add(name)
 			filled = true
 		}
 	}
 
-	return filled ? { ...value, members, type } : value
+	return filled
+		? { ...value, members: inDeclaredOrder(members, defaulted, type), type }
+		: value
+}
+
+// A defaulted member stands before the first written member declared after
+// it, so a payload written in declared order prints in it. The written members
+// keep their order, since a Record Literal evaluates its members as written.
+// See "Payload defaults" in DEVELOPMENT.md.
+function inDeclaredOrder<Member>(
+	members: Record<string, Member>,
+	defaulted: Set<string>,
+	type: common.RecordType,
+): Record<string, Member> {
+	let order = declared(type)
+	let rank = (name: string) =>
+		order.includes(name) ? order.indexOf(name) : order.length
+	let pending = order.filter((name) => defaulted.has(name))
+	let entries: Array<[string, Member]> = []
+
+	for (let [name, member] of Object.entries(members)) {
+		if (defaulted.has(name)) {
+			continue
+		}
+
+		while (pending.length > 0 && rank(pending[0]!) < rank(name)) {
+			let next = pending.shift()!
+
+			entries.push([next, members[next]!])
+		}
+
+		entries.push([name, member])
+	}
+
+	for (let name of pending) {
+		entries.push([name, members[name]!])
+	}
+
+	return Object.fromEntries(entries)
 }
 
 // A deep copy of a simplified Expression with one Position stamped
