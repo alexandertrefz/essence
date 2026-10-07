@@ -11,6 +11,9 @@ const MODE_FACETS = [
 	// Whether the run also synthesizes the goals a Module's Namespace
 	// declarations promise as property tests. It means nothing without `tests`.
 	"contracts",
+	// Whether the run binds onto each exported Namespace the provided Methods
+	// its Protocols give it, so a JavaScript host can call them there.
+	"embed",
 ] as const
 
 type CompileModeFacet = (typeof MODE_FACETS)[number]

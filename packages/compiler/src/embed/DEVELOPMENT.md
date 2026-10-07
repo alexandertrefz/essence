@@ -121,6 +121,21 @@ binds. A Namespace's Overload is bound under the bare Method name and printed un
 members are keyed as written, and `namespaceMemberName` mangles only `prototype` and `constructor`, which a class
 refuses as static members. An instance Method's receiver is already its first Parameter on the Export Surface.
 
+### Provided Methods
+
+A Namespace's Type holds only the Methods it writes, and Essence reaches a provided one through its Protocol. A
+host has no Protocol to go through, so an `embed` compile binds each provided Method onto the Namespace itself.
+The linker asks `exposedMethods` what each exported Namespace's Protocols provide and the Namespace does not
+write. It solves each witness as a call `Namespace.member(…)` would, and puts the answers on the Export Surface
+and the export entry. `describeModule` lists them with the Namespace's own Methods. The simplifier emits each as
+one more Method of the Namespace, whose body hands the receiver, the Arguments and the witness to the provided
+body.
+
+The `embed` facet of the compile mode gates all of it, so a build that is not for a host emits none, and its
+bundle carries no provided body it never calls. A generic Namespace offers none, since a host can not hand over
+the witnesses its Type Parameters need. Neither does a name two Protocols provide without one extending the
+other, since a call has to pick one.
+
 `describeTypes` lists declared Types and Protocols in export order, kept beside the `ModuleDescriptor` because
 nothing at run time reads a Type Alias. `carriesDictionary` and `carriesFuture` ask both, since a Dictionary in an
 exported `type` reaches a host through the declaration file. The answer is derived each time rather than stored in

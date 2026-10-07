@@ -25,7 +25,10 @@ export const simplify = (
 	return {
 		nodeType: "Program",
 		imports: simplifyImportSection(program.imports),
-		implementation: simplifyImplementationSection(program.implementation),
+		implementation: withExposedMethods(
+			simplifyImplementationSection(program.implementation),
+			program.exports,
+		),
 		tests:
 			program.tests === null
 				? null
@@ -74,6 +77,106 @@ function simplifyExportSection(
 			modulePath: entry.modulePath,
 			runtime: entry.runtime,
 		})),
+	}
+}
+
+// Each provided Method an exported Namespace offers a host becomes one of its
+// emitted Methods. Its Type is left alone, so Essence still reaches the Method
+// as provided. See "Provided Methods" in
+// packages/compiler/src/embed/DEVELOPMENT.md.
+function withExposedMethods(
+	implementation: common.typedSimple.ImplementationSectionNode,
+	exports: common.typed.ExportSectionNode | null,
+): common.typedSimple.ImplementationSectionNode {
+	let exposed = new Map<string, Array<common.ExposedMethod>>()
+
+	for (let entry of exports?.entries ?? []) {
+		if (entry.exposed !== undefined) {
+			exposed.set(entry.name, entry.exposed)
+		}
+	}
+
+	if (exposed.size === 0) {
+		return implementation
+	}
+
+	return {
+		...implementation,
+		nodes: implementation.nodes.map((node) => {
+			if (
+				node.nodeType !== "NamespaceDefinitionStatement" ||
+				!exposed.has(node.name.name)
+			) {
+				return node
+			}
+
+			let added: common.typedSimple.Methods = {}
+
+			for (let method of exposed.get(node.name.name)!) {
+				added[method.name] = exposedMethod(node, method)
+			}
+
+			return { ...node, methods: { ...node.methods, ...added } }
+		}),
+	}
+}
+
+// `(_self, _1, …) { <- Namespace.member(_self, _1, …) }`, handed the witness the
+// linker solved for the Namespace.
+function exposedMethod(
+	namespace: common.typedSimple.NamespaceDefinitionStatementNode,
+	exposed: common.ExposedMethod,
+): common.typedSimple.Method {
+	let parameters = exposed.type.parameterTypes.map(
+		(parameter, index): common.typedSimple.ParameterNode => ({
+			nodeType: "Parameter",
+			externalName: null,
+			internalName: {
+				nodeType: "Identifier",
+				name: index === 0 ? "_self" : `_${index}`,
+				type: parameter.type,
+			},
+			defaultValue: null,
+		}),
+	)
+
+	return {
+		method: {
+			nodeType: "FunctionValue",
+			value: {
+				nodeType: "FunctionDefinition",
+				parameters,
+				body: [
+					{
+						nodeType: "ReturnStatement",
+						expression: {
+							nodeType: "MethodInvocation",
+							base: namespace.name,
+							member: { name: exposed.name },
+							arguments: [
+								...parameters.map(
+									(
+										parameter,
+									): common.typedSimple.ArgumentNode => ({
+										nodeType: "Argument",
+										name: null,
+										value: parameter.internalName,
+									}),
+								),
+								...simplifyConformanceArguments([
+									exposed.conformance,
+								]),
+							],
+							providedBy: exposed.providedBy,
+							type: exposed.type.returnType,
+						},
+					},
+				],
+				returnType: exposed.type.returnType,
+			},
+			type: { ...exposed.type, type: "Function" },
+		},
+		isStatic: false,
 	}
 }
 

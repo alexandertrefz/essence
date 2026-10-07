@@ -103,6 +103,7 @@ export async function attemptLoad(
 		// The bundle carries the runtime bridge, which its sources do not
 		// say. The key keeps its hash apart from a plain bundle's.
 		emitterKey: BRIDGE_KEY,
+		embed: true,
 	}
 
 	// Linking alone yields the hash, so a bundle already on disk skips the

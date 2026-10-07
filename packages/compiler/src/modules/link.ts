@@ -9,6 +9,7 @@ import {
 	secondary,
 } from "../diagnostics/index"
 import { exampleTestsOf } from "../enricher/examples"
+import { exposedMethods } from "../enricher/exposedMethods"
 import {
 	enrichPrograms,
 	type LateNames,
@@ -73,6 +74,9 @@ export type ExportSurface = {
 	// Every Type the Module binds at its top level, private ones included. No
 	// import reaches them. A Help about a Choice it keeps private reads them.
 	moduleTypes: Record<string, common.Type>
+	// The provided Methods each exported Namespace offers a host, filled only
+	// in an `embed` compile once the Module is linked.
+	exposed?: Record<string, Array<common.ExposedMethod>>
 }
 
 export type LinkedModule = {
@@ -378,6 +382,16 @@ function moduleSections(
 														entry.name.content,
 													)
 												: null,
+										...(entry.source === null &&
+										surface.exposed?.[publicName] !==
+											undefined
+											? {
+													exposed:
+														surface.exposed[
+															publicName
+														],
+												}
+											: {}),
 										position: entry.position,
 									},
 								]
@@ -892,6 +906,10 @@ function linkGroup(
 
 		let surface = surfaceFor(state.module.filePath) ?? emptySurface()
 
+		if (options.embed === true) {
+			surface.exposed = exposedOf(state, surface)
+		}
+
 		return {
 			module: state.module,
 			program: {
@@ -917,6 +935,34 @@ function linkGroup(
 			imported: importedNames(state),
 		}
 	})
+}
+
+// The provided Methods each Namespace this Module exports offers a host. A
+// forwarded name keeps what its own Module found. The declaration proved each
+// conformance already, so nothing solved here is reported again.
+function exposedOf(
+	state: ModuleState,
+	surface: ExportSurface,
+): Record<string, Array<common.ExposedMethod>> {
+	let exposed = { ...surface.exposed }
+
+	collectDiagnostics(() => {
+		for (let [publicName, entry] of state.exports) {
+			let value = surface.values[publicName]
+
+			if (entry.source !== null || value?.type !== "Namespace") {
+				continue
+			}
+
+			let methods = exposedMethods(value, state.scope, entry.position)
+
+			if (methods.length > 0) {
+				exposed[publicName] = methods
+			}
+		}
+	})
+
+	return exposed
 }
 
 // Read off the Scope, so that it reports what the Module ended up with,
@@ -1075,6 +1121,15 @@ function surfaceOf(
 
 		if (forwardedProtocol !== undefined) {
 			surface.protocols[publicName] = forwardedProtocol
+		}
+
+		let forwardedExposed = dependency.exposed?.[exportedName]
+
+		if (forwardedExposed !== undefined) {
+			surface.exposed = {
+				...surface.exposed,
+				[publicName]: forwardedExposed,
+			}
 		}
 
 		if (dependency.constants.has(exportedName)) {

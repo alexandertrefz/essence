@@ -24,7 +24,7 @@ async function describedModule(
 	entryPath: string,
 ): Promise<{ descriptor: ModuleDescriptor; types: Array<DeclaredType> }> {
 	let entry = canonicalPath(entryPath)
-	let compiled = await compileToMemory(entry)
+	let compiled = await compileToMemory(entry, { embed: true })
 
 	expect(compiled.diagnostics).toEqual([])
 
@@ -381,6 +381,22 @@ export declare const Rectangle: {
 		expect(text).not.toContain(
 			canonicalPath(path.dirname(clientFixture("Bounded.es"))),
 		)
+	})
+
+	// A Namespace that writes the Method declares its own under the same name.
+	it("declares the provided Methods a Namespace's Protocol gives it", async () => {
+		let text = await declarationsOf(clientFixture("Provided.es"))
+
+		expect(text).toContain(`export declare const Rectangles: {
+	area(p0: Input<Rectangle>): bigint
+	isEmpty(p0: Input<Rectangle>): boolean
+	scaled(p0: Input<Rectangle>, by: bigint | number): bigint
+}`)
+		expect(text).toContain(`export declare const Squares: {
+	area(p0: Input<Square>): bigint
+	isEmpty(p0: Input<Square>): boolean
+	scaled(p0: Input<Square>, by: bigint | number): bigint
+}`)
 	})
 
 	it("declares a Protocol as a Type nothing holds", async () => {

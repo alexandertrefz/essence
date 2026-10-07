@@ -195,8 +195,9 @@ Union or `Optional` with one among its arms — is positional whatever its label
 says. Both readings take an object, and the Record is the one that can hold
 any shape, so `describe({ width: 3n, height: 4n })` passes the Rectangle.
 
-A Namespace comes back as an object of its Methods. There is no `::` on this
-side, so an instance Method takes its receiver where a call passes it, first.
+A Namespace comes back as an object of its Methods, with the Methods its
+Protocols provide among them. There is no `::` on this side, so an instance
+Method takes its receiver where a call passes it, first.
 
 ```js
 geometry.exports.RectangleMeasurable.area({ width: 3n, height: 4n }) // 12n

@@ -52,9 +52,10 @@ function clientFixture(name: string): string {
 async function build(entryPath: string, name: string): Promise<string> {
 	let entry = canonicalPath(entryPath)
 	let bundlePath = path.join(directory, name)
-	let linked = linkToMemory(entry)
+	let linked = linkToMemory(entry, { embed: true })
 	let descriptor = describeModule(linked.surface, entry)
 	let compiled = await compileToMemory(entry, {
+		embed: true,
 		transformSources: (sources) =>
 			withRuntimeBridge(sources, {
 				dictionary: carriesDictionary(
@@ -277,6 +278,30 @@ describe("`esc build --embed`", () => {
 		expect((module.exports.Colour as Record<string, unknown>).Red).toEqual({
 			$case: "Colour#Red",
 		})
+	})
+
+	// `esc` links for the embed, so the bundle binds what the Descriptor lists.
+	it("writes a pair whose Namespace offers its provided Methods", async () => {
+		let bundle = path.join(directory, "provided", "Provided.js")
+		let run = await esc(
+			"build",
+			path.relative(REPOSITORY, clientFixture("Provided.es")),
+			"-o",
+			bundle,
+			"--embed",
+			"--quiet",
+		)
+
+		expect(run.code).toBe(0)
+
+		let module = await loadPrebuilt(bundle)
+		let rectangles = module.exports.Rectangles as Record<
+			string,
+			(...args: Array<unknown>) => unknown
+		>
+
+		expect(rectangles.isEmpty!({ width: 0n, height: 4n })).toBe(true)
+		expect(rectangles.scaled!({ width: 2n, height: 3n }, 2n)).toBe(12n)
 	})
 
 	// `esc` decides the Dictionary door from the Descriptor it writes, so a

@@ -7,7 +7,10 @@ import {
 	carriesFuture,
 	linkToMemory,
 } from "@essence-lang/compiler/embed"
-import { canonicalPath } from "@essence-lang/compiler/modules"
+import {
+	canonicalPath,
+	type ExportSurface,
+} from "@essence-lang/compiler/modules"
 
 import {
 	type DeclaredType,
@@ -54,6 +57,38 @@ describe("A Module described", () => {
 			expect(moduleDescriptor(fileName)).toMatchSnapshot()
 		})
 	}
+
+	// Only an `embed` compile binds them, so a plain build is left as it was.
+	it("lists the provided Methods an exported Namespace offers a host", () => {
+		let entry = canonicalPath(path.join(FILES, "Provided.es"))
+		let signatures = (surface: ExportSurface): unknown => {
+			let rectangles = describeModule(surface, entry).exports.Rectangles
+
+			return rectangles?.kind === "namespace"
+				? Object.fromEntries(
+						Object.entries(rectangles.methods).map(
+							([name, method]) => [
+								name,
+								method.kind === "function"
+									? method.of.shown
+									: null,
+							],
+						),
+					)
+				: null
+		}
+
+		expect(
+			signatures(linkToMemory(entry, { embed: true }).surface),
+		).toEqual({
+			area: "(_ { width: Integer, height: Integer }) -> Integer",
+			isEmpty: "(_ { width: Integer, height: Integer }) -> Boolean",
+			scaled: "(_ { width: Integer, height: Integer }, by: Integer) -> Integer",
+		})
+		expect(signatures(linkToMemory(entry).surface)).toEqual({
+			area: "(_ { width: Integer, height: Integer }) -> Integer",
+		})
+	})
 
 	it("shows a bound by its Protocol's name and never its path", () => {
 		let measure = moduleDescriptor("Bounded.es").exports.measure

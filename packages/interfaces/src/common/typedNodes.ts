@@ -6,6 +6,7 @@ import type {
 	DispatchCase,
 	Documentation,
 	ErrorType,
+	ExposedMethod,
 	RationalType,
 	FunctionType,
 	GenericAliasType,
@@ -246,6 +247,9 @@ export type ExportNode = {
 	runtime: boolean
 	// What the entry publishes, for a Hover. Null on a re-export.
 	type: Type | null
+	// The provided Methods a Namespace declared here offers a host, set only
+	// in an `embed` compile.
+	exposed?: Array<ExposedMethod>
 	position: Position
 }
 

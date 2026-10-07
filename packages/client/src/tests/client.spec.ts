@@ -183,6 +183,24 @@ describe("Loading a Module", () => {
 		expect(typeof main.raw.Rectangle).toBe("function")
 	})
 
+	// A Namespace that writes the Method keeps its own, as in Essence.
+	it("binds the provided Methods a Namespace's Protocol gives it", async () => {
+		let provided = await loadModule(clientFixture("Provided.es"), {
+			cacheDirectory,
+		})
+		let rectangles = provided.exports.Rectangles as Record<
+			string,
+			(...args: Array<unknown>) => unknown
+		>
+		let squares = provided.exports.Squares as typeof rectangles
+
+		expect(Object.keys(rectangles)).toEqual(["area", "isEmpty", "scaled"])
+		expect(rectangles.isEmpty!({ width: 0n, height: 4n })).toBe(true)
+		expect(rectangles.scaled!({ width: 2n, height: 3n }, 2n)).toBe(12n)
+		expect(squares.isEmpty!({ side: 1n })).toBe(true)
+		expect(squares.scaled!({ side: 3n }, 2n)).toBe(18n)
+	})
+
 	it("undoes the Rewriter's escaping", async () => {
 		let escaped = await loadModule(clientFixture("Escaped.es"), {
 			cacheDirectory,
@@ -819,7 +837,10 @@ export {
 
 			await loadModule(entry, { cacheDirectory: directory })
 
-			let linked = linkToMemory(entry, { emitterKey: BRIDGE_KEY })
+			let linked = linkToMemory(entry, {
+				emitterKey: BRIDGE_KEY,
+				embed: true,
+			})
 
 			expect(
 				(await readdir(directory)).filter((name) =>

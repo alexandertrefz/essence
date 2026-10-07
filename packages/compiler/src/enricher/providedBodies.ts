@@ -73,23 +73,20 @@ export function conformanceProvidersIn(
 	}
 }
 
-// A provided Method named through a Namespace, as `Number.isLessThan(a, b)`,
-// with `Self` pinned to its target. Null where no conformance it declares
-// provides the name. Two unrelated providers the Arguments both fit tie, as at
-// `value::label()`.
-export function providedNamespaceMember(
+// The provided Methods of the name the Namespace's conformances reach, each
+// with `Self` pinned to its target. A descendant that provides the name again
+// answers it.
+export function providedNamespaceAnswers(
 	namespace: common.NamespaceType,
-	node: parser.LookupNode,
+	memberName: string,
 	scope: enricher.Scope,
-	call: InvokingCall | null,
-): { type: common.Type; providedBy?: string } | null {
-	let memberName = node.member.content
+): Array<{ type: common.MethodType; providedBy: string }> {
 	let reached = protocolsProviding(memberName, scope).filter(
 		(protocol) =>
 			namespace.conformsTo?.includes(protocol.identity) === true,
 	)
-	// A descendant that provides the name again answers it.
-	let answers = reached.flatMap((protocol) => {
+
+	return reached.flatMap((protocol) => {
 		let provided = reached.some(
 			(other) =>
 				other !== protocol &&
@@ -123,6 +120,20 @@ export function providedNamespaceMember(
 					},
 				]
 	})
+}
+
+// A provided Method named through a Namespace, as `Number.isLessThan(a, b)`,
+// with `Self` pinned to its target. Null where no conformance it declares
+// provides the name. Two unrelated providers the Arguments both fit tie, as at
+// `value::label()`.
+export function providedNamespaceMember(
+	namespace: common.NamespaceType,
+	node: parser.LookupNode,
+	scope: enricher.Scope,
+	call: InvokingCall | null,
+): { type: common.Type; providedBy?: string } | null {
+	let memberName = node.member.content
+	let answers = providedNamespaceAnswers(namespace, memberName, scope)
 	// The Arguments choose among them, as among a `::` call's candidates. Where
 	// none fits, the first answers and reports the mismatch.
 	let fits =

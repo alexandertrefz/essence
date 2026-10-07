@@ -954,6 +954,17 @@ export type Conformance = {
 	source: ConformanceSource
 }
 
+// A provided Method an exported Namespace offers a JavaScript host. `type`
+// pins `Self` to the Namespace's target, and `conformance` is the witness the
+// body is handed.
+export type ExposedMethod = {
+	name: string
+	// The identity of the Protocol whose body answers.
+	providedBy: string
+	type: SimpleMethodType
+	conformance: Conformance
+}
+
 // One branch of a Method call on a Union-typed receiver. The receiver's Type
 // picks the branch at run time, and each branch is resolved at compile time.
 export type DispatchCase = {

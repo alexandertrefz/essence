@@ -86,7 +86,8 @@ export async function planCompilation(
 		context.options.jobs ?? defaultWorkerCount(inputFileNames.length)
 
 	return {
-		...modeOf(options),
+		// Every request of the run carries `--embed`, so its Sessions link for it.
+		...modeOf({ ...options, embed: context.options.embed }),
 		inputFileNames,
 		outputs,
 		dispatcher: useWorkers

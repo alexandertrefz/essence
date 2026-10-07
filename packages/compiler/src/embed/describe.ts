@@ -549,7 +549,9 @@ export function describeModule(
 	for (let name of Object.keys(surface.kinds)) {
 		let type = surface.values[name]
 		let entry =
-			type === undefined ? undefined : describeValue(type, name, context)
+			type === undefined
+				? undefined
+				: describeValue(type, name, context, surface.exposed?.[name])
 		let cases = choiceCasesOf(surface.types[name], name, context)
 
 		if (cases !== null) {
@@ -580,6 +582,7 @@ function describeValue(
 	type: common.Type,
 	name: string,
 	context: DescribeContext,
+	exposed: Array<common.ExposedMethod> = [],
 ): ExportDescriptor {
 	if (isOverloaded(type)) {
 		return {
@@ -596,7 +599,7 @@ function describeValue(
 				of: describeSignature(type, context),
 			}
 		case "Namespace":
-			return describeNamespace(type, name, context)
+			return describeNamespace(type, name, context, exposed)
 		// A constant. The Validator refuses to export a `variable`.
 		default:
 			return {
@@ -796,11 +799,13 @@ function reaches(
 }
 
 // Members are keyed as written, since `memberKey` quotes what JavaScript can not
-// spell. An instance Method's receiver is already its first Parameter.
+// spell. An instance Method's receiver is already its first Parameter. The
+// provided Methods a host is offered are emitted beside the Namespace's own.
 function describeNamespace(
 	type: common.NamespaceType,
 	name: string,
 	context: DescribeContext,
+	exposed: Array<common.ExposedMethod>,
 ): NamespaceDescriptor {
 	let properties: NamespaceDescriptor["properties"] = {}
 	let methods: Record<string, NamespaceMethod> = {}
@@ -829,6 +834,14 @@ function describeNamespace(
 					emitted: namespaceMemberName(member),
 					of: describeSignature(methodType, context),
 				}
+	}
+
+	for (let method of exposed) {
+		methods[method.name] = {
+			kind: "function",
+			emitted: namespaceMemberName(method.name),
+			of: describeSignature(method.type, context),
+		}
 	}
 
 	return {

@@ -207,6 +207,7 @@ export function createCompiler(
 			host: options.host,
 			optimisation: options.optimisation,
 			emit: target,
+			embed: true,
 		})
 
 		// Thrown, since that is how a bundler's load hook fails. The message is
