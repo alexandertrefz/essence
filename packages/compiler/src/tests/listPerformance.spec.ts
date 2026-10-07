@@ -13,16 +13,10 @@ import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
 
-// Claims about how long a List takes rather than what it answers. Appending
-// and prepending are amortised O(1), so a build of `TURNS` items stays far
-// under the ceiling, which a quadratic build exceeds.
-const TURNS = 60_000
-const CEILING_MILLISECONDS = 1_000
-
-// Taking a List apart one item at a time is held to a ratio rather than a
-// ceiling, so the claim holds under any load. Doubling the length doubles a
-// linear cost and quadruples a quadratic one, so the guard is three per
-// doubling.
+// Claims about how long a List takes rather than what it answers. Each is
+// held to a ratio rather than a ceiling, so it holds under any load. Doubling
+// the length doubles a linear cost and quadruples a quadratic one, so the
+// guard is three per doubling.
 const WALK_LENGTHS = [10_000, 20_000, 40_000, 80_000]
 const GROWTH_PER_DOUBLING = 3
 
@@ -69,9 +63,9 @@ async function millisecondsToRun(
 
 // The seed's one item makes the State a List of Integers from the first turn,
 // and makes the printed length one more than the turns.
-function buildingSource(method: string): string {
+function buildingSource(method: string, turns: number): string {
 	return `implementation {
-	constant built = loop(from 1, through ${TURNS}, startingWith [0], (
+	constant built = loop(from 1, through ${turns}, startingWith [0], (
 		index,
 		list,
 	) { <- list::${method}(index) })
@@ -187,17 +181,14 @@ function printedSumFor(name: string, length: number): string {
 }
 
 describe("List performance", () => {
-	it("appends sixty thousand items in under a second", async () => {
-		expect(
-			await millisecondsToRun(buildingSource("append"), `${TURNS + 1}`),
-		).toBeLessThan(CEILING_MILLISECONDS)
-	})
-
-	it("prepends sixty thousand items in under a second", async () => {
-		expect(
-			await millisecondsToRun(buildingSource("prepend"), `${TURNS + 1}`),
-		).toBeLessThan(CEILING_MILLISECONDS)
-	})
+	for (let method of ["append", "prepend"] as const) {
+		it(`builds a List through ${method} in linear time`, async () => {
+			await expectLinearGrowth(
+				(length) => buildingSource(method, length),
+				(length) => `${length + 1}`,
+			)
+		})
+	}
 
 	// `remove(at 0)` on a prepend-built List shrinks the front run and shares
 	// both runs. On an append-built one the box upgrades itself once, and the
