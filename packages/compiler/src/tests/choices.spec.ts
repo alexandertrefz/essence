@@ -1589,6 +1589,23 @@ describe("Choices", () => {
 				])
 			})
 
+			// A lone signature leaves its mismatch to the validator, even where a
+			// bound makes the call answer an Error. So its Arguments still report.
+			it("reports one a bounded lone signature that took nothing decides", () => {
+				let source = `implementation { ${blankBox}
+					function count<infer Item is Printable>(
+						_ items: List<Item>,
+						_ box: Box<Item>,
+					) -> Integer {
+						<- items::length()
+					}
+
+					Terminal.inspect(count(5, #Blank))
+				}`
+
+				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
+			})
+
 			// Through a generic Alias, the Alias's own Type Parameters are the
 			// blanks, so the payload is asked for its members all the same.
 			it("decides no construction a generic Alias prefixes there", () => {

@@ -1051,8 +1051,9 @@ function enrichFunctionInvocation(
 		nodeType: "FunctionInvocation",
 		name,
 		// A call answering an Error is no refusal while it selected a candidate.
+		// A lone signature says for itself whether it refused its Arguments.
 		arguments: underRefusedCall(
-			(type.type === "Error" && !selected) || refused === true,
+			refused ?? (type.type === "Error" && !selected),
 			() =>
 				node.arguments.map((argument) =>
 					typer.enrichArgumentNode(argument),
@@ -13146,9 +13147,10 @@ function resolveFunctionInvocation(
 	// still answers its return Type, so the validator reports the Argument. The
 	// dead-fallback re-probe must not read that as an answer.
 	selected: boolean
-	// Set where the Arguments are read as a refused call's, though the call
-	// answers a Type: a lone signature whose count does not pair.
-	refused?: true
+	// Set by a lone signature, whose Arguments are read as a refused call's
+	// only where their count does not pair. Its mismatch is the validator's to
+	// report, even where a bound makes the call answer an Error.
+	refused?: boolean
 } {
 	const type = nameType
 
@@ -13235,7 +13237,7 @@ function resolveFunctionInvocation(
 			overloadedMethodIndex: null,
 			omittedParameterIndices: [],
 			selected: false,
-			...(paired ? {} : { refused: true as const }),
+			refused: !paired,
 		}
 	} else if (
 		type.type === "OverloadedMethod" ||

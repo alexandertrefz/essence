@@ -656,7 +656,9 @@ it mentions stays unbound and is reported as `uninferable-type-parameter`.
 A call of a single signature that did not match is matched once more, so its Function literals still read their
 Parameter Types. `pairedByPlace` pairs them as a reader does: each Argument meets the Parameter of its label, or the
 unlabelled one at its place among the unlabelled, whatever the count. Where the count does not pair, the call still
-answers its declared Type, and its Arguments are read as a refused call's. A literal with no Function at its place
+answers its declared Type, and its Arguments are read as a refused call's. Where it pairs, the mismatch is the
+validator's to report, so each Argument reports where it stands. That holds where a bound makes the call answer an
+Error, since a call that selected nothing has no witness to pass. A literal with no Function at its place
 reports nothing, and one with a Function there still reports a Parameter that Function lacks.
 `twice((x) { <- x::add("s") }, 1, 2)` then reports `argument-count-mismatch` and the mistake in the body, and
 nothing about the literal. A refused `::` call with one candidate reads its literals the same way
