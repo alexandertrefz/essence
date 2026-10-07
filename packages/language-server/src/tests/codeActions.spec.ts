@@ -8778,6 +8778,25 @@ describe("Extract to a Constant", () => {
 		).toEqual([])
 	})
 
+	// A Pattern's member name is no Expression, so the selection finds the
+	// Match around it.
+	it("offers nothing for a selection in a Matcher", () => {
+		let lines = [
+			"implementation {",
+			"\tfunction size(_ shape: { width: Integer } | { radius: Integer }) -> Integer {",
+			"\t\t<- match shape -> Integer {",
+			"\t\t\tcase { width: Integer } { <- width }",
+			"\t\t\tcase { radius } { <- radius }",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+
+		expect(refactoredCodesOf(lines)).toEqual([])
+		expect(extractions(lines, spanOf(lines, 4, "width"))).toEqual([])
+		expect(extractions(lines, spanOf(lines, 4, "case"))).toEqual([])
+	})
+
 	it("offers nothing where the Statement does not open its line", () => {
 		let lines = [
 			"implementation {",

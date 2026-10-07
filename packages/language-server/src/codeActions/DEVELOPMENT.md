@@ -126,7 +126,9 @@ It is safe only because the Expression is still evaluated exactly where it was. 
 lifted Expression would run where the Program ran it only sometimes. So is one that would read a name out of scope.
 
 The Expression is the smallest one that contains the trimmed selection, not one whose Position matches it exactly.
-A reader dragging over characters is often off by one, and still means the same Node.
+A reader dragging over characters is often off by one, and still means the same Node. A selection that starts past a
+Match's head finds the Match when it stands on no Expression, such as on a Pattern's member name. Lifting the whole
+Match is not what was meant, so `isAmongHandlers` turns it away.
 
 Only some Expressions are worth naming, and `isExtractable` lists them. A bare Identifier already has a name, and
 a scalar Literal reads as its own value. Others take their meaning from where they are written and would lose it.

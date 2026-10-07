@@ -49,7 +49,8 @@ export function extractConstantActions(
 	if (
 		expression === null ||
 		!isExtractable(expression) ||
-		holdsBareCase(expression)
+		holdsBareCase(expression) ||
+		isAmongHandlers(expression, selection)
 	) {
 		return []
 	}
@@ -150,6 +151,19 @@ function isExtractable(
 		default:
 			return false
 	}
+}
+
+// A selection past a Match's head stands among its Handlers, such as on a
+// Pattern's member name, which is no Expression. The Match around it is not
+// what was meant.
+function isAmongHandlers(
+	expression: parser.ExpressionNode,
+	selection: common.Position,
+): boolean {
+	return (
+		expression.nodeType === "Match" &&
+		!isBefore(selection.start, expression.returnType.position.end)
+	)
 }
 
 // Whether a bare `#Case` inside the value resolves against the Type its
