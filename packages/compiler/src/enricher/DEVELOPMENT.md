@@ -1024,6 +1024,23 @@ Hover, Completion and rename list the builtin Protocols in the Protocol order. A
 offered Protocol by Protocol in it as well. It is also the order the Protocols build on each other: `Orderable`
 extends `Comparable`.
 
+## Names a block reads before it declares them
+
+A local declaration comes into scope at its own line, so a read above it reaches the name around the block. The
+emitted JavaScript gives a `const` the whole of its block, so that read would meet the local before it holds a
+value, and a local Function is hoisted over it. So a name means one thing throughout a block. `noteOuterRead`
+notes the name on every Scope a read passes on its way out, and an assignment counts as a read.
+`declareVariableInScope` asks `refuseShadowingAfterRead`, which reports `shadowing-after-read` where a Scope
+declares a name it already read.
+
+A read inside a nested block or a Function literal passes the Scopes around it, so it counts for each of them. A
+refused read reached nothing and is not noted. A Parameter's default runs before the body's block exists, so the
+Scope it is read in, which carries `parameterDefaultBarrier`, does not count it. A Match Guard runs before its
+Handler's block too. The Handler's statements are read in a child of the Guard's Scope, as an `if` body is read
+inside its condition's, so the Guard's reads count only for the Scopes around the Match. A name the top level reads
+resolves there at the latest, since the prelude's names share its table, so nothing is noted on it. A name the
+compiler declares, such as `@`, has no Position and is never refused.
+
 ## Hoisting
 
 A `function`, `overload function`, `type`, `choice`, `namespace` or `protocol` at the top level of a section is

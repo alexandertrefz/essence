@@ -1351,6 +1351,40 @@ Quick Fix: **Move this Statement below 'Loud'**, unless a statement it would pas
 
 Taught on: [Namespaces and methods › Where a namespace can be used](/docs/language/namespaces-and-methods#where-a-namespace-can-be-used)
 
+### `shadowing-after-read`
+
+**Error.** A block declares a name it already read from outside. Above the declaration the read reached the outer one, and below it the name means the block's own, so one name would mean two things in one block.
+
+<div class="error-output">
+
+```
+[shadowing-after-read]
+Error: 'rate' is declared after this block read another 'rate'
+   ╭─┤ Shadow.es:6:12 │
+   │
+ 2 │     constant rate = 2
+   │              ──┬─  
+   │                ╰─── the outer 'rate'
+   │ 
+ 5 │        constant base = amount::multiply(with rate)
+   │                                              ──┬─  
+   │                                                ╰─── this read reaches the outer 'rate'
+ 6 │        constant rate = 3
+   │                 ──┬─  
+   │                   ╰─── declared here, so 'rate' names this one throughout the block
+   │ 
+   │ Help: Give this declaration a name of its own, and rename the reads of it that follow, so the outer 'rate' stays the one read above.
+   │ 
+   │ Note: A name means one thing throughout a block, so a block that reads an outer name can not declare its own of that name.
+───╯
+```
+
+</div>
+
+Give the block's own declaration a name of its own, and rename the reads that follow it. A read counts wherever it stands in the block: inside a nested `if`, a match arm, or a function literal written above the declaration, which would otherwise read the block's own name when it runs. A parameter's default is no read of the body, since it is worked out before the body runs, and a match arm's `where` guard is no read of the arm's body for the same reason. An assignment to the outer name counts as a read. A block that declares its own name first and reads it after is fine: that is shadowing, and the outer name is back after the closing brace.
+
+Taught on: [Conditions › A block is a scope](/docs/language/conditions#a-block-is-a-scope)
+
 ### `unknown-name`
 
 **Error.** A name is used that nothing in scope declares. The Help suggests the closest name when there is one. A word between braces in a string lands here too, since it is read as a name in a hole: `"use { and } carefully"` reports `'and' is not declared`, with a note saying so and the help `Write '\{' and '\}' where the braces stand for themselves.` That help comes LAST where anything else was found: a hole holding a name one edit from a constant is a hole somebody meant to open and mistyped, while a hole holding a word nothing resembles is prose that was never meant to be read.

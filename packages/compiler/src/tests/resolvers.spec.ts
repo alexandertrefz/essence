@@ -14,6 +14,7 @@ import { parse, parseWithDiagnostics } from "../parser/index"
 import { rewrite } from "../rewriter/index"
 import { simplify } from "../simplifier/index"
 import { validate } from "../validator/index"
+import { codesOfSource } from "./followedHelps"
 
 // What the Enricher's name resolution answers: the Scope walks in
 // `resolvers.ts`. Some answers show only when the emitted Program runs, so
@@ -156,6 +157,267 @@ describe("Resolvers", () => {
 
 			expect(diagnostics).toHaveLength(1)
 			expect(diagnostics[0].code).toBe("partial-type-mismatch")
+		})
+	})
+
+	// A read above a local declaration reaches the outer name, while the
+	// emitted `const` holds the whole block. See "Names a block reads before
+	// it declares them" in packages/compiler/src/enricher/DEVELOPMENT.md.
+	describe("A name a block reads before it declares its own", () => {
+		it("refuses the declaration and points at the read", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				constant k = 2
+
+				function f(_ n: Integer) -> Integer {
+					constant total = k::add(n)
+					constant k = 7
+					<- total::add(k)
+				}
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"shadowing-after-read",
+			])
+			expect(diagnostics[0].position?.start.line).toBe(6)
+			expect(
+				diagnostics[0].labels.map((label) => [
+					label.message,
+					label.position.start.line,
+				]),
+			).toEqual([
+				[
+					"declared here, so 'k' names this one throughout the block",
+					6,
+				],
+				["this read reaches the outer 'k'", 5],
+				["the outer 'k'", 2],
+			])
+		})
+
+		// Each body is its own block in the emitted JavaScript. A read in a
+		// nested block or a literal counts for the blocks around it.
+		for (let [block, source] of [
+			[
+				"a Constant in an if body",
+				`constant flag = true
+				if flag {
+					constant total = k::add(1)
+					constant k = 7
+					Terminal.inspect(total::add(k))
+				}`,
+			],
+			[
+				"a Constant in a Function literal's body",
+				`constant g = (_ n: Integer) -> Integer {
+					constant total = k::add(n)
+					constant k = 7
+					<- total::add(k)
+				}`,
+			],
+			[
+				"a Constant in a match arm",
+				`constant found: Optional<Integer> = #Value(3)
+				Terminal.inspect(match found -> Integer {
+					case #Value {
+						constant total = k::add(@.item)
+						constant k = 7
+						<- total::add(k)
+					}
+					case #Empty { <- 0 }
+				})`,
+			],
+			[
+				"a Variable",
+				`function f(_ n: Integer) -> Integer {
+					constant total = k::add(n)
+					variable k = 7
+					<- total::add(k)
+				}`,
+			],
+			[
+				"a Pattern binding",
+				`function f(_ r: { k: Integer }) -> Integer {
+					constant total = k::add(1)
+					constant { k } = r
+					<- total::add(k)
+				}`,
+			],
+			[
+				"a local Function",
+				`function f() -> Integer {
+					constant total = k::add(1)
+					function k() -> Integer {
+						<- 7
+					}
+					<- total::add(k())
+				}`,
+			],
+			[
+				"a Constant after a read in an earlier nested block",
+				`function f(_ flag: Boolean) -> Integer {
+					if flag {
+						Terminal.inspect(k)
+					}
+					constant k = 7
+					<- k
+				}`,
+			],
+			[
+				"a Constant after a literal that reads the outer name",
+				`function f() -> Integer {
+					constant read = () -> Integer { <- k }
+					constant k = 7
+					<- read()::add(k)
+				}`,
+			],
+			[
+				"a Constant whose own value reads the outer name",
+				`function f(_ n: Integer) -> Integer {
+					constant k = k::add(n)
+					<- k
+				}`,
+			],
+			[
+				"a Variable after an assignment to the outer one",
+				`variable v = 1
+				if true {
+					v = 2
+					variable v = 3
+					Terminal.inspect(v)
+				}`,
+			],
+		]) {
+			it(`refuses ${block}`, () => {
+				expect(
+					codesFor(`implementation {
+						constant k = 2
+						${source}
+					}`),
+				).toEqual(["shadowing-after-read"])
+			})
+		}
+
+		it("refuses it in a test's body", () => {
+			expect(
+				codesOfSource(
+					`implementation {
+						constant k = 2
+					}
+
+					tests {
+						test "reads the outer k first" {
+							constant total = k::add(1)
+							constant k = 7
+							require total::add(k)::is(10)
+						}
+					}`,
+					{ tests: true },
+				),
+			).toEqual(["shadowing-after-read"])
+		})
+
+		it("runs a block that declares its own name before reading it", async () => {
+			expect(
+				await run(`implementation {
+					constant table = "a table"
+
+					if true {
+						constant table = "the long table"
+						Terminal.inspect(table)
+					}
+
+					Terminal.inspect(table)
+				}`),
+			).toEqual(['"the long table"', '"a table"'])
+		})
+
+		it("names an assignment that reached the outer Variable", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				variable v = 1
+
+				if true {
+					v = 2
+					variable v = 3
+				}
+			}`)
+
+			expect(diagnostics[0]?.message).toBe(
+				"'v' is declared after this block assigned another 'v'",
+			)
+			expect(diagnostics[0]?.labels[1]?.message).toBe(
+				"this assignment reaches the outer 'v'",
+			)
+		})
+
+		// The default's `k` is the later Parameter, refused for that, so it
+		// reached no outer `k` for the block around `f` to shadow.
+		it("counts no refused read for the blocks around it", () => {
+			expect(
+				codesFor(`implementation {
+					constant k = 1
+
+					function outer() -> Integer {
+						function f(_ a: Integer = k, then k: Integer) -> Integer {
+							<- a
+						}
+
+						constant k = 5
+						<- f(then 2)::add(k)
+					}
+				}`),
+			).toEqual(["default-references-later-parameter"])
+		})
+
+		// The emitted Guard is the `if` test, which runs before the arm's
+		// block, so it still reads the outer `k`.
+		it("runs an arm whose Guard reads the name its body declares", async () => {
+			expect(
+				await run(`implementation {
+					constant k = 2
+					constant found: Optional<Integer> = #Value(3)
+
+					Terminal.inspect(match found -> Integer {
+						case #Value(item) where k::isGreaterThan(1) {
+							constant k = 7
+							<- k::add(item)
+						}
+						case _ { <- 0 }
+					})
+				}`),
+			).toEqual(["10"])
+		})
+
+		// The default is worked out before the body's block exists, so it
+		// still reads the outer `j`.
+		it("runs a body that declares the name a Parameter's default read", async () => {
+			expect(
+				await run(`implementation {
+					constant j = 2
+
+					function f(_ a: Integer = j) -> Integer {
+						constant j = 10
+						<- a::add(j)
+					}
+
+					Terminal.inspect(f())
+				}`),
+			).toEqual(["12"])
+		})
+
+		it("runs once the Help's rename is made", async () => {
+			expect(
+				await run(`implementation {
+					constant k = 2
+
+					function f(_ n: Integer) -> Integer {
+						constant total = k::add(n)
+						constant bonus = 7
+						<- total::add(bonus)
+					}
+
+					Terminal.inspect(f(1))
+				}`),
+			).toEqual(["10"])
 		})
 	})
 

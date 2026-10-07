@@ -127,6 +127,7 @@ import {
 	unboundToReport,
 } from "./dispatchReceivers"
 import { namespaceCallHelps, valueOf } from "./namespaceValues"
+import { noteOuterRead, refuseShadowingAfterRead } from "./outerReads"
 import {
 	bindsLastStep,
 	refuseBareNames,
@@ -3241,6 +3242,8 @@ function enrichIdentifierExpression(
 	if (declaringScope === null || alias === undefined) {
 		let type = resolveIdentifierType(node, scope, context)
 
+		noteOuterRead(node, type, scope)
+
 		return valueOf(enrichIdentifier(node, scope, type), context)
 	}
 
@@ -3764,10 +3767,13 @@ function enrichMatch(
 			let shadowedNarrowings = guardNarrowings.filter(
 				(narrowing) => !boundNames.has(narrowing.name),
 			)
-			let handlerScope =
+			// The Handler's statements are a block inside the Scope the Guard is
+			// read in, as an `if` body is, since the emitted Guard runs first.
+			let handlerScope = childScope(
 				shadowedNarrowings.length === 0
 					? bodyScope
-					: childScope(scopeShadowing(shadowedNarrowings, bodyScope))
+					: scopeShadowing(shadowedNarrowings, bodyScope),
+			)
 
 			// Bindings desugar into Constants at the head of the body. `@`
 			// still means the narrowed value, so an arm can bind parts and pass
@@ -5966,6 +5972,8 @@ function enrichVariableAssignmentStatement(
 
 	let name = enrichIdentifier(node.name, scope)
 
+	noteOuterRead(node.name, name.type, scope, true)
+
 	// The Variable's Type is the value's expected Type, so a bare Case resolves
 	// against it.
 	let value = enrichExpression(node.value, scope, name.type)
@@ -7958,6 +7966,8 @@ function declareVariableInScope(
 ): enricher.Scope {
 	const variableName =
 		typeof identifier === "string" ? identifier : identifier.content
+
+	refuseShadowingAfterRead(identifier, scope)
 
 	if (scope.members[variableName] != null) {
 		reportDuplicateDeclaration(

@@ -313,6 +313,7 @@ export type DiagnosticCode =
 	| "duplicate-type-parameter"
 	| "reserved-type-name"
 	| "use-before-declaration"
+	| "shadowing-after-read"
 	| "unknown-name"
 	| "default-references-later-parameter"
 	| "default-references-own-parameter"

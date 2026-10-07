@@ -160,6 +160,8 @@ implementation {
 
 A name declared inside a block belongs to that block. The inner `table` shadows the outer one until the closing brace, and after it the outer `table` is back, unchanged. A `const` inside a JavaScript block behaves the same way.
 
+A name means one thing throughout a block, so a block that has already read the outer `table` can not declare its own below that read. That is [`shadowing-after-read`](/docs/reference/diagnostics#shadowing-after-read). Declare the block's own `table` before reading it, or give it another name.
+
 A name declared only inside a branch does not exist after it: reading it past the closing brace is [`unknown-name`](/docs/reference/diagnostics#unknown-name).
 
 ## Choosing a value with `define`
