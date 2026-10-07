@@ -230,6 +230,33 @@ export function foreignChoiceDeclaration(
 	return null
 }
 
+// The Case a Choice declares, for one an Alias of an application holds, as
+// `type Crate<W> = Box<W>` holds `Box<W>#Full`. Where only the Alias is
+// imported, the Choice is read off its own Module. See "Resolving a Case" in
+// DEVELOPMENT.md.
+export function declaredCaseOf(
+	caseType: common.CaseType,
+	scope: enricher.Scope,
+): common.CaseType {
+	let foreign =
+		caseType.typeArguments === undefined
+			? null
+			: unboundForeignChoice(caseType, scope)
+	let declared =
+		foreign === null ? null : foreignChoiceDeclaration(foreign, scope)
+	let body = declared?.type === "GenericAlias" ? declared.aliasedType : null
+	let declaredCase = (
+		body?.type === "UnionType" ? flattenUnionMembers(body) : []
+	).find(
+		(member): member is common.CaseType =>
+			member.type === "Case" &&
+			member.choice === caseType.choice &&
+			member.name === caseType.name,
+	)
+
+	return declaredCase ?? caseType
+}
+
 // What to say of a Choice no name here binds: import it under the name its
 // Module exports it as, or export it first. A Choice its Type Arguments name
 // is imported too, since its derive is found the same way. Printing also needs
@@ -462,10 +489,14 @@ export function foreignChoicesSpelled(
 // with the Type Argument it takes for each of its Type Parameters, null where
 // the Case leaves one open. `type Boxes<A> = Box<List<A>>` writes the
 // `Box<List<Integer>>` of `#Full` as `Boxes<Integer>`.
-function aliasWriting(
+export function aliasWriting(
 	candidate: common.CaseType,
 	scope: enricher.Scope,
-): { name: string; typeArguments: Array<common.Type | null> } | null {
+): {
+	name: string
+	generics: Array<common.GenericDeclaration>
+	typeArguments: Array<common.Type | null>
+} | null {
 	for (
 		let current: enricher.Scope | null = scope;
 		current !== null;
@@ -505,6 +536,7 @@ function aliasWriting(
 			) {
 				return {
 					name,
+					generics: alias.generics,
 					typeArguments: alias.generics.map(({ name: generic }) => {
 						let bound = bindings.get(generic)
 

@@ -1,8 +1,17 @@
-import type { common, parser } from "@essence-lang/interfaces"
+import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError } from "../diagnostics/index"
-import { countOf, describeType } from "../helpers/describe"
-import { mentionsUnsolvedTypeParameter } from "../helpers/types"
+import {
+	countOf,
+	describeType,
+	displayChoiceName,
+	spellChoiceName,
+} from "../helpers/describe"
+import {
+	borrowedGenericName,
+	mentionsUnsolvedTypeParameter,
+} from "../helpers/types"
+import { aliasWriting, spellingIn } from "./spelling"
 
 // The values a Constant or a Variable is declared with, and the arms of a
 // `define` declared so, which its annotation decides.
@@ -67,7 +76,10 @@ export function reportUndecidedTypeArguments(
 		{
 			code: "undecided-type-arguments",
 			labels: [
-				primary(position, undecidedLabel(parameterNames, undecided)),
+				primary(
+					position,
+					undecidedLabel(parameterNames, undecided, choiceName),
+				),
 			],
 			notes: [
 				`'${choiceName}' takes ${countOf(parameterNames.length, "Type Parameter")}: ${quotedNames(parameterNames)}.`,
@@ -89,11 +101,49 @@ export function reportUndecidedTypeArguments(
 	return { type: "Error" }
 }
 
+// The report for an undecided bare Case. Where no name here binds its Choice,
+// a generic Alias of its application does, so the Helps write the Alias and
+// its own Type Parameters.
+export function reportUndecidedBareCase(
+	construction: string,
+	caseType: common.CaseType,
+	choiceGenerics: Array<common.GenericDeclaration>,
+	node: parser.CaseValueNode,
+	takesPayload: boolean,
+	scope: enricher.Scope,
+): common.ErrorType {
+	let unbound =
+		spellingIn(scope)(displayChoiceName(caseType.choice), caseType) === null
+	let alias = unbound ? aliasWriting(caseType, scope) : null
+	let generics = alias?.generics ?? choiceGenerics
+	// An Alias's Type Parameter the Case leaves open is spelled as undecided.
+	let payloadArguments = generics.map((generic, index) =>
+		alias === null
+			? caseType.typeArguments?.[index]
+			: (alias.typeArguments[index] ?? {
+					type: "GenericUse" as const,
+					name: borrowedGenericName(generic.name),
+				}),
+	)
+
+	return reportUndecidedTypeArguments(
+		construction,
+		alias?.name ?? spellChoiceName(caseType, spellingIn(scope)),
+		node.caseName.content,
+		generics,
+		node,
+		takesPayload,
+		takesPayload ? payloadArguments : undefined,
+	)
+}
+
 // The primary label. With a payload it says which Type Parameters the payload
-// decided beside those it left open.
+// decided beside those it left open. Through an Alias that fixes the rest, as
+// `type Keyed<V> = Bin<String, V>` does, only writing the Alias decides them.
 function undecidedLabel(
 	parameterNames: Array<common.GenericName>,
 	undecided: Array<common.GenericName> | undefined,
+	choiceName: string,
 ): string {
 	if (undecided === undefined) {
 		return "no Type Arguments here, and nothing around it decides them"
@@ -105,7 +155,9 @@ function undecidedLabel(
 		return "its payload decides none of them"
 	}
 
-	return `its payload decides ${quotedNames(decided)}, and nothing decides ${quotedNames(undecided)}`
+	return undecided.length === 0
+		? `its payload decides ${quotedNames(decided)}, and only writing '${choiceName}' decides the rest`
+		: `its payload decides ${quotedNames(decided)}, and nothing decides ${quotedNames(undecided)}`
 }
 
 function quotedNames(names: Array<common.GenericName>): string {

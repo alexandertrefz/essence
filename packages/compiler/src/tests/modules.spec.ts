@@ -13724,6 +13724,147 @@ export {
 		).toEqual([])
 	})
 
+	// `Main.es` imports the Aliases alone, whose Cases mention their own Type
+	// Parameters. A bare Case is still the one its Choice declares, read off
+	// the Choice's own Module, as where the Choice is in scope.
+	describe("a bare Case where only a generic Alias of its Choice is imported", () => {
+		let shelf = `implementation {
+	choice Box<Value> { Full { value: Value }, Empty }
+	choice Pair<A, B> { Left { a: A }, Neither }
+	choice Bin<K, V> { Stored { value: V }, Vacant }
+	type Crate<W> = Box<W>
+	type Boxes<L> = Box<List<L>>
+	type Flip<X, Y> = Pair<Y, X>
+	type Ints = Box<Integer>
+	type Keyed<V> = Bin<String, V>
+}
+
+export {
+	Boxes
+	Crate
+	Flip
+	Ints
+	Keyed
+}
+`
+		let importing = (entries: string, body: string) => ({
+			"Main.es": `import {
+	from "./Shelf.es" {
+		${entries}
+	}
+}
+
+implementation {
+${body}
+}
+`,
+			"Shelf.es": shelf,
+		})
+
+		it("instantiates it from its payload", async () => {
+			await withBuiltProject(
+				importing(
+					"Boxes\n\t\tCrate\n\t\tInts",
+					`	function take(_ box: Crate<Integer>) -> String {
+		<- "took"
+	}
+
+	Terminal.inspect(#Full(1))
+	Terminal.inspect(#Full("five"))
+	Terminal.inspect(#Full([2]))
+	Terminal.inspect([#Full(6), #Full(7)])
+	Terminal.inspect(take(#Full(8)))`,
+				),
+				async (directory) => {
+					expect(
+						codesOf(analysedAt(directory, "Main.es", "Main.es")),
+					).toEqual([])
+					expect(
+						await runBundle(
+							generateModules(linkProject(directory, "Main.es")),
+							directory,
+						),
+					).toEqual([
+						"Box#Full(1)",
+						'Box#Full("five")',
+						"Box#Full([ 2 ])",
+						"[ Box#Full(6), Box#Full(7) ]",
+						'"took"',
+					])
+				},
+			)
+		})
+
+		// The Choice is no name in `Main.es`, so the Helps write the Alias.
+		// `Keyed` fixes `Bin`'s `K`, so its payload decides every Type
+		// Parameter of the Alias, and only writing `Keyed` decides `K`.
+		it("writes an undecided one's Type Arguments through the Alias", () => {
+			let analysed = (body: string, entries = "Flip") =>
+				withProject(importing(entries, body), (directory) =>
+					analysedAt(directory, "Main.es", "Main.es"),
+				)
+			let undecided = (body: string, entries = "Flip") =>
+				analysed(body, entries).find(
+					(diagnostic) =>
+						diagnostic.code === "undecided-type-arguments",
+				)
+
+			expect(
+				undecided("\tconstant left = #Left({ a = 1 })")?.labels[0]
+					?.message,
+			).toBe("its payload decides 'Y', and nothing decides 'X'")
+			expect(
+				undecided("\tconstant none = #Neither")?.labels[0]?.message,
+			).toBe("no Type Arguments here, and nothing around it decides them")
+			expect(
+				undecided("\tconstant stored = #Stored(5)", "Keyed"),
+			).toMatchObject({
+				labels: [
+					{
+						message:
+							"its payload decides 'V', and only writing 'Keyed' decides the rest",
+					},
+				],
+				helps: [
+					"Annotate the Declaration this is written into with 'Keyed<Integer>', which is what decides them.",
+					"Or apply the Type Arguments here — 'Keyed<Integer>#Stored(…)', with the Type you mean in place of each '…'.",
+				],
+			})
+			expect(
+				codesOf(
+					analysed(
+						"\tconstant stored: Keyed<Integer> = #Stored(5)\n\tTerminal.inspect(stored)",
+						"Keyed",
+					),
+				),
+			).toEqual([])
+			expect(
+				undecided("\tconstant left = #Left({ a = 1 })")?.helps,
+			).toEqual([
+				"Annotate the Declaration this is written into with 'Flip<…, Integer>', which is what decides them.",
+				"Or apply the Type Arguments here — 'Flip<…, Integer>#Left(…)', with the Type you mean in place of each '…'.",
+			])
+			expect(
+				codesOf(
+					analysed(
+						"\tconstant left: Flip<String, Integer> = #Left({ a = 1 })\n\tTerminal.inspect(left)",
+					),
+				),
+			).toEqual([])
+			expect(
+				codesOf(
+					analysed(
+						"\tTerminal.inspect(Flip<String, Integer>#Left({ a = 1 }))",
+					),
+				),
+			).toEqual([])
+			expect(undecided("\tconstant none = #Neither")?.helps).toEqual([
+				"Annotate the Declaration this is written into with 'Flip<…, …>', which is what decides them.",
+				"Or apply the Type Arguments here — 'Flip<…, …>#Neither', with the Type you mean in place of each '…'.",
+			])
+		})
+	})
+
 	it("writes a missing Case under the name an import gave its Choice", () => {
 		let match = (handlers: string) =>
 			importing(

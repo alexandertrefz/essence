@@ -49,7 +49,10 @@ no Type Arguments and covers every application of its Case, so a Matcher's Helps
 position decides nothing, the scan of every Case in scope decides (`resolveBareCaseReference`). An Alias of an
 application holds the Choice's Cases applied, and the scan takes the Case the Choice declares over them
 (`findCaseTypesInScope`). With only the Alias in scope, its applied Case still counts, so a bare `#Full` is ambiguous
-beside another Choice's `#Full`. Two Choices declaring the name are ambiguous again, unless the position was itself
+beside another Choice's `#Full`. Where it stands alone, the Case the Choice declares is read off the Choice's own
+Module (`declaredCaseOf`), so `#Full(1)` is instantiated from its payload as it is where the Choice is in scope. The
+Choice is no name there, so the Helps of an undecided one write the Alias and its own Type Parameters
+(`reportUndecidedBareCase`). Two Choices declaring the name are ambiguous again, unless the position was itself
 refused. A unit Case of a generic Choice has no payload to decide anything, so a bare `#Bare` that nothing decides
 reports `undecided-type-arguments`, as `Holder#Bare` does.
 

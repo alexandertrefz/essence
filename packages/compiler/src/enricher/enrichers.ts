@@ -240,6 +240,7 @@ import {
 } from "./scope"
 import { reportEmptyLookup, specifierWasRefused } from "./specifiers"
 import {
+	declaredCaseOf,
 	reportAmbiguousCase,
 	spellingIn,
 	suggestionData,
@@ -263,6 +264,7 @@ import {
 } from "./typeParameterSteps"
 import {
 	markDeclaredValue,
+	reportUndecidedBareCase,
 	reportUndecidedTypeArguments,
 } from "./undecidedCases"
 import { dividedUnionNotes, reportNarrowedUnionMember } from "./unionDispatch"
@@ -937,14 +939,13 @@ function reportUndecidedPayloadTypeArguments(
 		return caseType
 	}
 
-	return reportUndecidedTypeArguments(
+	return reportUndecidedBareCase(
 		`#${node.caseName.content}(…)`,
-		spellChoiceName(caseType, spellingIn(scope)),
-		node.caseName.content,
+		caseType,
 		choiceGenerics,
 		node,
 		true,
-		choiceGenerics.map((_, index) => caseType.typeArguments?.[index]),
+		scope,
 	)
 }
 
@@ -14089,7 +14090,7 @@ function resolveBareCaseReference(
 	)
 
 	if (candidates.length === 1) {
-		return candidates[0]
+		return declaredCaseOf(candidates[0], scope)
 	}
 
 	// A Case dropped with its `choice` block is declared, so writing it is no
@@ -14261,13 +14262,13 @@ function resolveCaseValueType(
 				return { type: "Error" }
 			}
 
-			return reportUndecidedTypeArguments(
+			return reportUndecidedBareCase(
 				`#${node.caseName.content}`,
-				spellChoiceName(bareCase, spellingIn(scope)),
-				node.caseName.content,
+				bareCase,
 				bareCase.choiceGenerics,
 				node,
 				false,
+				scope,
 			)
 		}
 
