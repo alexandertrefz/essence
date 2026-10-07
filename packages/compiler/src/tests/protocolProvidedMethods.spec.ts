@@ -142,6 +142,78 @@ function declarationsOf(javaScript: string, name: string): number {
 	return javaScript.split(`const ${name} =`).length - 1
 }
 
+// Writes a Module graph into a directory of its own, and removes it
+// whatever the spec asks of it.
+async function withModules(
+	files: Record<string, string>,
+	ask: (directory: string) => Promise<void>,
+): Promise<void> {
+	let directory = mkdtempSync(join(tmpdir(), "essence-protocol-twice-"))
+
+	try {
+		for (let [name, source] of Object.entries(files)) {
+			mkdirSync(path.dirname(join(directory, name)), {
+				recursive: true,
+			})
+			writeFileSync(join(directory, name), source)
+		}
+
+		await ask(directory)
+	} finally {
+		rmSync(directory, { recursive: true, force: true })
+	}
+}
+
+function emitModules(directory: string, entry: string) {
+	let linked = linkModuleGraph(
+		loadModuleGraph(join(directory, entry), diskModuleHost),
+	)
+
+	expect(
+		[...linked.modules.values()].flatMap((module) => module.diagnostics),
+	).toEqual([])
+
+	return rewriteModules(
+		[...linked.modules.values()].map((module) => ({
+			filePath: module.module.filePath,
+			program: optimise(simplify(module.program)),
+		})),
+		linked.entryPath,
+	)
+}
+
+// A bundle file per name, since an imported file runs once.
+async function printedBy(
+	directory: string,
+	sources: ReturnType<typeof rewriteModules>,
+	name: string = "bundle",
+): Promise<string> {
+	let file = join(directory, `${name}.mjs`)
+	let result = await bundle(sources, {
+		sourceFileName: "Main.es",
+		outputFileName: file,
+	})
+
+	writeFileSync(file, result.outputs[0]!.contents)
+
+	let printed = ""
+	let originalWrite = process.stdout.write
+
+	process.stdout.write = ((chunk: unknown) => {
+		printed += String(chunk)
+
+		return true
+	}) as typeof process.stdout.write
+
+	try {
+		await import(file)
+	} finally {
+		process.stdout.write = originalWrite
+	}
+
+	return printed
+}
+
 const SHAPE = [
 	"\tprotocol Shape {",
 	"\t\tarea() -> Rational",
@@ -1067,12 +1139,9 @@ describe("Protocol-provided Methods", () => {
 							"\t\t}",
 							"\t}",
 							"",
-							...BIG,
-							"",
 							...integerNamespace(
-								"is Counted, is Big",
+								"is Counted, is Sized",
 								["size() -> Integer", "@"],
-								["extra() -> Integer", "7"],
 								["count() -> Integer", "9"],
 							),
 						],
@@ -1099,13 +1168,10 @@ describe("Protocol-provided Methods", () => {
 							"\t\t}",
 							"\t}",
 							"",
-							...BIG,
-							"",
-							...integerNamespace(
-								"is Shown, is Big",
-								["size() -> Integer", "@"],
-								["extra() -> Integer", "7"],
-							),
+							...integerNamespace("is Shown, is Sized", [
+								"size() -> Integer",
+								"@",
+							]),
 						],
 						"\tTerminal.inspect(gauge(3))",
 					),
@@ -1113,8 +1179,8 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(['"shown h3"'])
 		})
 
-		// Of two Protocols that do not extend each other the first the
-		// clauses reach provides the body, and of two that do the more derived.
+		// Of two Protocols that do not extend `Sized` the first the clauses
+		// reach provides the body, and of two that do the more derived.
 		it("should answer with the first of two unrelated bodies the clauses reach", async () => {
 			let shown = [
 				"\tprotocol Shown {",
@@ -1132,6 +1198,12 @@ describe("Protocol-provided Methods", () => {
 						[
 							...shown,
 							"",
+							"\tprotocol Counted {",
+							"\t\tdescribe() -> String {",
+							'\t\t\t<- "counted"',
+							"\t\t}",
+							"\t}",
+							"",
 							...BIG,
 							"",
 							"\tprotocol Bigger is Big {",
@@ -1146,13 +1218,9 @@ describe("Protocol-provided Methods", () => {
 								["extra() -> Integer", "7"],
 							),
 							"",
-							"\tnamespace StringAll for String is Shown, is Bigger {",
+							"\tnamespace StringAll for String is Counted, is Shown, is Sized {",
 							"\t\tsize() -> Integer {",
 							"\t\t\t<- @::length()",
-							"\t\t}",
-							"",
-							"\t\textra() -> Integer {",
-							"\t\t\t<- 8",
 							"\t\t}",
 							"\t}",
 						],
@@ -1160,7 +1228,7 @@ describe("Protocol-provided Methods", () => {
 						'\tTerminal.inspect(gauge("ab"))',
 					),
 				),
-			).toEqual(['"bigger 3"', '"shown 2"'])
+			).toEqual(['"bigger 3"', '"counted"'])
 		})
 
 		// `Shown` comes first, and its body answers with an Integer where
@@ -3399,49 +3467,6 @@ describe("Protocol-provided Methods", () => {
 				printed: Array<string>
 			}> = [
 				{
-					shape: "Walled before a Protocol extending Big twice over",
-					declarations: [
-						...walled,
-						...bigOnSize,
-						...other,
-						...bigger,
-						...integerNamespace(
-							"is Walled, is Other, is Bigger",
-							size,
-							extraInteger,
-						),
-					],
-					printed: ['"W 3"'],
-				},
-				{
-					shape: "Walled before Big and a descendant of Big",
-					declarations: [
-						...walled,
-						...bigOnSize,
-						...bigger,
-						...integerNamespace(
-							"is Walled, is Big, is Bigger",
-							size,
-							extraInteger,
-						),
-					],
-					printed: ['"W 3"'],
-				},
-				{
-					shape: "Walled before a descendant of Big",
-					declarations: [
-						...walled,
-						...bigOnSize,
-						...bigger,
-						...integerNamespace(
-							"is Walled, is Bigger",
-							size,
-							extraInteger,
-						),
-					],
-					printed: ['"W 3"'],
-				},
-				{
 					shape: "Big before Shown",
 					declarations: [
 						...bigBesideExtra,
@@ -3482,6 +3507,86 @@ describe("Protocol-provided Methods", () => {
 					printed: ['"Big 3"'],
 				},
 				{
+					shape: "a Big that asks for its extra before Shown",
+					declarations: [
+						...bigOnExtra,
+						...shown,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					printed: ['"Big e"'],
+				},
+				{
+					shape: "Big before Shown, beside a pick of Big",
+					declarations: [
+						...bigBesideExtra,
+						...shown,
+						...integerNamespace(
+							"is Big, is Shown",
+							size,
+							extraString,
+						),
+					],
+					lines: ["\tTerminal.inspect(3::<Big>describe())"],
+					printed: ['"Big 3"', '"Big 3"'],
+				},
+			]
+
+			// A body unrelated to `Sized` comes first, so `gauge` would run it
+			// while a bound on the descendant runs its own. A value bounded by
+			// the descendant can reach `gauge`, so each conformer is refused.
+			const refusedCases: Array<{
+				shape: string
+				declarations: Array<string>
+				refused: string
+			}> = [
+				{
+					shape: "Walled before a Protocol extending Big twice over",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...other,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Other, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					refused: "Other",
+				},
+				{
+					shape: "Walled before Big and a descendant of Big",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Big, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					refused: "Big",
+				},
+				{
+					shape: "Walled before a descendant of Big",
+					declarations: [
+						...walled,
+						...bigOnSize,
+						...bigger,
+						...integerNamespace(
+							"is Walled, is Bigger",
+							size,
+							extraInteger,
+						),
+					],
+					refused: "Bigger",
+				},
+				{
 					shape: "a Shown that asks for more than Sized before Big",
 					declarations: [
 						...bigOnExtra,
@@ -3498,7 +3603,7 @@ describe("Protocol-provided Methods", () => {
 							extraString,
 						),
 					],
-					printed: ['"Shown 3"'],
+					refused: "Big",
 				},
 				{
 					shape: "Shown before a Big that asks for its extra",
@@ -3511,20 +3616,7 @@ describe("Protocol-provided Methods", () => {
 							extraString,
 						),
 					],
-					printed: ['"Shown 3"'],
-				},
-				{
-					shape: "a Big that asks for its extra before Shown",
-					declarations: [
-						...bigOnExtra,
-						...shown,
-						...integerNamespace(
-							"is Big, is Shown",
-							size,
-							extraString,
-						),
-					],
-					printed: ['"Big e"'],
+					refused: "Big",
 				},
 				{
 					shape: "Shown before a Big on size",
@@ -3537,21 +3629,7 @@ describe("Protocol-provided Methods", () => {
 							extraString,
 						),
 					],
-					printed: ['"Shown 3"'],
-				},
-				{
-					shape: "Big before Shown, beside a pick of Big",
-					declarations: [
-						...bigBesideExtra,
-						...shown,
-						...integerNamespace(
-							"is Big, is Shown",
-							size,
-							extraString,
-						),
-					],
-					lines: ["\tTerminal.inspect(3::<Big>describe())"],
-					printed: ['"Big 3"', '"Big 3"'],
+					refused: "Big",
 				},
 				{
 					shape: "a Counted on size before Big",
@@ -3574,7 +3652,7 @@ describe("Protocol-provided Methods", () => {
 							extraInteger,
 						),
 					],
-					printed: ['"C 3"'],
+					refused: "Big",
 				},
 			]
 
@@ -3592,13 +3670,34 @@ describe("Protocol-provided Methods", () => {
 				})
 			}
 
+			for (let { shape, declarations, refused } of refusedCases) {
+				it(`should refuse ${shape}`, () => {
+					expect(
+						refusalsOf(
+							gaugeProgram(
+								declarations,
+								"\tTerminal.inspect(gauge(3))",
+							),
+						),
+					).toEqual([
+						[
+							"nonconforming-namespace",
+							`Namespace 'IntegerAll' does not conform to '${refused}'`,
+							[
+								`Method 'describe' runs one body for '${refused}' and another for 'Sized'`,
+							],
+						],
+					])
+				})
+			}
+
 			it("should still tie the two at a call that names neither", () => {
 				let source = gaugeProgram(
 					[
 						...bigOnExtra,
 						...shown,
 						...integerNamespace(
-							"is Shown, is Big",
+							"is Big, is Shown",
 							size,
 							extraString,
 						),
@@ -6464,62 +6563,86 @@ describe("Protocol-provided Methods", () => {
 		})
 
 		// `Counted` provides a `z` answering an Integer and `Weighed` one
-		// answering a Number, so `Both` takes `Counted`'s entry and its body.
-		it("should run the body of the extension whose entry it takes, in either clause order", async () => {
+		// answering a Number, so `Both` takes `Counted`'s entry and its body. A
+		// bound on `Weighed` runs `Weighed`'s own, and a value bounded by `Both`
+		// can reach it, so the conformer writes `z` itself.
+		it("should refuse a conformer whose extension takes the other body, in either clause order", async () => {
+			let program = (clauses: string, ...written: Array<string>) =>
+				[
+					"implementation {",
+					"\tprotocol Counted {",
+					"\t\tv() -> Integer",
+					"",
+					"\t\tz() -> Integer {",
+					"\t\t\t<- @::v()",
+					"\t\t}",
+					"\t}",
+					"",
+					"\tprotocol Weighed {",
+					"\t\tw() -> Integer",
+					"",
+					"\t\tz() -> Number {",
+					"\t\t\t<- @::w()",
+					"\t\t}",
+					"\t}",
+					"",
+					`\tprotocol Both is ${clauses} {}`,
+					"",
+					"\tnamespace IntegerBoth for Integer is Both {",
+					"\t\tv() -> Integer {",
+					"\t\t\t<- 10",
+					"\t\t}",
+					"",
+					"\t\tw() -> Integer {",
+					"\t\t\t<- 20",
+					"\t\t}",
+					...written,
+					"\t}",
+					"",
+					"\tfunction viaWeighed<infer T is Weighed>(_ t: T) -> Number {",
+					"\t\t<- t::z()",
+					"\t}",
+					"",
+					"\tfunction viaCounted<infer T is Counted>(_ t: T) -> Integer {",
+					"\t\t<- t::z()",
+					"\t}",
+					"",
+					"\tfunction viaBoth<infer T is Both>(_ t: T) -> String {",
+					'\t\t<- "{viaWeighed(t)} {viaCounted(t)} {t::z()}"',
+					"\t}",
+					"",
+					"\tTerminal.inspect(viaBoth(1))",
+					"\tTerminal.inspect(viaWeighed(2))",
+					"}",
+				].join("\n")
+
 			for (let clauses of [
 				"Counted, is Weighed",
 				"Weighed, is Counted",
 			]) {
+				expect(refusalsOf(program(clauses))).toEqual([
+					[
+						"nonconforming-namespace",
+						"Namespace 'IntegerBoth' does not conform to 'Both'",
+						[
+							"Method 'z' runs one body for 'Both' and another for 'Weighed'",
+						],
+					],
+				])
+				expect(helpsOf(program(clauses))).toEqual([
+					"Write 'z' in 'IntegerBoth' as 'Both' declares it, so one Method answers both.",
+				])
 				expect(
 					await run(
-						[
-							"implementation {",
-							"\tprotocol Counted {",
-							"\t\tv() -> Integer",
+						program(
+							clauses,
 							"",
 							"\t\tz() -> Integer {",
-							"\t\t\t<- @::v()",
+							"\t\t\t<- 30",
 							"\t\t}",
-							"\t}",
-							"",
-							"\tprotocol Weighed {",
-							"\t\tw() -> Integer",
-							"",
-							"\t\tz() -> Number {",
-							"\t\t\t<- @::w()",
-							"\t\t}",
-							"\t}",
-							"",
-							`\tprotocol Both is ${clauses} {}`,
-							"",
-							"\tnamespace IntegerBoth for Integer is Both {",
-							"\t\tv() -> Integer {",
-							"\t\t\t<- 10",
-							"\t\t}",
-							"",
-							"\t\tw() -> Integer {",
-							"\t\t\t<- 20",
-							"\t\t}",
-							"\t}",
-							"",
-							"\tfunction viaWeighed<infer T is Weighed>(_ t: T) -> Number {",
-							"\t\t<- t::z()",
-							"\t}",
-							"",
-							"\tfunction viaCounted<infer T is Counted>(_ t: T) -> Integer {",
-							"\t\t<- t::z()",
-							"\t}",
-							"",
-							"\tfunction viaBoth<infer T is Both>(_ t: T) -> String {",
-							'\t\t<- "{viaWeighed(t)} {viaCounted(t)} {t::z()}"',
-							"\t}",
-							"",
-							"\tTerminal.inspect(viaBoth(1))",
-							"\tTerminal.inspect(viaWeighed(2))",
-							"}",
-						].join("\n"),
+						),
 					),
-				).toEqual(['"10 10 10"', "10"])
+				).toEqual(['"30 30 30"', "30"])
 			}
 		})
 
@@ -7701,80 +7824,6 @@ describe("two Protocols of one name", () => {
 		expect(emitted).toContain("$es_Tagged__announce")
 	})
 
-	// Writes a Module graph into a directory of its own, and removes it
-	// whatever the spec asks of it.
-	async function withModules(
-		files: Record<string, string>,
-		ask: (directory: string) => Promise<void>,
-	): Promise<void> {
-		let directory = mkdtempSync(join(tmpdir(), "essence-protocol-twice-"))
-
-		try {
-			for (let [name, source] of Object.entries(files)) {
-				mkdirSync(path.dirname(join(directory, name)), {
-					recursive: true,
-				})
-				writeFileSync(join(directory, name), source)
-			}
-
-			await ask(directory)
-		} finally {
-			rmSync(directory, { recursive: true, force: true })
-		}
-	}
-
-	function emitModules(directory: string, entry: string) {
-		let linked = linkModuleGraph(
-			loadModuleGraph(join(directory, entry), diskModuleHost),
-		)
-
-		expect(
-			[...linked.modules.values()].flatMap(
-				(module) => module.diagnostics,
-			),
-		).toEqual([])
-
-		return rewriteModules(
-			[...linked.modules.values()].map((module) => ({
-				filePath: module.module.filePath,
-				program: optimise(simplify(module.program)),
-			})),
-			linked.entryPath,
-		)
-	}
-
-	// A bundle file per name, since an imported file runs once.
-	async function printedBy(
-		directory: string,
-		sources: ReturnType<typeof rewriteModules>,
-		name: string = "bundle",
-	): Promise<string> {
-		let file = join(directory, `${name}.mjs`)
-		let result = await bundle(sources, {
-			sourceFileName: "Main.es",
-			outputFileName: file,
-		})
-
-		writeFileSync(file, result.outputs[0]!.contents)
-
-		let printed = ""
-		let originalWrite = process.stdout.write
-
-		process.stdout.write = ((chunk: unknown) => {
-			printed += String(chunk)
-
-			return true
-		}) as typeof process.stdout.write
-
-		try {
-			await import(file)
-		} finally {
-			process.stdout.write = originalWrite
-		}
-
-		return printed
-	}
-
 	function taggedModule(
 		typeName: string,
 		memberName: string,
@@ -7888,10 +7937,10 @@ describe("two Protocols of one name", () => {
 		)
 	})
 
-	// One Namespace conforms to both, and neither extends the other, so
-	// both bounds run the first clause's body, with that Protocol's witness. A
-	// pick reaches either body.
-	it("should answer both bounds of one conformer with the first same-named body", async () => {
+	// One Namespace conforms to both, and neither extends the other. So each
+	// bound runs its own Protocol's body with that Protocol's witness, as a
+	// pick does.
+	it("should answer each bound of one conformer with its own Protocol's body", async () => {
 		let sized = (requirement: string, letter: string, gauge: string) =>
 			[
 				"implementation {",
@@ -7954,13 +8003,13 @@ describe("two Protocols of one name", () => {
 						directory,
 						emitModules(directory, "Main.es"),
 					),
-				).toBe("A 3\nA 3\nA 3\nB 30\n")
+				).toBe("A 3\nB 30\nA 3\nB 30\n")
 			},
 		)
 	})
 
-	// The same where one is imported under an alias, and a pick through
-	// the alias reaches that Protocol's body.
+	// The same where one is imported under an alias. A bound and a pick
+	// through the alias reach that Protocol's body.
 	it("should reach the body of a Protocol imported under an alias beside its namesake", async () => {
 		let tagged = (letter: string, show: string) =>
 			[
@@ -8019,9 +8068,369 @@ describe("two Protocols of one name", () => {
 						directory,
 						emitModules(directory, "Main.es"),
 					),
-				).toBe("A i\nA i\nB i\n")
+				).toBe("A i\nB i\nB i\n")
 			},
 		)
+	})
+})
+
+// A pick, a bounded pick and a bounded call through one Protocol run one body.
+// Where that Protocol has a body of the name, it is that body or one that a
+// Protocol extending the body's Protocol provides again.
+describe("a bound through a Protocol with a body of the name", () => {
+	function provides(
+		name: string,
+		body: string,
+		extending: string = "",
+	): Array<string> {
+		return [
+			`\tprotocol ${name}${extending === "" ? "" : ` is ${extending}`} {`,
+			"\t\tlabel() -> String {",
+			`\t\t\t<- "${body}"`,
+			"\t\t}",
+			"\t}",
+			"",
+		]
+	}
+
+	function bounded(name: string): Array<string> {
+		return [
+			`\tfunction via${name}<infer Item is ${name}>(_ item: Item) -> String {`,
+			`\t\t<- item::<${name}>label()`,
+			"\t}",
+			"",
+			`\tfunction plain${name}<infer Item is ${name}>(_ item: Item) -> String {`,
+			"\t\t<- item::label()",
+			"\t}",
+			"",
+		]
+	}
+
+	// The pick, the bounded pick and the bounded call, on one line per name.
+	function compared(name: string, print: string): string {
+		return `\tTerminal.${print}("${name} {value::<${name}>label()} {via${name}(value)} {plain${name}(value)}")`
+	}
+
+	type Shape = {
+		shape: string
+		protocols: Array<string>
+		names: Array<string>
+		conformer: Array<string>
+		value: string
+		printed: Array<string>
+	}
+
+	function singleFile({ protocols, names, conformer, value }: Shape): string {
+		return [
+			"implementation {",
+			...protocols,
+			...names.flatMap(bounded),
+			...conformer,
+			"",
+			value,
+			"",
+			...names.map((name) => compared(name, "inspect")),
+			"}",
+		].join("\n")
+	}
+
+	// The Protocols and the bounded Functions in one Module, and the
+	// conformer and the calls in the entry.
+	function graph({
+		protocols,
+		names,
+		conformer,
+		value,
+	}: Shape): Record<string, string> {
+		let exported = names.flatMap((name) => [
+			name,
+			`via${name}`,
+			`plain${name}`,
+		])
+
+		return {
+			"Shapes.es": [
+				"implementation {",
+				...protocols,
+				...names.flatMap(bounded),
+				"}",
+				"",
+				"export {",
+				...exported.map((name) => `\t${name}`),
+				"}",
+			].join("\n"),
+			"Main.es": [
+				"import {",
+				'\tfrom "./Shapes.es" {',
+				...exported.map((name) => `\t\t${name}`),
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				...conformer,
+				"",
+				value,
+				"",
+				...names.map((name) => compared(name, "print")),
+				"}",
+			].join("\n"),
+		}
+	}
+
+	const PRICED = provides("Priced", "priced")
+	const TITLED = provides("Titled", "titled")
+	const BOOK = ["\ttype Book = { title: String }", ""]
+	const BOOK_VALUE = '\tconstant value: Book = { title = "Ficciones" }'
+	const BOX = ["\ttype Box<Item> = { item: Item }", ""]
+	const BOX_VALUE = "\tconstant value: Box<Integer> = { item = 1 }"
+	const DIAMOND = [
+		...provides("Base", "base"),
+		"\tprotocol Left is Base {}",
+		"",
+		"\tprotocol Right is Base {}",
+		"",
+	]
+	const SIZED_AND_BIG = [
+		...provides("Sized", "sized"),
+		...provides("Big", "big", "Sized"),
+	]
+
+	const shapes: Array<Shape> = [
+		{
+			shape: "two unrelated Protocols",
+			protocols: [...PRICED, ...TITLED],
+			names: ["Priced", "Titled"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Priced, is Titled {}",
+			],
+			value: BOOK_VALUE,
+			printed: [
+				"Priced priced priced priced",
+				"Titled titled titled titled",
+			],
+		},
+		{
+			shape: "two unrelated Protocols in the other clause order",
+			protocols: [...PRICED, ...TITLED],
+			names: ["Priced", "Titled"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Titled, is Priced {}",
+			],
+			value: BOOK_VALUE,
+			printed: [
+				"Priced priced priced priced",
+				"Titled titled titled titled",
+			],
+		},
+		{
+			shape: "a diamond after an unrelated Protocol",
+			protocols: [...DIAMOND, ...TITLED],
+			names: ["Titled", "Left", "Right", "Base"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Titled, is Left, is Right {}",
+			],
+			value: BOOK_VALUE,
+			printed: [
+				"Titled titled titled titled",
+				"Left base base base",
+				"Right base base base",
+				"Base base base base",
+			],
+		},
+		{
+			shape: "a diamond whose one side provides the name again",
+			protocols: [
+				...provides("Base", "base"),
+				"\tprotocol Left is Base {}",
+				"",
+				...provides("Right", "right", "Base"),
+			],
+			names: ["Left", "Right", "Base"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Left, is Right {}",
+			],
+			value: BOOK_VALUE,
+			printed: [
+				"Left right right right",
+				"Right right right right",
+				"Base right right right",
+			],
+		},
+		{
+			shape: "a conditional conformance",
+			protocols: [...PRICED, ...TITLED],
+			names: ["Priced", "Titled"],
+			conformer: [
+				...BOX,
+				"\tnamespace Boxes<infer Item> for Box<Item> is Priced, is Titled where Item is Printable {}",
+			],
+			value: BOX_VALUE,
+			printed: [
+				"Priced priced priced priced",
+				"Titled titled titled titled",
+			],
+		},
+		{
+			shape: "a conditional conformance in the other clause order",
+			protocols: [...PRICED, ...TITLED],
+			names: ["Priced", "Titled"],
+			conformer: [
+				...BOX,
+				"\tnamespace Boxes<infer Item> for Box<Item> is Titled where Item is Printable, is Priced {}",
+			],
+			value: BOX_VALUE,
+			printed: [
+				"Priced priced priced priced",
+				"Titled titled titled titled",
+			],
+		},
+		{
+			shape: "a descendant providing the name again",
+			protocols: SIZED_AND_BIG,
+			names: ["Sized", "Big"],
+			conformer: [...BOOK, "\tnamespace Books for Book is Big {}"],
+			value: BOOK_VALUE,
+			printed: ["Sized big big big", "Big big big big"],
+		},
+		{
+			shape: "a descendant providing the name again after an unrelated Protocol",
+			protocols: [...SIZED_AND_BIG, ...provides("Shown", "shown")],
+			names: ["Sized", "Big", "Shown"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Shown, is Big {}",
+			],
+			value: BOOK_VALUE,
+			printed: [
+				"Sized big big big",
+				"Big big big big",
+				"Shown shown shown shown",
+			],
+		},
+	]
+
+	for (let shape of shapes) {
+		it(`should run one body per Protocol for ${shape.shape}`, async () => {
+			expect(await run(singleFile(shape))).toEqual(
+				shape.printed.map((line) => `"${line}"`),
+			)
+		})
+
+		it(`should run one body per Protocol for ${shape.shape} in a Module graph`, async () => {
+			await withModules(graph(shape), async (directory) => {
+				expect(
+					await printedBy(
+						directory,
+						emitModules(directory, "Main.es"),
+					),
+				).toBe(shape.printed.map((line) => `${line}\n`).join(""))
+			})
+		})
+	}
+
+	// Each side's bound runs its own body, and a value bounded by either can
+	// reach a bound on `Base`, which runs one. The Namespace writes the name.
+	it("should refuse a diamond whose two sides provide the name again", async () => {
+		let diamond = (...written: Array<string>): Shape => ({
+			shape: "a diamond whose two sides provide the name again",
+			protocols: [
+				...provides("Base", "base"),
+				...provides("Left", "left", "Base"),
+				...provides("Right", "right", "Base"),
+			],
+			names: ["Left", "Right", "Base"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Left, is Right {",
+				...written,
+				"\t}",
+			],
+			value: BOOK_VALUE,
+			printed: [],
+		})
+
+		expect(refusalsOf(singleFile(diamond()))).toEqual([
+			[
+				"nonconforming-namespace",
+				"Namespace 'Books' does not conform to 'Right'",
+				[
+					"Method 'label' runs one body for 'Right' and another for 'Base'",
+				],
+			],
+		])
+		expect(helpsOf(singleFile(diamond()))).toEqual([
+			"Write 'label' in 'Books' as 'Right' declares it, so one Method answers both.",
+		])
+		expect(
+			await run(
+				singleFile(
+					diamond(
+						"\t\tlabel() -> String {",
+						'\t\t\t<- "books"',
+						"\t\t}",
+					),
+				),
+			),
+		).toEqual([
+			'"Left books books books"',
+			'"Right books books books"',
+			'"Base books books books"',
+		])
+	})
+
+	// `Both` sees one of the two bodies, and a value bounded by it can reach a
+	// bound on the other Protocol, which runs its own.
+	it("should refuse a conformer to an extension of two unrelated Protocols", async () => {
+		let joined = (...written: Array<string>): Shape => ({
+			shape: "an extension of two unrelated Protocols",
+			protocols: [
+				...PRICED,
+				...TITLED,
+				"\tprotocol Both is Priced, is Titled {}",
+				"",
+			],
+			names: ["Priced", "Titled", "Both"],
+			conformer: [
+				...BOOK,
+				"\tnamespace Books for Book is Both {",
+				...written,
+				"\t}",
+			],
+			value: BOOK_VALUE,
+			printed: [],
+		})
+
+		expect(refusalsOf(singleFile(joined()))).toEqual([
+			[
+				"nonconforming-namespace",
+				"Namespace 'Books' does not conform to 'Both'",
+				[
+					"Method 'label' runs one body for 'Both' and another for 'Priced'",
+				],
+			],
+		])
+		expect(helpsOf(singleFile(joined()))).toEqual([
+			"Write 'label' in 'Books' as 'Both' declares it, so one Method answers both.",
+		])
+		expect(
+			await run(
+				singleFile(
+					joined(
+						"\t\tlabel() -> String {",
+						'\t\t\t<- "books"',
+						"\t\t}",
+					),
+				),
+			),
+		).toEqual([
+			'"Priced books books books"',
+			'"Titled books books books"',
+			'"Both books books books"',
+		])
 	})
 })
 

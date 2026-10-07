@@ -14,10 +14,10 @@ import {
 	probeContextualFunctionTypes,
 	resolveMethodInvocation,
 } from "./enrichers"
+import { conformanceProvidersIn } from "./providedBodies"
 import { underRefusedCall } from "./refusedCalls"
 import {
 	type ConformanceSourceNamespace,
-	conformanceProvidersIn,
 	conformanceSourcesFor,
 	namespacesDeclaringMethod,
 	partitionInstanceMethodNamespaces,
@@ -104,9 +104,8 @@ export function providedMethodNamespacesNamed(
 }
 
 // What the source's conformance to `protocol` runs for the name. That is the
-// Namespace's own Method, or a body its witness takes that overrides the one
-// the Protocol sees. A body that wins only by clause order overrides nothing,
-// so the Protocol's own runs, as it does for a derive.
+// Namespace's own Method, or the body its witness for the Protocol takes. A
+// derive runs the Protocol's own.
 function conformanceAnswer(
 	protocol: common.ProtocolType,
 	methodName: string,
@@ -118,22 +117,11 @@ function conformanceAnswer(
 		return conformer
 	}
 
-	let seen = providedMethodProtocol(protocol, methodName)
-	let overriding = (conformer?.conformsTo ?? []).filter((identity) => {
-		let body = providedMethodProtocol(
-			protocolOf(identity, scope),
-			methodName,
-		)
-
-		return (
-			body !== null && seen !== null && protocolGrants(body, seen, scope)
-		)
-	})
 	let body =
 		conformer === null
-			? seen
+			? providedMethodProtocol(protocol, methodName)
 			: conformanceProvidersIn(
-					overriding,
+					conformer.conformsTo ?? [],
 					protocol,
 					source.targetType,
 					scope,

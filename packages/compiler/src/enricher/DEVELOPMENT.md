@@ -1377,10 +1377,8 @@ Protocols provide one name through one source, the more derived one answers, and
 
 A pick, `value::<P>m()`, says which conformance answers. `providedMethodNamespacesNamed` in `protocolPicks.ts`
 offers each source of the receiver's conformance to `P`, so a value that does not conform to `P` gets none. A source
-answers with what its conformance runs where that overrides the body `P` sees: the Method the Namespace writes, or
-a body of a Protocol extending the one `P` sees, chosen as `conformanceProvidersIn` chooses for a witness. So a
-concrete pick runs what a bound through `P` runs. A body that wins only by clause order, from a Protocol unrelated to
-`P`'s, overrides nothing, and the pick runs `P`'s own.
+answers with what its conformance to `P` runs: the Method the Namespace writes, or the body `P`'s witness takes. So
+a concrete pick runs what a bound through `P` runs.
 
 The witness is `P`'s where `P` extends the body's Protocol, and otherwise the body's own, whose Methods the body
 reads. Either is solved from the source's conformance alone (`witnessFrom` on the `Self` Type Parameter), as a
@@ -1391,6 +1389,19 @@ its witness is solved for the receiver itself (`witnessType`). A derive's `Self`
 Case still fits the Parameter. `providedNamespaceMember` answers the `Number.isLessThan(a, b)` spelling the same
 way. A generic Namespace named there has no receiver, so its Type Parameters stay open for the first Argument to
 decide.
+
+### The body a witness takes
+
+`conformanceProvidersIn` in `providedBodies.ts` chooses the body for each name of a conformance's witness to `P`.
+Where `P` has a body of the name, its own or an inherited one, only a Protocol extending the body's Protocol can
+replace it. So a bound through `P` runs the body a pick through `P` runs, and a Protocol that does not extend the
+body's Protocol never replaces it. Where `P` only requires the name, any body whose signature fulfils the requirement
+can answer. Of the bodies that can, the more derived Protocol's wins, then the first the clauses reach.
+
+A value bounded by a Protocol can be handed to a bound on one it extends, which reads the same witness. So
+`reportSplitProvidedBodies` refuses a Namespace whose witnesses for the two answer a name with different bodies, as
+`nonconforming-namespace`. Two sides of a diamond that each provide the name again split so. So does an unrelated
+body answering a requirement of `P` ahead of a descendant's body, since the descendant's bound runs its own.
 
 ## Finding the Namespaces for a receiver
 

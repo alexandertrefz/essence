@@ -96,6 +96,7 @@ import {
 	otherConformerNotes,
 } from "./otherApplications"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
+import { conformanceProvidersIn } from "./providedBodies"
 import {
 	bodyCanWait,
 	childScope,
@@ -4641,48 +4642,6 @@ function conformanceGrantsIn(
 	scope: enricher.Scope,
 ): (declared: string, wanted: string) => boolean {
 	return (declared, wanted) => protocolGrants(declared, wanted, scope)
-}
-
-// Whose body answers a name `solving` requires, of everything the conformer
-// conforms to. One that fulfils the requirement wins, then the more derived
-// Protocol, then the first the clauses reach.
-export function conformanceProvidersIn(
-	identities: Iterable<string>,
-	solving: common.ProtocolType,
-	// The conformer's declared target, never a narrower value, so every
-	// call runs the body the declaration chose.
-	target: common.Type,
-	scope: enricher.Scope,
-): (methodName: string) => string | null {
-	let reached = [...identities].map((identity) => protocolOf(identity, scope))
-	let fulfils = (provider: string, methodName: string): boolean => {
-		let requirement = solving.methods[methodName]
-		let body = protocolOf(provider, scope).methods[methodName]
-
-		return (
-			(requirement?.type === "SimpleMethod" && requirement === body) ||
-			providedBodyFulfils(methodName, requirement, body, target)
-		)
-	}
-
-	return (methodName) => {
-		let winner: string | null = null
-
-		for (let protocol of reached) {
-			let candidate = providedMethodProtocol(protocol, methodName)
-
-			if (
-				candidate !== null &&
-				candidate !== winner &&
-				(winner === null || protocolGrants(candidate, winner, scope)) &&
-				fulfils(candidate, methodName)
-			) {
-				winner = candidate
-			}
-		}
-
-		return winner
-	}
 }
 
 // What a call says of a requirement the Namespace does not answer. It writes
