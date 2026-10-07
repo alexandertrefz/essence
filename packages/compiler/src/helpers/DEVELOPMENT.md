@@ -714,7 +714,10 @@ it mentions stays unbound and is reported as `uninferable-type-parameter`.
 
 A call of a single signature that did not match is matched once more, so its Function literals still read their
 Parameter Types. `pairedByPlace` pairs them as a reader does: each Argument meets the Parameter of its label, or the
-unlabelled one at its place among the unlabelled, whatever the count. Where the count does not pair, the call still
+unlabelled one at its place among the unlabelled, whatever the count. A label no Parameter carries meets the
+Parameter its place pairs it with where the count pairs, as `argument-label-mismatch` reads it, and otherwise the one
+Parameter left unpaired. So `mixed(1, stepp (x) { … })` types its literal as `step` would, and so does
+`two(by (x) { … }, stepp (x) { … })` against `(step f: …, by g: …)`. Where the count does not pair, the call still
 answers its declared Type, and its Arguments are read as a refused call's. Where it pairs, the mismatch is the
 validator's to report, so each Argument reports where it stands. That holds where a bound makes the call answer an
 Error, since a call that selected nothing has no witness to pass. A literal with no Function at its place

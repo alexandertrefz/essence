@@ -8,6 +8,7 @@ import {
 } from "../diagnostics/index"
 import { countOf } from "../helpers/describe"
 import { parameterInternalName } from "../helpers/names"
+import { pairedByPlace } from "../helpers/readerPairing"
 import {
 	applyGenericBindings,
 	createFreshenedInference,
@@ -16,7 +17,6 @@ import {
 	matchArguments,
 	mentionsUnsolvedTypeParameter,
 	pairArguments,
-	pairedByPlace,
 } from "../helpers/types"
 import { type ArgumentTyper, inferReturnTypeFromBody } from "./enrichers"
 import { insideRefusedCall, underRefusedCall } from "./refusedCalls"

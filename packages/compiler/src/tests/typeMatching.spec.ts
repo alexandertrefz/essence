@@ -439,6 +439,66 @@ describe("Type matching", () => {
 			])
 		})
 
+		// A label no Parameter carries meets the Parameter its place pairs it
+		// with, as the label mismatch reads it. The literal is typed there, so
+		// only its body's own mistake joins the label's.
+		it("should read a literal whose label names no Parameter at its place", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function mixed(_ a: Integer, step f: (_ x: Integer) -> Integer) -> Integer {
+					<- f(a)
+				}
+
+				namespace Steps for Integer {
+					mix(step f: (_ x: Integer) -> Integer) -> Integer {
+						<- f(@)
+					}
+				}
+
+				constant plain = mixed(1, stepp (x) { <- x })
+				constant body = mixed(1, stepp (x) { <- x::add("s") })
+				constant method = 1::mix(stepp (x) { <- x::add("t") })
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.message,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["No overload of 'add' accepts these Arguments", 13],
+				["No overload of 'mix' accepts these Arguments", 14],
+				["No overload of 'add' accepts these Arguments", 14],
+				["This Argument is not labelled 'step'", 12],
+				["This Argument is not labelled 'step'", 13],
+			])
+		})
+
+		// Where the Parameter at its place is taken by a label, such an
+		// Argument meets the one Parameter left unpaired.
+		it("should read a literal whose label names no Parameter at the one left", () => {
+			let diagnostics = diagnosticsFor(`implementation {
+				function two(step f: (_ x: Integer) -> Integer, by g: (_ x: String) -> Integer) -> Integer {
+					<- 1
+				}
+
+				constant swapped = two(by (x) { <- x::length() }, stepp (x) { <- x::add(1) })
+				constant body = two(by (x) { <- x::length() }, stepp (x) { <- x::add("s") })
+			}`)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["no-matching-overload", 7],
+				["argument-label-mismatch", 6],
+				["argument-label-mismatch", 6],
+				["argument-label-mismatch", 7],
+				["argument-label-mismatch", 7],
+			])
+		})
+
 		// The call still answers its declared Type, so what is done with the
 		// answer is measured. A literal paired with a Function at its place
 		// still reports a Parameter that Function lacks.

@@ -57,6 +57,7 @@ import {
 } from "../helpers/predicateEval"
 import { typedBodyNamespaceReaches } from "../helpers/providedReach"
 import { readsEveryEntry, typedBodyReads } from "../helpers/providedReads"
+import { pairedByPlace } from "../helpers/readerPairing"
 import { closestMatch, editDistance } from "../helpers/suggest"
 import {
 	answersForBase,
@@ -87,7 +88,6 @@ import {
 	negatedPredicateConjunct,
 	NotHoistedYet,
 	pairArguments,
-	pairedByPlace,
 	predicateConjunctKey,
 	provenConjuncts,
 	refinableBaseTag,

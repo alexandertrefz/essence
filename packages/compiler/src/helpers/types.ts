@@ -3941,35 +3941,6 @@ export function matchArguments(
 	}
 }
 
-// The Parameters and Arguments of a refused call, as a reader pairs them. Each
-// Argument meets the Parameter of its label, or the unlabelled one at its place
-// among the unlabelled. One meeting none is left out.
-export function pairedByPlace(
-	parameters: common.BaseFunction["parameterTypes"],
-	matchableArguments: Array<MatchableArgument>,
-): [common.BaseFunction["parameterTypes"], Array<MatchableArgument>] {
-	let unlabelled = parameters.filter((parameter) => parameter.name === null)
-	let unlabelledSeen = 0
-	let paired: common.BaseFunction["parameterTypes"] = []
-	let kept: Array<MatchableArgument> = []
-
-	for (let argument of matchableArguments) {
-		let parameter =
-			argument.name === null
-				? unlabelled[unlabelledSeen++]
-				: parameters.find(
-						(candidate) => candidate.name === argument.name,
-					)
-
-		if (parameter !== undefined && !paired.includes(parameter)) {
-			paired.push(parameter)
-			kept.push(argument)
-		}
-	}
-
-	return [paired, kept]
-}
-
 // Which Argument answers which Parameter, from labels and `hasDefault` alone,
 // so it is cheap and works before typing. The walk is greedy, which
 // `indistinguishable-default-parameter` makes complete. Null is an arity mismatch.
