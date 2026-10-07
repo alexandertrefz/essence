@@ -4207,7 +4207,7 @@ ${declared}
 		// Parameter the condition reads.
 		it("should carry that Generic's name as data", () => {
 			let diagnostics = diagnosticsFor(`implementation {
-				namespace Wrapper<infer Item> for { value: Item }
+				namespace Wrapper<infer Item> for { value: Item, other: Other }
 					is Comparable where Other is Comparable
 				{
 					compare(to other: { value: Item }) -> Ordering {
@@ -4216,7 +4216,11 @@ ${declared}
 				}
 			}`)
 
-			expect(diagnostics[0].data).toEqual({
+			expect(
+				diagnostics.find(
+					(diagnostic) => diagnostic.code === "unknown-where-generic",
+				)?.data,
+			).toEqual({
 				kind: "undeclared-parameter",
 				name: "Other",
 			})
@@ -4243,31 +4247,30 @@ ${declared}
 			expect(compiles(source("infer Item, infer Other"))).toBe(true)
 		})
 
-		// A target Type that never reads `Other` can not witness the condition.
-		// That is the next question the declaration raises, and its own Help
-		// answers it.
-		it("should lead a Generic the target never reads to the report that says so", () => {
-			let source = (generics: string, target: string) => `implementation {
-				namespace Pairs<${generics}> for ${target} is Printable where Other is Printable {
+		// A target Type that never reads `Other` could not witness the condition
+		// on a declared `Other` either, so dropping the condition is the edit.
+		it("should drop a condition on a Generic the target never reads", () => {
+			let source = (conformance: string) => `implementation {
+				namespace Pairs<infer Item> for List<Item> is ${conformance} {
 					toString() -> String {
 						<- "pairs"
 					}
 				}
 			}`
+			let diagnostics = diagnosticsFor(
+				source("Printable where Other is Printable"),
+			)
 
 			expect(
-				diagnosticsFor(
-					source("infer Item, infer Other", "List<Item>"),
-				).map((diagnostic) => diagnostic.code),
-			).toEqual(["unwitnessable-where-condition"])
-			expect(
-				compiles(
-					source(
-						"infer Item, infer Other",
-						"{ items: List<Item>, other: Other }",
-					),
-				),
-			).toBe(true)
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.helps,
+					diagnostic.data,
+				]),
+			).toEqual([
+				["unknown-where-generic", ["Drop this condition."], undefined],
+			])
+			expect(compiles(source("Printable"))).toBe(true)
 		})
 
 		it("should reject a where condition on a Generic the target Type never mentions", () => {

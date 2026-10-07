@@ -358,7 +358,9 @@ Error: 'Other' is not a Type Parameter of this Namespace
     │                            ──┬──  
     │                              ╰──── no such Type Parameter
     │ 
-    │ Help: Declare it in the Namespace's Generic list: '<infer Other>'.
+    │ Help: Drop this condition.
+    │ 
+    │ Note: The target Type never names 'Other', so a Type Parameter of that name would have nothing to prove the condition with.
 ────╯
 
 [conflicting-where-condition]

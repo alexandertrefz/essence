@@ -89,12 +89,6 @@ const ALLOWED: Array<Allowance> = [
 		],
 	},
 	{
-		code: "unknown-where-generic",
-		title: "Declare it as '",
-		reason: "Declaring the name answers WHERE the condition's subject comes from; whether the Namespace can witness a condition about it is the next question, and one the reader can only be asked once the name is there.",
-		followUp: ["unwitnessable-where-condition"],
-	},
-	{
 		code: "undeclared-conformance",
 		title: "Declare the conformance: '",
 		reason: "Writing the conformance down is what the derived Methods were used without; whether the Namespace actually holds up its end is then checked for the first time, and a Namespace that does not is a second, truthful report rather than this fix failing.",

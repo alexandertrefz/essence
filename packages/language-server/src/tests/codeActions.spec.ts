@@ -4821,7 +4821,7 @@ describe("Code Actions", () => {
 		it("should write it into a Generic list already there", () => {
 			let lines = [
 				...BOXES,
-				"\tnamespace Boxes<infer Item> for Box<Item> is Sized where Thing is Sized {",
+				"\tnamespace Boxes<infer Item> for { item: Item, thing: Thing } is Sized where Thing is Sized {",
 				"\t\tsize() -> Integer {",
 				"\t\t\t<- 1",
 				"\t\t}",
@@ -4832,10 +4832,26 @@ describe("Code Actions", () => {
 			let result = applied(lines, parameterFixes(lines)[0])
 
 			expect(result[7]).toBe(
-				"\tnamespace Boxes<infer Item, infer Thing> for Box<Item> is Sized where Thing is Sized {",
+				"\tnamespace Boxes<infer Item, infer Thing> for { item: Item, thing: Thing } is Sized where Thing is Sized {",
 			)
 
-			expect(codesOf(result)).toEqual(["unwitnessable-where-condition"])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// Declared, a Parameter the target Type never names could not prove the
+		// condition, so nothing offers to declare it.
+		it("should offer no declaration where the target never names it", () => {
+			let lines = [
+				...BOXES,
+				"\tnamespace Boxes<infer Item> for Box<Item> is Sized where Thing is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			expect(parameterFixes(lines)).toEqual([])
 		})
 	})
 

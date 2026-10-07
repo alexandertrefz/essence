@@ -5033,11 +5033,11 @@ Taught on: [Protocols › Conditional conformance](/docs/language/protocols#cond
 ```
 [unknown-where-generic]
 Error: 'Other' is not a Type Parameter of this Namespace
-   ╭─┤ Pairs.es:2:64 │
+   ╭─┤ Pairs.es:2:84 │
    │
- 2 │     namespace Pairs<infer Item> for List<Item> is Printable where Other is Printable {
-   │                                                                   ──┬──  
-   │                                                                     ╰──── no such Type Parameter
+ 2 │     namespace Pairs<infer Item> for { first: Item, second: Other } is Printable where Other is Printable {
+   │                                                                                       ──┬──  
+   │                                                                                         ╰──── no such Type Parameter
    │ 
    │ Help: Declare it in the Namespace's Generic list: '<infer Other>'.
 ───╯
@@ -5045,12 +5045,9 @@ Error: 'Other' is not a Type Parameter of this Namespace
 
 </div>
 
-Fix the name, or declare the parameter in the namespace's list. The target type must then mention it, or [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition) follows.
+Fix the name, or declare the parameter in the namespace's list. Declaring it is offered only where the target type names it, as `second: Other` does here. A target type that never names it could not prove the condition, which is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition), so there the help is to drop the condition.
 
-Quick Fix: **Declare it as '&lt;infer Other&gt;'**. It leaves that follow-up by
-design: declaring the parameter is the edit this report asks for, and whether the
-target type mentions it is a second question about the namespace's head, which no
-edit to the condition can settle.
+Quick Fix: **Declare it as '&lt;infer Other&gt;'**, where the target type names it.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

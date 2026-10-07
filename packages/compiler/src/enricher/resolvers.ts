@@ -138,6 +138,7 @@ import {
 	inferringRefused,
 	orderConditions,
 } from "./typeParameters"
+import { reportUnknownWhereGeneric } from "./whereGenerics"
 
 // Type resolution: written Types, declarations, the Types of Combinations,
 // Lookups and Literals from their enriched children, conformance solving, and
@@ -7453,27 +7454,7 @@ export function checkProtocolConformance(
 
 			if (rejection !== null) {
 				if (rejection.kind === "unknown-generic") {
-					reportError(
-						`'${condition.generic.content}' is not a Type Parameter of this Namespace`,
-						condition.generic.position,
-						{
-							code: "unknown-where-generic",
-							labels: [
-								primary(
-									condition.generic.position,
-									"no such Type Parameter",
-								),
-							],
-							helps: [
-								`Declare it in the Namespace's Generic list: '<infer ${condition.generic.content}>'.`,
-							],
-							// The name as the condition wrote it.
-							data: {
-								kind: "undeclared-parameter",
-								name: condition.generic.content,
-							},
-						},
-					)
+					reportUnknownWhereGeneric(condition, node.targetType)
 				} else if (rejection.kind === "unwitnessable") {
 					reportError(
 						`'${condition.generic.content}' does not appear in this Namespace's target Type`,
