@@ -26,6 +26,12 @@ raised. The chosen candidate is the same object as its key, so the commit reuses
 reading the subtree again. Reading afresh would multiply the work at every nesting level. The Diagnostics wait for
 the commit, because the selection must stay silent about the candidates it rejects.
 
+A construction passed as an Argument is read by every probe of its call and once more when the call commits. The
+call's typer hands each of those one set of readings (`payloadOf`), so a payload read under one candidate Case is
+read once. Probes held for a later candidate get a set of their own, since what such a probe decides is committed
+only if its candidate wins. Each reading of a payload reads the bodies of the literals in it, which hold the next
+level of nesting, so a fresh set per probe doubled the reads at every level.
+
 A one-member Case accepts its payload Record or the member's value directly. `expectedPayloadType` offers both
 readings, and `wrapSingleMemberShorthand` wraps a value that does not fit the Record into it, so `#Done(5)` and
 `#Done({ value = 5 })` reach the instantiation identically. A Record that fits wins the ambiguity. The fit check

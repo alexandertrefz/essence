@@ -3549,6 +3549,12 @@ describe("Enricher", () => {
 					"function two(_ c: Integer) -> Integer { <- c }",
 					(inner: string) => `two((p: Integer) { <- ${inner} })`,
 				],
+				[
+					`choice Box { Full { f: (_ a: Integer) -> Integer }, Blank }
+					function five(_ b: Box) -> Integer { <- 1 }`,
+					(inner: string) =>
+						`five(#Full({ f = (p: Integer) { <- ${inner} } }))`,
+				],
 			] as const
 
 			for (let [callee, wrap] of shapes) {
@@ -3592,6 +3598,55 @@ describe("Enricher", () => {
 				expect(reads).toHaveLength(12)
 				expect(Math.max(...reads)).toBeLessThanOrEqual(2 * 12)
 			}
+		})
+
+		// The probes of a call and its commit share one reading of a payload,
+		// so each literal's body is read once, however deep the nesting.
+		it("should read a construction's payload once for its call", () => {
+			let program = parse(`implementation {
+				choice Box<T> { Full { value: T }, Blank }
+				function five(_ b: Box<{ f: (_ a: Integer) -> Integer }>) -> Integer { <- 1 }
+
+				constant x = ${Array.from({ length: 12 }).reduce<string>(
+					(inner) =>
+						`five(#Full({ value = { f = (_ p: Integer) -> Integer { <- ${inner} } } }))`,
+					"1",
+				)}
+			}`)
+			let reads: Array<number> = []
+			let count = (node: ParserNode): void => {
+				forEachParserChild(node, count)
+
+				if (node.nodeType !== "FunctionDefinition") {
+					return
+				}
+
+				let internal = node.parameters[0]?.internalName
+
+				// Only the literals; `five` names its Parameter `b`.
+				if (
+					internal?.nodeType !== "Identifier" ||
+					internal.content !== "p"
+				) {
+					return
+				}
+
+				let { body } = node
+				let index = reads.push(0) - 1
+
+				Object.defineProperty(node, "body", {
+					get: () => {
+						reads[index] += 1
+
+						return body
+					},
+				})
+			}
+
+			count(program)
+
+			expect(enrich(program).diagnostics).toEqual([])
+			expect(reads).toEqual(Array.from({ length: 12 }, () => 1))
 		})
 
 		// The Help spells what the body answers in the reading around it. Under

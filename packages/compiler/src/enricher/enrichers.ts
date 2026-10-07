@@ -579,6 +579,8 @@ function enrichCaseValue(
 	node: parser.CaseValueNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
+	// An Argument's readings, which the probes of its call share.
+	payload: PayloadReadings = makePayloadReadings(node, scope),
 ): common.typed.CaseValueNode {
 	// An Argument's expected Type is the one the Invocation committed for the
 	// winning candidate's Parameter, read back here. A refused call's Argument
@@ -594,7 +596,6 @@ function enrichCaseValue(
 	// instantiations, the payload is read silently under each and chooses among
 	// them. It decides one only where the position offers none the prefix can
 	// write, and the position then refuses it.
-	let payload = makePayloadReadings(node, scope)
 	let type = resolveCaseValueType(node, scope, context, payload.valueUnder)
 
 	if (context !== null) {
@@ -9647,6 +9648,7 @@ function makeArgumentTyper(
 	expectedType: common.Type | null = null,
 ): ArgumentTyper {
 	let cache = new Map<parser.ExpressionNode, common.typed.ExpressionNode>()
+	let payloads = new Map<parser.CaseValueNode, Map<number, PayloadReadings>>()
 	let admissions = new Map<
 		parser.ExpressionNode,
 		Map<string, common.Type | null>
@@ -9680,7 +9682,9 @@ function makeArgumentTyper(
 			cached =
 				value.nodeType === "RecordValue"
 					? enrichRecordValue(value, scope, null, true)
-					: enrichExpression(value, scope)
+					: value.nodeType === "CaseValue"
+						? enrichCaseValue(value, scope, null, payloadOf(value))
+						: enrichExpression(value, scope)
 			cache.set(value, cached)
 		}
 
@@ -9720,6 +9724,20 @@ function makeArgumentTyper(
 		return bySpelling.get(spelling) ?? null
 	}
 
+	// A construction's payload readings, shared by the probes and the
+	// enrichment that run at one depth of probe recordings. A held probe reads
+	// apart, since what it decides is committed only if its candidate wins.
+	function payloadOf(node: parser.CaseValueNode): PayloadReadings {
+		let byDepth = payloads.get(node) ?? new Map<number, PayloadReadings>()
+		let readings =
+			byDepth.get(probeRecordings.length) ??
+			makePayloadReadings(node, scope)
+
+		payloads.set(node, byDepth.set(probeRecordings.length, readings))
+
+		return readings
+	}
+
 	// What one candidate's Parameter Type makes of a Case construction,
 	// recording the position it decided. See "Arguments that read their
 	// position" in DEVELOPMENT.md.
@@ -9728,7 +9746,7 @@ function makeArgumentTyper(
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
 	): common.Type {
-		let payload = makePayloadReadings(node, scope)
+		let payload = payloadOf(node)
 		let { result } = collectDiagnostics(() =>
 			resolveCaseValueType(node, scope, expectedType, payload.valueUnder),
 		)
