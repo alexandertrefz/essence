@@ -1105,8 +1105,8 @@ inside a collection of its own. A resolution without an Error enters Scope, unle
 an Error, or one that throws `NotHoistedYet`, waits for a later round, by when what it names may have hoisted. A round
 that makes no progress, where nothing hoisted, no import was seeded and no predicate filled, is followed by one that
 settles (see "Static Properties while hoisting"). The rounds stop when that one makes no progress either. A
-declaration that never hoists is left to the in-order enrichment, which reports it, apart from the Functions of
-"Functions that never resolve".
+declaration that never hoists is left to the in-order enrichment, which reports it, apart from those of
+"Declarations that never resolve".
 
 Only an Error keeps a declaration back. A Warning, such as one about its documentation, says nothing about
 whether the Type resolved. The Warnings of a kept resolution are reported then, since a hoisted Type is reused
@@ -1138,16 +1138,22 @@ reach Scope with its conditional bounds woven in, or a use site before it would 
 dropped only where its Protocol never arrives. The Namespace memos of every Scope are then dropped, since the
 rounds solved against the unsettled clauses.
 
-### Functions that never resolve
+### Declarations that never resolve
 
-A Function whose signature names a Type nothing declares resolves with an Error in every round, so it never hoists.
-A call written above it would read an undeclared name, and report `unknown-name` after the signature's own
-`unknown-type`. Once the rounds end and the final seeding has run, a name the signature lacks arrives only if a
-declaration still waiting in its Scope declares it. Where the signature names no such declaration
-(`signatureTypeNames`), its Error is final. `hoistRefusedFunctions` resolves it once more and puts it into Scope
-holding the Error, with its Diagnostics handed to the sink. A call above it measures nothing against the hole. A
-Function naming a declaration that still waits is left to the in-order enrichment, which reads it once that
-declaration is in Scope.
+A declaration whose own Types name something nothing declares resolves with an Error in every round, so it never
+hoists. A use written above it would read an undeclared name, and report `unknown-name`, `unknown-type` or
+`unknown-protocol` after the declaration's own `unknown-type`. Once the rounds end and the final seeding has run, a
+name it lacks arrives only if a declaration still waiting in its Scope declares it. Where it names no such
+declaration, its Error is final. It is resolved once more and put into Scope holding the Error, with its Diagnostics
+handed to the sink. A use above it measures nothing against the hole.
+
+`hoistRefusedTypes` in `refusedHoists.ts` does this first for a Type, a Choice or a Protocol, reading the names it
+writes (`declarationNames`). Each one it hoists stops waiting, so a declaration naming it may hoist next:
+`type Outer = { inner: Pair }` hoists once `Pair` holds its Error. `hoistRefusedNamespaces` then does it for a
+Namespace or an Overload, reading every name it writes outside its Methods' bodies, so `namespace Labels for Outer`
+hoists after `Outer`. `hoistRefusedFunctions` last does it for a Function, reading the names its signature writes
+(`signatureTypeNames`). A declaration naming one that still waits is left to the in-order enrichment, which reads it
+once that declaration is in Scope.
 
 ### Enriching a group in turns
 

@@ -2139,9 +2139,9 @@ describe("Enricher", () => {
 			).toEqual(["Type 'Colr' is not declared"])
 		})
 
-		// The waiting `Pair` and `Tools` are names the signature does not
-		// write, so `f` still hoists holding its hole.
-		it("should hoist such a Function beside a declaration still waiting", () => {
+		// `Pair` and then `Tools` hoist holding their own holes first, and `f`
+		// hoists holding its hole after them.
+		it("should hoist such a Function beside other refused declarations", () => {
 			expect(
 				diagnosticsFor(`implementation {
 					constant early = f(1)
@@ -2162,9 +2162,120 @@ describe("Enricher", () => {
 					diagnostic.position?.start.line,
 				]),
 			).toEqual([
-				["unknown-type", 4],
 				["unknown-type", 8],
 				["unknown-type", 11],
+				["unknown-type", 4],
+			])
+		})
+
+		// `Pair` holds its undeclared member for good, so it hoists holding
+		// the hole and the Function above it reads a Type rather than no name.
+		it("should hoist a Type whose declaration names a Type declared nowhere", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function describe(_ value: Pair) -> String {
+						<- "x"
+					}
+
+					constant now = describe(1)
+
+					type Pair = Integer | Colr
+				}`).map((diagnostic) => [diagnostic.code, diagnostic.message]),
+			).toEqual([["unknown-type", "Type 'Colr' is not declared"]])
+		})
+
+		// `Outer` hoists holding the hole `Pair` holds, which frees the
+		// Namespace for it to hoist too, so `describe` reaches its Method.
+		it("should hoist a Namespace for a refused Type after that Type", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function describe(_ value: Outer) -> String {
+						<- value::label()
+					}
+
+					function named(_ value: Outer) -> String {
+						<- Labels.label(value)
+					}
+
+					namespace Labels for Outer {
+						label() -> String {
+							<- "l"
+						}
+					}
+
+					type Outer = { inner: Pair, n: Integer }
+
+					type Pair = Integer | Colr
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([["unknown-type", 18]])
+		})
+
+		it("should hoist a Protocol whose Method names a Type declared nowhere", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function describe<infer T is Shows>(_ value: T) -> String {
+						<- value::shown()
+					}
+
+					namespace Numbers for Integer is Shows {
+						show() -> Colr {
+							<- 1
+						}
+					}
+
+					protocol Shows {
+						show() -> Colr
+
+						shown() -> String {
+							<- "s"
+						}
+					}
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-type", 13],
+				["unknown-type", 7],
+			])
+		})
+
+		// `Pair` hoists first, which frees `Outer` and the bound naming
+		// `Shows` to hoist after it.
+		it("should hoist a declaration naming a refused Type after that Type", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function describe(_ value: Outer) -> String {
+						<- "x"
+					}
+
+					constant kept: Outer = { inner = 1 }
+
+					namespace Labels for Outer {
+						label() -> String {
+							<- "l"
+						}
+					}
+
+					type Outer = { inner: Pair }
+
+					type Pair = Integer | Colr
+
+					type Boxed<T is Shows> = { value: T }
+
+					protocol Shows {
+						show() -> Colr
+					}
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-type", 16],
+				["unknown-type", 21],
 			])
 		})
 

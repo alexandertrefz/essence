@@ -42,6 +42,7 @@ import {
 	typedProvidedReads,
 } from "./enrichers"
 import { exampleSuite, exampleTestsOf } from "./examples"
+import { hoistRefusedDeclarations, typeNamesMentionedBy } from "./refusedHoists"
 import {
 	collectReachedNames,
 	forgetNamespaceTargets,
@@ -558,7 +559,7 @@ function isHoistable(
 	)
 }
 
-type HoistableTypeNode =
+export type HoistableTypeNode =
 	| parser.TypeAliasStatementNode
 	| parser.ChoiceDeclarationStatementNode
 
@@ -804,14 +805,14 @@ function poisonRefinementToBase(refinement: common.RefinementType): void {
 
 // A declaration waiting for a round, with the Scope it resolves in. A round
 // spans every unit, so the Scope travels with the Node.
-type PendingDeclaration = {
+export type PendingDeclaration = {
 	node: HoistableStatementNode
 	scope: enricher.Scope
 }
 
 // Where the hoist's own Diagnostics go, with the Node they belong to. A lone
 // Program hoists inside its own collection and reports them on.
-type HoistDiagnosticSink = (
+export type HoistDiagnosticSink = (
 	node: parser.ImplementationNode,
 	diagnostics: Array<common.Diagnostic>,
 ) => void
@@ -820,39 +821,6 @@ const reportOnwards: HoistDiagnosticSink = (_node, diagnostics) => {
 	for (let diagnostic of diagnostics) {
 		report(diagnostic)
 	}
-}
-
-// The Type names a Type declaration mentions. The body is read without the
-// declaration's own Type Parameters. A default is read with them, since it
-// resolves outside, so `type B<B = B> = { x: Integer }` names itself.
-function typeNamesMentionedBy(
-	node: HoistableTypeNode,
-): Array<parser.IdentifierNode> {
-	let parameters = new Set(
-		node.generics.map((generic) => generic.name.content),
-	)
-	let bodyReferences: Array<parser.IdentifierNode> = []
-
-	if (node.nodeType === "TypeAliasStatement") {
-		bodyReferences.push(...referencedTypeNames(node.type))
-	} else {
-		for (let choiceCase of node.cases) {
-			if (choiceCase.type !== null) {
-				bodyReferences.push(...referencedTypeNames(choiceCase.type))
-			}
-		}
-	}
-
-	return [
-		...node.generics.flatMap((generic) =>
-			generic.defaultType === null
-				? []
-				: referencedTypeNames(generic.defaultType),
-		),
-		...bodyReferences.filter(
-			(reference) => !parameters.has(reference.content),
-		),
-	]
 }
 
 // A generic Choice naming itself in a payload, which `resolveGenericCaseMembers`
@@ -1264,78 +1232,6 @@ function pendingProtocolNames(
 	return pendingProtocols
 }
 
-// A Function still waiting when the rounds end holds an Error for good, unless
-// its signature names a declaration still waiting in its Scope. It hoists
-// holding the Error. See "Functions that never resolve" in DEVELOPMENT.md.
-function hoistRefusedFunctions(
-	pendingNodes: Array<PendingDeclaration>,
-	sink: HoistDiagnosticSink,
-	hoistedTypes: HoistedTypes,
-): void {
-	let waiting = new Map<enricher.Scope, Set<string>>()
-
-	for (let { node, scope } of pendingNodes) {
-		if (node.nodeType !== "FunctionStatement") {
-			let names = waiting.get(scope) ?? new Set<string>()
-
-			waiting.set(scope, names.add(node.name.content))
-		}
-	}
-
-	for (let { node, scope } of pendingNodes) {
-		if (
-			node.nodeType !== "FunctionStatement" ||
-			signatureTypeNames(node.value).some(
-				(name) => waiting.get(scope)?.has(name) === true,
-			) ||
-			scope.members[node.name.content] != null
-		) {
-			continue
-		}
-
-		let resolved: {
-			result: common.FunctionType
-			diagnostics: Array<common.Diagnostic>
-		}
-
-		// A throw leaves the Function to the in-order enrichment.
-		try {
-			resolved = collectDiagnostics(() =>
-				resolveFunctionSignatureType(node.value, scope),
-			)
-		} catch {
-			continue
-		}
-
-		sink(node, resolved.diagnostics)
-		scope.members[node.name.content] = resolved.result
-		scope.constants.add(node.name.content)
-		countTypeDeclaration()
-		invalidateNamespacesInScope(scope, node.name.content, resolved.result)
-		hoistedTypes.set(node, resolved.result)
-	}
-}
-
-// The Type and Protocol names a Function's signature writes.
-function signatureTypeNames(
-	node: parser.FunctionDefinitionNode,
-): Array<string> {
-	let written = [
-		...node.parameters.map((parameter) => parameter.type),
-		node.returnType,
-		...node.generics.map((generic) => generic.defaultType),
-	]
-
-	return [
-		...written.flatMap((type) =>
-			type === null ? [] : referencedTypeNames(type),
-		),
-		...node.generics.flatMap((generic) =>
-			generic.constraint === null ? [] : [generic.constraint],
-		),
-	].map((name) => name.content)
-}
-
 // Puts the hoistable declarations' Types into Scope before the in-order
 // enrichment. The registry of pending refinement copies is closed in the
 // `finally`, so a throw can not leave it open. See "Hoisting" in DEVELOPMENT.md.
@@ -1689,7 +1585,7 @@ function hoistDeclarationsInner(
 	// The last declarations to hoist were never offered to the seeding, and
 	// an import naming one still has to bind before the bodies.
 	seedRound?.(true)
-	hoistRefusedFunctions(pendingNodes, sink, hoistedTypes)
+	hoistRefusedDeclarations(pendingNodes, sink, hoistedTypes)
 
 	// The final reading, after the seeding, since an answering Namespace may
 	// arrive through an import. Nothing past hoisting meets `conjuncts: null`.
