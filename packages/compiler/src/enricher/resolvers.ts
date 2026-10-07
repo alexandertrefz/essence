@@ -8640,8 +8640,9 @@ let namespacesInScopeCache = new WeakMap<
 	}
 >()
 
-// Every name ever declared as a Namespace. Only a declaration under such a
-// name changes what `getAllNamespacesInScope` answers.
+// Every name a remembered answer of `getAllNamespacesInScope` holds. Only
+// declaring a Namespace, or a member under such a name, changes an answer. It
+// is filled from the answers, since a restored library declares nothing.
 let namespaceNames = new Set<string>()
 
 export function invalidateNamespacesInScope(
@@ -8649,9 +8650,7 @@ export function invalidateNamespacesInScope(
 	name: string,
 	type: common.Type,
 ): void {
-	if (type.type === "Namespace") {
-		namespaceNames.add(name)
-	} else if (!namespaceNames.has(name)) {
+	if (type.type !== "Namespace" && !namespaceNames.has(name)) {
 		return
 	}
 
@@ -8781,6 +8780,7 @@ export function getAllNamespacesInScope(
 
 			if (value.type === "Namespace") {
 				result.set(key, value)
+				namespaceNames.add(key)
 			} else {
 				result.delete(key)
 			}

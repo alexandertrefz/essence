@@ -1361,9 +1361,10 @@ a Namespace, so they share their parent's answer by identity, and so does everyt
 
 Each answer records the version of every Scope on its chain (`scopeVersionSnapshot`), and revalidating compares
 those numbers. A declaration bumps its Scope's version only where it declares a Namespace, or shadows a name some
-Namespace was declared under (`namespaceNames`). Declaring an ordinary Constant leaves every answer standing. The
-hoist writes into Scopes directly and calls `invalidateNamespacesInScope` itself. The conformance memo of each Scope
-is version-guarded the same way.
+remembered answer holds (`namespaceNames`). Declaring an ordinary Constant leaves every answer standing. The names are
+collected from the answers as they are built, not from declarations: a process that restores the standard library
+from a snapshot declares none of its Namespaces. The hoist writes into Scopes directly and calls
+`invalidateNamespacesInScope` itself. The conformance memo of each Scope is version-guarded the same way.
 
 `namespacesTargeting` then matches the receiver against the visible Namespaces. `buildNamespaceIndex` buckets them
 by the kind of Type they target, since `matchTypes` can only match two Types of one kind. A Union, an Unknown or a

@@ -36,6 +36,8 @@ import {
 
 const VARIABLE = cacheVariable("compiler")
 
+const ANALYSIS_RUNNER = path.join(import.meta.dir, "snapshotAnalysisRunner.ts")
+
 let previousOverride = process.env[VARIABLE]
 
 afterEach(() => {
@@ -257,6 +259,74 @@ describe("A Restored Standard Library", () => {
 			useStdlib(previous)
 		}
 	})
+
+	// A process that restores the library never declares its Namespaces. What
+	// it remembers about the Namespaces in Scope must not depend on that, which
+	// a Constant shadowing a builtin Namespace after a Method lookup tests.
+	it("analyses every Program as a process that built the library does", async () => {
+		let sources = [
+			[
+				"implementation {",
+				"\tfunction report(_ scored: Integer) -> Boolean {",
+				"\t\tconstant before = scored::isGreaterThan(1)",
+				"\t\tconstant Integer = 1",
+				"",
+				"\t\t<- scored::isGreaterThan(0)",
+				"\t}",
+				"",
+				"\tTerminal.inspect(report(3))",
+				"}",
+			].join("\n"),
+			[
+				"implementation {",
+				"\tconstant early = 1::isGreaterThan(0)",
+				"\tconstant Integer = 1",
+				"",
+				"\tfunction report(_ scored: Integer) -> Integer {",
+				"\t\tif scored::isGreaterThan(0) {",
+				"\t\t\t<- scored",
+				"\t\t}",
+				"",
+				"\t\t<- 0",
+				"\t}",
+				"}",
+			].join("\n"),
+		]
+
+		// A fresh directory, so the first process builds and the second
+		// restores what the first wrote.
+		let directory = realpathSync.native(
+			mkdtempSync(path.join(tmpdir(), "essence-snapshot-")),
+		)
+
+		try {
+			let analyse = async () => {
+				let child = Bun.spawn(["bun", ANALYSIS_RUNNER], {
+					stdin: new TextEncoder().encode(JSON.stringify(sources)),
+					stdout: "pipe",
+					stderr: "pipe",
+					env: { ...process.env, [VARIABLE]: directory },
+				})
+				let output = await new Response(child.stdout).text()
+				let errors = await new Response(child.stderr).text()
+
+				expect(`${await child.exited} ${errors}`).toBe("0 ")
+
+				return JSON.parse(output) as {
+					restored: boolean
+					analyses: Array<Array<string>>
+				}
+			}
+
+			let built = await analyse()
+			let restored = await analyse()
+
+			expect([built.restored, restored.restored]).toEqual([false, true])
+			expect(restored.analyses).toEqual(built.analyses)
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	}, 60_000)
 
 	// A library a spec installed is not the one the snapshot key names, so its
 	// prelude is built rather than read. The real library's snapshot would
