@@ -673,6 +673,9 @@ for Completion already, so the reading is a walk, not a compile.
 - A signature written without a body, a native one or a Protocol requirement, has no Function literal for the walk to
   reach. Its span starts at its `(`, after any Type Parameters, and ends with its return Type. All of it reads as a
   Parameter list.
+- A body holds Statements wherever its Function stands, so it reads as an implementation's. In a declarations file
+  that differs from the section around it, which holds declarations only. A Function Declaration's block starts at
+  its Parameter list, so the start of its head line still reads as the section.
 - `method` is the value position inside an instance Method's body, where `{ @ with … }` means something. It is read
   from every containing block, so a Function literal inside a Method keeps it.
 - Whether the cursor starts a Statement comes from the text, since the text being typed does not parse yet.

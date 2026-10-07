@@ -108,8 +108,11 @@ function blockAt(
 	let context = base
 	let innermost: common.Position | null = null
 	let method = false
+	// A declarations file's section holds declarations, but a body in it holds
+	// Statements, as an implementation's does.
+	let body: SnippetContext = base === "declarations" ? "implementation" : base
 
-	for (let block of blocksOf(program, base)) {
+	for (let block of blocksOf(program, body)) {
 		if (!contains(block.position, cursor)) {
 			continue
 		}
@@ -165,8 +168,8 @@ function sectionAt(
 }
 
 // Every block a Statement or value may stand in, besides the sections. A
-// block carrying `base` re-opens a section's Statement body, such as a Method
-// body in a Namespace.
+// block carrying `base` re-opens a Statement body, such as a Method body in a
+// Namespace.
 function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 	let blocks: Array<Block> = []
 
@@ -310,7 +313,16 @@ function blocksOf(program: parser.Program, base: SnippetContext): Array<Block> {
 				)
 
 				return
+			// The body's block starts at the Parameter list, so the start of the
+			// head line reads as the section around it.
 			case "FunctionStatement":
+				blocks.push({
+					position: {
+						start: node.value.parameterListPosition.start,
+						end: node.position.end,
+					},
+					context: base,
+				})
 				blocks.push(
 					...parameterBlocks(
 						node.value.parameterListPosition,

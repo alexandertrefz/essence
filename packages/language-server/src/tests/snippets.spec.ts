@@ -316,6 +316,56 @@ describe("Snippet completion", () => {
 		expect(offered).not.toContain("test")
 	})
 
+	// A body holds Statements wherever its Function is declared, and a
+	// declarations file's section holds declarations only.
+	it("reads a body in a declarations file as a Statement body", () => {
+		let lines = [
+			"declarations {",
+			"\tfunction helper(_ value: Integer) -> Integer {",
+			"\t\t",
+			"\t\t<- value",
+			"\t}",
+			"",
+			"\tnamespace Sizes for Integer {",
+			"\t\tgrow(by amount: Integer) -> Integer {",
+			"\t\t\t",
+			"\t\t\t<- @::add(amount)",
+			"\t\t}",
+			"\t}",
+			"}",
+		]
+		let file = path.join(STDLIB_DIRECTORY, "Scratch.es")
+
+		for (let cursor of [
+			{ line: 3, column: 3 },
+			{ line: 9, column: 4 },
+		]) {
+			let offered = snippetsAt(lines, cursor, file)
+
+			expect([cursor, offered]).toEqual([
+				cursor,
+				expect.arrayContaining(["constant", "if"]),
+			])
+		}
+	})
+
+	it("offers the declarations at the head of a bodied Function in a declarations file", () => {
+		let offered = snippetsAt(
+			[
+				"declarations {",
+				"\tfunction helper(_ value: Integer) -> Integer {",
+				"\t\t<- value",
+				"\t}",
+				"}",
+			],
+			{ line: 2, column: 2 },
+			path.join(STDLIB_DIRECTORY, "Scratch.es"),
+		)
+
+		expect(offered).toContain("type-refinement")
+		expect(offered).not.toContain("constant")
+	})
+
 	// The Program form the standard library opens with, which is decided
 	// by the document's path and by nothing in the text.
 	it("offers the declarations a standard library file may write", () => {
