@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
 import { primary, reportError, secondary } from "../diagnostics/index"
+import { forEachTypedChild, type TypedNode } from "../visitor/index"
 import {
 	collectUnits,
 	defaultsOf,
@@ -69,6 +70,8 @@ type Simulation = {
 	// suspend, which a Module of the cycle may still be loading around.
 	late: Array<Started>
 	scheduled: Set<Unit>
+	// The Statements each Statement needs declared first, by index.
+	needs: Map<number, Set<number>>
 }
 
 // The part of a body after its first suspension, and where it was started.
@@ -177,6 +180,7 @@ export function reportReachedNamespaces(
 		tails: new Map(),
 		late: [],
 		scheduled: new Set(),
+		needs: new Map(),
 	})
 	let node = order.nodes[index]
 	let home =
@@ -548,6 +552,9 @@ function reportFrom(
 	reported: Set<string>,
 ): void {
 	let index = Math.floor(moment / STEPS)
+	// The Statement a Help moves: the one that starts the work, for started
+	// work.
+	let use = root.via === null ? index : statementAt(order, root.via.position)
 	let seen = new Set<Unit>([root.unit])
 	// Started work is walked from where it was started.
 	let queue: Array<Step> = [
@@ -601,7 +608,11 @@ function reportFrom(
 			if (dependency.kind === "cycle") {
 				reportCycleUse(order, step, dependency)
 			} else if (step.parent === null) {
-				reportUse(dependency, declaration)
+				reportUse(
+					dependency,
+					declaration,
+					moveHelp(simulation, use, dependency),
+				)
 			} else {
 				reportReach(step, dependency, declaration, home)
 			}
@@ -649,9 +660,25 @@ function reportFrom(
 		let { via, path } = pathTo(step)
 
 		if (dependency.kind === "namespace") {
-			reportReachedDependency(via!, path, dependency, declaration, home)
+			reportReachedDependency(
+				via!,
+				path,
+				dependency,
+				declaration,
+				dependency.name === home
+					? null
+					: moveHelp(simulation, use, dependency),
+			)
 		} else {
-			reportReadTooEarly(via!, path, dependency, declaration)
+			reportReadTooEarly(
+				via!,
+				path,
+				dependency,
+				declaration,
+				dependency.kind === "constant"
+					? moveHelp(simulation, use, dependency)
+					: "Move this Declaration below the one it reads.",
+			)
 		}
 	}
 }
@@ -659,8 +686,139 @@ function reportFrom(
 const ARRIVES =
 	"A Namespace comes into being where it is written, so nothing that runs above it can reach it."
 
-function moveHelp(namespace: string): string {
-	return `Move the Declaration of '${namespace}' above this Statement, or this Statement below it.`
+// Offers only the moves after which nothing runs before what it needs. See
+// "Use before declaration" in DEVELOPMENT.md.
+function moveHelp(
+	simulation: Simulation,
+	use: number,
+	dependency: Dependency,
+): string {
+	let { nodes } = simulation.order
+	let { name } = dependency
+	let declared = Math.floor(
+		availableFrom(dependency, simulation.order) / STEPS,
+	)
+	let moving = new Set([declared])
+
+	for (let index of moving) {
+		for (let needed of needsOf(simulation, index)) {
+			if (needed >= use && needed < declared) {
+				moving.add(needed)
+			}
+		}
+	}
+
+	let statementMoves = nodes
+		.slice(use + 1, declared + 1)
+		.every((_, offset) => !needsOf(simulation, use + 1 + offset).has(use))
+
+	if (moving.size === 1) {
+		return statementMoves
+			? `Move the Declaration of '${name}' above this Statement, or this Statement below it.`
+			: `Move the Declaration of '${name}' above this Statement.`
+	}
+
+	if (statementMoves) {
+		return `Move this Statement below the Declaration of '${name}'.`
+	}
+
+	if (moving.has(use)) {
+		let given = declaredName(nodes[use])
+
+		return `Give ${dependency.kind === "namespace" ? `the Properties of '${name}' values` : `'${name}' a value`} that do not need ${given === null ? "what this Statement declares" : `'${given}'`}, then move its Declaration above this Statement.`
+	}
+
+	let names = [...moving]
+		.sort((left, right) => left - right)
+		.flatMap((index) => {
+			let moved = declaredName(nodes[index])
+
+			return moved === null ? [] : [`'${moved}'`]
+		})
+
+	return `Move the Declarations of ${names.slice(0, -1).join(", ")} and ${names.at(-1)} above this Statement, in the order they are written.`
+}
+
+// The Statements whose Declarations a Statement needs. It needs what it reads
+// while it runs, and every Constant it names, since a body sees only the
+// Constants written above it.
+function needsOf(simulation: Simulation, index: number): Set<number> {
+	let known = simulation.needs.get(index)
+
+	if (known !== undefined) {
+		return known
+	}
+
+	let { order } = simulation
+	let needs = new Set<number>()
+	let need = (needed: number | undefined): void => {
+		if (needed !== undefined && needed >= 0 && needed !== index) {
+			needs.add(needed)
+		}
+	}
+	let seen = new Set(simulation.units.roots[index])
+
+	for (let unit of seen) {
+		for (let dependency of unit.dependencies) {
+			if (dependency.kind !== "cycle") {
+				need(Math.floor(availableFrom(dependency, order) / STEPS))
+			}
+		}
+
+		for (let id of [
+			...unit.runs.map((run) => run.target),
+			...unit.escapes,
+		]) {
+			let body = simulation.units.bodies.get(id)
+
+			if (body !== undefined) {
+				seen.add(body.head)
+			}
+		}
+	}
+
+	let names = (child: TypedNode): void => {
+		if (child.nodeType === "Identifier") {
+			need(order.constants.get(child.content)?.index)
+		}
+
+		forEachTypedChild(child, names)
+	}
+
+	names(order.nodes[index])
+	simulation.needs.set(index, needs)
+
+	return needs
+}
+
+// The name a Statement declares, or null where no source wrote one, as for a
+// Pattern's base.
+function declaredName(node: common.typed.ImplementationNode): string | null {
+	switch (node.nodeType) {
+		case "NamespaceDefinitionStatement":
+			return node.name.content
+		case "ConstantDeclarationStatement":
+		case "VariableDeclarationStatement":
+			return node.synthesized === undefined ||
+				node.synthesized === "binding"
+				? node.name.content
+				: null
+		default:
+			return null
+	}
+}
+
+// The top-level Statement written at a Position.
+function statementAt(
+	order: DeclarationOrder,
+	position: common.Position,
+): number {
+	return order.nodes.findLastIndex(
+		(node) =>
+			node.position.start.line < position.start.line ||
+			(node.position.start.line === position.start.line &&
+				node.position.start.column <= position.start.column),
+	)
 }
 
 // A use the Statement makes itself that `validate` does not read, such as a
@@ -668,6 +826,7 @@ function moveHelp(namespace: string): string {
 function reportUse(
 	dependency: Dependency,
 	declaration: { position: common.Position },
+	move: string,
 ): void {
 	reportError(
 		`Namespace '${dependency.name}' is used before it is declared`,
@@ -679,21 +838,22 @@ function reportUse(
 				secondary(declaration.position, "declared here, below the use"),
 			],
 			notes: [ARRIVES],
-			helps: [moveHelp(dependency.name)],
+			helps: [move],
 		},
 	)
 }
 
 // A use in a body the Statement runs. `path` names the bodies it runs
-// through, the first one at `via`.
+// through, the first one at `via`. `move` is null for a Namespace whose own
+// Property reaches it.
 function reportReachedDependency(
 	via: { position: common.Position; label: string },
 	path: Array<string>,
 	dependency: Dependency,
 	declaration: { position: common.Position },
-	home: string | null,
+	move: string | null,
 ): void {
-	let own = dependency.name === home
+	let own = move === null
 	let declared = own
 		? secondary(declaration.position, "still being declared when this runs")
 		: secondary(declaration.position, "declared here, below the use")
@@ -717,9 +877,8 @@ function reportReachedDependency(
 				`This reaches '${dependency.name}' through ${path.join(", then ")}.`,
 			],
 			helps: [
-				own
-					? `Work the value out in a Method of '${dependency.name}' instead.`
-					: moveHelp(dependency.name),
+				move ??
+					`Work the value out in a Method of '${dependency.name}' instead.`,
 			],
 		},
 	)
@@ -796,6 +955,7 @@ function reportReadTooEarly(
 	path: Array<string>,
 	dependency: Dependency,
 	declaration: { position: common.Position },
+	help: string,
 ): void {
 	let constant = dependency.kind === "constant"
 
@@ -815,11 +975,7 @@ function reportReadTooEarly(
 					: "A static Property is given its value where it is written, in order, so one written above it has nothing to read yet.",
 				`This reads '${dependency.name}' through ${path.join(", then ")}.`,
 			],
-			helps: [
-				constant
-					? `Move the Declaration of '${dependency.name}' above this Statement, or this Statement below it.`
-					: "Move this Declaration below the one it reads.",
-			],
+			helps: [help],
 		},
 	)
 }

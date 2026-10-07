@@ -3450,6 +3450,154 @@ describe("Validator", () => {
 				},
 			)
 
+			// Each move the Help offers is followed, so offering one that leaves
+			// a read before its value fails here.
+			const sizes = (value: string) => `namespace Sizes {
+					static base: Integer = ${value}
+				}`
+
+			it.each([
+				[
+					"a Constant between that the Namespace reads",
+					[
+						"Terminal.print(useIt())",
+						"constant size = 4",
+						sizes("size"),
+					],
+					"Move this Statement below the Declaration of 'Sizes'.",
+					[
+						"constant size = 4",
+						sizes("size"),
+						"Terminal.print(useIt())",
+					],
+				],
+				[
+					"a Statement between that reads what this one declares",
+					["constant v = useIt()", "Terminal.print(v)", sizes("4")],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[sizes("4"), "constant v = useIt()", "Terminal.print(v)"],
+				],
+				[
+					"both",
+					[
+						"constant v = useIt()",
+						"Terminal.print(v)",
+						"constant size = 4",
+						sizes("size"),
+					],
+					"Move the Declarations of 'size' and 'Sizes' above this Statement, in the order they are written.",
+					[
+						"constant size = 4",
+						sizes("size"),
+						"constant v = useIt()",
+						"Terminal.print(v)",
+					],
+				],
+				[
+					"a Namespace that needs what this Statement declares",
+					[
+						"constant v = useIt()",
+						"constant size = v",
+						sizes("size"),
+					],
+					"Give the Properties of 'Sizes' values that do not need 'v', then move its Declaration above this Statement.",
+					[sizes("4"), "constant v = useIt()", "constant size = v"],
+				],
+				[
+					"a body between that names what this Statement declares",
+					[
+						"constant v = useIt()",
+						"function show() -> Integer { <- v }",
+						sizes("4"),
+						"Terminal.print(show())",
+					],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[
+						sizes("4"),
+						"constant v = useIt()",
+						"function show() -> Integer { <- v }",
+						"Terminal.print(show())",
+					],
+				],
+				[
+					"a Constant between that a Method of the Namespace names",
+					[
+						"Terminal.print(useIt())",
+						"constant size = 4",
+						`namespace Sizes {
+							static base: Integer = 4
+
+							static twice() -> Integer { <- size::multiply(with 2) }
+						}`,
+					],
+					"Move this Statement below the Declaration of 'Sizes'.",
+					[
+						"constant size = 4",
+						`namespace Sizes {
+							static base: Integer = 4
+
+							static twice() -> Integer { <- size::multiply(with 2) }
+						}`,
+						"Terminal.print(useIt())",
+					],
+				],
+			])(
+				"offers only the move that compiles past %s",
+				(_, written, help, followed) => {
+					let program = (
+						statements: Array<string>,
+					) => `implementation {
+						function useIt() -> Integer {
+							<- Sizes.base
+						}
+
+						${statements.join("\n\n")}
+					}`
+
+					expect(
+						diagnosticsFor(program(written)).map(
+							(diagnostic) => diagnostic.helps,
+						),
+					).toEqual([[help]])
+					expect(compiles(program(followed))).toBe(true)
+				},
+			)
+
+			it("offers only the move that compiles to a Constant read too early", () => {
+				let program = (statements: Array<string>) => `implementation {
+					${statements.join("\n\n")}
+
+					function useIt() -> Integer {
+						<- k
+					}
+				}`
+
+				expect(
+					diagnosticsFor(
+						program([
+							"constant v = useIt()",
+							"Terminal.print(v)",
+							"constant w = 3",
+							"constant k = w",
+						]),
+					).map((diagnostic) => diagnostic.helps),
+				).toEqual([
+					[
+						"Move the Declarations of 'w' and 'k' above this Statement, in the order they are written.",
+					],
+				])
+				expect(
+					compiles(
+						program([
+							"constant w = 3",
+							"constant k = w",
+							"constant v = useIt()",
+							"Terminal.print(v)",
+						]),
+					),
+				).toBe(true)
+			})
+
 			it("names every Function a call runs through", () => {
 				let diagnostics = diagnosticsFor(`implementation {
 					function outer() -> Boolean {

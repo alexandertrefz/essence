@@ -146,6 +146,13 @@ what reaches it, unless `checkNamespaceIsDeclared` reported it for that Statemen
 notes the use, so `untypedReads.ts` leaves a read of an untyped static Property there to this report. `reachWork`
 counts the walk for a spec that holds it linear.
 
+The Help for a Namespace or a Constant reached too early offers only the moves after which nothing runs before what
+it needs. `moveHelp` moves the Declaration above the Statement, together with every Declaration written between the
+two that it needs, or the Statement below the Declaration, where nothing written between needs what the Statement
+declares. `needsOf` answers what a Statement needs: what it reads while it runs, through every body it runs or lets
+escape, and every Constant it names anywhere, since a body sees only the Constants written above it. A Declaration
+that needs what the Statement declares can not come first, so the Help names what to change before the move.
+
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its
 first sure suspension may run at the next top-level `complete`, even where the work it waits for takes longer.
