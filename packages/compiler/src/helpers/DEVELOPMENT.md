@@ -368,10 +368,17 @@ back as a subject would break it. The memo is a `WeakMap` keyed by the target Ty
 server outlives any one analysis, and a name key would answer a new analysis with an old target. An entry is
 rebuilt when another Generics array arrives for the same Type, since two Namespaces may share a target object.
 
-A Choice's Type Parameter that no payload mentions is carried by the Type Arguments alone, and matching reads only
-payloads. `bindPhantomTypeArguments` binds it from the subject's Type Arguments where every Case of the subject
-agrees. `[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and
-`disagreeingTypeArguments` says why.
+Matching reads only payloads, so a Case carries the Type Arguments its payload does not name in its spelling alone.
+`bindCaseTypeArguments` reads them for each Case of the subject. They are matched against the pattern's Case of the
+same tag, except where its Type Argument mentions a Generic its own payload names, which the payload decides. A Case
+whose Type Arguments fit no such Case names another application, and the target does not cover the subject. So
+`Tag<Integer>#Empty` is no `Tag<List<Integer>>`, and `Pair<Integer, String>#Neither` is no `Pair<Item, Item>`.
+Leaving the named ones to the payload keeps `flatten()` on a `Result<Result<Integer, String>, Integer>`, whose
+`#Value` binds the failure Type from its payload.
+
+A Generic the Type Arguments decide binds where every Case of the subject that decides it agrees.
+`[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and `disagreeingTypeArguments` says
+why.
 
 ### Specificity
 

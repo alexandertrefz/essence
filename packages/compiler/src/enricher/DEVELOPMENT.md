@@ -816,10 +816,10 @@ lookup that is refused is asked again for the application too (`branchNamespaces
 built for the receiver it was looked up for, so it is always looked up again. Each attempt's Diagnostics are
 reported only once it is taken.
 
-A Case's Type Arguments never decide a match, so a Namespace `for Box<Integer>` is found for `Box<String>#Empty`
-too. The lookup drops a Namespace whose target's Case of the same tag names another application, and keeps one whose
-Type Arguments name Type Parameters. Resolving every branch against its application instead would refuse a call
-whose Cases bind a Namespace's Type Parameters differently, such as `flatten()` on a
+A Namespace whose target's Case of the same tag names another application covers no member, as it covers no
+receiver; see "Namespace targets" in `packages/compiler/src/helpers/DEVELOPMENT.md`. So a Namespace `for
+Box<Integer>` answers no branch for `Box<String>#Empty`. Resolving every branch against its application instead
+would refuse a call whose Cases bind a Namespace's Type Parameters differently, such as `flatten()` on a
 `Result<Result<Integer, String>, Integer>`, which each Case answers on its own. The Notes of an `unknown-method` on
 a Union read each member the same way (`answersFor`). The member stays the branch's runtime test, and each branch
 records whether its Method takes a witness (`takesWitnesses`), for the validator's comparison of branches.

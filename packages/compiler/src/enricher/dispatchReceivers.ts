@@ -31,20 +31,17 @@ export function branchNamespaces(
 	scope: enricher.Scope,
 ): Map<string, common.NamespaceType> {
 	let lookUp = (receiver: common.Type) =>
-		ownApplication(
-			namespacesDeclaringMethod(
-				node.member.content,
-				resolveMethodLookupNamespacesForReceiverType(
-					receiver,
-					node.namespaceSpecifier,
-					scope,
-				),
+		namespacesDeclaringMethod(
+			node.member.content,
+			resolveMethodLookupNamespacesForReceiverType(
 				receiver,
-				scope,
-				node.position,
 				node.namespaceSpecifier,
+				scope,
 			),
-			memberType,
+			receiver,
+			scope,
+			node.position,
+			node.namespaceSpecifier,
 		)
 
 	let found = (
@@ -72,19 +69,12 @@ export function answersFor(
 	memberType: common.Type,
 	scope: enricher.Scope,
 ): boolean {
-	let namespaces = ownApplication(
-		namespacesDeclaringMethod(
-			node.member.content,
-			resolveMethodLookupNamespacesForReceiverType(
-				memberType,
-				null,
-				scope,
-			),
-			memberType,
-			scope,
-			node.position,
-		),
+	let namespaces = namespacesDeclaringMethod(
+		node.member.content,
+		resolveMethodLookupNamespacesForReceiverType(memberType, null, scope),
 		memberType,
+		scope,
+		node.position,
 	)
 
 	return (
@@ -234,48 +224,6 @@ function takesArguments(
 		appliedArguments.every((argument, index) =>
 			matchesType(argument, memberArguments[index]),
 		)
-	)
-}
-
-// The Namespaces that answer for the member's own application. A Case's Type
-// Arguments never decide a match, so the lookup also finds a Namespace for
-// another application.
-function ownApplication(
-	namespaces: Map<string, common.NamespaceType>,
-	memberType: common.Type,
-): Map<string, common.NamespaceType> {
-	if (memberType.type !== "Case" || memberType.typeArguments === undefined) {
-		return namespaces
-	}
-
-	return new Map(
-		[...namespaces].filter(([, namespace]) => {
-			let arms =
-				namespace.targetType === null
-					? []
-					: sameCaseArms(namespace.targetType, memberType)
-
-			return (
-				arms.length === 0 ||
-				arms.some((arm) => takesApplication(arm, memberType))
-			)
-		}),
-	)
-}
-
-// Whether a Case of a target takes the member's application. Each of its Type
-// Arguments names a Type Parameter or takes the member's.
-function takesApplication(
-	arm: common.CaseType,
-	memberType: common.CaseType,
-): boolean {
-	let memberArguments = memberType.typeArguments ?? []
-
-	return (arm.typeArguments ?? []).every(
-		(argument, index) =>
-			genericNamesMentioned(argument).size > 0 ||
-			(index < memberArguments.length &&
-				matchesType(argument, memberArguments[index])),
 	)
 }
 

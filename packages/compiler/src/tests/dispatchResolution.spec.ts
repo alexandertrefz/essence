@@ -1183,9 +1183,8 @@ describe("Dispatch and Resolution", () => {
 			])
 		})
 
-		// A Namespace for `Box<Integer>` is found for `Box<String>#Empty` too,
-		// since a Case's Type Arguments never decide a match. It is not the
-		// Case's Namespace.
+		// `Box<String>#Empty` fits `IntBoxes`' Case by its empty payload, but its
+		// Type Argument names another application, so its own Namespace answers.
 		it("runs the Namespace of the Case's own application", async () => {
 			let boxes = (namespace: string) => `implementation {
 				choice Box<Item> {
@@ -1236,10 +1235,10 @@ describe("Dispatch and Resolution", () => {
 		})
 
 		// `Pair<Item, Item>` binds `Item` twice from `Pair<Integer, String>`,
-		// which no one binding fits, so the branch binds it as a direct call
-		// does, from the Choice's application.
-		it("binds a repeated Type Parameter as a direct call does", async () => {
-			let pairs = (call: string) => `implementation {
+		// which no one binding fits, so its Namespace answers neither a direct
+		// call nor a dispatch. `Pair<Integer, Integer>` binds it once.
+		it("refuses a repeated Type Parameter another application fills twice", async () => {
+			let pairs = (application: string, call: string) => `implementation {
 				protocol Named {
 					static label() -> String
 				}
@@ -1273,17 +1272,105 @@ describe("Dispatch and Resolution", () => {
 					}
 				}
 
-				function show(_ value: Pair<Integer, String> | Boolean) -> String {
+				function show(_ value: ${application} | Boolean) -> String {
 					<- value::label()
 				}
 
-				constant none: Pair<Integer, String> = #Neither
+				constant none: ${application} = #Neither
 
 				Terminal.inspect(${call})
 			}`
 
-			expect(await run(pairs("none::label()"))).toEqual(['"integer"'])
-			expect(await run(pairs("show(none)"))).toEqual(['"integer"'])
+			expect(
+				diagnosticsFor(
+					pairs("Pair<Integer, String>", "none::label()"),
+				).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-method", "unknown-method"])
+			expect(
+				diagnosticsFor(
+					pairs(
+						"Pair<Integer, String>",
+						"Pair<Integer, String>#Neither::label()",
+					),
+				).map((diagnostic) => diagnostic.code),
+			).toEqual(["unknown-method", "no-namespace-for-value"])
+			expect(
+				await run(pairs("Pair<Integer, Integer>", "none::label()")),
+			).toEqual(['"integer"'])
+			expect(
+				await run(pairs("Pair<Integer, Integer>", "show(none)")),
+			).toEqual(['"integer"'])
+		})
+
+		// A Case's Type Arguments are its application's, named by a payload or
+		// not. A Namespace for another application answers no call to it.
+		it("runs no Namespace for another application, called directly or dispatched", async () => {
+			let tags = (application: string, call: string) => `implementation {
+				choice Tag<Item> {
+					On,
+					Off,
+				}
+
+				namespace Lists for Tag<List<Integer>> {
+					describe() -> String {
+						<- "list tag"
+					}
+				}
+
+				namespace Flags for Boolean {
+					describe() -> String {
+						<- "flag"
+					}
+				}
+
+				function show(_ value: ${application} | Boolean) -> String {
+					<- value::describe()
+				}
+
+				constant on: ${application} = #On
+
+				Terminal.inspect(${call})
+			}`
+			let codesOf = (source: string) =>
+				diagnosticsFor(source).map((diagnostic) => diagnostic.code)
+
+			expect(codesOf(tags("Tag<Integer>", "on::describe()"))).toEqual([
+				"unknown-method",
+				"unknown-method",
+			])
+			expect(
+				codesOf(tags("Tag<Integer>", "Tag<Integer>#On::describe()")),
+			).toEqual(["unknown-method", "no-namespace-for-value"])
+			expect(
+				await run(tags("Tag<List<Integer>>", "on::describe()")),
+			).toEqual(['"list tag"'])
+			expect(await run(tags("Tag<List<Integer>>", "show(on)"))).toEqual([
+				'"list tag"',
+			])
+		})
+
+		// A payload names the Type Parameter it binds, so a Namespace for
+		// another application of `Box` answers neither its Cases nor its
+		// payload-free one.
+		it("runs no Namespace for another application of a Case without a payload", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					choice Box<Item> {
+						Full { item: Item },
+						Empty,
+					}
+
+					namespace ListBoxes for Box<List<Integer>> {
+						describe() -> String {
+							<- "list box"
+						}
+					}
+
+					constant empty = Box<Integer>#Empty
+
+					Terminal.inspect(empty::describe())
+				}`).map((diagnostic) => diagnostic.code),
+			).toEqual(["no-namespace-for-value"])
 		})
 
 		// The Help the refusal gives: the receiver as one application.

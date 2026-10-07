@@ -418,51 +418,137 @@ export function bindNamespaceTarget(
 	}
 
 	if (pattern.generics.length === 0) {
-		return matchesType(pattern.targetType, subject) ? new Map() : null
+		return matchesType(pattern.targetType, subject) &&
+			bindCaseTypeArguments(
+				pattern.targetType,
+				subject,
+				createInferenceContext([]),
+			)
+			? new Map()
+			: null
 	}
 
 	let renamed = renamedNamespaceTarget(pattern.targetType, pattern.generics)
 	let context = createInferenceContext(renamed.generics)
 
-	if (!matchesTypeWithBindings(renamed.target, subject, context)) {
+	if (
+		!matchesTypeWithBindings(renamed.target, subject, context) ||
+		!bindCaseTypeArguments(renamed.target, subject, context)
+	) {
 		return null
 	}
 
-	bindPhantomTypeArguments(renamed.target, subject, context)
 	settleErrorBindings(context)
 
 	return unfreshenBindings(context.bindings, renamed.freshToOriginal)
 }
 
-// Binds a Choice's Type Parameter that no payload mentions from the subject's
-// Type Arguments, where every Case of the subject carries the same one.
-function bindPhantomTypeArguments(
+// Binds the Generics a subject Case's payload leaves to its Type Arguments,
+// where every such Case agrees. False where a Case's Type Arguments fit no Case
+// of the same tag in the pattern.
+function bindCaseTypeArguments(
 	pattern: common.Type,
 	subject: common.Type,
 	context: GenericInferenceContext,
-): void {
-	let phantom = phantomTypeArguments(pattern)
+): boolean {
+	let arms = choiceCasesOf(pattern)
+	let decided = new Map<common.GenericName, Array<common.Type>>()
 
-	if (phantom.length === 0) {
-		return
-	}
+	for (let carrier of choiceCasesOf(subject)) {
+		// Only a Case of a generic Choice carries Type Arguments.
+		if (carrier.typeArguments === undefined) {
+			continue
+		}
 
-	let choice = choiceCasesOf(pattern)[0]!.choice
-	let carriers = choiceCasesOf(subject).filter(
-		(choiceCase) => choiceCase.choice === choice,
-	)
+		let sameTag = arms.filter(
+			(arm) => arm.choice === carrier.choice && arm.name === carrier.name,
+		)
 
-	for (let [index, name] of phantom) {
-		let argument = agreedTypeArgument(carriers, index)
+		if (sameTag.length === 0) {
+			continue
+		}
 
-		if (
-			argument !== undefined &&
-			context.bindableNames.has(name) &&
-			!context.bindings.has(name)
-		) {
-			context.bindings.set(name, argument)
+		let fitting = sameTag
+			.map((arm) => typeArgumentsFit(arm, carrier, context.bindableNames))
+			.find((bindings): bindings is GenericBindings => bindings !== null)
+
+		if (fitting === undefined) {
+			return false
+		}
+
+		for (let [name, type] of fitting) {
+			decided.set(name, [...(decided.get(name) ?? []), type])
 		}
 	}
+
+	for (let [name, [first, ...rest]] of decided) {
+		let agreed = rest.every(
+			(type) => matchesType(first, type) && matchesType(type, first),
+		)
+
+		if (agreed && !context.bindings.has(name)) {
+			context.bindings.set(name, first)
+		}
+	}
+
+	return true
+}
+
+// What a pattern's Case binds from a subject Case's Type Arguments, or null
+// where they do not fit. A Type Argument naming a Generic the pattern's payload
+// names is the payload's, and so is one the subject leaves undecided.
+function typeArgumentsFit(
+	arm: common.CaseType,
+	carrier: common.CaseType,
+	bindableNames: Set<common.GenericName>,
+): GenericBindings | null {
+	let context: GenericInferenceContext = {
+		bindableNames,
+		bindings: new Map(),
+	}
+	let payloadNames = payloadGenericNames(arm)
+	let carried = carrier.typeArguments ?? []
+
+	for (let [index, argument] of (arm.typeArguments ?? []).entries()) {
+		let actual = carried[index]
+
+		if (
+			actual === undefined ||
+			typeContainsUnknown(actual) ||
+			[...genericNamesMentioned(argument)].some((name) =>
+				payloadNames.has(name),
+			)
+		) {
+			continue
+		}
+
+		if (!matchTypes(argument, actual, context, NESTED)) {
+			return null
+		}
+	}
+
+	return context.bindings
+}
+
+// Remembered per Case, which a Namespace renames once.
+const payloadGenericNamesMemo = new WeakMap<
+	common.CaseType,
+	Set<common.GenericName>
+>()
+
+function payloadGenericNames(arm: common.CaseType): Set<common.GenericName> {
+	let remembered = payloadGenericNamesMemo.get(arm)
+
+	if (remembered === undefined) {
+		remembered = new Set(
+			Object.values(arm.members).flatMap((member) => [
+				...genericNamesMentioned(member),
+			]),
+		)
+		payloadGenericNamesMemo.set(arm, remembered)
+	}
+
+	return remembered
 }
 
 // The differing Type Arguments a subject's Cases carry where a Choice pattern
@@ -513,72 +599,6 @@ export function disagreeingTypeArguments(
 				typeArguments,
 			}
 		: null
-}
-
-function agreedTypeArgument(
-	carriers: Array<common.CaseType>,
-	index: number,
-): common.Type | undefined {
-	let agreed = carriers[0]?.typeArguments?.[index]
-
-	if (agreed === undefined) {
-		return undefined
-	}
-
-	for (let carrier of carriers) {
-		let argument = carrier.typeArguments?.[index]
-
-		if (
-			argument === undefined ||
-			!matchesType(agreed, argument) ||
-			!matchesType(argument, agreed)
-		) {
-			return undefined
-		}
-	}
-
-	return agreed
-}
-
-// Remembered per pattern, which a Namespace renames once.
-const phantomTypeArgumentsMemo = new WeakMap<
-	common.Type,
-	Array<[number, common.GenericName]>
->()
-
-// The positions of a Choice pattern's Type Arguments that name a Generic
-// no payload of its Cases mentions.
-function phantomTypeArguments(
-	pattern: common.Type,
-): Array<[number, common.GenericName]> {
-	let remembered = phantomTypeArgumentsMemo.get(pattern)
-
-	if (remembered !== undefined) {
-		return remembered
-	}
-
-	let cases = choiceCasesOf(pattern)
-	let mentioned = new Set<common.GenericName>()
-
-	for (let choiceCase of cases) {
-		for (let member of Object.values(choiceCase.members)) {
-			for (let name of genericNamesMentioned(member)) {
-				mentioned.add(name)
-			}
-		}
-	}
-
-	let phantom: Array<[number, common.GenericName]> = []
-
-	for (let [index, argument] of (cases[0]?.typeArguments ?? []).entries()) {
-		if (argument.type === "GenericUse" && !mentioned.has(argument.name)) {
-			phantom.push([index, argument.name])
-		}
-	}
-
-	phantomTypeArgumentsMemo.set(pattern, phantom)
-
-	return phantom
 }
 
 function choiceCasesOf(type: common.Type): Array<common.CaseType> {

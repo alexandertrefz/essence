@@ -5387,6 +5387,66 @@ export {
 		)
 	})
 
+	// `Main.es` names no `Tag`, and `Lists` targets another application of it,
+	// so neither the direct call nor the dispatch reaches `Lists`.
+	it("runs no Namespace for another application of a Choice the calling Module never imported", () => {
+		withProject(
+			{
+				"Main.es": `import {
+	from "./Tag.es" {
+		IntegerTag
+		Lists
+		on
+	}
+}
+
+implementation {
+	namespace Flags for Boolean {
+		describe() -> String {
+			<- "flag"
+		}
+	}
+
+	function show(_ value: IntegerTag | Boolean) -> String {
+		<- value::describe()
+	}
+
+	Terminal.print(show(on))
+	Terminal.print(on::describe())
+}
+`,
+				"Tag.es": `implementation {
+	choice Tag<Item> {
+		On,
+		Off,
+	}
+
+	namespace Lists for Tag<List<Integer>> {
+		describe() -> String {
+			<- "list tag"
+		}
+	}
+
+	type IntegerTag = Tag<Integer>
+
+	constant on: IntegerTag = #On
+}
+
+export {
+	IntegerTag
+	Lists
+	on
+}
+`,
+			},
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["unused-import", "unknown-method", "unknown-method"])
+			},
+		)
+	})
+
 	// The body is emitted once, where the Protocol is declared, and binds the
 	// Pattern there.
 	it("runs a provided Method that takes its Parameter apart from another Module", async () => {
