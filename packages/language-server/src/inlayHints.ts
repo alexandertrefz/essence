@@ -20,11 +20,14 @@ export type InlayHint = {
 	// recorded there, which has no edit.
 	kind: "type" | "value"
 	textEdit: InlayHintEdit | null
+	// Set on a Type Hint made without spelling its Type, whose `textEdit` is
+	// not known yet. `resolveInlayHint` in the Server spells it on request.
+	unspelled?: true
 }
 
 // An insertion, so a Cursor: the annotation replaces nothing. A contextual
 // Function literal's Parameter also writes its label, via `labelEditOf`.
-type InlayHintEdit = {
+export type InlayHintEdit = {
 	position: common.Cursor
 	newText: string
 	labelEdit?: LabelEdit
@@ -39,8 +42,8 @@ type LabelEdit = {
 // accepting it inserts it. A Type that cannot be written gets no edit, and the
 // edit spells only what the position resolves, via `spellTypeAt`.
 //
-// A Hint on a line outside the requested range is never made, since spelling
-// its Type is the costly part.
+// Spelling the Type is the costly part. A Hint on a line outside the requested
+// range is never made, and an unspelled request leaves the edit for later.
 function addTypeHint(
 	hints: Hints,
 	position: common.Cursor,
@@ -53,6 +56,18 @@ function addTypeHint(
 		(position.line < hints.range.start.line ||
 			position.line > hints.range.end.line)
 	) {
+		return
+	}
+
+	if (!hints.spelled) {
+		hints.list.push({
+			position,
+			label: `${prefix}${printType(type)}`,
+			kind: "type",
+			textEdit: null,
+			...(labelEdit === "unwritable" ? {} : { unspelled: true }),
+		})
+
 		return
 	}
 
@@ -79,8 +94,9 @@ function addTypeHint(
 export function findInlayHints(
 	program: common.typed.Program,
 	range: common.Position | null = null,
+	spelled = true,
 ): Array<InlayHint> {
-	let hints: Hints = { list: [], program, range }
+	let hints: Hints = { list: [], program, range, spelled }
 
 	for (let body of typedProgramBodies(program)) {
 		for (let node of body) {
@@ -100,11 +116,13 @@ export function findInlayHints(
 }
 
 // The Hints being collected, the Program whose Scopes say what an edit may
-// write, and the lines asked for, or null for the whole file.
+// write, and the lines asked for, or null for the whole file. `spelled` says
+// whether a Type Hint spells its edit.
 type Hints = {
 	list: Array<InlayHint>
 	program: common.typed.Program
 	range: common.Position | null
+	spelled: boolean
 }
 
 function visitNode(node: TypedNode, hints: Hints) {

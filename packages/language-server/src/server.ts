@@ -9,6 +9,7 @@ import {
 import { isStdlibDocument } from "@essence-lang/compiler/documents"
 import { loadStdlib } from "@essence-lang/compiler/enricher/stdlib"
 import type { common, parser } from "@essence-lang/interfaces"
+import type { TestEvent } from "@essence-lang/runtime/Testing"
 import { TextDocument } from "vscode-languageserver-textdocument"
 import {
 	type CallHierarchyItem as LspCallHierarchyItem,
@@ -81,7 +82,11 @@ import { importRewrites } from "./fileRename"
 import { findFoldingRanges } from "./foldingRanges"
 import { findFormattingEdits } from "./formatting"
 import { findHover } from "./hover"
-import { findInlayHints, type InlayHint as InlayHintEntry } from "./inlayHints"
+import {
+	findInlayHints,
+	type InlayHint as InlayHintEntry,
+	type InlayHintEdit,
+} from "./inlayHints"
 import { isSamePosition } from "./positions"
 import {
 	findDefinition,
@@ -216,7 +221,9 @@ export const serverCapabilities: ServerCapabilities = {
 	// Run and Debug above every `test` and `suite`. No resolve: a lens carries
 	// its command and the ids of the tests under it.
 	codeLensProvider: { resolveProvider: false },
-	inlayHintProvider: true,
+	// A Type Hint's edit is spelled on resolve, for a client that can take it
+	// then. See "Inlay Hints" in DEVELOPMENT.md.
+	inlayHintProvider: { resolveProvider: true },
 	linkedEditingRangeProvider: true,
 	callHierarchyProvider: true,
 }
@@ -311,6 +318,7 @@ export function startServer(options: { connection?: Connection } = {}) {
 	// shape it never advertised applies nothing.
 	let clientSupportsDocumentChanges = false
 	let clientCreatesFiles = false
+	let clientResolvesHintEdits = false
 	// The live test session, which compiles and runs in a Worker of its own.
 	let session = createTestSession({
 		testFiles,
@@ -480,6 +488,10 @@ export function startServer(options: { connection?: Connection } = {}) {
 		clientCreatesFiles =
 			clientSupportsDocumentChanges &&
 			(workspaceEdit?.resourceOperations ?? []).includes("create")
+		clientResolvesHintEdits = (
+			params.capabilities.textDocument?.inlayHint?.resolveSupport
+				?.properties ?? []
+		).includes("textEdits")
 
 		workspace.setFolders(
 			params.workspaceFolders?.map((folder) =>
@@ -1680,43 +1692,40 @@ export function startServer(options: { connection?: Connection } = {}) {
 
 	// Not debounced: it reads the analysis cache.
 	connection.languages.inlayHint.on(async (params, token) => {
+		let uri = params.textDocument.uri
+
 		if (!inlayHintsEnabled) {
 			return null
 		}
 
-		if (!(await isCurrent(params.textDocument.uri, token))) {
+		if (!(await isCurrent(uri, token))) {
 			return abandoned(token)
 		}
 
-		let range = {
-			start: toCursor(params.range.start),
-			end: toCursor(params.range.end),
-		}
-		let document = sourceDocument(params.textDocument.uri)
-		// The values the last test run recorded, beside the Types the source
-		// left out.
-		let values =
-			document === undefined
-				? []
-				: findValueHints(
-						session.eventsFor(
-							documentFilePath(params.textDocument.uri),
-						),
-						document.getText(),
-						range,
-					)
-		let parsed = parseAndEnrich(params.textDocument.uri, {
-			cancellation: token,
+		return inlayHintsOf(toRange(params.range), sourceDocument(uri), {
+			events: session.eventsFor(documentFilePath(uri)),
+			parsed: parseAndEnrich(uri, { cancellation: token }),
+			spelled: !clientResolvesHintEdits,
 		})
+	})
 
-		if (parsed?.enrichedProgram == null) {
-			return values.map(toLspInlayHint)
+	// Against the buffer the Hint was made from. A Hint without `data` has
+	// nothing to spell, and one whose buffer moved keeps what it was sent.
+	connection.languages.inlayHint.resolve(async (hint, token) => {
+		let data = inlayHintDataOf(hint)
+
+		if (
+			data === null ||
+			sourceDocument(data.uri)?.version !== data.version ||
+			!(await isCurrent(data.uri, token))
+		) {
+			return hint
 		}
 
-		return [
-			...findInlayHints(parsed.enrichedProgram, range),
-			...values,
-		].map(toLspInlayHint)
+		return resolveInlayHint(
+			hint,
+			parseAndEnrich(data.uri, { cancellation: token })?.enrichedProgram,
+		)
 	})
 
 	connection.onCompletion(async (params, token) => {
@@ -2371,17 +2380,87 @@ export function startServer(options: { connection?: Connection } = {}) {
 	connection.listen()
 }
 
+// Where an unspelled Type Hint was made, which its resolve reads back.
+type InlayHintData = { uri: string; version: number }
+
+// A client hands `data` back as it pleases, so its shape is checked.
+function inlayHintDataOf(hint: InlayHint): InlayHintData | null {
+	let data: unknown = hint.data
+
+	if (data == null || typeof data !== "object") {
+		return null
+	}
+
+	let { uri, version } = data as Partial<InlayHintData>
+
+	return typeof uri === "string" && typeof version === "number"
+		? { uri, version }
+		: null
+}
+
+// The Type Hints of a range and the values the last test run recorded there.
+// An unspelled request leaves each Type Hint's edit to `resolveInlayHint`.
+function inlayHintsOf(
+	range: common.Position,
+	document: TextDocument | undefined,
+	sources: {
+		events: Array<TestEvent>
+		parsed: { enrichedProgram: common.typed.Program | null } | null
+		spelled: boolean
+	},
+): Array<InlayHint> {
+	if (document === undefined) {
+		return []
+	}
+
+	let data: InlayHintData = { uri: document.uri, version: document.version }
+	let program = sources.parsed?.enrichedProgram
+
+	return [
+		...(program == null
+			? []
+			: findInlayHints(program, range, sources.spelled)),
+		...findValueHints(sources.events, document.getText(), range),
+	].map((hint) => toLspInlayHint(hint, data))
+}
+
+// Finds the Hint again on its own line, which spells that line only, and
+// takes its edit. A Hint the Program no longer makes keeps none.
+export function resolveInlayHint(
+	hint: InlayHint,
+	program: common.typed.Program | null | undefined,
+): InlayHint {
+	if (program == null) {
+		return hint
+	}
+
+	let cursor = toCursor(hint.position)
+	let spelled = findInlayHints(program, { start: cursor, end: cursor }).find(
+		(entry) =>
+			entry.position.line === cursor.line &&
+			entry.position.column === cursor.column &&
+			entry.label === hint.label,
+	)
+	let textEdits =
+		spelled === undefined ? undefined : toLspInlayHint(spelled).textEdits
+
+	return textEdits === undefined ? hint : { ...hint, textEdits }
+}
+
 // A Type Hint carries the edit that writes it, an insertion at an empty
-// Range, and before it any label a Function literal's Parameter needs. A value
-// Hint records one run and has nothing to accept, so it is a Parameter Hint,
-// which Editors draw quietly.
-export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
+// Range, and before it any label a Function literal's Parameter needs. An
+// unspelled one carries `data` instead. A value Hint records one run and has
+// nothing to accept, so it is a Parameter Hint, which Editors draw quietly.
+export function toLspInlayHint(
+	hint: InlayHintEntry,
+	data: InlayHintData | null = null,
+): InlayHint {
 	let position = {
 		line: hint.position.line - 1,
 		character: hint.position.column - 1,
 	}
 
-	if (hint.textEdit === null) {
+	if (hint.kind === "value") {
 		return {
 			position,
 			label: hint.label,
@@ -2390,30 +2469,34 @@ export function toLspInlayHint(hint: InlayHintEntry): InlayHint {
 		}
 	}
 
-	let insertion = {
-		line: hint.textEdit.position.line - 1,
-		character: hint.textEdit.position.column - 1,
-	}
-
 	return {
 		position,
 		label: hint.label,
 		kind: InlayHintKind.Type,
-		textEdits: [
-			...(hint.textEdit.labelEdit === undefined
-				? []
-				: [
-						{
-							range: toLspRange(hint.textEdit.labelEdit.range),
-							newText: hint.textEdit.labelEdit.newText,
-						},
-					]),
-			{
-				range: { start: insertion, end: insertion },
-				newText: hint.textEdit.newText,
-			},
-		],
+		...(hint.textEdit === null
+			? {}
+			: { textEdits: inlayHintEditsOf(hint.textEdit) }),
+		...(hint.unspelled === true && data !== null ? { data } : {}),
 	}
+}
+
+function inlayHintEditsOf(edit: InlayHintEdit): Array<TextEdit> {
+	let insertion = {
+		line: edit.position.line - 1,
+		character: edit.position.column - 1,
+	}
+
+	return [
+		...(edit.labelEdit === undefined
+			? []
+			: [
+					{
+						range: toLspRange(edit.labelEdit.range),
+						newText: edit.labelEdit.newText,
+					},
+				]),
+		{ range: { start: insertion, end: insertion }, newText: edit.newText },
+	]
 }
 
 // The inverse of `documentFilePath`. Each segment is encoded on its own, so

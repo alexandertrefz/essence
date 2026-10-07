@@ -500,7 +500,7 @@ describe("LSP", () => {
 				foldingRangeProvider: true,
 				selectionRangeProvider: true,
 				codeLensProvider: { resolveProvider: false },
-				inlayHintProvider: true,
+				inlayHintProvider: { resolveProvider: true },
 				linkedEditingRangeProvider: true,
 				callHierarchyProvider: true,
 			})

@@ -7,10 +7,16 @@ import { canonicalPath } from "@essence-lang/compiler/documents"
 import { enrich } from "@essence-lang/compiler/enricher"
 import { parseWithDiagnostics } from "@essence-lang/compiler/parser"
 import type { common } from "@essence-lang/interfaces"
+import type { InlayHint as LspInlayHint } from "vscode-languageserver"
+import {
+	InlayHintRequest,
+	InlayHintResolveRequest,
+} from "vscode-languageserver/node"
 
 import { analyseDocument } from "../analyse"
 import { findInlayHints, type InlayHint } from "../inlayHints"
-import { toLspInlayHint } from "../server"
+import { toLspInlayHint, uriOf } from "../server"
+import { makeSessionWorkspace, startSession } from "./lspSession"
 import { applyEdits } from "./textEdits"
 
 function allHintsOf(source: string) {
@@ -748,6 +754,121 @@ describe("Inlay Hints", () => {
 
 		expect(hints).toHaveLength(1)
 		expect(hints[0].position.line).toBe(3)
+	})
+})
+
+// Spelling a Type is what a Hint costs, and a whole-file request would spell
+// every one. A client that resolves edits gets the Hints unspelled, and each
+// edit is spelled when it is resolved.
+describe("Inlay Hints spelled on resolve", () => {
+	const source = [
+		"implementation {",
+		"\tchoice Colour { Red, Green }",
+		"\ttype Point = { x: Integer, y: Integer }",
+		"",
+		"\tfunction origin() -> Point {",
+		"\t\t<- { x = 0, y = 0 }",
+		"\t}",
+		"",
+		"\tconstant point = origin()",
+		"\tconstant colour = Colour#Red",
+		"\tconstant kept = [1]::removeEvery(where (item) { <- true })",
+		"\tconstant every = [1]::removeEvery(where (_) { <- true })",
+		"}",
+	].join("\n")
+
+	it("makes no Type Hint's edit on an unspelled request", () => {
+		let { program } = parseWithDiagnostics(source)
+		let { program: enrichedProgram } = enrich(program)
+		let spelled = findInlayHints(enrichedProgram)
+		let unspelled = findInlayHints(enrichedProgram, null, false)
+
+		expect(unspelled.map((hint) => hint.label)).toEqual(
+			spelled.map((hint) => hint.label),
+		)
+		expect(unspelled.every((hint) => hint.textEdit === null)).toBe(true)
+		// A bare `_` is known to be unwritable without spelling anything.
+		expect(
+			unspelled
+				.filter((hint) => hint.unspelled !== true)
+				.map((hint) => hint.position),
+		).toEqual([{ line: 12, column: 44 }])
+	})
+
+	it("sends a whole file unspelled and spells each Hint as it is resolved", async () => {
+		let files = makeSessionWorkspace({ "Main.es": source })
+		let uri = uriOf(files.pathOf("Main.es"))
+		let wholeFile = {
+			textDocument: { uri },
+			range: {
+				start: { line: 0, character: 0 },
+				end: { line: 13, character: 0 },
+			},
+		}
+		let hintsFor = async (textDocument: object) => {
+			let session = startSession()
+
+			try {
+				await session.initialize([files.root], undefined, textDocument)
+				await session.open(files.pathOf("Main.es"), source)
+
+				let { result } = await session.request<Array<LspInlayHint>>(
+					InlayHintRequest.type,
+					wholeFile,
+				)
+				let resolved: Array<LspInlayHint> = []
+
+				for (let hint of result) {
+					resolved.push(
+						(
+							await session.request<LspInlayHint>(
+								InlayHintResolveRequest.type,
+								hint,
+							)
+						).result,
+					)
+				}
+
+				// `data` a client mangled leaves the Hint as it was.
+				let mangled = await Promise.all(
+					[null, "Main.es", { uri }].map(
+						async (data) =>
+							(
+								await session.request<LspInlayHint>(
+									InlayHintResolveRequest.type,
+									{ ...result[0], data },
+								)
+							).result,
+					),
+				)
+
+				return { sent: result, resolved, mangled }
+			} finally {
+				await session.dispose()
+			}
+		}
+
+		try {
+			let spelled = await hintsFor({})
+			let unspelled = await hintsFor({
+				inlayHint: { resolveSupport: { properties: ["textEdits"] } },
+			})
+
+			expect(unspelled.sent.map((hint) => hint.label)).toEqual(
+				spelled.sent.map((hint) => hint.label),
+			)
+			expect(unspelled.sent.some((hint) => hint.textEdits)).toBe(false)
+			expect(
+				unspelled.resolved.map((hint) => hint.textEdits ?? null),
+			).toEqual(spelled.sent.map((hint) => hint.textEdits ?? null))
+			// A Hint sent with its edit resolves to itself.
+			expect(spelled.resolved).toEqual(spelled.sent)
+			expect(
+				unspelled.mangled.map((hint) => hint.textEdits ?? null),
+			).toEqual([null, null, null])
+		} finally {
+			files.dispose()
+		}
 	})
 })
 

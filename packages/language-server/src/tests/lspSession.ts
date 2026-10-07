@@ -119,9 +119,9 @@ export function startSession() {
 	client.listen()
 
 	// The capabilities a client advertises decide what the Server may send it.
-	// The default is VS Code's: either shape of Workspace Edit, and file
-	// creation. A spec about a less capable editor hands over its whole
-	// `workspace` block.
+	// The default `workspace` block is VS Code's: either shape of Workspace
+	// Edit, and file creation. The default `textDocument` block is empty, as a
+	// minimal client's. A spec about another editor hands over either block.
 	async function initialize(
 		folders: Array<string>,
 		workspace: object = {
@@ -134,11 +134,12 @@ export function startSession() {
 				resourceOperations: ["create", "rename", "delete"],
 			},
 		},
+		textDocument: object = {},
 	): Promise<void> {
 		await client.sendRequest(InitializeRequest.type, {
 			processId: null,
 			rootUri: null,
-			capabilities: { workspace },
+			capabilities: { workspace, textDocument },
 			workspaceFolders: folders.map((folder) => ({
 				uri: uriOf(folder),
 				name: path.basename(folder),

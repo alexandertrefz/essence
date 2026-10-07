@@ -633,6 +633,21 @@ has just closed it, so the call around it is the answer.
 
 Each label carries the callee's name, so it shows the whole call, `append(_ String) -> String`.
 
+## Inlay Hints
+
+`findInlayHints` in `src/inlayHints.ts` makes a Hint for each annotation the source left out. Its label prints the Type
+with `printType`. Its edit writes the annotation as `spellTypeAt` spells it, naming only what resolves where it lands.
+Spelling is the costly part, since each name in the Type is looked up in the Scopes around the Hint.
+
+- A request covers a range, and a Hint outside it is never made.
+- A client that lists `textEdits` under `inlayHint.resolveSupport` gets every Type Hint without its edit. Asking for a
+  whole file then prints Types and spells none. Each such Hint carries its document's URI and version as `data`.
+- `resolveInlayHint` makes the Hints of the resolved Hint's line again, spelled, and takes the edit of the one at the
+  same Position with the same label. A buffer that moved since answers the Hint as it was sent, since its Position may
+  name another Hint by then.
+- A value Hint, which a test run recorded, has no edit to spell. Neither has a bare `_` Parameter, which no annotation
+  can follow.
+
 ## Snippets
 
 `src/snippets.ts` holds every snippet once. Completion offers them in the blocks they parse in. The
