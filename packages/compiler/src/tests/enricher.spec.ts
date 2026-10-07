@@ -1641,6 +1641,43 @@ describe("Enricher", () => {
 			expect(compiles(program("constant clockValue = 5"))).toBe(true)
 		})
 
+		// No Scope binds a Type's name as a value, so the assignment is
+		// refused for what the name is, never as a name nothing declares.
+		it.each([
+			[
+				"a Choice",
+				"Colour",
+				"choice Colour {\n\t\t\t\t\tRed,\n\t\t\t\t}",
+			],
+			["a Type", "Size", "type Size = Integer"],
+			[
+				"a Protocol",
+				"Shown",
+				"protocol Shown {\n\t\t\t\t\tshow() -> String\n\t\t\t\t}",
+			],
+		])(
+			"should ask a new value for %s's name to take a name of its own",
+			(kind, name, declaration) => {
+				let program = (statement: string): string => `implementation {
+				${declaration}
+
+				${statement}
+			}`
+
+				expect(codesOfSource(program(`${name} = 5`))).toEqual([
+					"constant-reassignment",
+				])
+
+				let diagnostic = reassignmentOf(program(`${name} = 5`))
+
+				expect(diagnostic.helps).toEqual([freshNameHelp])
+				expect(diagnostic.notes).toEqual([
+					`'${name}' is ${kind}, which is no value of its own.`,
+				])
+				expect(compiles(program("constant fresh = 5"))).toBe(true)
+			},
+		)
+
 		it("should ask a new value for a Function's name to take a name of its own", () => {
 			let program = (statement: string): string => `implementation {
 				function greet() -> String {

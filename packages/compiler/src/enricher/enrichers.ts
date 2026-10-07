@@ -147,10 +147,7 @@ import {
 	reportPickedRequirement,
 } from "./protocolPicks"
 import { type InvokingCall, providedNamespaceMember } from "./providedBodies"
-import {
-	recordWrittenConstant,
-	reportConstantReassignment,
-} from "./reassignment"
+import { recordWrittenConstant, refuseReassignment } from "./reassignment"
 import { pinnedForReceiver } from "./receiverPins"
 import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
 import {
@@ -5946,11 +5943,8 @@ function enrichVariableAssignmentStatement(
 		declaringScope?.declarations[node.name.content] ?? null
 
 	// A name that can be no Variable at all has no Type to judge the value by.
-	let refused =
-		declaringScope?.constants.has(node.name.content) === true &&
-		reportConstantReassignment(node.name, declaringScope)
-
-	let name = enrichIdentifier(node.name, scope)
+	let { refused, type } = refuseReassignment(node.name, declaringScope, scope)
+	let name = enrichIdentifier(node.name, scope, type)
 
 	noteOuterRead(node.name, name.type, scope, true)
 
