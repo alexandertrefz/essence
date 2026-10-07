@@ -21,7 +21,13 @@ export function expandShorthandKeyAction(
 ): CodeActionEntry | null {
 	let written = sliceOf(lines, diagnostic.position)
 
-	if (!namePattern.test(written) || !isRecordKey(program, diagnostic)) {
+	// The Help names the binding only where the Scope holds one, and the fix
+	// writes what the Help names.
+	if (
+		!namePattern.test(written) ||
+		!isRecordKey(program, diagnostic) ||
+		!diagnostic.helps.includes(`Write '${written} = ${written}'.`)
+	) {
 		return null
 	}
 

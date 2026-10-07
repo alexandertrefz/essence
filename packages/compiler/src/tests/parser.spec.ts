@@ -477,30 +477,24 @@ describe("Parser", () => {
 				expect(combination.rhs.nodeType).toBe("Identifier")
 			})
 
-			it("should refuse a bare name in an update's key list", () => {
-				let { diagnostics } = parseWithDiagnostics(
-					"implementation { constant value = { base with port, host } }",
-				)
-
-				expect(
-					diagnostics.map((diagnostic) => diagnostic.code),
-				).toEqual([
-					"shorthand-in-combination",
-					"shorthand-in-combination",
-				])
-			})
-
-			it("should refuse only the bare names in an update's key list", () => {
+			// Whether a bare name is a binding is the Scope's to say, so the
+			// Enricher reports it. The update is kept as the author meant it.
+			it("should keep a bare name in an update's key list for the Enricher", () => {
 				let { diagnostics } = parseWithDiagnostics(
 					"implementation { constant value = { base with a = 1, host } }",
 				)
+				let node = parse(
+					"implementation { constant value = { base with a = 1, host } }",
+				).implementation
+					.nodes[0] as parser.ConstantDeclarationStatementNode
+				let combination = node.value as parser.CombinationNode
 
-				expect(diagnostics).toHaveLength(1)
-				expect(diagnostics[0]!.code).toBe("shorthand-in-combination")
-				expect(diagnostics[0]!.helps).toEqual([
-					"Write 'host = host'.",
-					"Or merge a whole Record: '{ base with { host } }'.",
-				])
+				expect(diagnostics).toEqual([])
+				expect(combination.bare).toBe(true)
+				expect(
+					(combination.rhs as parser.RecordValueNode).members["host"]
+						?.shorthand,
+				).toBe(true)
 			})
 
 			// Only a bare name gets the shorthand explanation.
@@ -660,16 +654,6 @@ describe("Parser", () => {
 					"server",
 					"port",
 				])
-			})
-
-			it("should refuse a bare name beside a bare path", () => {
-				let { diagnostics } = parseWithDiagnostics(
-					"implementation { constant value = { config with server.port, host } }",
-				)
-
-				expect(
-					diagnostics.map((diagnostic) => diagnostic.code),
-				).toEqual(["shorthand-in-combination"])
 			})
 
 			it("should refuse a key that a path already writes", () => {

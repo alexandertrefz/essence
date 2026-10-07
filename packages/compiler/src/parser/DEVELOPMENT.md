@@ -417,7 +417,8 @@ A `{` in Expression position opens a Record literal or an update, `{ base with â
    merged, so `{ base with other }` never turns into "set member `other`".
 3. An Expression after `with`, merged whole.
 4. The key list once more, with shorthand. A shape like `{ base with port, host }` gets here, and the parser keeps
-   the update and reports `shorthand-in-combination` for each bare name. Each report's Help merges all of them.
+   the update, marked `bare`. The enricher reports `shorthand-in-combination` for each bare name, since only the
+   Scope says whether the name is a binding.
 
 A key that is a written value, such as `{ "a" = 1 }` or `{ ages with "alex" = 40 }`, belongs to a Dictionary in
 brackets and is refused as such. A name is never refused this way, since `{ x = ] }` also arrives with a broken

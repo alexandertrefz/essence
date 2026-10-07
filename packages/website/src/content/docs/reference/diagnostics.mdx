@@ -674,9 +674,9 @@ Error: A bare member name is not a key in an update
 
 </div>
 
-Write each value, `{ base with port = port, host = host }`, or merge a record literal that uses the shorthand: `{ base with { port, host } }`. One report stands per bare name, and each of them offers the same record — holding **every** bare key, so that following one does not drop the others in silence.
+Write each value, `{ base with port = port, host = host }`, or merge a record literal that uses the shorthand: `{ base with { port, host } }`. One report stands per bare name, and each of them offers the same record — holding **every** key, a written one as `name = …` to take the value you wrote, so that following one does not drop the others in silence. A name with no binding in scope is answered `Write the value it sets in place of '…': 'host = …'.` instead. The record is offered only where every name is bound and no path key is written, since a path key reaches into nothing in a record literal. The unbound name is not reported again as [`unknown-name`](/docs/reference/diagnostics#unknown-name).
 
-Quick Fix: **Write 'port = port'**.
+Quick Fix: **Write 'port = port'**, where `port` is in scope.
 
 Taught on: [Records › When the compiler refuses a record](/docs/language/records#when-the-compiler-refuses-a-record)
 

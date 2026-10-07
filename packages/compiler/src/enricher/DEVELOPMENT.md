@@ -144,6 +144,11 @@ the right side for its Nodes alone, so the language server can hover inside it. 
 and answers the base's Type. Reading `[config with port = 90]` as a Dictionary update would only report mistakes
 the author did not make.
 
+A bare name in an update's key list, `{ base with port, host }`, names no value to set. `refuseBareNames` reports
+each as `shorthand-in-combination`. Its Help writes the binding of the name where the Scope holds one, and asks for
+the value otherwise. Merging a Record of the names is offered only where every one is bound. An unbound name becomes
+a refused value, so it is not reported again as `unknown-name`.
+
 ### Path keys
 
 A dotted key is a nested update. `enrichPathCombination` enriches `{ config with server.port = 8080 }` as

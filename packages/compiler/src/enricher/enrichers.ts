@@ -109,7 +109,11 @@ import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import { namespaceCallHelps, valueTypeOf } from "./namespaceValues"
-import { bindsLastStep, reportBarePathKeys } from "./pathKeyShorthand"
+import {
+	bindsLastStep,
+	refuseBareNames,
+	reportBarePathKeys,
+} from "./pathKeyShorthand"
 import {
 	isOneShapeMatch,
 	isUnknownMember,
@@ -1039,7 +1043,10 @@ export function enrichCombination(
 		return combinationOfWrongBrackets(node, lhs, scope)
 	}
 
-	let keys = node.rhs
+	let keys =
+		node.bare === true && node.rhs.nodeType === "RecordValue"
+			? refuseBareNames(node.lhs, node.rhs, scope)
+			: node.rhs
 
 	if (keys.nodeType === "RecordValue" && hasPathKeys(keys)) {
 		reportBarePathKeys(keys, scope)

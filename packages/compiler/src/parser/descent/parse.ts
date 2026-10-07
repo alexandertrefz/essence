@@ -5362,12 +5362,11 @@ class DescentParser {
 		}
 
 		// Neither reading spans `{ base with port, host }`. Reading the keys
-		// once more with shorthand lets the report name the rule.
+		// once more with shorthand keeps the update. The Enricher reports each
+		// bare name, since only the Scope says whether it is a binding.
 		let shorthandCombination = combinationOfKeys(true)
 
 		if (shorthandCombination !== null) {
-			this.reportShorthandInCombination(shorthandCombination)
-
 			return shorthandCombination
 		}
 
@@ -5405,52 +5404,6 @@ class DescentParser {
 			start: leftBrace.position.start,
 			end: rightBrace.position.end,
 		})
-	}
-
-	// One Diagnostic per bare name in a recovered update, which is kept as the
-	// author meant it.
-	protected reportShorthandInCombination(
-		combination: parser.CombinationNode,
-	): void {
-		if (
-			this.suppressDiagnostics ||
-			combination.rhs.nodeType !== "RecordValue"
-		) {
-			return
-		}
-
-		// Every bare key, so each report's Help merges all of them.
-		let bare = Object.values(combination.rhs.members).filter(
-			(member) => member.shorthand === true && member.steps === undefined,
-		)
-		let base = writtenReceiver(combination.lhs) ?? "…"
-		let merged = `'{ ${base} with { ${bare.map((member) => member.name.content).join(", ")} } }'`
-
-		for (let member of bare) {
-			// A bare path key was refused as it was read.
-			let name = member.name.content
-
-			reportError(
-				"A bare member name is not a key in an update",
-				member.name.position,
-				{
-					code: "shorthand-in-combination",
-					labels: [
-						primary(
-							member.name.position,
-							"this names no value to set",
-						),
-					],
-					notes: [
-						"An update's key list always spells its values, because a bare name after 'with' is already the value being merged in.",
-					],
-					helps: [
-						`Write '${name} = ${name}'.`,
-						`Or merge a whole Record: ${merged}.`,
-					],
-				},
-			)
-		}
 	}
 
 	// `allowShorthand` belongs to the braces: a Record literal takes `{ x }`,

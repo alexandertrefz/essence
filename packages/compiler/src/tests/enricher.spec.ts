@@ -12,7 +12,12 @@ import {
 import { computeConformanceMethodMap } from "../helpers/conformance"
 import { parse } from "../parser/index"
 import { printType } from "../printType"
-import { codesOfSource, compiles, helpsOfCode } from "./followedHelps"
+import {
+	analysedDiagnosticsFor,
+	codesOfSource,
+	compiles,
+	helpsOfCode,
+} from "./followedHelps"
 
 function enrichSource(source: string): {
 	program: common.typed.Program
@@ -609,6 +614,86 @@ describe("Enricher", () => {
 						"shorthand-on-path-key",
 						"shorthand-in-combination",
 					])
+				})
+
+				// The offered Record holds every bare key, so following one report
+				// drops no other key. It is offered only where every name is bound.
+				it("should write each bare name's binding, and merge them only where all are bound", () => {
+					let base = `constant base = { port = 80, host = "localhost" }
+						constant port = 8080`
+					let update = (keys: string, host = 'constant host = "h"') =>
+						`implementation {
+						${base}
+						${host}
+						constant server = { base with ${keys} }
+					}`
+					let merged =
+						"Or merge a whole Record: '{ base with { port, host } }'."
+
+					expect(
+						analysedDiagnosticsFor(update("port, host")).flatMap(
+							(diagnostic) => diagnostic.helps,
+						),
+					).toEqual([
+						"Write 'port = port'.",
+						merged,
+						"Write 'host = host'.",
+						merged,
+					])
+					expect(compiles(update("{ port, host }"))).toBe(true)
+					expect(compiles(update("port = port, host = host"))).toBe(
+						true,
+					)
+				})
+
+				// The merged Record keeps the keys written beside the bare name,
+				// each value as written, so following it drops none.
+				it("should merge the written keys along with the bare name", () => {
+					let update = (keys: string) => `implementation {
+						constant base = { port = 80, name = "a" }
+						constant port = 8080
+						constant server = { base with ${keys} }
+					}`
+
+					expect(
+						helpsOfCode(
+							update('port, name = "x"'),
+							"shorthand-in-combination",
+						),
+					).toEqual([
+						"Write 'port = port'.",
+						"Or merge a whole Record: '{ base with { port, name = … } }', with each value as it is written.",
+					])
+					expect(compiles(update('{ port, name = "x" }'))).toBe(true)
+				})
+
+				it("should report an unbound bare name once, and ask for its value", () => {
+					let source = `implementation {
+						constant base = { port = 80, host = "localhost" }
+						constant port = 8080
+						constant server = { base with port, host }
+					}`
+
+					expect(codesOfSource(source)).toEqual([
+						"shorthand-in-combination",
+						"shorthand-in-combination",
+					])
+					expect(
+						analysedDiagnosticsFor(source).flatMap(
+							(diagnostic) => diagnostic.helps,
+						),
+					).toEqual([
+						"Write 'port = port'.",
+						"Write the value it sets in place of '…': 'host = …'.",
+					])
+					expect(
+						compiles(
+							source.replace(
+								"{ base with port, host }",
+								'{ base with port = port, host = "example.com" }',
+							),
+						),
+					).toBe(true)
 				})
 
 				// A plain Literal updates nothing, so the key reaches into

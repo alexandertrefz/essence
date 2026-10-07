@@ -1831,36 +1831,6 @@ describe("Parser AST", () => {
 			).toBe(true)
 		})
 
-		// The offered Record holds every bare key, so following one report
-		// drops no other key.
-		it("gathers every bare key into the Record it offers", () => {
-			let source = `implementation {
-	constant base = { port = 80, host = "localhost" }
-	constant port = 8080
-	constant host = "example.com"
-	constant server = { base with port, host }
-	Terminal.inspect(server)
-}`
-			let merged =
-				"Or merge a whole Record: '{ base with { port, host } }'."
-
-			expect(helpsOf(source)).toEqual([
-				"Write 'port = port'.",
-				merged,
-				"Write 'host = host'.",
-				merged,
-			])
-			expect(
-				compiles(`implementation {
-	constant base = { port = 80, host = "localhost" }
-	constant port = 8080
-	constant host = "example.com"
-	constant server = { base with { port, host } }
-	Terminal.inspect(server)
-}`),
-			).toBe(true)
-		})
-
 		// The Help and the Quick Fix read one computation, so both offer the
 		// value written.
 		it("offers the value the two mixed spellings say between them", () => {

@@ -2673,6 +2673,23 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).not.toContain("shorthand-in-combination")
 		})
 
+		// Without a binding of the name the fix would write an undeclared
+		// name, so the reader writes the value.
+		it("should offer nothing where the name is bound to nothing", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant base = { port = 1, host = 2 }",
+				"\tconstant updated = { base with port, host }",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual([
+				"shorthand-in-combination",
+				"shorthand-in-combination",
+			])
+			expect(quickFixes(lines)).toEqual([])
+		})
+
 		// A Dictionary's key is a value rather than a name, so a bare one is
 		// short for nothing.
 		it("should stay silent for a bare name in a Dictionary update", () => {
