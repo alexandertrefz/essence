@@ -9,16 +9,22 @@ import {
 import { countOf } from "../helpers/describe"
 import { parameterInternalName } from "../helpers/names"
 import {
+	applyGenericBindings,
 	createFreshenedInference,
+	type GenericBindings,
 	type MatchableArgument,
 	matchArguments,
+	mentionsUnsolvedTypeParameter,
+	pairArguments,
 	pairedByPlace,
 } from "../helpers/types"
+import { type ArgumentTyper, inferReturnTypeFromBody } from "./enrichers"
 import { insideRefusedCall, underRefusedCall } from "./refusedCalls"
 import {
 	parameterDocumentation,
 	reportDocumentationParameters,
 	resolveDeclaredType,
+	scopeWithGenerics,
 } from "./resolvers"
 
 // What Function literals reported while a call's candidates were probed: per
@@ -26,6 +32,9 @@ import {
 // "Literals a candidate does not fit" in DEVELOPMENT.md.
 type HeldReports = {
 	candidate: number
+	// Whether more candidates than one take the call's labels, so a literal's
+	// body may be what tells them apart.
+	several: boolean
 	byLiteral: Map<
 		parser.FunctionDefinitionNode,
 		Array<{ candidate: number; diagnostics: Array<common.Diagnostic> }>
@@ -104,8 +113,17 @@ export function discardingLiteralReports<T>(work: () => T): T {
 // it did.
 export function probingCandidates<T extends { index: number }>(
 	probe: () => T | undefined,
+	candidates: Array<common.BaseFunction>,
+	matchableArguments: Array<MatchableArgument>,
 ): T | undefined {
-	let held: HeldReports = { candidate: -1, byLiteral: new Map() }
+	let held: HeldReports = {
+		candidate: -1,
+		several:
+			candidates.filter((candidate) =>
+				pairsLabels(candidate.parameterTypes, matchableArguments),
+			).length > 1,
+		byLiteral: new Map(),
+	}
 	let into = holding
 	let selected: T | undefined
 
@@ -131,6 +149,23 @@ export function probingCandidates<T extends { index: number }>(
 	}
 
 	return selected
+}
+
+// Whether a candidate pairs every Argument with a Parameter of its label.
+function pairsLabels(
+	parameters: common.BaseFunction["parameterTypes"],
+	matchableArguments: Array<MatchableArgument>,
+): boolean {
+	let pairing = pairArguments(parameters, matchableArguments)
+
+	return (
+		pairing !== null &&
+		pairing.forParameter.every(
+			(index, at) =>
+				index === null ||
+				matchableArguments[index].name === parameters[at].name,
+		)
+	)
 }
 
 // The literal a candidate is reading as one of the call's Arguments. Only its
@@ -349,4 +384,80 @@ export function returnTypeHelpIn(
 	returnTypeHelps.set(node, helps.set(place, help))
 
 	return help
+}
+
+// A literal whose body has errors of its own under one of several candidates
+// reads as an Error Argument there. A later candidate it fits is selected
+// then. See "Literals a candidate does not fit" in DEVELOPMENT.md.
+export function typerReadingLiteralBodies(
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+): ArgumentTyper {
+	return {
+		...typer,
+		getType(value, expectedType, bindings, declaredType) {
+			let type = typer.getType(
+				value,
+				expectedType,
+				bindings,
+				declaredType,
+			)
+
+			if (
+				value.nodeType === "FunctionValue" &&
+				heldReports.at(-1)?.several === true &&
+				bodyRefuses(value.value, type, expectedType, bindings, scope)
+			) {
+				typer.noteErrorArgument()
+			}
+
+			return type
+		},
+	}
+}
+
+// Whether a literal's body has errors of its own under the Parameter Types a
+// candidate gave it. A return Type still open was read off the body while
+// matching, and open Parameter Types decide nothing yet.
+function bodyRefuses(
+	node: parser.FunctionDefinitionNode,
+	type: common.Type,
+	expectedType: common.Type,
+	bindings: GenericBindings | null | undefined,
+	scope: enricher.Scope,
+): boolean {
+	if (
+		!needsContext(node) ||
+		type.type !== "Function" ||
+		expectedType.type !== "Function"
+	) {
+		return false
+	}
+
+	let decided = (open: common.Type): common.Type =>
+		bindings == null ? open : applyGenericBindings(open, bindings)
+	let parameterTypes = type.parameterTypes.map((parameter) => ({
+		...parameter,
+		type: decided(parameter.type),
+	}))
+
+	if (
+		mentionsUnsolvedTypeParameter(decided(expectedType.returnType)) ||
+		parameterTypes.some((parameter) =>
+			mentionsUnsolvedTypeParameter(parameter.type),
+		)
+	) {
+		return false
+	}
+
+	let refused = { body: false }
+
+	inferReturnTypeFromBody(
+		node,
+		parameterTypes,
+		scopeWithGenerics(node.generics, scope),
+		refused,
+	)
+
+	return refused.body
 }

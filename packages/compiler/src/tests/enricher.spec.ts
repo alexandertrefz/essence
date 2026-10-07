@@ -5853,6 +5853,63 @@ ${declared}
 				})
 			})
 
+			// A callback's body with mistakes of its own under one entry does
+			// not fit that entry while a later entry reads it cleanly.
+			describe("told apart by a callback's body", () => {
+				let runner = (call: string) => `implementation {
+					namespace Runner for Integer {
+						overload run {
+							(step advance: (_ a: Integer, _ b: Integer) -> Integer) -> Integer {
+								<- advance(@, 10)
+							}
+							(step advance: (_ a: String, _ b: String) -> Integer) -> Integer {
+								<- advance("a", "b")
+							}
+						}
+					}
+
+					constant ran = ${call}
+				}`
+
+				it("should select the entry whose Types the callback's body reads", () => {
+					let strings = runner(
+						"1::run(step (a, b) { <- a::length() })",
+					)
+					let both = runner("1::run(step (a, b) { <- 1 })")
+
+					expect(diagnosticsFor(strings)).toEqual([])
+					expect(
+						lastConstantMethodInvocation(strings)
+							.overloadedMethodIndex,
+					).toBe(1)
+					expect(diagnosticsFor(both)).toEqual([])
+					expect(
+						lastConstantMethodInvocation(both)
+							.overloadedMethodIndex,
+					).toBe(0)
+				})
+
+				// Where no entry reads it, the first is selected, and its own
+				// reading reports the body's mistake.
+				it("should report a callback's body no entry reads under the first", () => {
+					expect(
+						diagnosticsFor(
+							runner("1::run(step (a, b) { <- a::nope() })"),
+						).map((diagnostic) => [
+							diagnostic.code,
+							diagnostic.notes,
+						]),
+					).toEqual([
+						[
+							"unknown-method",
+							[
+								"Searched Namespaces 'Integer', 'Scalar', 'Number', 'Runner'.",
+							],
+						],
+					])
+				})
+			})
+
 			// The call carries the conformances solved during selection, not a
 			// second solve.
 			it("should carry the conformances the selected Overload was probed with", () => {

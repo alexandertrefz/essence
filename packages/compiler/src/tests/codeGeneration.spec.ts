@@ -2481,6 +2481,27 @@ describe("Code Generation", () => {
 				}`),
 			).toEqual(["11"])
 		})
+
+		// A callback's body that reads only under a later entry runs that one.
+		it("should run the Overload a callback's body reads under", async () => {
+			expect(
+				await run(`implementation {
+					namespace Runner for Integer {
+						overload static run {
+							(_ step: (_ a: Integer, _ b: Integer) -> Integer) -> String {
+								<- "ints"
+							}
+							(_ step: (_ a: String, _ b: String) -> Integer) -> String {
+								<- "strings"
+							}
+						}
+					}
+
+					Terminal.inspect(Runner.run((a, b) { <- a::length() }))
+					Terminal.inspect(Runner.run((a, b) { <- a::add(b) }))
+				}`),
+			).toEqual(['"strings"', '"ints"'])
+		})
 	})
 
 	// A literal inside an Argument is no Argument, so it takes no Types from

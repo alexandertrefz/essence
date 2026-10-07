@@ -123,6 +123,7 @@ import {
 	readLiteralsByPlace,
 	resolveContextualParameterTypes,
 	returnTypeHelpIn,
+	typerReadingLiteralBodies,
 } from "./contextualParameters"
 import {
 	branchNamespaces,
@@ -9498,7 +9499,7 @@ const undecidedWithoutAReturnType: ReadonlySet<common.DiagnosticCode> = new Set(
 // Infers a Function literal's return Type by enriching its body, with the
 // Diagnostics dropped. See "Return Type inference from a body" in
 // DEVELOPMENT.md.
-function inferReturnTypeFromBody(
+export function inferReturnTypeFromBody(
 	node: parser.FunctionDefinitionNode,
 	parameterTypes: Array<common.Parameter>,
 	scope: enricher.Scope,
@@ -9838,7 +9839,7 @@ function makeArgumentTyper(
 			: result
 	}
 
-	return typerRefusingErrorPlaces({
+	let typer: ArgumentTyper = {
 		expectedType,
 		getType(value, expectedType, bindings = null, declaredType) {
 			// A Function literal without annotations is resolved fresh per
@@ -9953,7 +9954,9 @@ function makeArgumentTyper(
 				type: value.type,
 			}
 		},
-	})
+	}
+
+	return typerRefusingErrorPlaces(typerReadingLiteralBodies(scope, typer))
 }
 
 // A Function literal's Type. A fully annotated one is a plain signature. An
@@ -10552,7 +10555,11 @@ function overloadProbeOrder(
 export function selectOverload(
 	...args: Parameters<typeof selectFittingOverload>
 ): SelectedOverload | undefined {
-	return probingCandidates(() => selectFittingOverload(...args))
+	return probingCandidates(
+		() => selectFittingOverload(...args),
+		args[0],
+		args[1],
+	)
 }
 
 function selectFittingOverload(

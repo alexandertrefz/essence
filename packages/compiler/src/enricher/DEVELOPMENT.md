@@ -798,6 +798,14 @@ Parameter every resolution left without a Type is reported, with the closest can
 call's own refusal stands beside it. A lone signature's re-match reports from outside the hold, so the report there
 is the same one.
 
+A literal's body can tell candidates apart too. Where more candidates than one take the call's labels, a literal
+whose expected return Type is decided is read once more under each candidate's Parameter Types, silently
+(`typerReadingLiteralBodies`). Any other call reads no body for this, which keeps nested literals from being read
+again at every level. A body with errors of its own there reads as an Error Argument, so the candidate
+does not fit while a later one does. `1::run(step (a, b) { <- a::length() })` then selects the entry taking
+Strings. Where no candidate reads the body cleanly, the first match is selected, and its real pass reports the
+body's mistake. A return Type the call has not solved is read off the body while matching, so it is not read again.
+
 A literal inside another Argument, as a Record member, a List item, a Case payload or a Match arm, is no Argument and
 takes no Types from the call. It reads the same against every candidate, so its report is never held, and it
 reports whichever candidate is selected. Its Help reads its body once per Scope it stands in.
