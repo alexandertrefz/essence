@@ -2441,6 +2441,94 @@ describe("Choices", () => {
 				])
 			})
 
+			// An Alias of an application holds the Choice's Cases applied, `W`
+			// and all. A bare Case still resolves as `Box` declares it, in every
+			// position, whichever Aliases are declared and wherever.
+			it("resolves a bare Case as its Choice declares it beside Aliases of it", async () => {
+				let program = (
+					declarations: string,
+					name: string,
+				): string => `implementation {
+					${declarations}
+
+					function take<infer Item>(_ b: Box<Item>) -> String {
+						<- "took"
+					}
+
+					constant h = #Full(1)
+					constant c: ${name}<Integer> = #Full(2)
+					constant boxed: Box<Integer> = #Full(3)
+
+					Terminal.inspect(h)
+					Terminal.inspect(c)
+					Terminal.inspect(${name}<Integer>#Full(4))
+					Terminal.inspect(#Full("five"))
+					Terminal.inspect([#Full(6), #Full(7)])
+					Terminal.inspect(take(#Full(8)))
+					Terminal.inspect(match boxed -> String {
+						case #Full { <- "full" }
+						case #Empty { <- "empty" }
+					})
+				}`
+				let box = "choice Box<Value> { Full { value: Value }, Empty }\n"
+				let crate = "type Crate<W> = Box<W>\n"
+				let others =
+					"type Boxes<A> = Box<List<A>>\ntype Ints = Box<Integer>\n"
+				let printed = [
+					"Box#Full(1)",
+					"Box#Full(2)",
+					"Box#Full(4)",
+					'Box#Full("five")',
+					"[ Box#Full(6), Box#Full(7) ]",
+					'"took"',
+					'"full"',
+				]
+
+				expect(await run(program(box, "Box"))).toEqual(printed)
+				expect(await run(program(box + crate, "Crate"))).toEqual(
+					printed,
+				)
+				expect(await run(program(crate + box, "Crate"))).toEqual(
+					printed,
+				)
+				expect(
+					await run(program(others + box + crate, "Crate")),
+				).toEqual(printed)
+			})
+
+			// Without the Alias, `Box#Empty` leaves its Type Arguments undecided,
+			// so the Help writes them. The Alias changes nothing.
+			it("names a bare Case's Choice in an ambiguity as without an Alias of it", () => {
+				let program = (
+					alias: string,
+					body: string,
+				): string => `implementation {
+					choice Box<Value> { Full { value: Value }, Empty }
+					${alias}
+					choice Bag { Full { value: Integer }, Empty }
+
+					${body}
+				}`
+				let crate = "type Crate<W> = Box<W>"
+				let ambiguous = program(crate, "constant e = #Full(1)")
+
+				expect(helpsOf(ambiguous)).toEqual(
+					helpsOf(program("", "constant e = #Full(1)")),
+				)
+				expect(helpsOf(ambiguous)).toEqual([
+					"Write 'Box<…>#Full' with its Type Arguments to pick 'Box'.",
+					"Write 'Bag#Full' to pick 'Bag'.",
+				])
+				expect(
+					compiles(
+						program(crate, "constant e = Box<Integer>#Full(1)"),
+					),
+				).toBe(true)
+				expect(
+					compiles(program(crate, "constant e = Bag#Full(1)")),
+				).toBe(true)
+			})
+
 			// Reported once, since no unsolved Type Parameter leaves through the
 			// return Type to be reported again.
 			it("says so once, and lets nothing carry the Parameter onward", () => {

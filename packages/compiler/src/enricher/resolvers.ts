@@ -1286,7 +1286,9 @@ function programNamespaceScope(
 
 // Every Case of every Choice in Type scope, for a bare `#Add({ … })` to look
 // itself up in. Shadowed Type names are skipped, as `getAllNamespacesInScope`
-// skips them. A near miss is drawn from the same scan.
+// skips them. A near miss is drawn from the same scan. An Alias of an
+// application holds the Choice's Cases applied, so a Case the Choice declares
+// stands over them. See "Resolving a Case" in DEVELOPMENT.md.
 export function findCaseTypesInScope(
 	scope: enricher.Scope,
 ): Array<common.CaseType> {
@@ -1313,8 +1315,14 @@ export function findCaseTypesInScope(
 						: [type]
 
 			for (let member of members) {
-				if (member.type === "Case") {
-					cases.set(`${member.choice}#${member.name}`, member)
+				if (member.type !== "Case") {
+					continue
+				}
+
+				let key = `${member.choice}#${member.name}`
+
+				if (!givesWay(cases.get(key), member)) {
+					cases.set(key, member)
 				}
 			}
 		}
@@ -1323,6 +1331,19 @@ export function findCaseTypesInScope(
 	}
 
 	return [...cases.values()]
+}
+
+// Whether an applied Case, as `Box<Integer>` holds, gives way to the declared
+// one already found.
+function givesWay(
+	held: common.CaseType | undefined,
+	member: common.CaseType,
+): boolean {
+	return (
+		held !== undefined &&
+		held.typeArguments === undefined &&
+		member.typeArguments !== undefined
+	)
 }
 
 // Reports an undeclared name as another language's habit, or as a Case

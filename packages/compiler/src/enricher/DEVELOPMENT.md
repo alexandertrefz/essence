@@ -46,10 +46,12 @@ Choice, its Helps name each with its Type Arguments, as `Box<Integer>#Full`, sin
 construction can write them. Any other arm is named by its Choice alone. Where every arm applies one Choice, the
 report speaks of applications rather than Choices, since one Choice declares the Case once. A Case Matcher writes
 no Type Arguments and covers every application of its Case, so a Matcher's Helps name each Choice once. Where the
-position decides nothing, the scan of every Case in scope decides (`resolveBareCaseReference`). Two Choices
-declaring the name are ambiguous again, unless the position was itself refused. A unit Case of a generic Choice has
-no payload to decide anything, so a bare `#Bare` that nothing decides reports `undecided-type-arguments`, as
-`Holder#Bare` does.
+position decides nothing, the scan of every Case in scope decides (`resolveBareCaseReference`). An Alias of an
+application holds the Choice's Cases applied, and the scan takes the Case the Choice declares over them
+(`findCaseTypesInScope`). With only the Alias in scope, its applied Case still counts, so a bare `#Full` is ambiguous
+beside another Choice's `#Full`. Two Choices declaring the name are ambiguous again, unless the position was itself
+refused. A unit Case of a generic Choice has no payload to decide anything, so a bare `#Bare` that nothing decides
+reports `undecided-type-arguments`, as `Holder#Bare` does.
 
 A prefixed `Holder#Case` is decided by the Type Arguments it writes, then by its position
 (`resolvePrefixedCaseValueType`). Its payload only chooses among the instantiations the position offers, and the
