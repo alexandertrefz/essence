@@ -1,8 +1,10 @@
 import type { common, enricher } from "@essence-lang/interfaces"
 
 import {
+	applyGenericBindings,
 	flattenUnionMembers,
 	genericNamesMentioned,
+	matchesType,
 	matchesTypeWithBindings,
 } from "../helpers/types"
 import { findTypeInScope } from "./resolvers"
@@ -58,4 +60,50 @@ export function offeredCases(
 					bindings: new Map(),
 				})),
 	)
+}
+
+// The Case an Alias's payload writes, where the position offers the Case only
+// in applications the Alias can not write. The position then refuses it as it
+// would `Boxes<Integer>#Full([1])`. See "Resolving a Case" in DEVELOPMENT.md.
+export function payloadCase(
+	declaredCase: common.CaseType,
+	expectedType: common.Type,
+	payloadUnder: (under: common.Type) => common.typed.ExpressionNode | null,
+	aliasGenerics: Array<common.GenericDeclaration> | null,
+): common.CaseType | null {
+	if (
+		aliasGenerics === null ||
+		genericNamesMentioned(expectedType).size > 0 ||
+		offeredCases(declaredCase, expectedType, null).length === 0
+	) {
+		return null
+	}
+
+	let payload = payloadUnder(declaredCase)
+	let members = Object.values(declaredCase.members)
+	let context = {
+		bindableNames: new Set(aliasGenerics.map((generic) => generic.name)),
+		bindings: new Map(),
+	}
+	let bound =
+		payload !== null &&
+		(matchesTypeWithBindings(
+			{ type: "Record", members: declaredCase.members },
+			payload.type,
+			context,
+		) ||
+			(members.length === 1 &&
+				matchesTypeWithBindings(members[0]!, payload.type, context)))
+	let written = bound
+		? (applyGenericBindings(
+				declaredCase,
+				context.bindings,
+			) as common.CaseType)
+		: null
+
+	return written !== null &&
+		aliasGenerics.every((generic) => context.bindings.has(generic.name)) &&
+		!matchesType(expectedType, written)
+		? written
+		: null
 }

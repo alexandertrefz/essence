@@ -65,7 +65,10 @@ The prefix may be a generic Alias of an application, as `Crate` is in `type Crat
 the Alias's own Type Parameters, and those are decided as a Choice's are (`aliasTypeParameters`): by the Type
 Arguments written, then by the position, and otherwise `undecided-type-arguments` spells the Alias. The position
 offers only the instantiations the Alias can write (`offeredCases`), so `Boxes#Full`, under `type Boxes<A> =
-Box<List<A>>`, takes no `Box<Integer>`.
+Box<List<A>>`, takes no `Box<Integer>`. Where the position offers the Case only in such applications, the
+construction can not fit it whatever its Type Arguments. So the payload decides them (`payloadCase`), and the position
+refuses the Case it writes as it refuses `Boxes<Integer>#Full([1])`. A position whose Type mentions a Type Parameter
+might take that Case, so there the construction stays undecided.
 
 A refused position leaves a construction undecided without a report, bare or prefixed. The position's own mistake
 is the one reported, as an annotation that did not resolve. A prefixed construction there takes each Type Parameter

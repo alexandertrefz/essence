@@ -2508,15 +2508,44 @@ describe("Choices", () => {
 				).toEqual(["Box#Full(1)", "Box#Full(2)", "Box#Full(3)"])
 			})
 
-			// `Boxes` writes only a List's application of `Box`, so the
-			// `Box<Integer>` the position offers decides nothing for it.
-			it("decides through a generic Alias only what the Alias can write", () => {
+			// `Boxes` writes only a List's application of `Box`, so it never
+			// writes the `Box<Integer>` the position offers. The position
+			// refuses the Case the payload writes, as it refuses
+			// `Boxes<Integer>#Full([1])`.
+			it.each(["Box<Integer>", "Crate<Integer> | Bag"])(
+				"refuses what a generic Alias writes where %s is expected",
+				(annotation) => {
+					let source = `implementation {
+						choice Box<Value> { Full { value: Value }, Empty }
+						type Crate<V> = Box<V>
+						type Boxes<A> = Box<List<A>>
+						choice Bag { Full { value: Integer }, Empty }
+
+						constant box: ${annotation} = Boxes#Full([1])
+					}`
+
+					expect(codesOf(source)).toEqual([
+						"assignment-type-mismatch",
+					])
+					expect(labelsOf(source)).toEqual([
+						"this is a Box<List<Integer>>#Full",
+					])
+				},
+			)
+
+			// A Type Parameter the position mentions might take the Case the
+			// payload writes, so nothing there decides it.
+			it("leaves a construction undecided where the position mentions a Type Parameter", () => {
 				expect(
 					messagesOf(`implementation {
 						choice Box<Value> { Full { value: Value }, Empty }
 						type Boxes<A> = Box<List<A>>
 
-						constant box: Box<Integer> = Boxes#Full([1])
+						function take<infer T>(_ b: Box<Integer> | T) -> Integer {
+							<- 1
+						}
+
+						Terminal.inspect(take(Boxes#Full([1])))
 					}`),
 				).toEqual([
 					"Nothing decides the Type Arguments of 'Boxes#Full'",

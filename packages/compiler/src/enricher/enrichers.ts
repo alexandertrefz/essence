@@ -108,7 +108,7 @@ import {
 	undeclaredMembers,
 } from "../helpers/undeclaredMembers"
 import { printSignature, printType, signaturesOf } from "../printType"
-import { aliasTypeParameters, offeredCases } from "./aliasCases"
+import { aliasTypeParameters, offeredCases, payloadCase } from "./aliasCases"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
 import { argumentTypeRefusal } from "./argumentRefusals"
 import { askAssertionQuestions } from "./assertionQuestions"
@@ -579,9 +579,9 @@ function enrichCaseValue(
 	// The Case resolves before its payload, so the position's members are what
 	// the payload stands in: `Box<Box<Integer>>#Full(Box#Full(1))` reads the
 	// inner Type Arguments off the outer. Where the position offers several
-	// instantiations of the Case, the payload is read silently under each
-	// candidate. The payload only chooses among instantiations the context
-	// decided; it never decides one.
+	// instantiations, the payload is read silently under each and chooses among
+	// them. It decides one only where the position offers none the prefix can
+	// write, and the position then refuses it.
 	let payload = makePayloadReadings(node, scope)
 	let type = resolveCaseValueType(node, scope, context, payload.valueUnder)
 
@@ -14325,7 +14325,8 @@ function resolveAppliedCase(
 
 // The instantiation the position decides for a prefixed construction, or `null`
 // where it says nothing about this Choice. Several instantiations are chosen
-// between by the payload, and the first stands where none fits.
+// between by the payload, and the first stands where none fits. Through an
+// Alias that writes none of them, it is the Case the payload writes.
 function decideCaseFromExpectedType(
 	declaredCase: common.CaseType,
 	expectedType: common.Type,
@@ -14336,7 +14337,10 @@ function decideCaseFromExpectedType(
 	let candidates = offeredCases(declaredCase, expectedType, aliasGenerics)
 
 	if (candidates.length <= 1) {
-		return candidates[0] ?? null
+		return (
+			candidates[0] ??
+			payloadCase(declaredCase, expectedType, payloadUnder, aliasGenerics)
+		)
 	}
 
 	return (
