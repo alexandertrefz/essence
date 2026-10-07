@@ -32,6 +32,15 @@ type HeldReports = {
 	>
 }
 
+// Whether a Function literal leaves an annotation out, so it takes its Types
+// from the Parameter it is passed to.
+export function needsContext(node: parser.FunctionDefinitionNode): boolean {
+	return (
+		node.returnType === null ||
+		node.parameters.some((parameter) => parameter.type === null)
+	)
+}
+
 // Null stands for a call being enriched, so no call around it holds its
 // reports.
 let heldReports: Array<HeldReports | null> = []

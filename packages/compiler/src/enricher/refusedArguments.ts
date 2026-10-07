@@ -7,7 +7,9 @@ import {
 	refusedFunctionsAsHoles,
 	typeContainsError,
 } from "../helpers/types"
-import type { ArgumentTyper } from "./enrichers"
+import { needsContext } from "./contextualParameters"
+import { type ArgumentTyper, recordDecidedArgument } from "./enrichers"
+import { underRefusedCall } from "./refusedCalls"
 
 // The typer with each Function refused as a value read as a hole, or null where
 // no Argument holds one. A refused call is then measured around such a
@@ -72,4 +74,49 @@ export function holdsOnlyHoles(
 	let type = typer.enrichedArgumentValue(argument.value).type
 
 	return holdsFunctionRefusedAsValue(type) && !typeContainsError(type)
+}
+
+// An Argument at a Parameter whose Type is an Error stands in a refused place,
+// as a refused call's Argument does. See "Arguments at a refused Parameter" in
+// DEVELOPMENT.md.
+export function typerRefusingErrorPlaces(typer: ArgumentTyper): ArgumentTyper {
+	let refused = new Set<parser.ExpressionNode>()
+
+	return {
+		...typer,
+		getType(value, expectedType, bindings, declaredType) {
+			if (expectedType.type !== "Error" || !readsItsPlace(value)) {
+				return typer.getType(
+					value,
+					expectedType,
+					bindings,
+					declaredType,
+				)
+			}
+
+			// Kept only for the candidate the call commits.
+			recordDecidedArgument(() => refused.add(value))
+
+			return underRefusedCall(true, () =>
+				typer.getType(value, expectedType, bindings, declaredType),
+			)
+		},
+		enrichArgumentNode(argument) {
+			return refused.has(argument.value)
+				? underRefusedCall(true, () =>
+						typer.enrichArgumentNode(argument),
+					)
+				: typer.enrichArgumentNode(argument)
+		},
+	}
+}
+
+// Whether an Argument is read again for each candidate, under the Parameter it
+// stands at. Any other Argument is typed once, whatever the candidate.
+function readsItsPlace(value: parser.ExpressionNode): boolean {
+	return (
+		value.nodeType === "CaseValue" ||
+		value.nodeType === "MemberPath" ||
+		(value.nodeType === "FunctionValue" && needsContext(value.value))
+	)
 }

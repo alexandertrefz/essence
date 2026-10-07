@@ -1873,6 +1873,38 @@ describe("Code Generation", () => {
 			])
 		})
 
+		// An annotation naming an undeclared Type is a refused position, at
+		// the top or nested, so the path says nothing more.
+		it("reports only the annotation a path stands at when its Type is an Error", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				constant one: Colr = .price
+				constant listed: List<Colr> = [.price]
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-type",
+				"unknown-type",
+			])
+		})
+
+		// A Parameter whose Type is an Error names no Function either, and its
+		// own refusal is the mistake.
+		it("reports only the Parameter a path stands at when its Type is an Error", () => {
+			let diagnostics = diagnosticsOf(`implementation {
+				${product}
+				function total(_ rule: Colr, of items: List<Product>) -> Integer {
+					<- 0
+				}
+
+				constant summed = total(.price, of products)
+			}`)
+
+			expect(diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+				"unknown-type",
+			])
+		})
+
 		// A call inside the refused one reads its own Arguments' positions. A
 		// literal's body stands in no Argument. A path in either is a mistake of
 		// its own.

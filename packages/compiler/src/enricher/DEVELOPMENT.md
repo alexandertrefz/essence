@@ -212,9 +212,10 @@ debugger all see the Function literal the author could have written instead.
 The path reads its first member off the one Parameter of the Function the position expects (`memberPathRootType`).
 A position expecting a Function of another arity, or no Function at all, names no Root Type, and the path reports
 `path-without-context`. Inside a call that resolved to nothing it stays silent, since the call's own refusal is the
-mistake (`callRefused`). A structural language can not invent a Root Type from a member name, which is the
-same rule a bare `#Case` follows. An Argument is matched in one pass and enriched in another. So a path matched as
-an Argument reads back the Type the matching recorded (`recordedMemberPathType`).
+mistake (`callRefused`). So it does at a position that is itself an Error, as under an annotation naming an
+undeclared Type (`positionWasRefused`). A structural language can not invent a Root Type from a member name, which
+is the same rule a bare `#Case` follows. An Argument is matched in one pass and enriched in another. So a path
+matched as an Argument reads back the Type the matching recorded (`recordedMemberPathType`).
 
 Each step reads a member off a Record or a Case. An Optional, a Union, a Choice or a List has to be decided by a
 Match before it is read. A step off one reports `path-step-not-a-record`. So does a step off a Type Parameter the
@@ -803,6 +804,17 @@ A `::` call holds what each Namespace's probe of its literals reported (`holdLit
 winner, or several, the hold stands beside the refusal. `providedNamespaceMember` only asks whether each provider
 fits, so it drops its hold (`discardingLiteralReports`). Only literal reports are held: an Argument's first
 enrichment reports directly, and the typer never enriches it again.
+
+### Arguments at a refused Parameter
+
+A Parameter whose Type is an Error was refused where it was declared, so an Argument passed to it stands in a refused
+place. An Argument that reads its position, a bare Case, a member path or an unannotated Function literal, is read
+there as a refused call's Argument is (`typerRefusingErrorPlaces`). So `take(#Red)` and `take(.price)` report only
+the Parameter's `unknown-type`, not `ambiguous-case` or `path-without-context`. A Case no Choice declares is still
+`unknown-case`, and a mistake in a literal's body is still reported.
+
+The place is noted on the probe recordings (`recordDecidedArgument`), so only the candidate the call commits decides
+it. Any other Argument is typed once for every candidate. It reads no position, so it keeps its own reports.
 
 ### The no-matching-overload report
 

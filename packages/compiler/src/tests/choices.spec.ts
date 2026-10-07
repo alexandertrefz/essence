@@ -1606,6 +1606,33 @@ describe("Choices", () => {
 				expect(codesOf(source)).toEqual(["undecided-type-arguments"])
 			})
 
+			// A Parameter whose Type is an Error was refused where it was
+			// declared, so it decides no construction either.
+			it("reports only the Parameter a construction stands at when it is an Error", () => {
+				let source = `implementation {
+					choice Light { Red, Green }
+					choice Paint { Red, Blue }
+
+					function take(_ value: Colr, by count: Integer) -> Integer {
+						<- count
+					}
+
+					constant red = take(#Red, by 1)
+					constant valued = take(#Value(1), by 2)
+					constant unknown = take(#Valu(1), by 3)
+				}`
+
+				expect(
+					diagnosticsOf(source).map((diagnostic) => [
+						diagnostic.code,
+						diagnostic.position?.start.line,
+					]),
+				).toEqual([
+					["unknown-type", 5],
+					["unknown-case", 11],
+				])
+			})
+
 			// Through a generic Alias, the Alias's own Type Parameters are the
 			// blanks, so the payload is asked for its members all the same.
 			it("decides no construction a generic Alias prefixes there", () => {

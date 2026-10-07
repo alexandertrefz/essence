@@ -3446,6 +3446,27 @@ describe("Enricher", () => {
 			).toEqual(["unknown-name", "unknown-member"])
 		})
 
+		// A Parameter whose Type is an Error takes a literal as a refused call
+		// does. The body is still read, so a mistake there is its own.
+		it("should report nothing for a literal at a Parameter whose Type is an Error", () => {
+			expect(
+				diagnosticsFor(`implementation {
+					function run(_ step: Colr) -> Integer {
+						<- 1
+					}
+
+					constant ran = run((x) { <- x })
+					constant read = run((x) { <- zz })
+				}`).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.position?.start.line,
+				]),
+			).toEqual([
+				["unknown-type", 2],
+				["unknown-name", 7],
+			])
+		})
+
 		// A literal with no Parameters is reported at its empty Parameter list.
 		it("should place an unreadable return Type on a literal with no Parameters", () => {
 			let source = `implementation {

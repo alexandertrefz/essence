@@ -116,6 +116,7 @@ import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
 	enteringCall,
 	holdLiteralReports,
+	needsContext,
 	probingCandidate,
 	probingCandidates,
 	readingArgumentLiteral,
@@ -149,7 +150,11 @@ import {
 import { type InvokingCall, providedNamespaceMember } from "./providedBodies"
 import { recordWrittenConstant, refuseReassignment } from "./reassignment"
 import { pinnedForReceiver } from "./receiverPins"
-import { holdsOnlyHoles, typerAroundRefusedFunctions } from "./refusedArguments"
+import {
+	holdsOnlyHoles,
+	typerAroundRefusedFunctions,
+	typerRefusingErrorPlaces,
+} from "./refusedArguments"
 import {
 	insideRefusedCall,
 	noteRefusedCallNamespaces,
@@ -2951,8 +2956,9 @@ function enrichMemberPath(
 	let rootType = memberPathRootType(expected)
 
 	if (rootType === null) {
-		// Silent inside a refused call; see `callRefused`.
-		if (!insideRefusedCall()) {
+		// Silent inside a refused call, and at a position that is itself an
+		// Error; see `callRefused` and `positionWasRefused`.
+		if (!insideRefusedCall() && !positionWasRefused(expected)) {
 			reportPathWithoutContext(node, expected)
 		}
 
@@ -9863,7 +9869,7 @@ function makeArgumentTyper(
 			: result
 	}
 
-	return {
+	return typerRefusingErrorPlaces({
 		expectedType,
 		getType(value, expectedType, bindings = null, declaredType) {
 			// A Function literal without annotations is resolved fresh per
@@ -9978,7 +9984,7 @@ function makeArgumentTyper(
 				type: value.type,
 			}
 		},
-	}
+	})
 }
 
 // A Function literal's Type. A fully annotated one is a plain signature. An
@@ -15364,7 +15370,7 @@ function recordedContextualFunctionType(
 }
 
 // The same rail for a decision written onto an Argument Node.
-function recordDecidedArgument(decide: () => void): void {
+export function recordDecidedArgument(decide: () => void): void {
 	let innermost = probeRecordings[probeRecordings.length - 1]
 
 	if (innermost === undefined) {
@@ -15519,13 +15525,6 @@ function withContextualFunctionTypes<Result>(
 	} finally {
 		probeRecordings.pop()
 	}
-}
-
-function needsContext(node: parser.FunctionDefinitionNode): boolean {
-	return (
-		node.returnType === null ||
-		node.parameters.some((parameter) => parameter.type === null)
-	)
 }
 
 // The Function literals whose return Type could not be read off their body. The
