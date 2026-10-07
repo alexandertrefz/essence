@@ -639,6 +639,8 @@ Each label carries the callee's name, so it shows the whole call, `append(_ Stri
 with `printType`. Its edit writes the annotation as `spellTypeAt` spells it, naming only what resolves where it lands.
 Spelling is the costly part, since each name in the Type is looked up in the Scopes around the Hint.
 
+- A Type holding an Error anywhere, as `{ Clock: Error }` does, gets no Hint. Its Diagnostic was reported where it
+  was written, and no annotation can spell it.
 - A request covers a range, and a Hint outside it is never made.
 - A client that lists `textEdits` under `inlayHint.resolveSupport` gets every Type Hint without its edit. Asking for a
   whole file then prints Types and spells none. Each such Hint carries its document's URI and version as `data`.

@@ -203,6 +203,32 @@ describe("Inlay Hints", () => {
 		expect(hintsOf(source)).toEqual([])
 	})
 
+	// An Error anywhere in a Type was reported where it was written, and no
+	// annotation can spell it.
+	it("should not annotate a Type that holds an Error", () => {
+		let source = [
+			"implementation {",
+			"\tnamespace Clock for Integer {",
+			"\t\tstatic now() -> Integer {",
+			"\t\t\t<- 7",
+			"\t\t}",
+			"\t}",
+			"",
+			"\tconstant settings = { Clock }",
+			"\tconstant names = [missingName]",
+			"\tconstant nested = [1]::map((item) { <- [missingName] })",
+			"}",
+		].join("\n")
+
+		expect(hintsOf(source)).toEqual([
+			{
+				position: { line: 10, column: 34 },
+				label: ": Integer",
+				kind: "type",
+			},
+		])
+	})
+
 	// No Namespace is a value, so a Constant can not hold one and has no Type
 	// to show. What it reads off the Namespace does.
 	it("should not annotate a Constant written as a Namespace", () => {

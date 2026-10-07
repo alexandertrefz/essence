@@ -1,3 +1,4 @@
+import { typeContainsError } from "@essence-lang/compiler/helpers"
 import { printType } from "@essence-lang/compiler/printType"
 import {
 	forEachTypedChild,
@@ -39,10 +40,9 @@ type LabelEdit = {
 }
 
 // Each Hint's label is the omitted annotation, placed where it belongs, so
-// accepting it inserts it. A Type that cannot be written gets no edit, and the
-// edit spells only what the position resolves, via `spellTypeAt`.
-//
-// Spelling the Type is the costly part. A Hint on a line outside the requested
+// accepting it inserts it. A Type that cannot be written gets no edit, and one
+// holding an Error, as `List<Error>` does, gets no Hint. Spelling the edit with
+// `spellTypeAt` is the costly part. A Hint on a line outside the requested
 // range is never made, and an unspelled request leaves the edit for later.
 function addTypeHint(
 	hints: Hints,
@@ -52,9 +52,10 @@ function addTypeHint(
 	labelEdit: LabelEdit | null | "unwritable" = null,
 ) {
 	if (
-		hints.range !== null &&
-		(position.line < hints.range.start.line ||
-			position.line > hints.range.end.line)
+		typeContainsError(type) ||
+		(hints.range !== null &&
+			(position.line < hints.range.start.line ||
+				position.line > hints.range.end.line))
 	) {
 		return
 	}
@@ -130,13 +131,11 @@ function visitNode(node: TypedNode, hints: Hints) {
 		case "ConstantDeclarationStatement":
 		case "VariableDeclarationStatement":
 			// `declaredType` is set when the source spelled the Type out, and
-			// then no Hint is needed. A failed inference shows nothing. A
-			// synthesized Declaration, such as a Pattern's `{ width }` binder,
-			// takes no annotation and is skipped.
+			// then no Hint is needed. A synthesized Declaration, such as a
+			// Pattern's `{ width }` binder, takes no annotation and is skipped.
 			if (
 				node.synthesized === undefined &&
 				node.declaredType === null &&
-				node.type.type !== "Error" &&
 				!writesItsOwnType(node.value)
 			) {
 				addTypeHint(hints, node.name.position.end, ": ", node.type)
@@ -167,8 +166,8 @@ function writesItsOwnType(value: common.typed.ExpressionNode): boolean {
 }
 
 // `inferredType` and `inferredReturnType` are set when the source omitted
-// them; a failed inference shows nothing. The Hints sit at the end of the
-// Parameter's name and at the end of the Parameter list.
+// them. The Hints sit at the end of the Parameter's name and at the end of the
+// Parameter list.
 function hintFunctionDefinition(
 	definition: common.typed.FunctionDefinitionNode,
 	type: common.FunctionType,
@@ -178,10 +177,7 @@ function hintFunctionDefinition(
 		// INVARIANT: `parameter.position` stops at the Type, before any default. The
 		// applied edit writes at that end, so a wider span would put `: Integer` after
 		// `= 1`.
-		if (
-			parameter.inferredType !== null &&
-			parameter.inferredType.type !== "Error"
-		) {
+		if (parameter.inferredType !== null) {
 			addTypeHint(
 				hints,
 				parameter.position.end,
@@ -195,10 +191,7 @@ function hintFunctionDefinition(
 		}
 	}
 
-	if (
-		definition.inferredReturnType !== null &&
-		definition.inferredReturnType.type !== "Error"
-	) {
+	if (definition.inferredReturnType !== null) {
 		addTypeHint(
 			hints,
 			definition.parameterListPosition.end,
