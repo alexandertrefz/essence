@@ -6709,9 +6709,9 @@ implementation {
 		)
 	})
 
-	// Only a Namespace is used through a dispatch. A Choice and a refinement
-	// have uses of their own a file need not spell. A Constant, a Function or
-	// a Record Alias is used only where it is written.
+	// Only a Namespace is used through a dispatch. A Choice, an Alias of one
+	// and a refinement have uses of their own a file need not spell. A
+	// Constant, a Function or a Record Alias is used only where it is written.
 	it("says what counts as a use of each kind of import", () => {
 		withProject(
 			{
@@ -6719,6 +6719,7 @@ implementation {
 	from "./Kinds.es" {
 		Clock
 		Colour
+		Flipped
 		greet
 		one
 		Point
@@ -6745,6 +6746,10 @@ implementation {
 
 	choice Colour { Red, Green }
 
+	choice Pair<A, B> { First { value: A }, Second { value: B } }
+
+	type Flipped<A, B> = Pair<B, A>
+
 	type Small = Integer where @::isLessThan(10)
 
 	type Point = { x: Integer }
@@ -6753,8 +6758,10 @@ implementation {
 export {
 	Clock
 	Colour
+	Flipped
 	greet
 	one
+	Pair
 	Point
 	Small
 }
@@ -6776,6 +6783,12 @@ export {
 						"'Colour' is imported and never used",
 						[
 							"A Choice counts as used where this file names it, writes one of its Cases, or reaches a conformance it derives.",
+						],
+					],
+					[
+						"'Flipped' is imported and never used",
+						[
+							"An Alias of a Choice counts as used where this file names it or writes one of its Cases.",
 						],
 					],
 					["'greet' is imported and never used", []],

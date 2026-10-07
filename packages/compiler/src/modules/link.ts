@@ -21,7 +21,7 @@ import {
 } from "../enricher/resolvers"
 import { countTypeDeclaration } from "../enricher/scope"
 import { derivedPrintableNamespaceName } from "../helpers/conformance"
-import { specifierTo } from "../helpers/describe"
+import { isDeclaration, specifierTo } from "../helpers/describe"
 import { forEachHeldRecord } from "../helpers/nodes"
 import { patternBindings } from "../helpers/patterns"
 import { closestMatch } from "../helpers/suggest"
@@ -1995,11 +1995,15 @@ function unusedImportNotes(scope: enricher.Scope, name: string): Array<string> {
 					"A Namespace counts as used when a Method dispatches through it, even where the call never spells its name.",
 				]
 			: []),
-		...(type !== undefined && casesOf(type).length > 0
-			? [
-					"A Choice counts as used where this file names it, writes one of its Cases, or reaches a conformance it derives.",
-				]
-			: []),
+		...(type === undefined || casesOf(type).length === 0
+			? []
+			: isDeclaration(type)
+				? [
+						"A Choice counts as used where this file names it, writes one of its Cases, or reaches a conformance it derives.",
+					]
+				: [
+						"An Alias of a Choice counts as used where this file names it or writes one of its Cases.",
+					]),
 		...(body?.type === "Refinement"
 			? [
 					"A refinement counts as used where this file names it, or where a narrowing proves it of a value.",
