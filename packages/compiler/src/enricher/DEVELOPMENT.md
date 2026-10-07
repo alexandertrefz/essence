@@ -197,6 +197,12 @@ merged. Anywhere else `refusePathKeys` reports `path-key-outside-combination`, w
 the path's first step names then holds a hole, so the Literal is not measured as lacking it and nothing read through
 it reports again.
 
+A refused path still reads its values (`readDroppedPathValues` in `refusedPathKeys.ts`), so a mistake inside one
+is reported. That covers a base that is no place, a step that is no Record and a key outside a merged position. A
+value is read against the member its path names where the Type in hand declares one, so
+`{ load() with server.port = … }` reads it against `Config`. Past a step that does not resolve, it stands in a
+refused place, so a bare Case there is not reported as ambiguous.
+
 In an update or a merged Literal, a path key written with no value is `shorthand-on-path-key`. `reportBarePathKeys`
 reports it where the key list is first read, so a walk that stops before the leaf, at a misspelled step or a base
 that is no Record, still reports it. Its Help writes the binding the last step names where the Scope holds one,

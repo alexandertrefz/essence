@@ -921,6 +921,63 @@ describe("Enricher", () => {
 				expect(diagnostics[0].code).toBe("path-on-computed-value")
 			})
 
+			// A refused path's value is still read, so a mistake inside it is
+			// a report of its own.
+			it("should report a mistake inside a refused path key's value", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						${config}
+
+						function load() -> Config {
+							<- config
+						}
+
+						constant loaded = { load() with server.port = 1::add("q") }
+						constant renamed = { config with name.length = 1::add("q") }
+						constant missing = { config with nope.port = 1::add("q") }
+						constant grouped = { config with nope.{ port = 1::add("q") } }
+						constant loose: Config = { server.port = 1::add("q") }
+					}`).map((diagnostic) => diagnostic.code),
+				).toEqual([
+					"path-on-computed-value",
+					"no-matching-overload",
+					"path-step-not-a-record",
+					"no-matching-overload",
+					"unknown-member",
+					"no-matching-overload",
+					"unknown-member",
+					"no-matching-overload",
+					"path-key-outside-combination",
+					"no-matching-overload",
+				])
+			})
+
+			// The value reads the member its path names where the Type in hand
+			// declares it. Past a step that does not resolve, it stands in a
+			// refused place, so a bare Case there is no second mistake.
+			it("should read a refused path key's value where its path stands", () => {
+				expect(
+					diagnosticsFor(`implementation {
+						choice Light { Red, Green }
+						choice Paint { Red, Blue }
+						type Lamp = { light: Light }
+						type Room = { lamp: Lamp }
+
+						function load() -> Room {
+							<- { lamp = { light = #Green } }
+						}
+
+						constant loaded = { load() with lamp.light = #Red }
+						constant missing = { load() with lmp.light = #Red }
+						constant loose: Room = { lamp.light = #Red }
+					}`).map((diagnostic) => diagnostic.code),
+				).toEqual([
+					"path-on-computed-value",
+					"path-on-computed-value",
+					"path-key-outside-combination",
+				])
+			})
+
 			// `@` is a place, and the one a Method's nested update is
 			// written on.
 			it("should accept a path key on '@'", () => {

@@ -163,6 +163,11 @@ import {
 } from "./refusedCalls"
 import { carriesRefusedCapture, noteRefusedCapture } from "./refusedCaptures"
 import {
+	readDroppedEntries,
+	readDroppedPathValues,
+	refusePathKeys,
+} from "./refusedPathKeys"
+import {
 	checkProtocolConformance,
 	type CheckedConformance,
 	reportReservedTypeName,
@@ -1108,7 +1113,12 @@ export function enrichCombination(
 		}
 
 		// The path keys are dropped, so a member called `server.port` does not
-		// raise a second Diagnostic.
+		// raise a second Diagnostic. Their values are still read.
+		readDroppedPathValues(
+			keys.members,
+			expectedRecordMembers(lhs.type),
+			scope,
+		)
 		keys = { ...keys, members: withoutPathKeys(keys.members) }
 	}
 
@@ -1493,7 +1503,7 @@ function enrichPathCombination(
 	}
 }
 
-type PathKeyEntry = {
+export type PathKeyEntry = {
 	// The steps still to walk, the first being the member this level writes.
 	// Never empty.
 	steps: Array<parser.IdentifierNode>
@@ -1509,7 +1519,7 @@ function pathKeyEntries(record: parser.RecordValueNode): Array<PathKeyEntry> {
 
 // What an entry writes one step further in. That is the rest of its path, or
 // the member list of its braced descend once the path is used up.
-function stepInto(entry: PathKeyEntry): Array<PathKeyEntry> {
+export function stepInto(entry: PathKeyEntry): Array<PathKeyEntry> {
 	if (entry.steps.length > 1) {
 		return [{ steps: entry.steps.slice(1), member: entry.member }]
 	}
@@ -1566,6 +1576,8 @@ function pathUpdate(
 		let stepType = pathKeyStepType(step, baseType, base.position)
 
 		if (stepType.type !== "Record") {
+			readDroppedEntries(group.flatMap(stepInto), null, scope)
+
 			continue
 		}
 
@@ -2058,7 +2070,11 @@ function enrichRecordValue(
 			: {
 					members: enrichMembers(
 						hasPathKeys(node)
-							? refusePathKeys(node.members)
+							? refusePathKeys(
+									node.members,
+									scope,
+									expectedMembers,
+								)
 							: node.members,
 						scope,
 						expectedMembers,
@@ -8042,53 +8058,6 @@ function declareProtocolInScope(
 	return scope
 }
 
-// A path key outside a merged position reaches into nothing, so it is reported,
-// with or without a value. Its first step holds a hole. Called only where
-// `hasPathKeys` found one. See "Path keys" in DEVELOPMENT.md.
-function refusePathKeys(
-	members: Record<string, parser.RecordValueMemberNode>,
-): Record<string, parser.RecordValueMemberNode> {
-	let plain: Record<string, parser.RecordValueMemberNode> = {}
-
-	for (let [key, member] of Object.entries(members)) {
-		if (member.steps === undefined) {
-			plain[key] = member
-
-			continue
-		}
-
-		let position = {
-			start: member.steps[0].position.start,
-			end: member.steps[member.steps.length - 1].position.end,
-		}
-
-		// The member the path meant is written, so the Literal is not
-		// measured as lacking it.
-		plain[member.steps[0].content] ??= {
-			name: member.steps[0],
-			value: {
-				nodeType: "RefusedValue",
-				base: member.value ?? member.group!,
-				position,
-			},
-		}
-
-		reportError("A path key reaches into nothing here", position, {
-			code: "path-key-outside-combination",
-			labels: [primary(position, "this reaches into a value")],
-			notes: [
-				"A Record Literal writes its members from nothing, so there is no value under this key to reach into. A path key needs one that is already there — the value a 'with' updates, or the value a default fills in for an Argument or a Case payload.",
-			],
-			helps: [
-				`Write the whole member: '${member.steps[0].content} = { … }'.`,
-				`Or update a value that already has it: '{ original with ${key}${member.group === undefined ? " = …" : ".{ … }"} }'.`,
-			],
-		})
-	}
-
-	return plain
-}
-
 function enrichMembers(
 	members: Record<string, parser.RecordValueMemberNode>,
 	scope: enricher.Scope,
@@ -8110,7 +8079,7 @@ function enrichMembers(
 // A shorthand member's value is its own name, read with the flag that says it
 // stands in both positions. `asValue` drops a Function's defaults as anywhere
 // else. A path key's leaf is read here too.
-function enrichMember(
+export function enrichMember(
 	member: parser.RecordValueMemberNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null,
@@ -8160,7 +8129,7 @@ function expectedListItemType(
 
 // The same for a Record's members, keyed by name. A member offered by several
 // arms is their Union.
-function expectedRecordMembers(
+export function expectedRecordMembers(
 	expectedType: common.Type | null,
 ): Record<string, common.Type> | null {
 	if (expectedType === null) {
