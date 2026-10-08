@@ -756,6 +756,40 @@ describe("Property tests", () => {
 			).toBe(true)
 		})
 
+		// A `_` names no value for a counterexample to stand beside, and a
+		// label before it is a label still.
+		it("refuses a '_' where a name belongs", () => {
+			expect(analyse(sectionOf("_: Integer")).diagnostics).toMatchObject([
+				{
+					code: "property-parameters",
+					message: "A generated Parameter has to be a name",
+					helps: ["Name the value — 'for any (value: Integer)'."],
+				},
+			])
+			expect(
+				analyse(sectionOf("on _: Integer")).diagnostics.map(
+					(diagnostic) => [diagnostic.message, diagnostic.helps],
+				),
+			).toEqual([
+				[
+					"A generated Parameter has to be a name",
+					["Name the value — 'for any (value: Integer)'."],
+				],
+				[
+					"A generated Parameter takes no label",
+					["Write the name alone: 'for any (value: …)'."],
+				],
+			])
+			expect(
+				compiles(
+					sectionOf("value: Integer", "expect value::is(value)"),
+					{
+						tests: true,
+					},
+				),
+			).toBe(true)
+		})
+
 		it("refuses a Pattern where a name belongs", () => {
 			expect(codesOf(sectionOf("{ name }: { name: String }"))).toEqual([
 				"property-parameters",

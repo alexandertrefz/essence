@@ -4343,18 +4343,31 @@ function enrichTestProperty(
 		}
 	}
 
+	// `_` binds no name, so a counterexample has nothing to stand beside.
+	if (parameter.internalName === null) {
+		reportPropertyParameters(
+			parameter.position,
+			"A generated Parameter has to be a name",
+			"this binds no name",
+			`Name the value — 'for any (value: ${type.type === "Error" ? "…" : spellType(type, spellingIn(scope))})'.`,
+			"A counterexample is reported beside the name it was generated for, and '_' names no value.",
+		)
+	}
+
 	// `a: Integer` records one Identifier as both names, so a label is two
-	// different words.
+	// different words. `on _` is a label too.
 	if (
 		parameter.externalName !== null &&
-		parameter.internalName?.nodeType === "Identifier" &&
-		parameter.externalName.content !== parameter.internalName.content
+		(parameter.internalName === null ||
+			(parameter.internalName.nodeType === "Identifier" &&
+				parameter.externalName.content !==
+					parameter.internalName.content))
 	) {
 		reportPropertyParameters(
 			parameter.externalName.position,
 			"A generated Parameter takes no label",
 			"nothing calls this test",
-			`Write the name alone: 'for any (${name}: …)'.`,
+			`Write the name alone: 'for any (${parameter.internalName === null ? "value" : name}: …)'.`,
 			"A label is what a caller writes at a call site, and nothing calls a test.",
 		)
 	}
