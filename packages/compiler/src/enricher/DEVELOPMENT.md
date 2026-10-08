@@ -795,9 +795,11 @@ reports whichever candidate is selected. Its Help reads its body once per Scope 
 The hold belongs to the call probing. Every call is enriched inside `enteringCall`, which pushes a barrier, so a call
 nested in an Argument reports its own literals whatever the call around it selects.
 
-A probe that only asks whether a call fits drops its hold instead (`discardingLiteralReports`), since the call reads
-its literals again once it chooses. `providedNamespaceMember` probes each provider so. Only the hold is dropped: an
-Argument's first enrichment reports directly, and the typer never enriches it again.
+A `::` call holds what each Namespace's probe of its literals reported (`holdLiteralReports`). Where
+`resolveMethodInvocation` commits one Namespace, the winner reads its literals again, so the hold is dropped. With no
+winner, or several, the hold stands beside the refusal. `providedNamespaceMember` only asks whether each provider
+fits, so it drops its hold (`discardingLiteralReports`). Only literal reports are held: an Argument's first
+enrichment reports directly, and the typer never enriches it again.
 
 ### The no-matching-overload report
 

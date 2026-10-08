@@ -48,23 +48,46 @@ export function enteringCall<T>(work: () => T): T {
 	}
 }
 
-// Set while a call is probed only to learn whether it fits. The call reads its
-// literals again once it chooses, so what they reported then is dropped.
-let discardingHeld = false
+// Where a call's candidate probing puts what its own literals reported, while
+// a caller decides whether those reports stand. Null reports them at once.
+let holding: Array<common.Diagnostic> | null = null
 
-// Runs `work`, whose candidate probing drops what the call's own literals
-// reported. A report made directly, as an Argument's first enrichment, stands.
-// See "Literals a candidate does not fit" in DEVELOPMENT.md.
-export function discardingLiteralReports<T>(work: () => T): T {
-	let outer = discardingHeld
+// What the call's own literals reported while its candidates were probed. A
+// committed winner reads its literals again, so they stand only where none is
+// committed. A report made directly, as an Argument's first enrichment, is not
+// held. See "Literals a candidate does not fit" in DEVELOPMENT.md.
+export function holdLiteralReports(): {
+	during: <T>(work: () => T) => T
+	release: (stands: boolean) => void
+} {
+	let held: Array<common.Diagnostic> = []
 
-	discardingHeld = true
+	return {
+		during: (work) => {
+			let outer = holding
 
-	try {
-		return work()
-	} finally {
-		discardingHeld = outer
+			holding = held
+
+			try {
+				return work()
+			} finally {
+				holding = outer
+			}
+		},
+		release: (stands) => {
+			for (let diagnostic of held.splice(0)) {
+				if (stands) {
+					report(diagnostic)
+				}
+			}
+		},
 	}
+}
+
+// Runs `work`, a probe that only asks whether a call fits. What its literals
+// reported is dropped, since the call reads them again once it chooses.
+export function discardingLiteralReports<T>(work: () => T): T {
+	return holdLiteralReports().during(work)
 }
 
 // Probes a call's candidates. Once one is selected, only what a literal reported
@@ -74,27 +97,27 @@ export function probingCandidates<T extends { index: number }>(
 	probe: () => T | undefined,
 ): T | undefined {
 	let held: HeldReports = { candidate: -1, byLiteral: new Map() }
-	let discarding = discardingHeld
+	let into = holding
 	let selected: T | undefined
 
 	// A call inside an Argument reports as usual.
-	discardingHeld = false
+	holding = null
 	heldReports.push(held)
 
 	try {
 		selected = probe()
 	} finally {
 		heldReports.pop()
-		discardingHeld = discarding
-	}
-
-	if (discarding) {
-		return selected
+		holding = into
 	}
 
 	for (let batches of held.byLiteral.values()) {
 		for (let diagnostic of standingReports(batches, selected?.index)) {
-			report(diagnostic)
+			if (into === null) {
+				report(diagnostic)
+			} else {
+				into.push(diagnostic)
+			}
 		}
 	}
 

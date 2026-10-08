@@ -5787,6 +5787,74 @@ describe("Protocol-provided Methods", () => {
 				).toEqual(['"mapper 6"', '"picker Green"'])
 			})
 
+			// The value's own spelling probes each Namespace's candidates. A
+			// Namespace the literal does not fit leaves no report behind once
+			// another is committed.
+			it("should run an untyped Function literal alike in both spellings", async () => {
+				expect(
+					await run(
+						positions(
+							["Mapper", "Picker", "Shaper", "Getter"],
+							"Books.apply(book, (x) { <- x::multiply(with 3) })",
+							"book::apply((x) { <- x::multiply(with 3) })",
+						),
+					),
+				).toEqual(['"mapper 6"', '"mapper 6"'])
+				expect(
+					await run(
+						positions(
+							["Mapper", "Picker"],
+							"book::apply((x) { <- x::multiply(with 3) })",
+							"book::apply(#Green)",
+						),
+					),
+				).toEqual(['"mapper 6"', '"picker Green"'])
+			})
+
+			it("should report a mistake in a literal's body once in either spelling", () => {
+				for (let call of [
+					"Books.apply(book, (x) { <- x::nope() })",
+					"book::apply((x) { <- x::nope() })",
+				]) {
+					expect(
+						codesOf(
+							positions(
+								["Mapper", "Picker", "Shaper", "Getter"],
+								call,
+							),
+						),
+					).toEqual(["unknown-method"])
+				}
+			})
+
+			it("should keep an Error Argument's Diagnostic on the value", () => {
+				expect(
+					codesOf(
+						positions(
+							["Mapper", "Picker", "Shaper", "Getter"],
+							"book::apply(nowhere)",
+						),
+					),
+				).toContain("unknown-name")
+			})
+
+			// No Namespace is committed, so what the literal reported against
+			// each candidate stands beside the refusal.
+			it("should keep a literal's reports where no provider fits", () => {
+				expect(
+					codesOf(
+						positions(
+							["Mapper", "Picker", "Shaper", "Getter"],
+							"book::apply((a, b) { <- a })",
+						),
+					),
+				).toEqual([
+					"uninferable-parameter-type",
+					"uninferable-parameter-type",
+					"no-matching-overload",
+				])
+			})
+
 			it("should let each Argument choose the provider its position fits", async () => {
 				expect(
 					await run(

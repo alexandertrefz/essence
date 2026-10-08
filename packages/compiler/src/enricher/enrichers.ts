@@ -113,6 +113,7 @@ import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
 	enteringCall,
+	holdLiteralReports,
 	probingCandidate,
 	probingCandidates,
 	readingArgumentLiteral,
@@ -12508,18 +12509,21 @@ export function resolveMethodInvocation(
 	let resolvedMethods = []
 
 	// Every Namespace is probed, to find an ambiguity. Each probe's recordings
-	// are held, and only the selected candidate's are committed.
+	// and literal reports are held, and only the selected candidate's stand.
 	let lastRecording: ContextualFunctionTypeRecording | undefined
+	let literalReports = holdLiteralReports()
 
 	for (let [namespaceName, namespaceType] of matchingNamespaces) {
 		let { result: resolvedMethod, recording } =
 			probeContextualFunctionTypes(() =>
-				resolveInvokedMethodInNamespace(
-					node,
-					namespaceType,
-					baseType,
-					scope,
-					typer,
+				literalReports.during(() =>
+					resolveInvokedMethodInNamespace(
+						node,
+						namespaceType,
+						baseType,
+						scope,
+						typer,
+					),
 				),
 			)
 
@@ -12548,6 +12552,7 @@ export function resolveMethodInvocation(
 		// every Namespace.
 		if (typeContainsUnknown(baseType)) {
 			commitContextualFunctionTypes(lastRecording)
+			literalReports.release(true)
 
 			reportUndecidedReceiverType(
 				node,
@@ -12571,6 +12576,9 @@ export function resolveMethodInvocation(
 			(candidate) => candidate.namespace.type,
 		)
 	}
+
+	// A committed winner reads its literals again.
+	literalReports.release(resolvedMethods.length !== 1)
 
 	if (resolvedMethods.length === 0) {
 		// The covering Namespace rejects the Arguments, but per-member dispatch
