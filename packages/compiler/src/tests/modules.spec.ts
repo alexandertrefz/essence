@@ -5527,6 +5527,83 @@ export {
 		)
 	})
 
+	// `Main.es` imports Aliases of `Pair` alone. Its phantom `B` is read off
+	// `Pair`'s own Module, so `Mixed` turns `Sames` away and `Same` does not.
+	it("reads a phantom Type Argument of a Choice the calling Module never imported", async () => {
+		let project = (body: string) => ({
+			"Main.es": `import {
+	from "./Pairs.es" {
+		IntegerNames
+		Mixed
+		Same
+		Sames
+	}
+}
+
+implementation {
+${body}
+}
+`,
+			"Pairs.es": `implementation {
+	protocol Named {
+		static label() -> String
+	}
+
+	namespace IntegerNames for Integer is Named {
+		static label() -> String {
+			<- "integer"
+		}
+	}
+
+	choice Pair<A, B> {
+		Left { a: A },
+		Neither,
+	}
+
+	namespace Sames<infer Item> for Pair<Item, Item> {
+		label<Item is Named>() -> String {
+			<- Item.label()
+		}
+	}
+
+	type Same<T> = Pair<T, T>
+	type Mixed = Pair<Integer, String>
+}
+
+export {
+	IntegerNames
+	Mixed
+	Same
+	Sames
+}
+`,
+		})
+
+		withProject(
+			project(
+				"\tTerminal.inspect(Same<Integer>#Left({ a = 1 })::label())\n\tTerminal.inspect(Mixed#Left({ a = 2 })::label())",
+			),
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["no-namespace-for-value"])
+			},
+		)
+		await withBuiltProject(
+			project(
+				"\tconstant mixed: Mixed = #Neither\n\tTerminal.inspect(Same<Integer>#Left({ a = 1 })::label())\n\tTerminal.inspect(Same<Integer>#Neither::label())\n\tTerminal.inspect(mixed)",
+			),
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"integer"', '"integer"', "Pair#Neither"])
+			},
+		)
+	})
+
 	// The body is emitted once, where the Protocol is declared, and binds the
 	// Pattern there.
 	it("runs a provided Method that takes its Parameter apart from another Module", async () => {

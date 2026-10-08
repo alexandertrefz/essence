@@ -374,7 +374,8 @@ same tag, except where its Type Argument mentions a Generic its own payload name
 whose Type Arguments fit no such Case names another application, and the target does not cover the subject. So
 `Tag<Integer>#Empty` is no `Tag<List<Integer>>`, and `Pair<Integer, String>#Neither` is no `Pair<Item, Item>`.
 Leaving the named ones to the payload keeps `flatten()` on a `Result<Result<Integer, String>, Integer>`, whose
-`#Value` binds the failure Type from its payload.
+`#Value` binds the failure Type from its payload. A `::` call also checks the Type Arguments no payload of the Choice
+names; see "Phantom Type Arguments" in `packages/compiler/src/enricher/DEVELOPMENT.md`.
 
 A Generic the Type Arguments decide binds where every Case of the subject that decides it agrees.
 `[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and `disagreeingTypeArguments` says

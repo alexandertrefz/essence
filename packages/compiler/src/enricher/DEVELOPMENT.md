@@ -577,6 +577,22 @@ The pinned Type Parameter is renamed to a borrowed name, as a derived Method's a
 is a caller-side Type, and inside the Namespace's own body it names the Namespace's `Item`. Freshening renames a
 default along with its Parameter, so under the declared name the pin would bind `Item` to itself.
 
+## Phantom Type Arguments
+
+A Type Parameter of a Choice that no payload of any of its Cases names is phantom, as `B` is in `choice Pair<A, B> {
+Left { a: A }, Neither }`. Only the Type Argument says what a value's `B` is. `bindNamespaceTarget` leaves a Type
+Argument that mentions a Type Parameter the target's payload names to the payload, and `Pair<Item, Item>` names `Item`
+in `#Left`. So `Pair<Integer, String>#Left` would reach `namespace Sames<infer Item> for Pair<Item, Item>`, with its
+payload binding `Item` to Integer.
+
+The lookup every `::` call makes, a dispatch branch's included, turns such a Namespace away (`namespacesCovering`).
+It binds the target from the receiver, and each phantom Type Argument of the receiver's Cases must fit the bound
+target's at its position. An applied Case does not say which Type Parameters are phantom, so they are read off the
+Choice's declaration, here or in its own Module. A Type Argument some payload of the Choice names stays the
+payload's. So `flatten()` on a `Result<Result<Integer, String>, Integer>` still joins the two failure Types, since
+`#Failure` names `FailureType`. The refusal's Note names the Namespace and the phantom Type Parameter
+(`otherApplicationNotes`).
+
 ## Return Type inference from a body
 
 A Function literal without `-> Type` takes its return Type from its body (`inferReturnTypeFromBody`). The Type of

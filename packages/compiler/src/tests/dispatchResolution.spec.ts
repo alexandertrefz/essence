@@ -1602,6 +1602,108 @@ describe("Dispatch and Resolution", () => {
 			})
 		})
 
+		// No payload of `Pair` names `B`, so only its Type Argument says what a
+		// value's `B` is. A payload binds `Item` to Integer, and `B` must agree.
+		// See "Phantom Type Arguments" in
+		// packages/compiler/src/enricher/DEVELOPMENT.md.
+		describe("a phantom Type Argument", () => {
+			let pairs = (body: string) => `implementation {
+				protocol Named {
+					static label() -> String
+				}
+
+				namespace IntegerNames for Integer is Named {
+					static label() -> String {
+						<- "integer"
+					}
+				}
+
+				choice Pair<A, B> {
+					Left { a: A },
+					Neither,
+				}
+
+				namespace Sames<infer Item> for Pair<Item, Item> {
+					label<Item is Named>() -> String {
+						<- Item.label()
+					}
+				}
+
+				type Same<T> = Pair<T, T>
+				type Mixed = Pair<Integer, String>
+
+				${body}
+			}`
+			let reported = (body: string) =>
+				diagnosticsFor(pairs(body)).map(({ code, notes }) => ({
+					code,
+					notes,
+				}))
+			let refusal = (receiver: string) => [
+				{
+					code: "no-namespace-for-value" as const,
+					notes: [
+						`No Namespace in scope targets ${receiver}.`,
+						"'Sames' declares 'label' for Pair<Item, Item>, which takes Integer for 'B' where this value has String, and no payload carries 'B'.",
+					],
+				},
+			]
+
+			it("turns away a Namespace whose target takes another one", () => {
+				expect(
+					reported(
+						"Terminal.inspect(Pair<Integer, String>#Left({ a = 1 })::label())",
+					),
+				).toEqual(refusal("Pair<Integer, String>#Left"))
+				expect(
+					reported(
+						"Terminal.inspect(Mixed#Left({ a = 1 })::label())",
+					),
+				).toEqual(refusal("Pair<Integer, String>#Left"))
+			})
+
+			it("lets a payload-free or an Alias-applied Case of the application it takes through", async () => {
+				expect(
+					await run(
+						pairs(`function show(_ pair: Pair<Integer, Integer>) -> String {
+							<- pair::label()
+						}
+
+						Terminal.inspect(Pair<Integer, Integer>#Left({ a = 1 })::label())
+						Terminal.inspect(Same<Integer>#Left({ a = 2 })::label())
+						Terminal.inspect(Same<Integer>#Neither::label())
+						Terminal.inspect(show(#Neither))
+						Terminal.inspect(show(#Left({ a = 3 })))`),
+					),
+				).toEqual([
+					'"integer"',
+					'"integer"',
+					'"integer"',
+					'"integer"',
+					'"integer"',
+				])
+			})
+
+			// A payload names every Type Parameter of `Result`, so `flatten`
+			// still reads each Case's failure Type from its payload.
+			it("leaves a Type Argument a payload carries to the payload", async () => {
+				expect(
+					await run(`implementation {
+						constant mismatched: Result<Result<Integer, String>, Integer> = #Value(#Value(1))
+						constant failed: Result<Result<Integer, String>, Integer> = #Failure(7)
+
+						Terminal.inspect(mismatched::flatten())
+						Terminal.inspect(failed::flatten())
+						Terminal.inspect(Result<Result<Integer, String>, Integer>#Value({ item = #Value(2) })::flatten())
+					}`),
+				).toEqual([
+					"Result#Value(1)",
+					"Result#Failure(7)",
+					"Result#Value(2)",
+				])
+			})
+		})
+
 		// The Help the refusal gives: the receiver as one application.
 		it("runs the Method once the receiver is one application", async () => {
 			expect(

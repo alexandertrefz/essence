@@ -90,6 +90,7 @@ import { recordAnnotation } from "./annotations"
 import { derivesWithImports } from "./derivedImports"
 import { reportTypeWithoutMembers } from "./memberHelps"
 import { narrowedBodyReport, narrowedMethodReport } from "./narrowedMethods"
+import { namespacesCovering } from "./otherApplications"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
 import {
 	bodyCanWait,
@@ -9313,12 +9314,7 @@ export function resolveMethodLookupNamespacesForReceiverType(
 		return matchingNamespaces
 	}
 
-	// The memoised answer is shared, so a caller copies it before changing
-	// it.
-	return namespacesTargeting(
-		named ?? getAllNamespacesInScope(scope, null),
-		baseType,
-	)
+	return namespacesCovering(named, baseType, scope)
 }
 
 // The Namespaces declaring the Method as an instance Method, apart from
