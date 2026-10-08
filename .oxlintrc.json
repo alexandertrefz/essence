@@ -104,7 +104,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 13222,
+						"max": 13087,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -117,7 +117,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 8236,
+						"max": 7886,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -147,7 +147,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 5816,
+						"max": 5782,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
@@ -179,7 +179,7 @@
 				"max-lines": [
 					"error",
 					{
-						"max": 2921,
+						"max": 2887,
 						"skipComments": true,
 						"skipBlankLines": true
 					}
