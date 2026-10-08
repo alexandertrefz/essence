@@ -143,6 +143,7 @@ import {
 	compilesWithoutPick,
 	reportPickedRequirement,
 } from "./protocolPicks"
+import { type InvokingCall, providedNamespaceMember } from "./providedBodies"
 import {
 	recordWrittenConstant,
 	reportConstantReassignment,
@@ -195,7 +196,6 @@ import {
 	protocolNameTaken,
 	protocolOf,
 	protocolSpelling,
-	providedNamespaceMember,
 	recordValueTypeOf,
 	reportDocumentationParameters,
 	reportProvidedBodyReaches,
@@ -397,10 +397,9 @@ function enrichCalleeExpression(
 	node: parser.ExpressionNode,
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
-	// Whether an Invocation asked for this Expression. Only a Lookup reads it,
+	// The Invocation that asked for this Expression. Only a Lookup reads it,
 	// to tell `names.length()` from `names.length` when the member is missing.
-	isCalled = false,
-	writtenArguments = 0,
+	call: InvokingCall | null = null,
 ): common.typed.ExpressionNode {
 	switch (node.nodeType) {
 		// A call reads its own Arguments' positions; see `enteringCall`.
@@ -433,12 +432,12 @@ function enrichCalleeExpression(
 		case "DictionaryValue":
 			return enrichDictionaryValue(node, scope, expectedType)
 		case "Lookup":
-			return enrichLookup(node, scope, isCalled, writtenArguments)
+			return enrichLookup(node, scope, call)
 		case "MemberPath":
 			return enrichMemberPath(node, scope, expectedType)
 		case "Identifier":
 			return enrichIdentifierExpression(node, scope, {
-				applied: isCalled,
+				applied: call !== null,
 			})
 		case "Self":
 			return enrichSelf(node, scope)
@@ -1032,14 +1031,8 @@ function enrichFunctionInvocation(
 ): common.typed.FunctionInvocationNode {
 	// The callee and every Argument are enriched once and reused for the final
 	// Node.
-	let name = enrichCalleeExpression(
-		node.name,
-		scope,
-		null,
-		true,
-		node.arguments.length,
-	)
 	let typer = makeArgumentTyper(scope, expectedType)
+	let name = enrichCalleeExpression(node.name, scope, null, { node, typer })
 	let {
 		type,
 		conformances,
@@ -2734,11 +2727,10 @@ function enrichLookupBase(
 function enrichLookup(
 	node: parser.LookupNode,
 	scope: enricher.Scope,
-	// Whether an Invocation calls this Lookup. A missing member that is called
+	// The Invocation that calls this Lookup. A missing member that is called
 	// is a Method call written with another language's separator, and the
-	// Diagnostic says so.
-	isCalled = false,
-	writtenArguments = 0,
+	// Diagnostic says so. A provided member's Arguments choose its Protocol.
+	call: InvokingCall | null = null,
 ): common.typed.LookupNode {
 	// A base naming a Type, such as a Choice or a bounded Type Parameter, reads
 	// its member off a Namespace nobody declared. Asked before enriching the
@@ -2763,7 +2755,7 @@ function enrichLookup(
 		base.type.type === "Namespace" &&
 		!Object.hasOwn(base.type.properties, node.member.content) &&
 		!Object.hasOwn(base.type.methods, node.member.content)
-			? providedNamespaceMember(base.type, node.member.content, scope)
+			? providedNamespaceMember(base.type, node, scope, call)
 			: null
 	// A Method no Namespace holds: a Choice's derived `cases`, or what a
 	// bounded Type Parameter's conformance answers. Both carry what the
@@ -2789,8 +2781,8 @@ function enrichLookup(
 				node,
 				base.type,
 				scope,
-				isCalled,
-				writtenArguments,
+				call !== null,
+				call?.node.arguments.length ?? 0,
 			),
 			scope,
 		)
@@ -10590,7 +10582,7 @@ function overloadProbeOrder(
 // Falls back on the first candidate whose Arguments matched. A literal's report
 // against a candidate it does not fit waits for the selection. See "Choosing an
 // Overload" in DEVELOPMENT.md.
-function selectOverload(
+export function selectOverload(
 	...args: Parameters<typeof selectFittingOverload>
 ): SelectedOverload | undefined {
 	return probingCandidates(() => selectFittingOverload(...args))
@@ -10804,7 +10796,7 @@ function reportUnboundGenerics(
 
 // What every written Argument offers a match: its label, its Type under the
 // Parameter Type tried, and the typer's other answers.
-function argumentMatchables(
+export function argumentMatchables(
 	args: Array<parser.ArgumentNode>,
 	typer: ArgumentTyper,
 ): Array<MatchableArgument> {

@@ -48,6 +48,25 @@ export function enteringCall<T>(work: () => T): T {
 	}
 }
 
+// Set while a call is probed only to learn whether it fits. The call reads its
+// literals again once it chooses, so what they reported then is dropped.
+let discardingHeld = false
+
+// Runs `work`, whose candidate probing drops what the call's own literals
+// reported. A report made directly, as an Argument's first enrichment, stands.
+// See "Literals a candidate does not fit" in DEVELOPMENT.md.
+export function discardingLiteralReports<T>(work: () => T): T {
+	let outer = discardingHeld
+
+	discardingHeld = true
+
+	try {
+		return work()
+	} finally {
+		discardingHeld = outer
+	}
+}
+
 // Probes a call's candidates. Once one is selected, only what a literal reported
 // against it stands. Where none is, a literal reports what every resolution of
 // it did.
@@ -55,14 +74,22 @@ export function probingCandidates<T extends { index: number }>(
 	probe: () => T | undefined,
 ): T | undefined {
 	let held: HeldReports = { candidate: -1, byLiteral: new Map() }
+	let discarding = discardingHeld
 	let selected: T | undefined
 
+	// A call inside an Argument reports as usual.
+	discardingHeld = false
 	heldReports.push(held)
 
 	try {
 		selected = probe()
 	} finally {
 		heldReports.pop()
+		discardingHeld = discarding
+	}
+
+	if (discarding) {
+		return selected
 	}
 
 	for (let batches of held.byLiteral.values()) {

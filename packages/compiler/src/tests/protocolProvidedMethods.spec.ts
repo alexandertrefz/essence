@@ -5437,6 +5437,440 @@ describe("Protocol-provided Methods", () => {
 			).toEqual(["false"])
 		})
 
+		// `Priced` and `Titled` both provide `label` to `Books`, and neither
+		// extends the other. The Namespace spelling ties them as a call on the
+		// value does, whichever is declared first.
+		describe("two unrelated providers", () => {
+			function tied(
+				first: string,
+				second: string,
+				call: string,
+			): Record<string, string> {
+				let provides = (name: string) => [
+					`\tprotocol ${name} {`,
+					"\t\tlabel() -> String {",
+					`\t\t\t<- "${name}"`,
+					"\t\t}",
+					"\t}",
+					"",
+				]
+
+				return {
+					"Shapes.es": [
+						"implementation {",
+						...provides(first),
+						...provides(second),
+						"}",
+						"",
+						"export {",
+						`\t${first}`,
+						`\t${second}`,
+						"}",
+					].join("\n"),
+					"Main.es": [
+						"import {",
+						'\tfrom "./Shapes.es" {',
+						`\t\t${first}`,
+						`\t\t${second}`,
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\ttype Book = { title: String }",
+						"",
+						"\tnamespace Books for Book is Priced, is Titled {}",
+						"",
+						'\tconstant book: Book = { title = "Ficciones" }',
+						"",
+						`\tTerminal.print(${call})`,
+						"}",
+					].join("\n"),
+				}
+			}
+
+			// The Protocols and the call in one Program.
+			function singleFile(files: Record<string, string>): string {
+				let shapes = files["Shapes.es"]!
+				let main = files["Main.es"]!
+
+				return [
+					shapes.slice(0, shapes.lastIndexOf("}\n\nexport")),
+					main.slice(main.indexOf("implementation {") + 17),
+				].join("")
+			}
+
+			function graphCodes(files: Record<string, string>) {
+				return withModules(files, async (directory) => {
+					let linked = linkModuleGraph(
+						loadModuleGraph(
+							join(directory, "Main.es"),
+							diskModuleHost,
+						),
+					)
+
+					expect(
+						[...linked.modules.values()].flatMap((module) =>
+							module.diagnostics.map(
+								(diagnostic) => diagnostic.code,
+							),
+						),
+					).toEqual(["ambiguous-namespace"])
+				})
+			}
+
+			for (let [first, second] of [
+				["Priced", "Titled"],
+				["Titled", "Priced"],
+			] as const) {
+				it(`should tie them with ${first} declared first`, async () => {
+					let source = singleFile(
+						tied(first, second, "Books.label(book)"),
+					)
+
+					expect(refusalsOf(source)).toEqual([
+						[
+							"ambiguous-namespace",
+							"'label' is provided to 'Books' by more than one Protocol",
+							["'Books' reaches all of them"],
+						],
+					])
+					expect(notesOf(source)).toEqual([
+						`'${first}' provides 'label' for 'Books'.`,
+						`'${second}' provides 'label' for 'Books'.`,
+					])
+					expect(helpsOf(source)).toEqual([
+						`Call it on the value and name the Protocol, e.g. 'value::<${first}>label(…)'.`,
+					])
+					expect(
+						codesOf(
+							singleFile(tied(first, second, "book::label()")),
+						),
+					).toEqual(["ambiguous-namespace"])
+					await graphCodes(tied(first, second, "Books.label(book)"))
+				})
+
+				it(`should run the named body where the Help is followed, with ${first} declared first`, async () => {
+					let followed = tied(
+						first,
+						second,
+						`book::<${first}>label()`,
+					)
+
+					expect(compiles(singleFile(followed))).toBe(true)
+					await withModules(followed, async (directory) => {
+						expect(
+							await printedBy(
+								directory,
+								emitModules(directory, "Main.es"),
+							),
+						).toBe(`${first}\n`)
+					})
+				})
+			}
+		})
+
+		// `Plain`, `Counted` and `Tallied` provide `m` with differing
+		// Parameters. The Arguments choose among them, as they choose among a
+		// call on the value's candidates.
+		describe("providers the Arguments choose among", () => {
+			function signatures(
+				conformances: Array<string>,
+				...calls: Array<string>
+			): Record<string, string> {
+				let provides = (
+					name: string,
+					parameters: string,
+					body: string,
+				) => [
+					`\tprotocol ${name} {`,
+					`\t\tm(${parameters}) -> String {`,
+					`\t\t\t<- "${body}"`,
+					"\t\t}",
+					"\t}",
+					"",
+				]
+
+				return {
+					"Main.es": [
+						"import {",
+						'\tfrom "./Shapes.es" {',
+						...conformances.map((name) => `\t\t${name}`),
+						"\t}",
+						"}",
+						"",
+						"implementation {",
+						"\ttype Book = { title: String }",
+						"",
+						`\tnamespace Books for Book ${conformances.map((name) => `is ${name}`).join(", ")} {}`,
+						"",
+						'\tconstant book: Book = { title = "F" }',
+						"",
+						...calls.map((call) => `\tTerminal.print(${call})`),
+						"}",
+					].join("\n"),
+					"Shapes.es": [
+						"implementation {",
+						...provides("Plain", "", "plain"),
+						...provides("Counted", "_ x: Integer", "counted {x}"),
+						...provides("Tallied", "_ x: Integer", "tallied {x}"),
+						"}",
+						"",
+						"export {",
+						"\tPlain",
+						"\tCounted",
+						"\tTallied",
+						"}",
+					].join("\n"),
+				}
+			}
+
+			// The Protocols and the calls in one Program.
+			function singleFile(files: Record<string, string>): string {
+				let shapes = files["Shapes.es"]!
+				let main = files["Main.es"]!
+
+				return [
+					shapes.slice(0, shapes.lastIndexOf("}\n\nexport")),
+					main.slice(main.indexOf("implementation {") + 17),
+				].join("")
+			}
+
+			async function printed(
+				files: Record<string, string>,
+			): Promise<string> {
+				let lines = ""
+
+				await withModules(files, async (directory) => {
+					lines = await printedBy(
+						directory,
+						emitModules(directory, "Main.es"),
+					)
+				})
+
+				return lines
+			}
+
+			it("should run the provider whose signature the Arguments fit", async () => {
+				let files = signatures(
+					["Plain", "Counted"],
+					"Books.m(book)",
+					"Books.m(book, 3)",
+					"book::m()",
+					"book::m(3)",
+				)
+
+				expect(compiles(singleFile(files))).toBe(true)
+				expect(await printed(files)).toBe(
+					"plain\ncounted 3\nplain\ncounted 3\n",
+				)
+			})
+
+			it("should tie only the providers the Arguments fit, and pick one of them", async () => {
+				let source = singleFile(
+					signatures(
+						["Plain", "Counted", "Tallied"],
+						"Books.m(book, 3)",
+					),
+				)
+
+				expect(codesOf(source)).toEqual(["ambiguous-namespace"])
+				expect(notesOf(source)).toEqual([
+					"'Counted' provides 'm' for 'Books'.",
+					"'Tallied' provides 'm' for 'Books'.",
+				])
+				expect(helpsOf(source)).toEqual([
+					"Call it on the value and name the Protocol, e.g. 'value::<Counted>m(…)'.",
+				])
+				expect(
+					await printed(
+						signatures(
+							["Plain", "Counted", "Tallied"],
+							"book::<Counted>m(3)",
+						),
+					),
+				).toBe("counted 3\n")
+			})
+
+			// An Error fits every Parameter, so whether two providers tie is
+			// left until the Argument is written.
+			it("should leave a call with an Error Argument to that Argument's Diagnostic", () => {
+				for (let call of [
+					"Books.m(book, nowhere)",
+					"Books.m(nowhere, 3)",
+				]) {
+					expect(
+						codesOf(
+							singleFile(
+								signatures(["Counted", "Tallied"], call),
+							),
+						),
+					).toEqual(["unknown-name"])
+				}
+			})
+		})
+
+		// Each Argument here reads the position it stands in, and fits one of
+		// the four providers of `apply`. Probing the others leaves no report
+		// behind.
+		describe("Arguments that read their position", () => {
+			function positions(
+				conformances: Array<string>,
+				...calls: Array<string>
+			): string {
+				let provides = (
+					name: string,
+					parameters: string,
+					body: string,
+				) => [
+					`\tprotocol ${name} {`,
+					`\t\tapply(${parameters}) -> String {`,
+					`\t\t\t<- "${body}"`,
+					"\t\t}",
+					"\t}",
+					"",
+				]
+
+				return [
+					"implementation {",
+					"\tchoice Colour {",
+					"\t\tRed,",
+					"\t\tGreen,",
+					"\t}",
+					"",
+					"\tnamespace Colours for Colour is Printable {}",
+					"",
+					"\ttype Book = { title: String }",
+					"",
+					...provides(
+						"Mapper",
+						"_ f: (_ x: Integer) -> Integer",
+						"mapper {f(2)}",
+					),
+					...provides("Picker", "_ c: Colour", "picker {c}"),
+					...provides(
+						"Shaper",
+						"_ p: { a: List<Integer> }",
+						"shaper {p.a::length()}",
+					),
+					...provides(
+						"Getter",
+						"_ get: (_ b: Book) -> String, from b: Book",
+						"getter {get(b)}",
+					),
+					`\tnamespace Books for Book ${conformances.map((name) => `is ${name}`).join(", ")} {}`,
+					"",
+					'\tconstant book: Book = { title = "F" }',
+					"\tconstant flag = true",
+					"",
+					...calls.map((call) => `\tTerminal.inspect(${call})`),
+					"}",
+				].join("\n")
+			}
+
+			it("should run an untyped Function literal against the provider it fits", async () => {
+				expect(
+					await run(
+						positions(
+							["Mapper", "Picker", "Shaper", "Getter"],
+							"Books.apply(book, (x) { <- x::multiply(with 3) })",
+						),
+					),
+				).toEqual(['"mapper 6"'])
+				expect(
+					await run(
+						positions(
+							["Mapper", "Picker"],
+							"Books.apply(book, (x) { <- x::multiply(with 3) })",
+							"Books.apply(book, #Green)",
+						),
+					),
+				).toEqual(['"mapper 6"', '"picker Green"'])
+			})
+
+			it("should let each Argument choose the provider its position fits", async () => {
+				expect(
+					await run(
+						positions(
+							["Mapper", "Picker", "Shaper", "Getter"],
+							"Books.apply(book, #Green)",
+							"Books.apply(book, define { as #Red if flag as #Green otherwise })",
+							"Books.apply(book, { a = [] })",
+							"Books.apply(book, .title, from book)",
+						),
+					),
+				).toEqual([
+					'"picker Green"',
+					'"picker Red"',
+					'"shaper 0"',
+					'"getter F"',
+				])
+			})
+		})
+
+		// One provider, a descendant's body and a diamond's overriding side
+		// each answer the Namespace spelling. Each runs the body the call on
+		// the value runs.
+		it("should run the body a call on the value runs", async () => {
+			expect(
+				await run(
+					[
+						"implementation {",
+						"\tprotocol Sized {",
+						"\t\tsize() -> Integer",
+						"",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "sized {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Big is Sized {",
+						"\t\tdescribe() -> String {",
+						'\t\t\t<- "big {@::size()}"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Base {",
+						"\t\tlabel() -> String {",
+						'\t\t\t<- "base"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\tprotocol Left is Base {}",
+						"",
+						"\tprotocol Right is Base {",
+						"\t\tlabel() -> String {",
+						'\t\t\t<- "right"',
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Box = { v: Integer }",
+						"",
+						"\tnamespace Boxes for Box is Sized {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.v",
+						"\t\t}",
+						"\t}",
+						"",
+						"\ttype Crate = { w: Integer }",
+						"",
+						"\tnamespace Crates for Crate is Big, is Left, is Right {",
+						"\t\tsize() -> Integer {",
+						"\t\t\t<- @.w",
+						"\t\t}",
+						"\t}",
+						"",
+						"\tconstant box: Box = { v = 1 }",
+						"\tconstant crate: Crate = { w = 2 }",
+						"",
+						'\tTerminal.inspect("{Boxes.describe(box)} {box::describe()}")',
+						'\tTerminal.inspect("{Crates.describe(crate)} {crate::describe()}")',
+						'\tTerminal.inspect("{Crates.label(crate)} {crate::label()}")',
+						"}",
+					].join("\n"),
+				),
+			).toEqual(['"sized 1 sized 1"', '"big 2 big 2"', '"right right"'])
+		})
+
 		// A miss is the ordinary Argument mismatch the `::` spelling reports.
 		// `Boolean`'s `isNot` is `Equatable`'s, where `Integer` writes an
 		// Overload of its own.

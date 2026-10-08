@@ -2656,6 +2656,8 @@ Error: 'shout' is provided by more than one Namespace
 
 Name the namespace at the call: `"hello"::<Loud>shout()`. Where two protocols provide the method, name the protocol whose body should run. Where one protocol's body reaches the value through two namespaces, naming that protocol picks neither. The help then names a protocol only one of the namespaces conforms to, such as a `Left` that extends it. Where there is none, the help is to drop the conformance from all but one of the namespaces. On a union, a pick holds for every member, so the help names one only where every member answers through it. Otherwise it asks for a `match` that picks in the arm for the ambiguous member.
 
+A call that names the namespace, such as `Books.label(book)`, reports the same code where two protocols that do not extend each other both provide the method to that namespace, and the call's arguments fit both. Where they fit one, that protocol's body runs, as `Books.m(book, 3)` runs the `m` that takes an `Integer`. The message reads `'label' is provided to 'Books' by more than one Protocol`, and the help is to call the method on the value with a pick instead: `book::<Priced>label()`.
+
 Quick Fix: **Write '::&lt;Loud&gt;' at the call**, one for each candidate.
 
 Taught on: [Namespaces and methods › Choosing between namespaces](/docs/language/namespaces-and-methods#choosing-between-namespaces)

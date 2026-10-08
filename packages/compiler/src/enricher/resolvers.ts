@@ -4720,7 +4720,7 @@ export type ConformanceSourceNamespace = {
 
 // The Protocols in scope that wrote a body for this name. It runs for every
 // Method Invocation, so it asks by name alone.
-function protocolsProviding(
+export function protocolsProviding(
 	methodName: string,
 	scope: enricher.Scope,
 ): Array<common.ProtocolType> {
@@ -4973,59 +4973,6 @@ export function providedMethodNamespaces(
 	}
 
 	return found
-}
-
-// A provided Method named through a Namespace, as `Number.isLessThan(a, b)`,
-// with `Self` pinned to its target. Null where no conformance it declares
-// provides the name.
-export function providedNamespaceMember(
-	namespace: common.NamespaceType,
-	memberName: string,
-	scope: enricher.Scope,
-): { type: common.MethodType; providedBy: string } | null {
-	let reached = protocolsProviding(memberName, scope).filter(
-		(protocol) =>
-			namespace.conformsTo?.includes(protocol.identity) === true,
-	)
-
-	for (let protocol of reached) {
-		// A descendant that provides the name again answers it.
-		if (
-			reached.some(
-				(other) =>
-					other !== protocol &&
-					other.conformsTo?.includes(protocol.identity) === true,
-			)
-		) {
-			continue
-		}
-
-		let provided = providedMethodNamespaceFor(protocol, memberName, {
-			name: namespace.name,
-			selfType: namespace.targetType ?? { type: "Unknown" },
-			targetType: namespace.targetType ?? { type: "Unknown" },
-			generics: namespace.generics,
-			// Asked only for a name the Namespace does not declare.
-			writes: new Set(),
-			// Named without a receiver, as in `List.isNot(a, b)`, a generic
-			// Namespace's Type Parameters are inferred from the Arguments.
-			openGenerics: namespace.generics.map((generic) => ({
-				name: generic.name,
-				infer: true,
-				defaultType: null,
-				constraint: null,
-			})),
-		})
-
-		if (provided !== null) {
-			return {
-				type: provided.methods[memberName]!,
-				providedBy: protocol.identity,
-			}
-		}
-	}
-
-	return null
 }
 
 // Solves whether `binding` conforms to `protocolName`, producing the witness.

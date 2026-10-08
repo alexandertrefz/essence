@@ -795,6 +795,10 @@ reports whichever candidate is selected. Its Help reads its body once per Scope 
 The hold belongs to the call probing. Every call is enriched inside `enteringCall`, which pushes a barrier, so a call
 nested in an Argument reports its own literals whatever the call around it selects.
 
+A probe that only asks whether a call fits drops its hold instead (`discardingLiteralReports`), since the call reads
+its literals again once it chooses. `providedNamespaceMember` probes each provider so. Only the hold is dropped: an
+Argument's first enrichment reports directly, and the typer never enriches it again.
+
 ### The no-matching-overload report
 
 `overloadRefusalReport` builds every `no-matching-overload` report, whether the call is a `::` call, one member of
@@ -1386,9 +1390,11 @@ bound's witness is. Another Namespace giving the Type the same Protocol is never
 
 The standard library's `Record` Namespace conforms for the top Record, conditionally on the receiver's members. So
 its witness is solved for the receiver itself (`witnessType`). A derive's `Self` is the whole Choice, so a sibling
-Case still fits the Parameter. `providedNamespaceMember` answers the `Number.isLessThan(a, b)` spelling the same
-way. A generic Namespace named there has no receiver, so its Type Parameters stay open for the first Argument to
-decide.
+Case still fits the Parameter. `providedNamespaceMember` in `providedBodies.ts` answers the `Number.isLessThan(a, b)`
+spelling the same way. `enrichLookup` hands it the Invocation, whose Arguments choose among unrelated Protocols
+providing the name, probed with `selectOverload` as a `::` call's candidates are. Two that both fit are
+`ambiguous-namespace`. An Error Argument fits every candidate, so it ties none. A generic Namespace named there has
+no receiver, so its Type Parameters stay open for the first Argument to decide.
 
 ### The body a witness takes
 
