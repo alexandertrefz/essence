@@ -6,6 +6,7 @@ import { join } from "node:path"
 import type { common } from "@essence-lang/interfaces"
 
 import { enrich } from "../enricher/index"
+import { phantomTargetChecks } from "../enricher/otherApplications"
 import { optimise } from "../optimiser/index"
 import { parse } from "../parser/index"
 import { rewrite } from "../rewriter/index"
@@ -1701,6 +1702,171 @@ describe("Dispatch and Resolution", () => {
 					"Result#Failure(7)",
 					"Result#Value(2)",
 				])
+			})
+
+			// A call through a bound reads the conformance as a `::` call reads
+			// the Namespace, so the two agree.
+			describe("through a bound", () => {
+				let labelled = (body: string) => `implementation {
+					protocol Labelled {
+						label() -> String
+					}
+
+					choice Pair<A, B> {
+						Left { a: A },
+						Neither,
+					}
+
+					namespace Sames<infer Item> for Pair<Item, Item> is Labelled {
+						label() -> String {
+							<- "same"
+						}
+					}
+
+					function describe<infer T is Labelled>(_ value: T) -> String {
+						<- value::label()
+					}
+
+					${body}
+				}`
+
+				it("refuses a conformance a phantom Type Argument turns away", () => {
+					expect(
+						diagnosticsFor(
+							labelled(
+								"Terminal.inspect(describe(Pair<Integer, String>#Left({ a = 1 })))",
+							),
+						).map(({ code, notes }) => ({ code, notes })),
+					).toEqual([
+						{
+							code: "unsatisfied-bound",
+							notes: [
+								"No Namespace in scope makes Pair<Integer, String>#Left conform to 'Labelled'.",
+								"'Sames' conforms to 'Labelled' for Pair<Item, Item>, which takes Integer for 'B' where this value has String, and no payload carries 'B'.",
+							],
+						},
+					])
+				})
+
+				// A target without Type Parameters is read the same way, so a
+				// conformance for `Box<Integer>` lends nothing to a `Box<String>`.
+				it("refuses a conformance for another application", () => {
+					expect(
+						diagnosticsFor(`implementation {
+							protocol Labelled {
+								label() -> String
+							}
+
+							choice Box<Item> {
+								Full { item: Item },
+								Empty,
+							}
+
+							namespace IntBoxes for Box<Integer> is Labelled {
+								label() -> String {
+									<- "integer box"
+								}
+							}
+
+							function describe<infer T is Labelled>(_ value: T) -> String {
+								<- value::label()
+							}
+
+							Terminal.inspect(describe(Box<String>#Empty))
+							Terminal.inspect(describe(Box<Integer>#Empty))
+						}`).map(({ code, notes }) => ({ code, notes })),
+					).toEqual([
+						{
+							code: "unsatisfied-bound",
+							notes: [
+								"No Namespace in scope makes Box<String>#Empty conform to 'Labelled'.",
+								"'IntBoxes' conforms to 'Labelled' for Box<Integer>, another application of 'Box'.",
+							],
+						},
+					])
+				})
+
+				it("lets the application the target takes conform", async () => {
+					expect(
+						await run(
+							labelled(`Terminal.inspect(describe(Pair<Integer, Integer>#Left({ a = 1 })))
+							Terminal.inspect(describe(Pair<Integer, Integer>#Neither))`),
+						),
+					).toEqual(['"same"', '"same"'])
+				})
+
+				// `Result` names both its Type Parameters in payloads, so a
+				// conformance for nested Results still binds the failure Type
+				// from the payload, as `flatten` does.
+				it("leaves a Type Argument a payload carries to the payload", async () => {
+					expect(
+						await run(`implementation {
+							protocol Flattens {
+								flattened() -> Integer
+							}
+
+							namespace NestedFlattens<infer V, infer F> for Result<Result<V, F>, F> is Flattens {
+								flattened() -> Integer {
+									<- match @::flatten() -> Integer {
+										case #Value { <- 1 }
+										case #Failure { <- 0 }
+									}
+								}
+							}
+
+							function count<infer T is Flattens>(_ value: T) -> Integer {
+								<- value::flattened()
+							}
+
+							Terminal.inspect(count(Result<Result<Integer, String>, Integer>#Value({ item = #Value(2) })))
+							Terminal.inspect(count(Result<Result<Integer, String>, Integer>#Value({ item = #Failure("no") })))
+						}`),
+					).toEqual(["1", "0"])
+				})
+			})
+
+			// Binding a target to compare is a full match, and almost no Choice
+			// has a phantom Type Parameter. Counted, since a clock would flake.
+			it("binds no target for a Choice without phantom Type Parameters", () => {
+				let checksFor = (source: string) => {
+					phantomTargetChecks.count = 0
+
+					expect(enrich(parse(source)).diagnostics).toEqual([])
+
+					return phantomTargetChecks.count
+				}
+
+				expect(
+					checksFor(`implementation {
+						choice Box<Item> {
+							Full { item: Item },
+							Empty,
+						}
+
+						namespace Boxes<infer Item> for Box<Item> {
+							describe() -> String {
+								<- "box"
+							}
+						}
+
+						constant numbers: List<Integer> = [1, 2]
+						constant first = numbers::firstItem()
+						constant result: Result<Integer, String> = #Value(1)
+
+						Terminal.inspect(first::value(defaultingTo 0))
+						Terminal.inspect(result::hasFailed())
+						Terminal.inspect(result::toList())
+						Terminal.inspect(Box<String>#Empty::describe())
+						Terminal.inspect(first)
+					}`),
+				).toBe(0)
+				expect(
+					checksFor(
+						pairs(
+							"Terminal.inspect(Pair<Integer, Integer>#Left({ a = 1 })::label())",
+						),
+					),
+				).toBeGreaterThan(0)
 			})
 		})
 

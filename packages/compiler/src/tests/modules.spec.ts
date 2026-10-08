@@ -5604,6 +5604,81 @@ export {
 		)
 	})
 
+	// The conformance is read as a `::` call reads the Namespace, with `Pair`'s
+	// phantom `B` read off its own Module.
+	it("refuses a conformance a phantom Type Argument turns away in a Module that never imported its Choice", async () => {
+		let project = (body: string) => ({
+			"Main.es": `import {
+	from "./Pairs.es" {
+		Labelled
+		Mixed
+		Same
+		Sames
+	}
+}
+
+implementation {
+	function describe<infer T is Labelled>(_ value: T) -> String {
+		<- value::label()
+	}
+
+${body}
+}
+`,
+			"Pairs.es": `implementation {
+	protocol Labelled {
+		label() -> String
+	}
+
+	choice Pair<A, B> {
+		Left { a: A },
+		Neither,
+	}
+
+	namespace Sames<infer Item> for Pair<Item, Item> is Labelled {
+		label() -> String {
+			<- "same"
+		}
+	}
+
+	type Same<T> = Pair<T, T>
+	type Mixed = Pair<Integer, String>
+}
+
+export {
+	Labelled
+	Mixed
+	Same
+	Sames
+}
+`,
+		})
+
+		withProject(
+			project(
+				"\tTerminal.inspect(describe(Same<Integer>#Left({ a = 1 })))\n\tTerminal.inspect(describe(Mixed#Left({ a = 2 })))",
+			),
+			(directory) => {
+				expect(
+					codesOf(analysedAt(directory, "Main.es", "Main.es")),
+				).toEqual(["unsatisfied-bound"])
+			},
+		)
+		await withBuiltProject(
+			project(
+				"\tconstant mixed: Mixed = #Neither\n\tTerminal.inspect(describe(Same<Integer>#Left({ a = 1 })))\n\tTerminal.inspect(mixed)",
+			),
+			async (directory) => {
+				expect(
+					await runBundle(
+						generateModules(linkProject(directory, "Main.es")),
+						directory,
+					),
+				).toEqual(['"same"', "Pair#Neither"])
+			},
+		)
+	})
+
 	// The body is emitted once, where the Protocol is declared, and binds the
 	// Pattern there.
 	it("runs a provided Method that takes its Parameter apart from another Module", async () => {

@@ -593,6 +593,15 @@ payload's. So `flatten()` on a `Result<Result<Integer, String>, Integer>` still 
 `#Failure` names `FailureType`. The refusal's Note names the Namespace and the phantom Type Parameter
 (`otherApplicationNotes`).
 
+A conformance is solved from its Namespace's target read the same way (`conformingBindings`), a target without Type
+Parameters included, so a call through a bound agrees with a direct call. `describe(Pair<Integer, String>#Left(…))`
+under `describe<infer T is Labelled>` is `unsatisfied-bound`, and `otherConformerNotes` names the Namespace as the
+`::` refusal does.
+
+Binding a target to compare is a full match, so it runs only for a receiver whose Choice has a phantom Type
+Parameter, which almost none has. Which ones are phantom is remembered per declaration and per Case.
+`phantomTargetChecks` counts the bindings, so `tests/dispatchResolution.spec.ts` holds the cost without a clock.
+
 ## Return Type inference from a body
 
 A Function literal without `-> Type` takes its return Type from its body (`inferReturnTypeFromBody`). The Type of

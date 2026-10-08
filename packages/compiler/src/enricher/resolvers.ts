@@ -90,7 +90,11 @@ import { recordAnnotation } from "./annotations"
 import { derivesWithImports } from "./derivedImports"
 import { reportTypeWithoutMembers } from "./memberHelps"
 import { narrowedBodyReport, narrowedMethodReport } from "./narrowedMethods"
-import { namespacesCovering } from "./otherApplications"
+import {
+	conformingBindings,
+	namespacesCovering,
+	otherConformerNotes,
+} from "./otherApplications"
 import { providedMethodNamespacesNamed } from "./protocolPicks"
 import {
 	bodyCanWait,
@@ -5202,28 +5206,17 @@ function solveNamespaceConformance(
 			generics: namespace.generics,
 		}
 
-		if (namespace.generics.length === 0) {
-			if (matchesType(namespace.targetType, binding)) {
-				candidates.push({
-					name,
-					type: namespace,
-					declaredTarget,
-					conditions: orderedConditions,
-					conditionBindings: new Map(),
-				})
-			}
+		// A Namespace conforms where its target covers the binding, as a `::`
+		// call's lookup reads it. A generic one is then specialized against it.
+		let targetBindings = conformingBindings(namespace, binding, scope)
 
-			continue
-		}
-
-		let targetBindings = bindNamespaceTarget(namespace, binding)
-
-		// A generic Namespace conforms where its target unifies with the
-		// binding, and is then specialized against it.
 		if (targetBindings !== null) {
 			candidates.push({
 				name,
-				type: specializeNamespace(namespace, targetBindings),
+				type:
+					namespace.generics.length === 0
+						? namespace
+						: specializeNamespace(namespace, targetBindings),
 				declaredTarget,
 				conditions: orderedConditions,
 				conditionBindings: targetBindings,
@@ -6214,7 +6207,8 @@ type ConformanceRemedy = {
 }
 
 // The remedy, led by what a reader is told where the name the report
-// spells binds another Protocol here.
+// spells binds another Protocol here. A Namespace for another application of
+// the culprit's Choice that conforms is named too.
 function missingConformance(
 	culprit: common.Type,
 	protocolName: string,
@@ -6224,14 +6218,15 @@ function missingConformance(
 	asker: "bound" | "condition",
 ): ConformanceRemedy {
 	let remedy = conformanceRemedy(culprit, protocolName, scope, position)
-	let homonyms = [
+	let leading = [
 		...homonymNotes(protocolName, scope, asker),
 		...homonymConformerNotes(protocolName, culprit, scope),
+		...otherConformerNotes(protocolName, culprit, scope),
 	]
 
-	return homonyms.length === 0
+	return leading.length === 0
 		? remedy
-		: { ...remedy, notes: [...homonyms, ...remedy.notes] }
+		: { ...remedy, notes: [...leading, ...remedy.notes] }
 }
 
 function conformanceRemedy(

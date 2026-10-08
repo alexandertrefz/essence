@@ -12,7 +12,11 @@ import {
 	typeContainsUnknown,
 	typeMentionsGeneric,
 } from "../helpers/types"
-import { getAllNamespacesInScope, namespacesTargeting } from "./resolvers"
+import {
+	describeProtocol,
+	getAllNamespacesInScope,
+	namespacesTargeting,
+} from "./resolvers"
 import {
 	choiceBindingIn,
 	choiceNameIn,
@@ -60,6 +64,10 @@ type PhantomMismatch = {
 	receiver: common.Type
 }
 
+// How many targets were bound to compare phantom Type Arguments. A spec holds
+// a Choice without phantom Type Parameters to none, without a clock.
+export const phantomTargetChecks = { count: 0 }
+
 // The first phantom Type Argument of a receiver's Case that the target's Case
 // of the same tag does not take, once the target is bound. Null where each
 // one fits.
@@ -69,7 +77,14 @@ function phantomMismatch(
 	scope: enricher.Scope,
 ): PhantomMismatch | null {
 	let carriers = phantomCarriers(receiver, scope)
-	let bound = carriers.length === 0 ? null : boundTarget(namespace, receiver)
+
+	if (carriers.length === 0) {
+		return null
+	}
+
+	phantomTargetChecks.count += 1
+
+	let bound = boundTarget(namespace, receiver)
 
 	if (bound === null) {
 		return null
@@ -163,9 +178,14 @@ function casesOf(type: common.Type): Array<common.CaseType> {
 	)
 }
 
-// Remembered per declaration, which every Case of the Choice reads.
+// Remembered per declaration, which every Case of the Choice reads, and per
+// Case, whose declaration never changes.
 const phantomParametersMemo = new WeakMap<
 	common.Type,
+	Array<[number, common.GenericName]>
+>()
+const phantomParametersOfCase = new WeakMap<
+	common.CaseType,
 	Array<[number, common.GenericName]>
 >()
 
@@ -176,6 +196,12 @@ function phantomParameters(
 	carrier: common.CaseType,
 	scope: enricher.Scope,
 ): Array<[number, common.GenericName]> {
+	let known = phantomParametersOfCase.get(carrier)
+
+	if (known !== undefined) {
+		return known
+	}
+
 	let foreign = unboundForeignChoice(carrier, scope)
 	let declared =
 		foreign === null
@@ -210,6 +236,8 @@ function phantomParameters(
 		phantomParametersMemo.set(declared, remembered)
 	}
 
+	phantomParametersOfCase.set(carrier, remembered)
+
 	return remembered
 }
 
@@ -222,39 +250,84 @@ export function otherApplicationNotes(
 	receiver: common.Type,
 	scope: enricher.Scope,
 ): Array<string> {
-	let choice = choiceCarried(receiver)
-
-	if (choice === null) {
-		return []
-	}
-
 	let namespaces = getAllNamespacesInScope(scope, null)
 	let targeting = namespacesTargeting(namespaces, receiver)
 
-	return [...namespaces].flatMap(([name, namespace]) => {
-		if (
-			namespace.targetType === null ||
-			!Object.hasOwn(namespace.methods, methodName)
-		) {
-			return []
-		}
+	return [...namespaces].flatMap(([name, namespace]) =>
+		Object.hasOwn(namespace.methods, methodName)
+			? turnedAwayNotes(
+					`'${name}' declares '${methodName}'`,
+					namespace,
+					receiver,
+					targeting.has(name),
+					scope,
+				)
+			: [],
+	)
+}
 
-		let declares = `'${name}' declares '${methodName}' for ${describeType(namespace.targetType)}`
-		let phantom = targeting.has(name)
-			? phantomMismatch(namespace, receiver, scope)
-			: null
+// A conformance's target bound from a Type, as a `::` call reads it. Null
+// where it does not cover the Type, a phantom Type Argument included.
+export function conformingBindings(
+	namespace: common.NamespaceType,
+	type: common.Type,
+	scope: enricher.Scope,
+): GenericBindings | null {
+	let bindings = bindNamespaceTarget(namespace, type)
 
-		if (phantom !== null) {
-			return [
-				`${declares}, which takes ${describeType(phantom.target)} for '${phantom.parameter}' where this value has ${describeType(phantom.receiver)}, and no payload carries '${phantom.parameter}'.`,
+	return bindings === null || phantomMismatch(namespace, type, scope) === null
+		? bindings
+		: null
+}
+
+// The Notes `otherApplicationNotes` gives, for each Namespace in scope that
+// declares a Protocol for another application of the Type's Choice.
+export function otherConformerNotes(
+	protocolName: string,
+	type: common.Type,
+	scope: enricher.Scope,
+): Array<string> {
+	return [...getAllNamespacesInScope(scope, null)].flatMap(
+		([name, namespace]) =>
+			namespace.conformsTo?.includes(protocolName) === true
+				? turnedAwayNotes(
+						`'${name}' conforms to '${describeProtocol(protocolName, scope)}'`,
+						namespace,
+						type,
+						bindNamespaceTarget(namespace, type) !== null,
+						scope,
+					)
+				: [],
+	)
+}
+
+// Why a Namespace whose target covers the receiver's payloads is turned away.
+// `covers` says whether its target covers the receiver as the lookup reads it.
+function turnedAwayNotes(
+	lead: string,
+	namespace: common.NamespaceType,
+	receiver: common.Type,
+	covers: boolean,
+	scope: enricher.Scope,
+): Array<string> {
+	let choice = choiceCarried(receiver)
+
+	if (choice === null || namespace.targetType === null) {
+		return []
+	}
+
+	let declares = `${lead} for ${describeType(namespace.targetType)}`
+	let phantom = covers ? phantomMismatch(namespace, receiver, scope) : null
+
+	if (phantom !== null) {
+		return [
+			`${declares}, which takes ${describeType(phantom.target)} for '${phantom.parameter}' where this value has ${describeType(phantom.receiver)}, and no payload carries '${phantom.parameter}'.`,
+		]
+	}
+
+	return !covers && coversApartFromTypeArguments(namespace, receiver)
+		? [
+				`${declares}, another application of '${choiceNameIn(choice, scope)}'.`,
 			]
-		}
-
-		return !targeting.has(name) &&
-			coversApartFromTypeArguments(namespace, receiver)
-			? [
-					`${declares}, another application of '${choiceNameIn(choice, scope)}'.`,
-				]
-			: []
-	})
+		: []
 }
