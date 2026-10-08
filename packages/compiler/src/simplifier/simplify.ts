@@ -8,6 +8,7 @@ import {
 } from "../helpers/defaults"
 import { conformanceParameterName } from "../helpers/names"
 import { bodyDefinitelyReturns } from "../helpers/returns"
+import { runsNothing } from "../helpers/runsNothing"
 import { isMergedLevel, resolveOverloadedMethodName } from "../helpers/types"
 import { valueCommentLines } from "../valueComments"
 
@@ -461,31 +462,6 @@ function inDeclaredOrder(
 	}
 
 	return Object.fromEntries(entries)
-}
-
-// Whether evaluating a simplified Expression runs nothing whose order a
-// reader could see. That holds for a literal, a name, and a member read, List,
-// Record or Case built of those.
-function runsNothing(node: common.typedSimple.ExpressionNode): boolean {
-	switch (node.nodeType) {
-		case "Identifier":
-		case "StringValue":
-		case "IntegerValue":
-		case "RationalValue":
-		case "BooleanValue":
-		case "FunctionValue":
-			return true
-		case "Lookup":
-			return runsNothing(node.base)
-		case "RecordValue":
-			return Object.values(node.members).every(runsNothing)
-		case "ListValue":
-			return node.values.every(runsNothing)
-		case "CaseValue":
-			return node.value === null || runsNothing(node.value)
-		default:
-			return false
-	}
 }
 
 // A deep copy of a simplified Expression with one Position stamped

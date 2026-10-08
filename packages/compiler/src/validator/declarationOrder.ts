@@ -8,7 +8,7 @@ import {
 	type Unit,
 	type Units,
 } from "./reachUnits"
-import { runsNothing } from "./runsNothing"
+import { statementRunsNothing } from "./runsNothing"
 import { forgetRefusedUses, refuseUse } from "./untypedReads"
 
 // Each top-level Namespace's index in the Statement list and its name's
@@ -763,10 +763,11 @@ function moveHelp(
 		crossed.every(
 			(_, offset) => !bound(simulation, use + 1 + offset, use),
 		) &&
-		(runsNothing(nodes[use]) || between.every(runsNothing))
+		(statementRunsNothing(nodes[use]) ||
+			between.every(statementRunsNothing))
 	let upward =
-		[...moving].every((index) => runsNothing(nodes[index])) ||
-		passed.every(runsNothing)
+		[...moving].every((index) => statementRunsNothing(nodes[index])) ||
+		passed.every(statementRunsNothing)
 	let moves = (help: string): Move => ({
 		helps: [help],
 		data: {
