@@ -23,6 +23,7 @@ import {
 	partitionInstanceMethodNamespaces,
 	protocolGrants,
 	protocolOf,
+	protocolSpelling,
 	providedMethodNamespaceFor,
 	resolveMethodLookupNamespacesForReceiverType,
 	resolveWrittenProtocol,
@@ -192,14 +193,16 @@ export function reportPickedRequirement(
 	}
 
 	let declaring = declaringProtocolName(protocol, methodName, scope) ?? picked
-	let written = [
-		...answeringNamespaces(
-			methodName,
-			baseType,
-			scope,
-			node.position,
-		).keys(),
-	]
+	let answering = answeringNamespaces(
+		methodName,
+		baseType,
+		scope,
+		node.position,
+	)
+	// The Namespaces that write the name, apart from a Protocol's bodies.
+	let written = [...answering]
+		.filter(([, namespace]) => namespace.providedBy === undefined)
+		.map(([key]) => key)
 	let pickable = namespaceNamesIn(scope).filter((name) =>
 		written.includes(name),
 	)
@@ -213,8 +216,15 @@ export function reportPickedRequirement(
 		)
 	let call = node.arguments.length === 0 ? "()" : "(…)"
 	let drops =
-		(pickable.length > 0 || written.length > 0 || dispatched) &&
+		(answering.size > 0 || dispatched) &&
 		compilesWithoutPick(node, baseType, scope, typer)
+	let body =
+		drops ||
+		[...answering.values()].every(
+			(namespace) => namespace.providedBy === undefined,
+		)
+			? null
+			: bodyPickFor(node, protocol, baseType, scope, typer)
 
 	reportError(
 		`'${picked}' has no body for '${methodName}'`,
@@ -233,11 +243,13 @@ export function reportPickedRequirement(
 			],
 			helps: [
 				pickedRequirementHelp(methodName, {
+					picked,
 					pickable: pickable[0] ?? null,
 					call,
 					drops,
 					dispatched,
 					writer: written[0] ?? null,
+					body,
 				}),
 				...helps(),
 			],
@@ -248,28 +260,40 @@ export function reportPickedRequirement(
 }
 
 // What the pick of a requirement leaves to write. Dropping the pick is
-// offered only where the call then compiles. Otherwise its Arguments do not
-// fit, and a Union receiver needs a single member to call the Method on.
+// offered only where the call then compiles. Otherwise two bodies may tie, its
+// Arguments may not fit, or a Union receiver needs a single member.
 function pickedRequirementHelp(
 	methodName: string,
 	{
+		picked,
 		pickable,
 		call,
 		drops,
 		dispatched,
 		writer,
+		body,
 	}: {
+		picked: string
 		pickable: string | null
 		call: string
 		drops: boolean
 		dispatched: boolean
 		writer: string | null
+		body: { name: string; compiles: boolean } | null
 	},
 ): string {
 	if (drops) {
 		return pickable === null
 			? "Drop the pick."
 			: `Drop the pick, or pick the Namespace that writes '${methodName}': '::<${pickable}>${methodName}${call}'.`
+	}
+
+	if (body !== null) {
+		let pick = `'::<${body.name}>${methodName}${call}'`
+
+		return body.compiles
+			? `Pick the Protocol whose body '${picked}' runs here: ${pick}.`
+			: `Pick the Protocol whose body '${picked}' runs here, ${pick}, and pass it the Arguments '${body.name}' declares.`
 	}
 
 	if (writer !== null) {
@@ -279,6 +303,56 @@ function pickedRequirementHelp(
 	return dispatched
 		? `Match on the value, and call '${methodName}' on '@' in each arm, with Arguments of that arm's Type.`
 		: `Drop the pick, and call '${methodName}' on a value whose Namespace writes it.`
+}
+
+// The Protocol whose body the receiver's conformance to the picked one runs,
+// where the Namespace writes no Method of the name. Whether picking it
+// compiles is asked too. See "The body a witness takes" in DEVELOPMENT.md.
+function bodyPickFor(
+	node: parser.MethodInvocationNode,
+	protocol: common.ProtocolType,
+	baseType: common.Type,
+	scope: enricher.Scope,
+	typer: ArgumentTyper,
+): { name: string; compiles: boolean } | null {
+	let methodName = node.member.content
+
+	for (let [, namespace] of resolveMethodLookupNamespacesForReceiverType(
+		baseType,
+		null,
+		scope,
+	)) {
+		let body =
+			namespace.conformsTo?.includes(protocol.identity) !== true ||
+			Object.hasOwn(namespace.methods, methodName)
+				? null
+				: conformanceProvidersIn(
+						namespace.conformsTo,
+						protocol,
+						namespace.targetType ?? baseType,
+						scope,
+					)(methodName)
+		let name = body === null ? null : protocolSpelling(body, scope)
+
+		if (name !== null) {
+			return {
+				name,
+				compiles: compilesWithSpecifier(
+					node,
+					{
+						nodeType: "Identifier",
+						content: name,
+						position: node.member.position,
+					},
+					baseType,
+					scope,
+					typer,
+				),
+			}
+		}
+	}
+
+	return null
 }
 
 // Whether the call compiles once its pick is dropped, asked silently.

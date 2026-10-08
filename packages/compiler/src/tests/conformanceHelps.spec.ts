@@ -1491,6 +1491,79 @@ describe("A Protocol pick of a requirement", () => {
 		).toBe(true)
 	})
 
+	// `Other` and `Counting` both provide `trail`, and `Things` writes none,
+	// so dropping the pick ties them. `Things`'s conformance to `Requiring`
+	// runs `Other`'s body, the first its clauses reach, so that is the pick.
+	let trails = (
+		call: string,
+		clauses: string = "is Requiring, is Other, is Counting",
+	) => `implementation {
+		protocol Requiring {
+			trail(_ n: Integer) -> String
+		}
+
+		protocol Counting {
+			trail(_ n: Integer) -> String {
+				<- "c{n}"
+			}
+		}
+
+		protocol Other {
+			trail(_ n: Integer) -> String {
+				<- "o{n}"
+			}
+		}
+
+		type Thing = { value: Integer }
+
+		namespace Things for Thing ${clauses} {}
+
+		function viaRequiring<infer Item is Requiring>(_ item: Item) -> String {
+			<- item::trail(3)
+		}
+
+		constant thing: Thing = { value = 1 }
+
+		Terminal.print(viaRequiring(thing))
+		Terminal.print(${call})
+	}`
+
+	it("should pick the Protocol whose body the conformance runs where two bodies tie", () => {
+		expect(
+			firstOf(trails("thing::<Requiring>trail(3)"), "picked-requirement")
+				.helps,
+		).toEqual([
+			"Pick the Protocol whose body 'Requiring' runs here: '::<Other>trail(…)'.",
+		])
+		expect(codesOfSource(trails("thing::trail(3)"))).toEqual([
+			"ambiguous-namespace",
+		])
+		expect(compiles(trails("thing::<Other>trail(3)"))).toBe(true)
+	})
+
+	it("should ask for the Arguments the picked body declares", () => {
+		expect(
+			firstOf(
+				trails('thing::<Requiring>trail("x")'),
+				"picked-requirement",
+			).helps,
+		).toEqual([
+			"Pick the Protocol whose body 'Requiring' runs here, '::<Other>trail(…)', and pass it the Arguments 'Other' declares.",
+		])
+		expect(compiles(trails("thing::<Other>trail(3)"))).toBe(true)
+	})
+
+	// One body answers, and `Things` writes no `trail` to pick.
+	it("should drop the pick where one Protocol's body answers", () => {
+		let single = (call: string) => trails(call, "is Requiring, is Other")
+
+		expect(
+			firstOf(single("thing::<Requiring>trail(3)"), "picked-requirement")
+				.helps,
+		).toEqual(["Drop the pick."])
+		expect(compiles(single("thing::trail(3)"))).toBe(true)
+	})
+
 	it("should name the Protocol that declares an inherited requirement", () => {
 		let reported = firstOf(
 			`implementation {
