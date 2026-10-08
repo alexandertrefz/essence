@@ -61,6 +61,7 @@ import {
 	splitSnapshotActions,
 	staticCallActions,
 	recordMemberAction,
+	removeRecordMemberAction,
 	suggestionAction,
 	unreachableCaseAction,
 	updateBracketsAction,
@@ -398,11 +399,12 @@ export type FixProvider = (context: FixContext) => Array<CodeActionEntry>
 const spellingFix: FixProvider = ({ diagnostic, lines }) =>
 	listed(suggestionAction(diagnostic, lines, (suggestion) => suggestion))
 
-// Every Type mismatch code may carry a misspelled Record member or a missing
-// `complete`. Nothing is both a Future and a Record, so at most one answers.
+// Every Type mismatch code may carry a misspelled or undeclared Record member,
+// or a missing `complete`. Each `data` kind answers one fix.
 const mismatchFixes: FixProvider = ({ diagnostic, program, lines }) => [
 	...listed(waitForValueAction(diagnostic)),
 	...listed(recordMemberAction(diagnostic, program, lines)),
+	...listed(removeRecordMemberAction(diagnostic, program, lines)),
 ]
 
 // An unknown name is misspelled or not imported. Imports come first, since
@@ -541,8 +543,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 		listed(dropKeywordAction(diagnostic, program, lines)),
 	// Only an Argument that is work where its answer is wanted, marked by
 	// `data`, has a mechanical fix.
-	"no-matching-overload": ({ diagnostic }) =>
-		listed(waitForArgumentAction(diagnostic)),
+	"no-matching-overload": ({ diagnostic, program, lines }) => [
+		...listed(waitForArgumentAction(diagnostic)),
+		...listed(removeRecordMemberAction(diagnostic, program, lines)),
+	],
 	"partial-type-mismatch": mismatchFixes,
 	"payload-type-mismatch": mismatchFixes,
 	"nonconforming-namespace": implementProtocolAction,

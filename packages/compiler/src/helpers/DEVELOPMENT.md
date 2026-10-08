@@ -27,6 +27,27 @@ Both take the two fields they read, `nodeType` and `members`, rather than a Node
 simplified Record Literals all carry them. `recordDefaultMembers` sorts its list, so two structurally equal
 signatures carry equal lists.
 
+## Undeclared members
+
+A Record Literal written as an Argument or as a Case's payload may name only the members its Type declares. That
+holds for a whole Literal and for a partial one a default completes, and at every level its Literals reach.
+`undeclaredMembers` lists what it names beyond them. A value that is not a Literal is not walked, since Record
+assignability is width subtyping, and a value passed along keeps whatever it holds. So `describe(start)` compiles
+where `describe({ x = 1, y = 2, label = "start" })` does not.
+
+A Type that declares nothing takes any member. That is `{}`, a Type Parameter, and a Union holding anything but
+Records. A Union of Records takes a member any of its Records declares, and walks into it only where one Record
+declares it.
+
+Three sites ask. `argumentFits` refuses the Argument, so the call reports `argument-type-mismatch`, or no Overload
+matches and `argumentTypeRefusal` reports `no-matching-overload`. The Validator refuses a payload as
+`payload-type-mismatch`. `updateRefusal` holds an update's right-hand side to it, which matters only below the top
+level, since `isPartialOf` already refuses an undeclared member there. Each report reads `recordMismatchEvidence`
+with `refusesUndeclared`, which walks into a nested Literal that fits only by width. `removalEvidence` adds the Help
+that removes the member. A misspelled member gets its near miss instead, and an update that writes nothing else gets
+no removal, since an empty update does not parse. An annotated Constant is no such position, and keeps an extra
+member.
+
 ## Erasing refinements
 
 A checked refinement such as `NonZeroInteger` is the same value as its base at run time, and its predicate is
@@ -151,6 +172,8 @@ members instead, and the report carries the disagreements:
   clause becomes the leading Label on the Literal itself, and no note repeats it.
 - A Help and the data for a Quick Fix only where exactly one member is misspelled, since two misspellings are two
   edits.
+- Where the position takes only declared members, a Help that removes the undeclared ones, named in one sentence.
+  The data for its Quick Fix comes only with exactly one of them, and only where no misspelling claims the data.
 
 Members are listed in written order. A member the Record does not declare is measured with `closestMatch` against
 the declared members the value has not written. A member already written is not what an unknown one was meant to

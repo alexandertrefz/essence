@@ -2612,6 +2612,8 @@ Error: This Argument does not fit Parameter 'using'
     │                                                                          ─┐  
     │                                                                           ╰── 'timeout' is not a member of Options
     │ 
+    │ Help: Remove 'timeout'.
+    │ 
     │ Note: Parameter 'using' is Options.
 ────╯
 

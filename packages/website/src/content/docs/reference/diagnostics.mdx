@@ -1789,6 +1789,10 @@ Error: This Argument does not fit Parameter 1
 
 Pass a value of that type: `greet("Ada")`.
 
+A record literal written as the argument may name only the members the parameter's type declares, at every level its literals reach. `describe({ x = 1, y = 2, label = "start" })` against a `Point` is this code, with the label `'label' is not a member of Point` and the help `Remove 'label'.`. A record value passed along still carries what it holds: `describe(start)` compiles whatever `start` carries beside `x` and `y`. A parameter of type `{}` takes any record.
+
+Quick Fix: **Remove 'label'**, which takes the member out with its comma.
+
 Asynchrony adds the same three Helps this code carries at a constant. A [`Future`](/docs/library/future) passed where its value is wanted asks for `complete`, and so does a `Started`, which is still in flight; the Quick Fix **Wait for it with 'complete'** writes the word for either. A plain value where a future is wanted asks for one to be built.
 
 Taught on: [Functions › Labels](/docs/language/functions#labels)
@@ -3348,10 +3352,15 @@ A case of **several** members gets a second Help — `The one-member shorthand
 what a reader writing `#Rectangle(2)` reached for, and it is the one thing the
 member diff above cannot say. A single-member case gets no such Help: the
 shorthand would have accepted the value, so what is wrong is the value itself,
-which the note names the type of. Neither does a payload that already spells the
-case's members out — a `#Rectangle({ width = "wide", height = 2 })` names every
-member the case declares and got one value wrong, so nothing there reached for
-the shorthand.
+which the note names the type of. Neither does a payload that writes the case's
+record — a `#Rectangle({ width = "wide", height = 2 })` names the members the case
+declares and got one value wrong, so nothing there reached for the shorthand.
+
+A payload literal may name only the members its case declares, whether it writes
+them all or leaves some to the payload's default. `#Article({ slug = "choices",
+draft = true })` is this code, with the help `Remove 'draft'.` and the Quick Fix
+**Remove 'draft'**. A record value passed as the payload, as in `#Article(post)`,
+still carries what it holds.
 
 Taught on: [Choices and `match` › Building a case](/docs/language/choices-and-match#building-a-case)
 

@@ -242,6 +242,45 @@ export function recordMemberAction(
 	}
 }
 
+// Removes a member a Record literal names where only declared members may
+// stand. The comma before it goes too, or the one after it when it comes
+// first, as `removeFallbackAction` removes an Argument.
+export function removeRecordMemberAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	program: parser.Program,
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "undeclared-member") {
+		return null
+	}
+
+	let { member, value } = diagnostic.data
+	let name = findRecordMemberName(program, value, member)
+
+	if (
+		name === null ||
+		sliceOf(lines, name.position) !== member ||
+		!isWordBounded(lines, name.position)
+	) {
+		return null
+	}
+
+	let start = commaBefore(lines, name.position.start) ?? name.position.start
+	let end =
+		start === name.position.start
+			? (commaAfter(lines, value.end) ?? value.end)
+			: value.end
+
+	return {
+		title: `Remove '${member}'`,
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [{ range: { start, end }, newText: "" }],
+	}
+}
+
 // What an import fix needs: the Workspace, and where this file is. Absent
 // outside a workspace, and then no import fix is offered.
 export type ImportContext = {

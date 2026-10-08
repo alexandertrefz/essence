@@ -1,5 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
+import { undeclaredMembers } from "./undeclaredMembers"
+
 // The suffix the Simplifier mangles an Overload's name with.
 const OVERLOAD_SUFFIX = "__overload$"
 
@@ -3673,6 +3675,16 @@ function argumentFits(
 	argumentType: common.Type,
 	inferenceContext: GenericInferenceContext | null,
 ): boolean {
+	// A Literal names only members its Parameter declares. See "Undeclared
+	// members" in DEVELOPMENT.md.
+	if (
+		argument.spellsItsMembers === true &&
+		undeclaredMembers(expectedType, argument.mergedValue?.(expectedType))
+			.length > 0
+	) {
+		return false
+	}
+
 	// A Literal with a path key is measured by its merge, and only where the
 	// default reaches into a member, since `mergedValue` enriches.
 	let effectiveType =

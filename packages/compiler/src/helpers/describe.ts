@@ -14,6 +14,7 @@ import {
 	genericNamesMentioned,
 	matchesType,
 } from "./types"
+import { removalEvidence, undeclaredMembers } from "./undeclaredMembers"
 
 // The name a Generic is shown under. `createFreshenedInference` renames a
 // callee's Generics per call to the name, a zero-width space and a counter, and
@@ -1180,6 +1181,9 @@ export function recordMismatchEvidence(
 		// What the sentences call the expected Record where it has no Alias, such as
 		// `'#Get'` for a Case's payload. Top level only.
 		subject?: string
+		// Set where a Literal may name only declared members, as an Argument and a
+		// payload may. See "Undeclared members" in DEVELOPMENT.md.
+		refusesUndeclared?: boolean
 	} = {},
 ): RecordMismatchEvidence {
 	let source = recordShapeOf(written)
@@ -1197,12 +1201,14 @@ export function recordMismatchEvidence(
 	let literal =
 		value !== null && value.nodeType === "RecordValue" ? value : null
 	let subject = recordSubject(target.shape, options.subject)
+	let refuses = options.refusesUndeclared === true
 	let differences = memberDifferences(
 		target.shape,
 		source,
 		literal,
 		"",
 		subject,
+		refuses,
 	)
 	let missing = missingMemberNames(target.shape, source, differences, options)
 
@@ -1221,6 +1227,13 @@ export function recordMismatchEvidence(
 	let misspelled = differences.filter(
 		(difference) => difference.suggestion !== undefined,
 	)
+	let removal = refuses
+		? removalEvidence(
+				target.shape,
+				literal,
+				misspelled.map((difference) => difference.path),
+			)
+		: { helps: [], data: undefined }
 	// A refusal only about members nobody wrote points at the Literal itself, and
 	// its Label names them, so no note repeats them.
 	let missingLead =
@@ -1261,10 +1274,12 @@ export function recordMismatchEvidence(
 				? []
 				: [`${missingClause(missing)}.`]),
 		],
-		helps:
-			misspelled.length === 1
+		helps: [
+			...(misspelled.length === 1
 				? [`Did you mean '${misspelled[0]!.suggestion}'?`]
-				: [],
+				: []),
+			...removal.helps,
+		],
 		data:
 			misspelled.length === 1 && misspelled[0]!.position !== null
 				? {
@@ -1272,7 +1287,7 @@ export function recordMismatchEvidence(
 						member: lastStep(misspelled[0]!.path),
 						suggestion: misspelled[0]!.suggestion as string,
 					}
-				: undefined,
+				: removal.data,
 	}
 }
 
@@ -1352,6 +1367,7 @@ function memberDifferences(
 	literal: common.typed.RecordValueNode | null,
 	prefix: string,
 	subject: string,
+	refusesUndeclared = false,
 ): Array<MemberDifference> {
 	let differences: Array<MemberDifference> = []
 
@@ -1387,7 +1403,16 @@ function memberDifferences(
 
 		let declaredType = target.members[name] as common.Type
 
-		if (matchesType(declaredType, writtenType)) {
+		// A nested Literal that fits may still name a member its Type does not
+		// declare, where the position refuses that.
+		if (
+			matchesType(declaredType, writtenType) &&
+			!(
+				refusesUndeclared &&
+				undeclaredMembers(declaredType, literal?.members[name]).length >
+					0
+			)
+		) {
 			continue
 		}
 
@@ -1397,6 +1422,7 @@ function memberDifferences(
 			literal,
 			name,
 			path,
+			refusesUndeclared,
 		)
 
 		if (nested !== null) {
@@ -1432,6 +1458,7 @@ function nestedDifferences(
 	literal: common.typed.RecordValueNode | null,
 	name: string,
 	path: string,
+	refusesUndeclared: boolean,
 ): Array<MemberDifference> | null {
 	let target = recordShapeOf(declaredType)
 	let source = recordShapeOf(writtenType)
@@ -1452,6 +1479,7 @@ function nestedDifferences(
 		member,
 		`${path}.`,
 		recordSubject(target),
+		refusesUndeclared,
 	)
 	let missing = missingMemberNames(target, source, nested, {})
 

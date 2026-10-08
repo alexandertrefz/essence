@@ -143,6 +143,9 @@ export type DiagnosticData =
 	// near miss. The Diagnostic stands at the member's value, so the fix gets a
 	// name to find rather than a span.
 	| { kind: "record-member"; member: string; suggestion: string }
+	// A member a Record literal writes where only declared members may stand,
+	// and where its value was written, for the fix that removes it.
+	| { kind: "undeclared-member"; member: string; value: Position }
 	// Every requirement the Namespace has not written, not only the first one
 	// the check met. A Method the Protocol provides is left out.
 	| {

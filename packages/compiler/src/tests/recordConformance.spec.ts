@@ -206,20 +206,16 @@ describe("A Record asks its declared members", () => {
 					<- value
 				}
 
-				Terminal.inspect(narrow({ tag = news, extra = 1 })::is({ tag = lower }))
-				Terminal.inspect(
-					narrow({ tag = news, extra = 1 })::is(
-						narrow({ tag = lower, extra = 1 }),
-					),
-				)
-				Terminal.inspect(
-					narrow({ tag = news, extra = 1 })::is(
-						narrow({ tag = lower, extra = 2 }),
-					),
-				)
-				Terminal.inspect(
-					narrow({ tag = news })::is(narrow({ tag = lower, extra = 1 })),
-				)
+				§ A literal Argument names only declared members, so the extra
+				§ ones ride in on values.
+				constant newsOne = { tag = news, extra = 1 }
+				constant lowerOne = { tag = lower, extra = 1 }
+				constant lowerTwo = { tag = lower, extra = 2 }
+
+				Terminal.inspect(narrow(newsOne)::is({ tag = lower }))
+				Terminal.inspect(narrow(newsOne)::is(narrow(lowerOne)))
+				Terminal.inspect(narrow(newsOne)::is(narrow(lowerTwo)))
+				Terminal.inspect(narrow({ tag = news })::is(narrow(lowerOne)))
 			}`),
 		).toEqual(["false", "true", "false", "false"])
 	})

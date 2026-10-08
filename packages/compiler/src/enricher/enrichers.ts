@@ -13,8 +13,6 @@ import {
 } from "../diagnostics/index"
 import { providedMethodProtocol } from "../helpers/conformance"
 import {
-	asynchronyData,
-	asynchronyHelps,
 	booleanQuestionFor,
 	asynchronyState,
 	barredCompletion,
@@ -35,7 +33,6 @@ import {
 	unnameableTarget,
 	recordMismatchEvidence,
 	undecidedSlotAnnotation,
-	undecidedSlotEvidence,
 	unwaitedWorkReport,
 	withArticle,
 	writtenValueHelps,
@@ -109,6 +106,7 @@ import {
 import { printSignature, printType, signaturesOf } from "../printType"
 import { aliasTypeParameters, offeredCases } from "./aliasCases"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
+import { argumentTypeRefusal } from "./argumentRefusals"
 import { askAssertionQuestions } from "./assertionQuestions"
 import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
@@ -12168,55 +12166,17 @@ function overloadRefusalReport(
 		}
 	}
 
-	// A `List<Unknown>` Parameter refuses a write into a blank, which a note
-	// says.
-	let undecided = undecidedSlotEvidence(
-		detail.expectedType,
-		detail.argumentType,
-		null,
+	return argumentTypeRefusal(
+		{ ...detail, argumentType: detail.argumentType },
+		candidate,
+		parameterName,
+		position,
+		call,
+		notes,
+		matchableArguments[detail.argumentIndex]?.mergedValue?.(
+			detail.expectedType,
+		),
 	)
-	// A Future passed where its value is wanted, said in the validator's words.
-	let asynchrony = asynchronyHelps(
-		detail.expectedType,
-		detail.argumentType,
-		call.canWait !== false,
-		call.barrier ?? null,
-	)
-	// A refused Record member, as notes, since the two labels name the Argument
-	// and the callee.
-	let record = recordMismatchEvidence(
-		detail.expectedType,
-		detail.argumentType,
-		null,
-	)
-
-	return {
-		labels: [
-			primary(
-				position,
-				typeContainsError(detail.argumentType) &&
-					call.holesOnly?.(detail.argumentIndex) !== true
-					? "this Argument's Type could not be read"
-					: `this is ${withArticle(describeType(detail.argumentType))}`,
-			),
-			secondary(
-				call.callee,
-				`${candidate.name} takes ${withArticle(describeType(detail.expectedType))} as ${parameterName}`,
-			),
-		],
-		notes: [...notes, ...record.notes, ...undecided.notes],
-		helps: [...asynchrony, ...record.helps, ...undecided.helps],
-		// Only for a written Argument, never a receiver: `complete` in front of
-		// a receiver would wait for the whole call.
-		data:
-			detail.argumentIndex < candidate.receiverParameters
-				? undefined
-				: asynchronyData(
-						detail.expectedType,
-						detail.argumentType,
-						call.canWait !== false,
-					),
-	}
 }
 
 // What a candidate is called in a report. A provided Method's pseudo Namespace

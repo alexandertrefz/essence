@@ -7833,6 +7833,87 @@ describe("Code Actions", () => {
 		})
 	})
 
+	// A Record literal in Argument or payload position names only declared
+	// members, and the fix takes the extra one out with its comma.
+	describe("a Record literal member no Type declares", () => {
+		let declarations = [
+			"implementation {",
+			"\ttype Server = { host: String, port: Integer }",
+			"\ttype Options = { retries: Integer, host: String }",
+			"\tfunction connect(using settings: Options = { retries = 3 }) -> Options {",
+			"\t\t<- settings",
+			"\t}",
+			"\tfunction serve(_ server: Server) -> String {",
+			"\t\t<- server.host",
+			"\t}",
+			"\tnamespace Servers for Server {",
+			"\t\tbeside(_ other: Server) -> Boolean {",
+			"\t\t\t<- true",
+			"\t\t}",
+			"\t}",
+			"\tchoice Call {",
+			'\t\tPost { server: String, body: String } = { server = "localhost" },',
+			"\t}",
+			'\tconstant base: Server = { host = "h", port = 1 }',
+		]
+
+		it.each([
+			[
+				'\tconstant call = Call#Post({ body = "x", draft = true })',
+				'\tconstant call = Call#Post({ body = "x" })',
+				"Remove 'draft'",
+			],
+			[
+				'\tconstant options = connect(using { extra = 1, host = "z" })',
+				'\tconstant options = connect(using { host = "z" })',
+				"Remove 'extra'",
+			],
+			[
+				'\tconstant beside = base::beside({ host = "h", port = 2, extra })',
+				'\tconstant beside = base::beside({ host = "h", port = 2 })',
+				"Remove 'extra'",
+			],
+		])("should remove the member from %s", (written, fixed, title) => {
+			let lines = [...declarations, "\tconstant extra = 1", written, "}"]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([title])
+			expect(applied(lines, fixes[0])).toEqual([
+				...declarations,
+				"\tconstant extra = 1",
+				fixed,
+				"}",
+			])
+			expect(codesOf(applied(lines, fixes[0]))).toEqual([])
+		})
+
+		it("should remove a nested member written on a line of its own", () => {
+			let lines = [
+				...declarations,
+				"\tconstant host = serve({",
+				'\t\thost = "h",',
+				"\t\tport = 1,",
+				"\t\textra = 2,",
+				"\t})",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual(["Remove 'extra'"])
+
+			let result = applied(lines, fixes[0])
+
+			expect(result.slice(declarations.length)).toEqual([
+				"\tconstant host = serve({",
+				'\t\thost = "h",',
+				"\t\tport = 1,",
+				"\t})",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+	})
+
 	describe("foreign-syntax", () => {
 		it("should write the Keyword Essence declares a binding with", () => {
 			let lines = [

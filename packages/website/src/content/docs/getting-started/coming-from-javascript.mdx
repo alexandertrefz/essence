@@ -368,7 +368,7 @@ These need no relearning. Each carries its one caveat.
 - **Function hoisting.** A function can be called above its declaration. Caveat: a namespace cannot be used by a statement above it.
 - **The constant's dead zone.** A constant cannot be read above its line, the way `const` has a temporal dead zone. Caveat: a function body written above the constant cannot read it either.
 - **`{ x, y }` shorthand.** It builds a record from the names in scope. Caveat: `{ point with x }` merges a record named `x`; it is not shorthand for `x = x`.
-- **Structural object types.** A record with more members passes where a narrower `type` is asked for, and keeps them. Caveat: a literal with extra members passes too, so there is no excess-property check.
+- **Structural object types.** A record with more members passes where a narrower `type` is asked for, and keeps them. Caveat: only a literal written as an argument or a payload is checked for extra members, as TypeScript's excess-property check does; one bound to an annotated constant may carry more.
 - **Renames with `as`.** `constant { y as row } = point` and `from "./Money.es" { twice as double }`. Caveat: in a pattern, `:` annotates a type instead of renaming.
 - **ES-module shape.** A file imports by relative path and exports by name. Caveat: the `.es` extension is written, and there is no default export.
 - **Default parameters are evaluated per call, in the callee.** A default runs on every call that leaves its argument out, and may read the parameters to its left. Caveat: a call that passes the argument still writes its label.

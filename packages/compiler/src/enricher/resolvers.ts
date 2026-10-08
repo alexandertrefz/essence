@@ -41,7 +41,6 @@ import {
 	displayGenericName,
 	displayProtocolName,
 	protocolIdentity,
-	recordMismatchEvidence,
 	specifierTo,
 	undecidedSlotEvidence,
 	unwaitedWorkReport,
@@ -74,7 +73,6 @@ import {
 	disagreeingTypeArguments,
 	filterMostSpecificByTarget,
 	flattenUnionMembers,
-	isPartialOf,
 	isReportedValue,
 	matchesType,
 	NotHoistedYet,
@@ -86,6 +84,7 @@ import {
 	typeMentionsGeneric,
 	withoutHoles,
 } from "../helpers/types"
+import { updateRefusal } from "../helpers/writtenPartials"
 import { recordAnnotation } from "./annotations"
 import { derivesWithImports } from "./derivedImports"
 import { reportTypeWithoutMembers } from "./memberHelps"
@@ -332,18 +331,16 @@ export function combinationTypeOf(
 	// hole here. A written member carries its own evidence for a refinement.
 	let written = admittedPartialType(combined, rhsType, rhs)
 
-	if (isPartialOf(combined, written)) {
+	// A Partial, so only what the update writes can be wrong.
+	let record = updateRefusal(combined, written, rhs)
+
+	if (record === null) {
 		return combined
 	}
 
 	// A member written but left undecided, such as `items = 1` over an
 	// `items` from `[]`, is explained as a Variable's assignment would be.
 	let undecided = undecidedSlotEvidence(combined, written, null)
-	// A Partial, so only what the update writes can be wrong.
-	let record = recordMismatchEvidence(combined, written, rhs ?? null, {
-		partial: true,
-		subject: "the value it updates",
-	})
 
 	reportError(
 		"This is not a Partial of the value it updates",

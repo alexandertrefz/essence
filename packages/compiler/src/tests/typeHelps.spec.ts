@@ -690,7 +690,8 @@ describe("A payload that spells the Case's members", () => {
 	})
 
 	// A payload that leaves a defaulted member out wrote its Record too, and
-	// so does one that carries a member the Case does not declare.
+	// so does one that carries a member the Case does not declare. That member
+	// is what the Help removes.
 	it("withholds the shorthand sentence from a partial payload", () => {
 		let source = `implementation {
 		choice Call {
@@ -700,7 +701,9 @@ describe("A payload that spells the Case's members", () => {
 		constant call = Call#Post({ body = "x", draft = true })
 	}`
 
-		expect(helpsOfCode(source, "payload-type-mismatch")).toEqual([])
+		expect(helpsOfCode(source, "payload-type-mismatch")).toEqual([
+			"Remove 'draft'.",
+		])
 	})
 
 	// A value handed over on its own is the shape the sentence is for.

@@ -371,7 +371,9 @@ describe("Patterns", () => {
 					}
 				}
 
-				Terminal.inspect(read({ payload = { x = 1, note = "kept" } }))
+				constant wrapped = { payload = { x = 1, note = "kept" } }
+
+				Terminal.inspect(read(wrapped))
 				Terminal.inspect(read({ tag = "t" }))
 			}`
 

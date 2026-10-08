@@ -62,6 +62,7 @@ import {
 	typeContainsRefinement,
 	typeContainsUnknown,
 } from "../helpers/types"
+import { undeclaredMembers } from "../helpers/undeclaredMembers"
 import {
 	reportApplicationOverlap,
 	reportDispatchApplicationOverlap,
@@ -80,6 +81,7 @@ import {
 } from "./emptyOverlap"
 import { holesShiftTheCall } from "./holes"
 import { reportMissingCases } from "./missingCases"
+import { payloadWritesTheCasesRecord } from "./payloadRecords"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 import {
 	resetRefusedValues,
@@ -2153,7 +2155,8 @@ function validateCaseValue(
 			reportIncompleteCasePayload(node.type, missing, node.value)
 		}
 	} else if (
-		!matchesType(payloadType, casePayloadType(node.type, node.value))
+		!matchesType(payloadType, casePayloadType(node.type, node.value)) ||
+		undeclaredMembers(payloadType, node.value).length > 0
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
@@ -2170,6 +2173,7 @@ function validateCaseValue(
 			{
 				filled: node.type.payloadDefault?.members,
 				subject: `'#${node.type.name}'`,
+				refusesUndeclared: true,
 			},
 		)
 
@@ -2194,8 +2198,9 @@ function validateCaseValue(
 				helps: [
 					...record.helps,
 					// The shorthand hint, only for a multi-member Case whose
-					// payload is not a Record it wrote.
+					// payload is not a Record it wrote, nor one a Help mends.
 					...(Object.keys(node.type.members).length > 1 &&
+					record.helps.length === 0 &&
 					!payloadWritesTheCasesRecord(node.type, node.value)
 						? [
 								"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
@@ -2209,23 +2214,6 @@ function validateCaseValue(
 	}
 
 	return node
-}
-
-// Whether the payload is a Record naming one of the Case's members, which
-// tells a written Record from a tried shorthand. A partial payload and one
-// with an extra member are written Records too. Names only, since the Types
-// disagreed.
-function payloadWritesTheCasesRecord(
-	caseType: common.CaseType,
-	value: common.typed.ExpressionNode,
-): boolean {
-	if (value.type.type !== "Record") {
-		return false
-	}
-
-	return Object.keys(value.type.members).some((name) =>
-		Object.hasOwn(caseType.members, name),
-	)
 }
 
 // A Record Literal payload for a Case with a payload default is measured as a
@@ -3523,6 +3511,7 @@ function reportArgumentMismatch(
 					{
 						filled: parameter.defaultMembers,
 						subject: "the Parameter's Type",
+						refusesUndeclared: true,
 					},
 				)
 
