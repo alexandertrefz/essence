@@ -591,7 +591,9 @@ phantom one strictly with the bound target's at its position. An applied Case do
 phantom, so they are read off the Choice's declaration, here or in its own Module. A Type Argument some payload of the
 Choice names is matched as the target reads it. So `flatten()` on a `Result<Result<Integer, String>, Integer>` still
 joins the two failure Types, since `#Failure` names `FailureType`. The refusal's Note names the Namespace and the
-phantom Type Parameter (`otherApplicationNotes`).
+phantom Type Parameter (`otherApplicationNotes`). The language server has no Scope, so its completion reads the
+positions off the declarations it gathers, through the same `phantomParametersOf`, and offers no Method such a call
+refuses.
 
 A conformance is solved from its Namespace's target read the same way (`conformingBindings`), a target without Type
 Parameters included, so a call through a bound agrees with a direct call. `describe(Pair<Integer, String>#Left(…))`

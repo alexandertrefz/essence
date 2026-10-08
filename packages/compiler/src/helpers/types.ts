@@ -620,6 +620,48 @@ export type PhantomMismatch = {
 	actual: common.Type
 }
 
+// Remembered per declaration, which every Case of the Choice reads.
+const phantomParametersMemo = new WeakMap<
+	common.Type,
+	Array<[number, common.GenericName]>
+>()
+
+// The phantom Type Parameters of a generic Choice's declaration, by position,
+// or null for anything else. The caller finds the declaration.
+export function phantomParametersOf(
+	declared: common.Type,
+): Array<[number, common.GenericName]> | null {
+	if (
+		declared.type !== "GenericAlias" ||
+		declared.aliasedType.type !== "UnionType"
+	) {
+		return null
+	}
+
+	let remembered = phantomParametersMemo.get(declared)
+
+	if (remembered === undefined) {
+		let named = new Set(
+			flattenUnionMembers(declared.aliasedType).flatMap((member) =>
+				member.type === "Case"
+					? Object.values(member.members).flatMap((payload) => [
+							...genericNamesMentioned(payload),
+						])
+					: [],
+			),
+		)
+
+		remembered = declared.generics.flatMap((generic, index) =>
+			named.has(generic.name)
+				? []
+				: [[index, generic.name] as [number, common.GenericName]],
+		)
+		phantomParametersMemo.set(declared, remembered)
+	}
+
+	return remembered
+}
+
 // The first phantom Type Argument of a subject's Cases that the target does
 // not take, compared strictly once the target is bound by everything else.
 // Null where each one fits. See "Phantom Type Arguments" in
@@ -629,6 +671,16 @@ export function phantomMismatchOf(
 	subject: common.Type,
 	phantom: PhantomPositions,
 ): PhantomMismatch | null {
+	// Nearly no Choice has a phantom Type Parameter, so nothing is matched then.
+	let carriers = choiceCasesOf(subject).filter(
+		(carrier) =>
+			carrier.typeArguments !== undefined && phantom(carrier).length > 0,
+	)
+
+	if (carriers.length === 0) {
+		return null
+	}
+
 	let renamed = renamedNamespaceTarget(pattern.targetType, pattern.generics)
 	let context = createInferenceContext(renamed.generics)
 
@@ -641,14 +693,12 @@ export function phantomMismatchOf(
 
 	let arms = choiceCasesOf(renamed.target)
 
-	for (let carrier of choiceCasesOf(subject)) {
+	for (let carrier of carriers) {
 		let positions = phantom(carrier)
 		let mismatches = arms
 			.filter(
 				(arm) =>
-					positions.length > 0 &&
-					arm.choice === carrier.choice &&
-					arm.name === carrier.name,
+					arm.choice === carrier.choice && arm.name === carrier.name,
 			)
 			.map((arm) =>
 				strictPhantomMismatch(arm, carrier, positions, context),

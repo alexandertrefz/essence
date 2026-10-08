@@ -6,8 +6,8 @@ import {
 	coversApartFromTypeArguments,
 	flattenUnionMembers,
 	type GenericBindings,
-	genericNamesMentioned,
 	phantomMismatchOf,
+	phantomParametersOf,
 } from "../helpers/types"
 import {
 	describeProtocol,
@@ -122,12 +122,7 @@ function casesOf(type: common.Type): Array<common.CaseType> {
 	)
 }
 
-// Remembered per declaration, which every Case of the Choice reads, and per
-// Case, whose declaration never changes.
-const phantomParametersMemo = new WeakMap<
-	common.Type,
-	Array<[number, common.GenericName]>
->()
+// Remembered per Case, whose declaration never changes.
 const phantomParametersOfCase = new WeakMap<
 	common.CaseType,
 	Array<[number, common.GenericName]>
@@ -151,33 +146,10 @@ function phantomParameters(
 		foreign === null
 			? (choiceBindingIn(carrier.choice, scope)?.type ?? null)
 			: foreignChoiceDeclaration(foreign, scope)
+	let remembered = declared === null ? null : phantomParametersOf(declared)
 
-	if (
-		declared?.type !== "GenericAlias" ||
-		declared.aliasedType.type !== "UnionType"
-	) {
+	if (remembered === null) {
 		return []
-	}
-
-	let remembered = phantomParametersMemo.get(declared)
-
-	if (remembered === undefined) {
-		let named = new Set(
-			flattenUnionMembers(declared.aliasedType).flatMap((member) =>
-				member.type === "Case"
-					? Object.values(member.members).flatMap((payload) => [
-							...genericNamesMentioned(payload),
-						])
-					: [],
-			),
-		)
-
-		remembered = declared.generics.flatMap((generic, index) =>
-			named.has(generic.name)
-				? []
-				: [[index, generic.name] as [number, common.GenericName]],
-		)
-		phantomParametersMemo.set(declared, remembered)
 	}
 
 	phantomParametersOfCase.set(carrier, remembered)

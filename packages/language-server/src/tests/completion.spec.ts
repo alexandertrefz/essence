@@ -767,6 +767,43 @@ describe("Completion", () => {
 			expect(labelsOf(source, { line: 6, column: 13 })).toContain("size")
 		})
 
+		// No payload of `Pair` names `B`, so `Sames` answers no `Pair<Integer,
+		// String>`, as the call would be refused. `Pair<Integer, Integer>` takes
+		// it. See "Phantom Type Arguments" in
+		// packages/compiler/src/enricher/DEVELOPMENT.md.
+		it("should offer no Method whose target takes another phantom Type Argument", () => {
+			let after = (receiver: string) =>
+				atMarker([
+					"implementation {",
+					"\tchoice Pair<A, B> {",
+					"\t\tLeft { a: A },",
+					"\t\tNeither,",
+					"\t}",
+					"",
+					"\tnamespace Sames<infer Item> for Pair<Item, Item> {",
+					"\t\tsameLabel() -> String {",
+					'\t\t\t<- "same"',
+					"\t\t}",
+					"\t}",
+					"",
+					`\tconstant p = ${receiver}`,
+					"\tp::‸",
+					"}",
+				])
+			let offered = (receiver: string) => {
+				let { source, cursor } = after(receiver)
+
+				return labelsOf(source, cursor)
+			}
+
+			expect(
+				offered("Pair<Integer, String>#Left({ a = 1 })"),
+			).not.toContain("sameLabel")
+			expect(offered("Pair<Integer, Integer>#Left({ a = 1 })")).toContain(
+				"sameLabel",
+			)
+		})
+
 		it("should filter by an explicit Namespace specifier", () => {
 			let source = [
 				"implementation {",

@@ -17,6 +17,9 @@ import {
 	bindNamespaceTarget,
 	flattenUnionMembers,
 	type GenericBindings,
+	phantomMismatchOf,
+	phantomParametersOf,
+	type PhantomPositions,
 	providedMethodProtocol,
 } from "@essence-lang/compiler/helpers"
 import { spellProtocol } from "@essence-lang/compiler/printType"
@@ -109,32 +112,85 @@ export function namedTypeNamespaces(
 
 // Through `bindNamespaceTarget`, the Enricher's own matching, so a Method is
 // offered exactly where a call resolves. It renames the Namespace's Generics
-// first, so a receiver spelled like one of them still matches.
+// first, so a receiver spelled like one of them still matches. A phantom Type
+// Argument is compared strictly, as `namespacesCovering` compares it.
 function targetTypeMatches(
 	namespace: common.NamespaceType,
 	baseType: common.Type,
+	phantom: PhantomPositions,
 ): boolean {
-	if (namespace.targetType === null) {
-		return false
-	}
+	let target = namespace.targetType
 
-	if (namespace.targetType.type === "UnionType") {
-		// A Union receiver such as `Ordering` matches a Union target as a whole, as
-		// in `resolveMethodLookupNamespacesForReceiverType`.
-		if (bindNamespaceTarget(namespace, baseType) !== null) {
-			return true
-		}
+	// A Union receiver such as `Ordering` matches a Union target as a whole, as
+	// in `resolveMethodLookupNamespacesForReceiverType`, or by a member.
+	let members = target?.type === "UnionType" ? target.types : []
+	let covering = [target, ...members].find(
+		(targetType): targetType is common.Type =>
+			targetType !== null &&
+			bindNamespaceTarget(
+				{ targetType, generics: namespace.generics },
+				baseType,
+			) !== null,
+	)
 
-		return namespace.targetType.types.some(
+	return (
+		covering !== undefined &&
+		phantomMismatchOf(
+			{ targetType: covering, generics: namespace.generics },
+			baseType,
+			phantom,
+		) === null
+	)
+}
+
+// Which Type Arguments of a Case are phantom, read off its Choice's
+// declaration in this document or in another Module of its graph. The
+// declarations are gathered on first use.
+function phantomPositionsIn(
+	document: DocumentAnalysis | null,
+): PhantomPositions {
+	let declarations: Array<common.Type> | null = null
+
+	return (carrier) => {
+		declarations ??= choiceDeclarationsOf(document)
+
+		let declared = declarations.find(
 			(type) =>
-				bindNamespaceTarget(
-					{ targetType: type, generics: namespace.generics },
-					baseType,
-				) !== null,
+				type.type === "GenericAlias" &&
+				type.aliasedType.type === "UnionType" &&
+				type.aliasedType.types.some(
+					(member) =>
+						member.type === "Case" &&
+						member.choice === carrier.choice,
+				),
 		)
-	}
 
-	return bindNamespaceTarget(namespace, baseType) !== null
+		return declared === undefined
+			? []
+			: (phantomParametersOf(declared) ?? []).map(([index]) => index)
+	}
+}
+
+function choiceDeclarationsOf(
+	document: DocumentAnalysis | null,
+): Array<common.Type> {
+	let program = document?.enrichedProgram ?? null
+	let own =
+		program === null
+			? []
+			: typedProgramBodies(program).flatMap((body) =>
+					body.flatMap((node) =>
+						node.nodeType === "ChoiceDeclarationStatement"
+							? [node.type]
+							: [],
+					),
+				)
+	let surfaces = [...(document?.module?.context.surfaces.values() ?? [])]
+
+	return [
+		...own,
+		...surfaces.flatMap((surface) => Object.values(surface.moduleTypes)),
+	]
 }
 
 // `workspaceNamespaces` are other Modules' Namespaces this document has not
@@ -213,11 +269,12 @@ export function matchingNamespaces(
 		...workspaceNamespaces,
 	]
 
+	let phantom = phantomPositionsIn(analysed)
 	let namespaces =
 		baseType.type === "UnionType"
-			? unionReceiverNamespaces(baseType, allNamespaces)
+			? unionReceiverNamespaces(baseType, allNamespaces, phantom)
 			: allNamespaces.filter((namespace) =>
-					targetTypeMatches(namespace, baseType),
+					targetTypeMatches(namespace, baseType, phantom),
 				)
 
 	// A Choice's `is`, `isNot` and `toString` may be derived, and are offered
@@ -419,13 +476,14 @@ function choiceTypeFor(
 function unionReceiverNamespaces(
 	baseType: common.UnionType,
 	allNamespaces: Array<common.NamespaceType>,
+	phantom: PhantomPositions,
 ): Array<common.NamespaceType> {
 	let coveringNamespaces = allNamespaces.filter((namespace) =>
-		targetTypeMatches(namespace, baseType),
+		targetTypeMatches(namespace, baseType, phantom),
 	)
 	let memberNamespaceSets = flattenUnionMembers(baseType).map((member) =>
 		allNamespaces.filter((namespace) =>
-			targetTypeMatches(namespace, member),
+			targetTypeMatches(namespace, member, phantom),
 		),
 	)
 
