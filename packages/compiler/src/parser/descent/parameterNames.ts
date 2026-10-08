@@ -1,4 +1,4 @@
-import { type common, lexer } from "@essence-lang/interfaces"
+import { type common, lexer, type parser } from "@essence-lang/interfaces"
 
 import { primary, reportError } from "../../diagnostics/index"
 import { describeToken, ParseError } from "./tokenStream"
@@ -18,6 +18,26 @@ export function reportRedundantLabel(
 		],
 		helps: [`Write only '${binder}'.`],
 	})
+}
+
+// `start` or `complete` as a Parameter's label, which no call could pass.
+// See "Asynchrony keywords" in DEVELOPMENT.md.
+export function reportReservedLabel(name: parser.IdentifierNode): void {
+	reportError(
+		`A Parameter's label can not be spelled '${name.content}'`,
+		name.position,
+		{
+			code: "reserved-parameter-label",
+			labels: [primary(name.position, "this word opens an Expression")],
+			notes: [
+				`An Argument written '${name.content} value' reads as a '${name.content}' of the value, so no call could pass this Parameter by name.`,
+			],
+			helps: [
+				"Name the label another word.",
+				"Or write '_' in its place, so the Parameter takes no label at all.",
+			],
+		},
+	)
 }
 
 // The failure of an Expression position at a Token that opens none. A `_`

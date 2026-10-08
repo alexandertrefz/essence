@@ -6,7 +6,7 @@ import { containsErrors } from "../diagnostics/index"
 import { enrich } from "../enricher/index"
 import { operatorNote } from "../helpers/foreign"
 import { parseWithDiagnostics } from "../parser/index"
-import { compiles } from "./followedHelps"
+import { analysedDiagnosticsFor, compiles } from "./followedHelps"
 
 // What a reader arriving from another language writes, and what the Compiler
 // says about it. `a && b` is refused by the Parser and `!a` by the Enricher,
@@ -2169,6 +2169,160 @@ describe("Foreign syntax", () => {
 					),
 				),
 			).toEqual([])
+		})
+	})
+
+	// A `(` that wraps a value is refused once and read past, so the Statement
+	// keeps its value. See "Grouping parentheses" in
+	// packages/compiler/src/parser/DEVELOPMENT.md.
+	describe("parentheses that group one value", () => {
+		let declarations = [
+			"choice Holder {",
+			"\tBare,",
+			"\tFull { value: Integer },",
+			"}",
+			"choice Box<T> {",
+			"\tEmpty,",
+			"\tFull { value: T },",
+			"}",
+			"constant point = { x = 1 }",
+			"constant count = 2",
+		]
+
+		// The Help's edit, made with the spans its data names.
+		function withoutParentheses(
+			source: string,
+			diagnostic: common.Diagnostic,
+		): string {
+			let data = diagnostic.data
+
+			if (data?.kind !== "grouping-parentheses") {
+				throw new Error("Expected the spans of both parentheses")
+			}
+
+			let lines = source.split("\n")
+
+			for (let { start } of [data.close, data.open]) {
+				let line = lines[start.line - 1]!
+
+				lines[start.line - 1] =
+					line.slice(0, start.column - 1) + line.slice(start.column)
+			}
+
+			return lines.join("\n")
+		}
+
+		it.each([
+			["constant one = (1)", "constant one = 1"],
+			[
+				"constant held: Optional<Integer> = (#Empty)",
+				"constant held: Optional<Integer> = #Empty",
+			],
+			["constant bare = (Holder#Bare)", "constant bare = Holder#Bare"],
+			[
+				"constant full = (Box<Integer>#Full(1))",
+				"constant full = Box<Integer>#Full(1)",
+			],
+			['constant word = ("x")', 'constant word = "x"'],
+			["constant read = (point.x)", "constant read = point.x"],
+			["constant sum = (count::add(2))", "constant sum = count::add(2)"],
+			["constant items = [(1), 2]", "constant items = [1, 2]"],
+			[
+				"Terminal.print((1::add(2))::multiply(with 3))",
+				"Terminal.print(1::add(2)::multiply(with 3))",
+			],
+			[
+				"Terminal.inspect(Holder#Full((3)))",
+				"Terminal.inspect(Holder#Full(3))",
+			],
+		])("refuses %s once and removes both parentheses", (written, fixed) => {
+			let source = program(...declarations, written)
+			let diagnostics = analysedDiagnosticsFor(source)
+
+			expect(
+				diagnostics.map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+					diagnostic.helps,
+				]),
+			).toEqual([
+				[
+					"foreign-syntax",
+					"Essence has no grouping parentheses",
+					["Remove the parentheses."],
+				],
+			])
+
+			let followed = withoutParentheses(source, diagnostics[0]!)
+
+			expect(followed).toBe(program(...declarations, fixed))
+			expect(compiles(followed)).toBe(true)
+		})
+
+		// A pair inside a pair is a second pair, and each Help removes its own.
+		it("reports each pair of a nested group", () => {
+			expect(codesOf(program("constant one = ((1))"))).toEqual([
+				"foreign-syntax",
+				"foreign-syntax",
+			])
+		})
+
+		it("still reads a Function literal", () => {
+			expect(
+				analysedDiagnosticsFor(
+					program(
+						"constant one = (_: Integer) -> Integer { <- 1 }",
+						"constant labelled = (on value: Integer) -> Integer { <- value }",
+						"constant doubled = [1, 2]::map((n) { <- n::multiply(with 2) })",
+						"constant odd = [1, 2]::removeEvery(where (n) { <- n::isEven() })",
+						"Terminal.inspect([one(1), labelled(on 2)])",
+						"Terminal.inspect([doubled, odd])",
+					),
+				),
+			).toEqual([])
+		})
+
+		// Another language's arrow goes on past the `)`, and its own refusal
+		// is the one report.
+		it.each([
+			[
+				"constant doubled = [1, 2]::map((n) => n)",
+				[["foreign-syntax", "A Function literal has no '=>'"]],
+			],
+			[
+				"constant f = (x): Integer => x",
+				[["syntax-error", "Expected '{' but found ':'."]],
+			],
+		])("keeps the arrow's refusal for %s", (written, expected) => {
+			expect(
+				diagnosticsOf(program(written)).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+				]),
+			).toEqual(expected)
+		})
+
+		// The `)` stands before the `if`'s `{`, so the Function literal's
+		// reading and its refusal are kept.
+		it.each([
+			["if (count::isEven()) {", "Expected a Type but found ':'."],
+			["if (ready) {", "Expected '{' but found '}'."],
+			["if (count > 3) {", "Expected ')' but found '>'."],
+		])("keeps the refusal of %s", (written, message) => {
+			let source = program(
+				"constant count = 4",
+				"constant ready = true",
+				written,
+				'\tTerminal.print("yes")',
+				"}",
+			)
+
+			expect(
+				diagnosticsOf(source).map((diagnostic) => [
+					diagnostic.code,
+					diagnostic.message,
+				]),
+			).toEqual([["syntax-error", message]])
 		})
 	})
 })

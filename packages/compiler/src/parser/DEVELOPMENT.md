@@ -379,6 +379,24 @@ across a line break, so a `-` opening the next line is a negative Number.
 Most of these reports carry `essence-spelling` data for a Quick Fix. A habit whose fix depends on a Type, such as
 which Method reads an item, offers Helps instead, because the parser knows no Types.
 
+### Grouping parentheses
+
+Essence has no grouping parentheses. A `(` in Expression position opens a Function literal's Parameter list. `(1)`,
+`(#Empty)` and `(a::b())` are another language's habit, answered with `foreign-syntax` and the Help "Remove the
+parentheses.". Its `grouping-parentheses` data names both parentheses for the Quick Fix.
+
+`wrapsAValue` decides before anything is read. It finds the matching `)` and asks what follows it. A Function literal
+goes on with its `->` or its body's `{`. Another language's literal goes on with `=>` or `: Type =>`, and its own
+refusal, "A Function literal has no '=>'", is the one to report. Any other Token, `::` included, means the `(` is read
+as wrapping a value. `parseParenthesised` then reads `( Expression )` speculatively. A reading that holds is reported and gives back the value inside, so the
+Statement stands, keeps its Constant declared, and the parentheses are its one report. A pair nested in another is a
+second pair, and reports once more.
+
+Every other `(` is read as a Function literal. That covers `(x) { … }`, a `(` that never closes, and `if (ready) {`,
+whose `)` is followed by a `{`. A group whose inside is not one Expression is not reported as a group. A refusal of
+the text inside it, such as the `+` of `(a + b)`, stands as it would anywhere. Any other failure falls back to the
+Function literal, and the failure that got further is reported, as "The furthest failure" says.
+
 ## Define
 
 `parseDefine` reads `define { as VALUE if CONDITION … as VALUE otherwise }`. The arms are told apart by their `as`,

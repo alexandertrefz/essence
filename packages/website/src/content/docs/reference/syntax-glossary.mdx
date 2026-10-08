@@ -542,7 +542,7 @@ Taught on [Programs and values](/docs/language/programs-and-values) and [Diction
 
 | What it is | Where it is legal | What it is not |
 | --- | --- | --- |
-| A parameter list, an argument list, a case's payload (`#Value(3)`), a function type (`(_: Integer) -> Integer`) and a function literal's parameters. | After a name that is declared or called, after a case, and where a function type or a function literal starts. | Grouping. A `(` in an expression starts a function literal, so `(1::add(2))` is a syntax error. There are no operators to group. |
+| A parameter list, an argument list, a case's payload (`#Value(3)`), a function type (`(_: Integer) -> Integer`) and a function literal's parameters. | After a name that is declared or called, after a case, and where a function type or a function literal starts. | Grouping. A `(` in an expression starts a function literal, so `(1::add(2))` is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), "Essence has no grouping parentheses". There are no operators to group. |
 
 </div>
 

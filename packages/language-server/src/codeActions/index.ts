@@ -66,7 +66,11 @@ import {
 	updateBracketsAction,
 	wrapInHoldingCaseActions,
 } from "./fixes"
-import { essenceSpellingAction, methodSeparatorAction } from "./foreignFixes"
+import {
+	essenceSpellingAction,
+	methodSeparatorAction,
+	removeParenthesesAction,
+} from "./foreignFixes"
 import {
 	declareFutureReturnAction,
 	discardedFutureActions,
@@ -485,7 +489,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"focused-tests-remain": ({ diagnostic, lines }) =>
 		listed(removeFocusedAction(diagnostic, lines)),
 	"foreign-syntax": ({ diagnostic, lines }) =>
-		listed(essenceSpellingAction(diagnostic, lines)),
+		listed(
+			essenceSpellingAction(diagnostic, lines) ??
+				removeParenthesesAction(diagnostic, lines),
+		),
 	"incomplete-record-argument": ({ diagnostic, lines }) =>
 		listed(missingMembersAction(diagnostic, lines)),
 	"infer-on-applied-parameter": ({ diagnostic, program, lines }) =>

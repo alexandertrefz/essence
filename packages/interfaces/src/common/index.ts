@@ -223,6 +223,8 @@ export type DiagnosticData =
 	// it, such as `constant` for `const`. An empty `spelling` deletes, as for a
 	// trailing `;`. The span may be narrower than the Diagnostic's.
 	| { kind: "essence-spelling"; position: Position; spelling: string }
+	// The two parentheses written around one value, which removing both fixes.
+	| { kind: "grouping-parentheses"; open: Position; close: Position }
 	// A Method reached with a member's `.`: the span of the `.`, and where
 	// `()` goes when none was written. Absent where the call would need an
 	// Argument.

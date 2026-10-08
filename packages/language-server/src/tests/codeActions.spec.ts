@@ -7853,6 +7853,41 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		// Both parentheses go, including across lines, and the value between
+		// them stays as written.
+		it("should remove the parentheses that group one value", () => {
+			let lines = [
+				"implementation {",
+				"\tconstant items = [(1), 2]",
+				"\tconstant total = (",
+				"\t\titems::length()",
+				"\t)",
+				"\tTerminal.print(total)",
+				"}",
+			]
+			let fixes = quickFixes(lines)
+
+			expect(titles(fixes)).toEqual([
+				"Remove the parentheses",
+				"Remove the parentheses",
+			])
+			expect(fixes.every((fix) => fix.isPreferred)).toBe(true)
+
+			let once = applied(lines, fixes[0])
+			let result = applied(once, quickFixes(once)[0])
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tconstant items = [1, 2]",
+				"\tconstant total = ",
+				"\t\titems::length()",
+				"\t",
+				"\tTerminal.print(total)",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
 		it("should write the arrow a value leaves through", () => {
 			let lines = [
 				"implementation {",

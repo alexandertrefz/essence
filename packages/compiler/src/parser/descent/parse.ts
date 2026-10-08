@@ -21,11 +21,16 @@ import {
 } from "../../helpers/foreign"
 import { mixedRationalSpellings } from "../../helpers/mixedRational"
 import * as generators from "../nodeGenerators"
+import { readGroup, wrapsAValue } from "./groupingParentheses"
 import {
 	type MisplacedDefault,
 	reportMisplacedDefault,
 } from "./misplacedDefaults"
-import { expressionExpected, reportRedundantLabel } from "./parameterNames"
+import {
+	expressionExpected,
+	reportRedundantLabel,
+	reportReservedLabel,
+} from "./parameterNames"
 import {
 	refusedMatcherAfterValue,
 	refusedMatcherOnExpect,
@@ -4339,18 +4344,8 @@ class DescentParser {
 				return generators.booleanValueNode(false, token.position)
 			case TokenType.SymbolLeftBracket:
 				return this.parseListOrDictionaryLiteral()
-			case TokenType.SymbolLeftParen: {
-				// The one Function literal whose annotations may be omitted,
-				// since an expected signature can supply them.
-				let literal = this.parseFunctionLiteral(true, false)
-
-				this.refuseDefaultValues(
-					literal.value.parameters,
-					"Function literal",
-				)
-
-				return literal
-			}
+			case TokenType.SymbolLeftParen:
+				return this.parseParenthesised()
 			case TokenType.SymbolLeftAngle: {
 				let literal = this.parseGenericFunctionLiteral(false)
 
@@ -4386,6 +4381,27 @@ class DescentParser {
 			default:
 				throw expressionExpected(token)
 		}
+	}
+
+	// The one Function literal whose annotations may be omitted, since an
+	// expected signature can supply them. A `(` that can only wrap a value is
+	// refused and read past. See "Grouping parentheses" in DEVELOPMENT.md.
+	protected parseParenthesised(): parser.ExpressionNode {
+		let grouped = wrapsAValue(this.tokens)
+			? this.backtrack(() =>
+					readGroup(this.tokens, () => this.parseExpression()),
+				)
+			: null
+
+		if (grouped !== null) {
+			return grouped
+		}
+
+		let literal = this.parseFunctionLiteral(true, false)
+
+		this.refuseDefaultValues(literal.value.parameters, "Function literal")
+
+		return literal
 	}
 
 	// `start x` and `complete x`. The operand takes the whole postfix chain,
@@ -6593,23 +6609,7 @@ class DescentParser {
 			return name
 		}
 
-		reportError(
-			`A Parameter's label can not be spelled '${name.content}'`,
-			name.position,
-			{
-				code: "reserved-parameter-label",
-				labels: [
-					primary(name.position, "this word opens an Expression"),
-				],
-				notes: [
-					`An Argument written '${name.content} value' reads as a '${name.content}' of the value, so no call could pass this Parameter by name.`,
-				],
-				helps: [
-					"Name the label another word.",
-					"Or write '_' in its place, so the Parameter takes no label at all.",
-				],
-			},
-		)
+		reportReservedLabel(name)
 
 		return null
 	}

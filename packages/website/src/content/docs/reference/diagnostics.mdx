@@ -1044,19 +1044,19 @@ Error: 'const' is not how Essence declares a binding
 
 </div>
 
-One code covers the family, and the message says which habit was written. It answers fifty words, and thirteen habits written in punctuation, quotes or brackets.
+One code covers the family, and the message says which habit was written. It answers fifty words, and fourteen habits written in punctuation, quotes or brackets.
 
-The punctuation: a `;` at the end of a statement; `{ x: 1 }` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; `identity<Integer>(1)`; `primes[0]` and `ages["ada"]` for an item read by position or key, and `primes[0] = 5` for one written by position; and `user!` and `user?.name`.
+The punctuation: a `;` at the end of a statement; `{ x: 1 }` for a record member; `point.x = 2`; `(n) => n`; `c ? a : b`; `// a comment` and `/* a comment */`; `'hi'` and `` `hi` `` for a string; `identity<Integer>(1)`; `primes[0]` and `ages["ada"]` for an item read by position or key, and `primes[0] = 5` for one written by position; `user!` and `user?.name`; and `(total)`, parentheses that group one value.
 
 The words: `const`, `let`, `var`, `mut` and `return`; `null`, `undefined`, `nil`, `None` and `Some`; `this` and `self`; `print`, `println`, `println!`, `puts`, `echo` and `fmt`; `len`, `console`, `Math`, `parseInt`, `parseFloat`, `NaN` and `Infinity`; `new`, `class`, `def`, `fn` and `func`; `elif`, `guard`, `switch`, `typeof` and `instanceof`; `throw`, `try` and `catch`; `while`, `break` and `continue`; `enum`, `interface`, `implements` and `extends`; `async` and `await`; and `Map`, `Set` and `require`.
 
-A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it. An index recovers the same way, and has to: `constant first = primes[0]` keeps `first` declared, bound to an error rather than to the list in front of the brackets, so neither the name nor its type is reported about again.
+A declaration keyword is reported once and read on: `const price = 12` declares `price` for the rest of the file, so one mistake is one report rather than one per line that reads it. An index recovers the same way, and has to: `constant first = primes[0]` keeps `first` declared, bound to an error rather than to the list in front of the brackets, so neither the name nor its type is reported about again. Grouping parentheses are read past to the value inside them: `constant total = (1::add(2))` keeps `total` declared as `1::add(2)`, so the parentheses are the only report.
 
 An index with an `=` behind it is a write, and is answered about writing: `primes[0] = 5` gets `A value is not written into with brackets`, the methods that rebuild a list and a dictionary — `primes = primes::replace(5, at 0)`, `ages = ages::set("ada", to 37)` — and the whole statement, since nothing changes a collection in place. That one is refused rather than read on: what follows the `=` is the value being stored, and reading on would answer it as a statement of its own.
 
 An index is refused by its spacing. A `[` written flush against the value in front of it is an index; one written a space behind a name is the list that name labels, as in `append(contentsOf [4])`. That is the rule `#` and `.` are already read by — see [A label sits in front of its value](/docs/reference/syntax-glossary#labels-flush).
 
-Quick Fix: **Write 'constant' instead of 'const'**, and its equivalent wherever one word replaces one word. There is none where the fix is a restructuring — a `=>` body, a ternary, a member assignment.
+Quick Fix: **Write 'constant' instead of 'const'**, and its equivalent wherever one word replaces one word. **Remove the parentheses** removes both of a grouping pair. There is none where the fix is a restructuring — a `=>` body, a ternary, a member assignment.
 
 Taught on: [Coming from JavaScript](/docs/getting-started/coming-from-javascript)
 

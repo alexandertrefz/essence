@@ -41,6 +41,35 @@ export function essenceSpellingAction(
 	}
 }
 
+// `(value)` becomes `value`. Both parentheses go, and the stale check reads
+// each one back off the buffer.
+export function removeParenthesesAction(
+	diagnostic: common.Diagnostic & { position: common.Position },
+	lines: Array<string>,
+): CodeActionEntry | null {
+	if (diagnostic.data?.kind !== "grouping-parentheses") {
+		return null
+	}
+
+	let { open, close } = diagnostic.data
+
+	if (sliceOf(lines, open) !== "(" || sliceOf(lines, close) !== ")") {
+		return null
+	}
+
+	return {
+		title: "Remove the parentheses",
+		kind: "quickfix",
+		diagnosticCode: diagnostic.code,
+		diagnosticPosition: diagnostic.position,
+		isPreferred: true,
+		edits: [
+			{ range: open, newText: "" },
+			{ range: close, newText: "" },
+		],
+	}
+}
+
 // `names.length` becomes `names::length()`. A Method that was only read gets
 // the `()` as a second edit; one already called keeps its own.
 export function methodSeparatorAction(

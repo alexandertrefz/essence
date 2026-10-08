@@ -83,18 +83,22 @@ The first chain reads as `((212 - 32) * 5) / 9`. A chain too long for one line i
 
 ## Grouping without parentheses
 
-There are no grouping [parentheses](/docs/reference/syntax-glossary#parentheses). An opening parenthesis in expression position always begins the parameter list of a [function literal](/docs/language/functions-as-values), Essence's arrow function. Wrapping a call in parentheses is a syntax error:
+There are no grouping [parentheses](/docs/reference/syntax-glossary#parentheses). An opening parenthesis in expression position always begins the parameter list of a [function literal](/docs/language/functions-as-values), Essence's arrow function. Wrapping a call in parentheses is [`foreign-syntax`](/docs/reference/diagnostics#foreign-syntax), and its fix removes them:
 
 <div class="error-output">
 
 ```
-[syntax-error]
-Error: Expected an Identifier but found '1'.
-   ╭─┤ grouping.es:2:18 │
+[foreign-syntax]
+Error: Essence has no grouping parentheses
+   ╭─┤ grouping.es:2:17 │
    │
  2 │     Terminal.print((1::add(2))::multiply(with 3))
-   │                     ▲  
-   │                     ╰── here
+   │                    ─────┬─────  
+   │                         ╰─────── these parentheses group one value
+   │ 
+   │ Help: Remove the parentheses.
+   │ 
+   │ Note: A '(' in an Expression opens a Function literal's Parameter list. A value needs no grouping, since a Method chain reads left to right.
 ───╯
 ```
 
