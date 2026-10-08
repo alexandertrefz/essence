@@ -3524,15 +3524,98 @@ describe("Validator", () => {
 					],
 				],
 				[
-					"a Namespace that needs what this Statement declares",
+					"a Property that needs what this Statement declares",
 					[
 						"constant v = useIt()",
 						"constant size = v",
 						sizes("size"),
 					],
-					"Give the Properties of 'Sizes' values that do not need 'v', then move its Declaration above this Statement.",
+					"Change 'Sizes' so it does not need 'size', then move its Declaration above this Statement.",
 					[sizes("4"), "constant v = useIt()", "constant size = v"],
 				],
+				[
+					"a Method that needs what this Statement declares",
+					[
+						"constant v = useIt()",
+						`namespace Sizes {
+							static base: Integer = 4
+
+							static twice() -> Integer { <- v::multiply(with 2) }
+						}`,
+					],
+					"Change 'Sizes' so it does not need 'v', then move its Declaration above this Statement.",
+					[
+						`namespace Sizes {
+							static base: Integer = 4
+
+							static twice() -> Integer { <- 8 }
+						}`,
+						"constant v = useIt()",
+					],
+				],
+				[
+					"a Statement between that reads the Variable this one declares",
+					["variable v = useIt()", "constant w = v", sizes("4")],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[sizes("4"), "variable v = useIt()", "constant w = v"],
+				],
+				...[
+					["variable v = useIt()", "v"],
+					["variable { b } = { b = useIt() }", "b"],
+				].map(
+					([statement, name]): [
+						string,
+						Array<string>,
+						string,
+						Array<string>,
+					] => [
+						`a Property that needs the Variable '${name}' this Statement declares`,
+						[
+							statement,
+							`namespace Sizes {
+								static base: Integer = 4
+								static other: Integer = ${name}
+							}`,
+						],
+						`Change 'Sizes' so it does not need '${name}', then move its Declaration above this Statement.`,
+						[
+							`namespace Sizes {
+								static base: Integer = 4
+								static other: Integer = 3
+							}`,
+							statement,
+						],
+					],
+				),
+				// Only a read through the Scope needs the Constant, so neither a
+				// Property, a Parameter nor a Record member of its name does.
+				...[
+					sizes("4"),
+					`namespace Sizes {
+						static base: Integer = 4
+
+						static twice(base: Integer) -> Integer { <- base }
+					}`,
+					sizes("{ base = 4 }.base"),
+				].map(
+					(
+						namespace,
+						index,
+					): [string, Array<string>, string, Array<string>] => [
+						`a ${["Property", "Parameter", "Record member"][index]} named like what this Statement declares`,
+						[
+							"constant base = useIt()",
+							"Terminal.print(base)",
+							namespace,
+						],
+						"Move the Declaration of 'Sizes' above this Statement.",
+						[
+							namespace,
+							"constant base = useIt()",
+							"Terminal.print(base)",
+						],
+					],
+				),
 				[
 					"a body between that names what this Statement declares",
 					[
@@ -3592,6 +3675,31 @@ describe("Validator", () => {
 					expect(compiles(program(followed))).toBe(true)
 				},
 			)
+
+			it("names what a Constant needs that keeps it below the Statement", () => {
+				let program = (statements: Array<string>) => `implementation {
+					${statements.join("\n\n")}
+
+					function useIt() -> Integer {
+						<- k
+					}
+				}`
+
+				expect(
+					diagnosticsFor(
+						program(["constant v = useIt()", "constant k = v"]),
+					).map((diagnostic) => diagnostic.helps),
+				).toEqual([
+					[
+						"Change 'k' so it does not need 'v', then move its Declaration above this Statement.",
+					],
+				])
+				expect(
+					compiles(
+						program(["constant k = 3", "constant v = useIt()"]),
+					),
+				).toBe(true)
+			})
 
 			it("offers only the move that compiles to a Constant read too early", () => {
 				let program = (statements: Array<string>) => `implementation {

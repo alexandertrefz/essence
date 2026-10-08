@@ -47,11 +47,15 @@ export type Body = {
 	head: Unit
 	tail: Unit | null
 	completing: boolean
+	// The top-level Statement whose text holds the body.
+	statement: number
 }
 
 export type Units = {
 	bodies: Map<string, Body>
 	roots: Array<Array<Unit>>
+	// The bodies each top-level Statement's text holds, nested ones included.
+	declared: Array<Array<Body>>
 	// For each Statement, the first one at or after it that may suspend.
 	suspensions: Array<number>
 }
@@ -68,6 +72,8 @@ type Builder = {
 	bodies: Map<string, Body>
 	literals: WeakMap<object, string>
 	count: number
+	// The top-level Statement being walked, which holds each body made now.
+	statement: number
 	// The top-level Namespaces, whose classes are bound where they are written.
 	namespaces: ReadonlySet<string>
 	// The names bound from another Module of the import cycle.
@@ -103,6 +109,7 @@ export function collectUnits(
 		bodies: new Map(),
 		literals: new WeakMap(),
 		count: 0,
+		statement: 0,
 		namespaces,
 		cycleMates,
 	}
@@ -114,9 +121,15 @@ export function collectUnits(
 		home,
 		body: null,
 	})
-	let pending: Array<{ walk: Pending; home: string | null }> = []
+	let pending: Array<{
+		walk: Pending
+		home: string | null
+		statement: number
+	}> = []
 
 	for (let [index, node] of nodes.entries()) {
+		build.statement = index
+
 		if (node.nodeType === "FunctionStatement") {
 			let id = `fn ${node.name.content}`
 
@@ -132,6 +145,7 @@ export function collectUnits(
 					),
 				},
 				home: null,
+				statement: index,
 			})
 		} else if (
 			node.nodeType === "ConstantDeclarationStatement" ||
@@ -144,7 +158,11 @@ export function collectUnits(
 			})
 		} else if (node.nodeType === "NamespaceDefinitionStatement") {
 			for (let method of declareMethods(build, node, node.name.content)) {
-				pending.push({ walk: method, home: node.name.content })
+				pending.push({
+					walk: method,
+					home: node.name.content,
+					statement: index,
+				})
 			}
 		}
 	}
@@ -152,6 +170,8 @@ export function collectUnits(
 	// A body may call a Constant's Function value, which a call through it
 	// follows, wherever the body is written.
 	for (let [index, node] of nodes.entries()) {
+		build.statement = index
+
 		if (node.nodeType === "ConstantDeclarationStatement") {
 			let ids = valueOf(node.value, topWalk(newUnit("", ""), null))
 
@@ -164,13 +184,22 @@ export function collectUnits(
 		}
 	}
 
-	for (let { walk, home } of pending) {
+	for (let { walk, home, statement } of pending) {
+		build.statement = statement
 		walkDefinition(build, walk, top, home)
 	}
 
-	let roots = nodes.map((node, index) =>
-		rootUnits(node, index, (unit, home) => topWalk(unit, home)),
-	)
+	let roots = nodes.map((node, index) => {
+		build.statement = index
+
+		return rootUnits(node, index, (unit, home) => topWalk(unit, home))
+	})
+	let declared: Array<Array<Body>> = nodes.map(() => [])
+
+	for (let body of build.bodies.values()) {
+		declared[body.statement]?.push(body)
+	}
+
 	let suspensions: Array<number> = []
 	let next = Number.POSITIVE_INFINITY
 
@@ -182,7 +211,7 @@ export function collectUnits(
 		suspensions[index] = next
 	}
 
-	return { bodies: build.bodies, roots, suspensions }
+	return { bodies: build.bodies, roots, declared, suspensions }
 }
 
 // What runs where a top-level Statement is written. A static Property is given
@@ -256,7 +285,13 @@ function bodyFor(
 	let body = build.bodies.get(id)
 
 	if (body === undefined) {
-		body = { id, head: newUnit(id, name), tail: null, completing }
+		body = {
+			id,
+			head: newUnit(id, name),
+			tail: null,
+			completing,
+			statement: build.statement,
+		}
 		build.bodies.set(id, body)
 	}
 
@@ -423,14 +458,22 @@ function visitStatement(
 
 			return
 		}
-		case "VariableDeclarationStatement":
+		case "VariableDeclarationStatement": {
+			let declared = resolve(walk.scope, node.name.content)
+
 			visitExpression(node.value, walk, "value")
+
+			// A top-level Variable keeps the Statement declaring it.
 			walk.scope.names.set(node.name.content, {
 				kind: "value",
 				bodies: null,
+				...(walk.scope.parent === null && declared?.kind === "value"
+					? { declared: declared.declared }
+					: {}),
 			})
 
 			return
+		}
 		case "FunctionStatement": {
 			let id = `local ${walk.build.count++}`
 			let body = bodyFor(

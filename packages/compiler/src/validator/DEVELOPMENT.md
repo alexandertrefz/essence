@@ -150,8 +150,11 @@ The Help for a Namespace used too early, or a Constant reached too early, offers
 before what it needs. `moveHelp` moves the Declaration above the Statement, together with every Declaration written
 between the two that it needs, or the Statement below the Declaration, where nothing written between needs what the
 Statement declares. `needsOf` answers what a Statement needs: what it reads while it runs, through every body it runs or
-lets escape, and every Constant it names anywhere, since a body sees only the Constants written above it. A Declaration
-that needs what the Statement declares can not come first, so the Help names what to change before the move.
+lets escape, and every Constant read by a body written in it, since a body sees only the Constants written above it.
+Both are the reads `collectUnits` resolved through Scope, so a Property, a Parameter or a Record member that shares a
+Constant's name needs nothing. `Units.declared` holds the bodies each Statement's text holds. A Declaration that needs
+what the Statement declares can not come first, so the Help names what it needs that leads there, to change before the
+move.
 
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its

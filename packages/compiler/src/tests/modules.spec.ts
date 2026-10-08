@@ -7644,6 +7644,59 @@ implementation {
 		})
 	})
 
+	// An imported name binds no Constant of this Module, and the Property
+	// `base` reads nothing, so only `size` moves up with `Sizes`.
+	it("moves only what the Namespace reads with it in a Module that imports", () => {
+		let main = (statements: Array<string>) => `import {
+	from "./Lib.es" { seed }
+}
+
+implementation {
+	function useIt() -> Integer {
+		<- Sizes.base
+	}
+
+	${statements.join("\n\t")}
+}
+`
+		let sizes = "namespace Sizes {\n\t\tstatic base: Integer = size\n\t}"
+		let files = (statements: Array<string>) => ({
+			"Lib.es":
+				"implementation {\n\tconstant seed = 4\n}\n\nexport {\n\tseed\n}\n",
+			"Main.es": main(statements),
+		})
+		let analysed = (statements: Array<string>) =>
+			withProject(files(statements), (directory) =>
+				analysedAt(directory, "Main.es", "Main.es"),
+			)
+
+		expect(
+			analysed([
+				"constant base = useIt()",
+				"Terminal.print(base)",
+				"constant size = seed",
+				sizes,
+			]).map((diagnostic) => [diagnostic.code, diagnostic.helps]),
+		).toEqual([
+			[
+				"use-before-declaration",
+				[
+					"Move the Declarations of 'size' and 'Sizes' above this Statement, in the order they are written.",
+				],
+			],
+		])
+		expect(
+			codesOf(
+				analysed([
+					"constant size = seed",
+					sizes,
+					"constant base = useIt()",
+					"Terminal.print(base)",
+				]),
+			),
+		).toEqual([])
+	})
+
 	// A Module of a cycle may load before the other, so code that runs while it
 	// loads must not need the other one.
 	describe("Code that runs while a Module of a cycle loads", () => {
