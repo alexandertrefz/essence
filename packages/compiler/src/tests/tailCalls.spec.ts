@@ -373,6 +373,18 @@ describe("self tail calls", () => {
 			let noisy = random() < 0.5
 			let paired = captured && random() < 0.5
 			let closured = captured && random() < 0.5
+			// A `provided` walk is a Protocol's provided Method, which calls itself
+			// through `@`. Such a body takes no default and reaches nothing the
+			// Program declares, so the knobs that need either are off.
+			let provided = random() < 0.3
+
+			if (provided) {
+				driver = driver === "match" ? "if" : driver
+				defaulted = false
+				recorded = false
+				noisy = false
+				closured = false
+			}
 
 			// `note` prints a tag and answers its value, so it shows evaluation
 			// order without changing the answer.
@@ -440,14 +452,14 @@ describe("self tail calls", () => {
 			// The turn swaps its pair, takes the defaults again and hands on a
 			// closure built in this turn. A wrong rebinding order, a stale default
 			// or a binding shared across turns changes the answer.
-			let turn = called(
+			let turn = `${provided ? "@::" : ""}${called(
 				noted("arg-n", `n::subtract(${step})`),
 				carried,
 				["right", "left"],
 				"opts",
 				noted("arg-tag", String(step)),
 				closured ? "made::append(maker)" : `made::append(${closure})`,
-			)
+			)}`
 			let answer = captured
 				? "sum::add(made::map((_ f: () -> Integer) -> Integer { <- f() })::sum())"
 				: swapped
@@ -540,12 +552,27 @@ describe("self tail calls", () => {
 `
 					: ""
 
-			return `implementation {
-${choice}${helper}	function walked(${parameters.join(", ")}) -> Integer {
+			let declared = provided
+				? `	protocol Walking {
+		walked(${parameters.join(", ")}) -> Integer {
 ${body}
+		}
 	}
 
-${extra}	Terminal.print(${called(
+	type Walker = { walker: Integer }
+
+	namespace Walkers for Walker is Walking {}
+
+	constant walker: Walker = { walker = 0 }
+`
+				: `	function walked(${parameters.join(", ")}) -> Integer {
+${body}
+	}
+`
+
+			return `implementation {
+${choice}${helper}${declared}
+${extra}	Terminal.print(${provided ? "walker::" : ""}${called(
 				String(start),
 				"0",
 				[String(turns), String(step)],
