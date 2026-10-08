@@ -16,6 +16,13 @@ The live test session's Worker is bundled BESIDE the server as
 `server/testWorker.js`: a Worker is started from a file, and the server ships
 as one file with nothing to resolve out of.
 
+The bundle runs on the Node VS Code ships, not on Bun. A dependency whose
+`main` is a UMD build, as `jsonc-parser`'s is, requires its own files from
+inside a factory the bundler can not see through, so the bundle would look for
+them beside itself. `buildServer.js` bundles such a package's `module` entry
+instead (`umdPackages`). `tests/serverBundle.spec.ts` builds the server and
+starts it under Node, since no other spec runs the bundle there.
+
 ```sh
 bun install        # links the workspace, or fetches the published packages
 bun run build      # server/server.js, server/testWorker.js, and the sources
