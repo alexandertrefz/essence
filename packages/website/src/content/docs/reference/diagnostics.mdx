@@ -5045,9 +5045,9 @@ Error: 'Other' is not a Type Parameter of this Namespace
 
 </div>
 
-Fix the name, or declare the parameter in the namespace's list. Declaring it is offered only where the target type names it, as `second: Other` does here. A target type that never names it could not prove the condition, which is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition), so there the help is to drop the condition.
+Fix the name, or declare the parameter in the namespace's list. Declaring it is offered only where the target type names it, as `second: Other` does here. A target type that never names it could not prove the condition, which is [`unwitnessable-where-condition`](/docs/reference/diagnostics#unwitnessable-where-condition). There the help names the type parameter the name is a near miss of, as `Item` for `Itme`, and otherwise says to drop the condition.
 
-Quick Fix: **Declare it as '&lt;infer Other&gt;'**, where the target type names it.
+Quick Fix: **Declare it as '&lt;infer Other&gt;'**, where the target type names it, or **Change to 'Item'** for a near miss.
 
 Taught on: [Protocols › Conditional conformance](/docs/language/protocols#conditional-conformance)
 

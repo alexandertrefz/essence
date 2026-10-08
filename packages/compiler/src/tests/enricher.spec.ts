@@ -4310,6 +4310,30 @@ ${declared}
 			expect(compiles(source("Printable"))).toBe(true)
 		})
 
+		// A near miss of a Type Parameter the target reads is likelier a slip
+		// than a condition to drop, which would leave `toString` unprovable.
+		it("should offer the Type Parameter a misspelt condition is closest to", () => {
+			let source = (generic: string) => `implementation {
+				type Box<Item> = { item: Item }
+
+				namespace Boxes<infer Item> for Box<Item> is Printable where ${generic} is Printable {
+					toString() -> String {
+						<- @.item::toString()
+					}
+				}
+			}`
+			let refused = diagnosticsFor(source("Itme")).find(
+				(diagnostic) => diagnostic.code === "unknown-where-generic",
+			)
+
+			expect(refused?.helps).toEqual(["Did you mean 'Item'?"])
+			expect(refused?.data).toEqual({
+				kind: "suggestion",
+				suggestion: "Item",
+			})
+			expect(compiles(source("Item"))).toBe(true)
+		})
+
 		it("should reject a where condition on a Generic the target Type never mentions", () => {
 			// A phantom Generic's condition can never be witnessed at a use site,
 			// so it is refused at the Namespace.

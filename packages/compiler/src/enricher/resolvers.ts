@@ -7454,7 +7454,7 @@ export function checkProtocolConformance(
 
 			if (rejection !== null) {
 				if (rejection.kind === "unknown-generic") {
-					reportUnknownWhereGeneric(condition, node.targetType)
+					reportUnknownWhereGeneric(condition, clause, node)
 				} else if (rejection.kind === "unwitnessable") {
 					reportError(
 						`'${condition.generic.content}' does not appear in this Namespace's target Type`,

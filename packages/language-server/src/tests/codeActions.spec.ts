@@ -4838,6 +4838,27 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		it("should change a misspelt Type Parameter to the one it is closest to", () => {
+			let lines = [
+				...BOXES,
+				"\tnamespace Boxes<infer Item> for Box<Item> is Sized where Itme is Sized {",
+				"\t\tsize() -> Integer {",
+				"\t\t\t<- 1",
+				"\t\t}",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = parameterFixes(lines)
+			let result = applied(lines, fix!)
+
+			expect(fix?.title).toBe("Change to 'Item'")
+			expect(result[7]).toBe(
+				"\tnamespace Boxes<infer Item> for Box<Item> is Sized where Item is Sized {",
+			)
+			expect(codesOf(result)).toEqual([])
+		})
+
 		// Declared, a Parameter the target Type never names could not prove the
 		// condition, so nothing offers to declare it.
 		it("should offer no declaration where the target never names it", () => {

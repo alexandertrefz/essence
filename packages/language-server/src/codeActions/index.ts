@@ -640,8 +640,10 @@ const fixesByCode: Partial<Record<common.DiagnosticCode, FixProvider>> = {
 	"unknown-name": bareCaseOrImportOrSpellingFix,
 	"unknown-protocol": importOrSpellingFix,
 	"unknown-type": importOrSpellingFix,
-	"unknown-where-generic": ({ diagnostic, program }) =>
-		listed(declareParameterAction(diagnostic, program)),
+	"unknown-where-generic": (context) => [
+		...listed(declareParameterAction(context.diagnostic, context.program)),
+		...spellingFix(context),
+	],
 	"unreachable-case": ({ diagnostic, program, lines }) =>
 		listed(unreachableCaseAction(diagnostic, program, lines)),
 	"unreachable-define-arm": ({ diagnostic, program, lines }) =>
