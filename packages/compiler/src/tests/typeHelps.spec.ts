@@ -689,6 +689,20 @@ describe("A payload that spells the Case's members", () => {
 		expect(helpsOfCode(source, "payload-type-mismatch")).toEqual([])
 	})
 
+	// A payload that leaves a defaulted member out wrote its Record too, and
+	// so does one that carries a member the Case does not declare.
+	it("withholds the shorthand sentence from a partial payload", () => {
+		let source = `implementation {
+		choice Call {
+			Post { server: String, body: String } = { server = "localhost" },
+		}
+
+		constant call = Call#Post({ body = "x", draft = true })
+	}`
+
+		expect(helpsOfCode(source, "payload-type-mismatch")).toEqual([])
+	})
+
 	// A value handed over on its own is the shape the sentence is for.
 	it("keeps it where the payload is not the Case's Record", () => {
 		let source = `implementation {

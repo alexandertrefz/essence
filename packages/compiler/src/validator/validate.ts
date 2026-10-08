@@ -2194,9 +2194,9 @@ function validateCaseValue(
 				helps: [
 					...record.helps,
 					// The shorthand hint, only for a multi-member Case whose
-					// payload does not already spell its members.
+					// payload is not a Record it wrote.
 					...(Object.keys(node.type.members).length > 1 &&
-					!payloadSpellsTheCasesMembers(node.type, node.value)
+					!payloadWritesTheCasesRecord(node.type, node.value)
 						? [
 								"The one-member shorthand '#Case(value)' only applies to single-member Cases.",
 							]
@@ -2211,9 +2211,11 @@ function validateCaseValue(
 	return node
 }
 
-// Whether the payload names exactly the Case's members, which tells a written
-// Record from a tried shorthand. Names only, since the Types disagreed.
-function payloadSpellsTheCasesMembers(
+// Whether the payload is a Record naming one of the Case's members, which
+// tells a written Record from a tried shorthand. A partial payload and one
+// with an extra member are written Records too. Names only, since the Types
+// disagreed.
+function payloadWritesTheCasesRecord(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
 ): boolean {
@@ -2221,12 +2223,8 @@ function payloadSpellsTheCasesMembers(
 		return false
 	}
 
-	let declared = Object.keys(caseType.members)
-	let written = Object.keys(value.type.members)
-
-	return (
-		declared.length === written.length &&
-		declared.every((name) => written.includes(name))
+	return Object.keys(value.type.members).some((name) =>
+		Object.hasOwn(caseType.members, name),
 	)
 }
 
