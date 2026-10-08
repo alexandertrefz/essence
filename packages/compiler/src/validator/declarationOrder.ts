@@ -721,8 +721,15 @@ function reportFrom(
 const ARRIVES =
 	"A Namespace comes into being where it is written, so nothing that runs above it can reach it."
 
-// A Help that moves Statements.
-type Move = { helps: [string] }
+// A Help that moves Statements, with the moves it offers for the Quick Fix.
+type Move = {
+	helps: [string]
+	data: {
+		kind: "declaration-moves"
+		statement: boolean
+		declaration: boolean
+	}
+}
 
 // Offers only the moves after which nothing runs before what it needs. See
 // "Use before declaration" in DEVELOPMENT.md.
@@ -750,7 +757,14 @@ function moveHelp(
 	let statement = nodes
 		.slice(use + 1, declared + 1)
 		.every((_, offset) => !needsOf(simulation, use + 1 + offset).has(use))
-	let moves = (help: string): Move => ({ helps: [help] })
+	let moves = (help: string): Move => ({
+		helps: [help],
+		data: {
+			kind: "declaration-moves",
+			statement,
+			declaration: moving.size === 1,
+		},
+	})
 
 	if (moving.size === 1) {
 		return moves(

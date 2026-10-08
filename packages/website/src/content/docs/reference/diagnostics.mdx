@@ -1377,7 +1377,7 @@ Move the namespace above the statement, or the statement below the namespace. Th
 
 Work put in flight with `start` runs up to its first `complete` at once, and the rest when the top level next waits: at the first statement from the starting one on that holds a `complete`. Where that rest uses a namespace declared further down, the label reads "this starts work that later reaches it". The starting statement is judged as a whole, so a `complete` anywhere in it counts, even one written to the left of the `start`: `both(complete pause(), start later())` is refused although `pause` is over before `later` begins. Write that `complete` in a statement of its own above, as in `constant paused = complete pause()`, and pass `paused` on. [Asynchrony › Started work and what comes below](/docs/language/asynchrony#started-work-and-what-comes-below) says why.
 
-Quick Fix: **Move this Statement below 'Loud'**, unless a statement it would pass reads what it declares.
+Quick Fix: **Move this Statement below 'Loud'**, where the help offers that move.
 
 Taught on: [Namespaces and methods › Where a namespace can be used](/docs/language/namespaces-and-methods#where-a-namespace-can-be-used)
 

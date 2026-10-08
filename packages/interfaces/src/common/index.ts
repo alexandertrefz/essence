@@ -199,6 +199,9 @@ export type DiagnosticData =
 			block: Position
 			into: Position | null
 	  }
+	// The moves a `use-before-declaration` Help offers: the Statement below the
+	// Declaration, and the Declaration alone above the Statement.
+	| { kind: "declaration-moves"; statement: boolean; declaration: boolean }
 	// A mismatch that a `complete` in front of the value fixes. `unstarted` is
 	// a `Future<T>` where `T` was wanted, and `in-flight` a `Started<T>`.
 	| {

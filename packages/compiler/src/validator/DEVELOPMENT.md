@@ -154,7 +154,7 @@ lets escape, and every Constant read by a body written in it, since a body sees 
 Both are the reads `collectUnits` resolved through Scope, so a Property, a Parameter or a Record member that shares a
 Constant's name needs nothing. `Units.declared` holds the bodies each Statement's text holds. A Declaration that needs
 what the Statement declares can not come first, so the Help names what it needs that leads there, to change before the
-move.
+move. The Help's `data` says which moves it offers, and the Quick Fix makes only those.
 
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its

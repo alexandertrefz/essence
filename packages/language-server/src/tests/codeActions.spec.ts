@@ -5569,6 +5569,76 @@ describe("Code Actions", () => {
 			expect(titles(quickFixes(lines))).toEqual([])
 		})
 
+		it("should move a Variable's Declaration below the Namespace it names", () => {
+			let lines = [
+				"implementation {",
+				"\tvariable total = Maths.zero",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			let result = applied(lines, quickFixes(lines)[0]!)
+
+			expect(result).toEqual([
+				"implementation {",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\tvariable total = Maths.zero",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
+		// `Terminal.print(total)` would read the Variable above its Declaration.
+		it("should offer nothing where a Statement it would pass reads the Variable it declares", () => {
+			let lines = [
+				"implementation {",
+				"\tvariable total = Maths.zero",
+				"",
+				"\tTerminal.print(total)",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+
+		// `show` reads `v`, so `Terminal.print(show())` would run it above the
+		// Declaration of `v`. The fix offers only the moves the Help offers.
+		it("should offer nothing where a Statement it would pass runs a body that reads what it declares", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction useIt() -> Integer {",
+				"\t\t<- Maths.zero",
+				"\t}",
+				"",
+				"\tconstant v = useIt()",
+				"",
+				"\tTerminal.print(show())",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"",
+				"\tfunction show() -> Integer {",
+				"\t\t<- v",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+
 		// `Terminal.inspect(total)` would read `total` above its Declaration.
 		it("should offer nothing where a Statement it would pass reads what it declares", () => {
 			let lines = [

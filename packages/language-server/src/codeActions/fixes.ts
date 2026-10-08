@@ -1,8 +1,4 @@
 import { patternBindings } from "@essence-lang/compiler/helpers"
-import {
-	findParserChild,
-	type ParserNode,
-} from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
 import {
@@ -2128,10 +2124,9 @@ export function moveTestsSectionAction(
 	}
 }
 
-// Moves the top-level Statement holding a use after the Namespace it reads.
-// Not preferred: the move can change what the Statement sees. Nothing is
-// offered where a Statement it would pass reads a name it declares, or for a
-// Property read from another Property.
+// Moves the top-level Statement holding a use after the Namespace it reads,
+// where the Help offers that move. Not preferred: the move can change what the
+// Statement sees.
 export function moveDeclarationAction(
 	diagnostic: common.Diagnostic & { position: common.Position },
 	program: parser.Program,
@@ -2141,7 +2136,11 @@ export function moveDeclarationAction(
 		(label) => label.kind === "secondary",
 	)?.position
 
-	if (declared === undefined) {
+	if (
+		declared === undefined ||
+		diagnostic.data?.kind !== "declaration-moves" ||
+		!diagnostic.data.statement
+	) {
 		return null
 	}
 
@@ -2157,14 +2156,7 @@ export function moveDeclarationAction(
 		containsRange(node.position, diagnostic.position),
 	)
 
-	if (
-		declaration === -1 ||
-		use === -1 ||
-		use > declaration ||
-		statements
-			.slice(use + 1, declaration + 1)
-			.some((node) => readsDeclaredName(node, statements[use]!))
-	) {
+	if (declaration === -1 || use === -1 || use > declaration) {
 		return null
 	}
 
@@ -2184,33 +2176,4 @@ export function moveDeclarationAction(
 		isPreferred: false,
 		edits,
 	}
-}
-
-// Whether a Statement reads a name the other declares. A name read inside a
-// body counts too, which only refuses a move a shadowing local would allow.
-function readsDeclaredName(
-	node: parser.ImplementationNode,
-	declaring: parser.ImplementationNode,
-): boolean {
-	if (
-		declaring.nodeType !== "ConstantDeclarationStatement" &&
-		declaring.nodeType !== "VariableDeclarationStatement"
-	) {
-		return false
-	}
-
-	let names = new Set(
-		declaring.name.nodeType === "Pattern"
-			? patternBindings(declaring.name).map(
-					(binding) => binding.name.content,
-				)
-			: [declaring.name.content],
-	)
-	let reads = (child: ParserNode): true | undefined =>
-		(child.nodeType === "Identifier" && names.has(child.content)) ||
-		findParserChild(child, reads)
-			? true
-			: undefined
-
-	return reads(node) === true
 }
