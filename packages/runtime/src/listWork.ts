@@ -1,6 +1,6 @@
 declare global {
-	// Set only by a spec that counts List work. The bundler defines it false,
-	// so a Program's bundle drops every count.
+	// Set only by a spec that counts List work. Every bundle defines it false,
+	// the Compiler's and a client plugin host's, so it drops every count.
 	var essenceCountsListWork: boolean | undefined
 }
 

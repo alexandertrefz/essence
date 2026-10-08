@@ -234,6 +234,31 @@ export const pi = PI.toString()
 		expect(text).not.toContain("?source")
 	})
 
+	// Only a spec counts List work, so the build defines the flag false and
+	// nothing of the count is left.
+	it("drops the List work count from what it builds", async () => {
+		let directory = project({
+			"Lists.es": `implementation {
+	function grown(_ count: Integer) -> List<Integer> {
+		<- [1, 2]::prepend(count)::remove(at 1)
+	}
+}
+
+export {
+	grown
+}
+`,
+			"entry.js": `import { grown } from "./Lists.es"
+
+export const lengths = grown(3n).length
+`,
+		})
+		let { text, module } = await built(directory, "entry.js")
+
+		expect(module.lengths).toBe(2)
+		expect(text).not.toContain("essenceCountsListWork")
+	})
+
 	// The plugin's bridge imports the Dictionary door, so a `Map` goes in, the
 	// Module adds to it, and the entries come back in order.
 	it("carries a Dictionary across the marshalled door", async () => {

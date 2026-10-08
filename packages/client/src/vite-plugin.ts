@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import * as path from "node:path"
 
+import { BUNDLE_DEFINES } from "@essence-lang/compiler/bundler"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import {
@@ -32,6 +33,7 @@ export type ResolvedConfig = {
 export type VitePlugin = {
 	name: string
 	enforce?: "pre" | "post"
+	config: () => { define: Record<string, string> }
 	configResolved: (config: ResolvedConfig) => void
 	buildStart: () => void
 	watchChange: (id: string) => void
@@ -95,6 +97,11 @@ export function essence(options: PluginOptions = {}): VitePlugin {
 		// Ahead of Vite's own resolution, so a `.es` id is claimed before
 		// anything reads it as JavaScript.
 		enforce: "pre",
+		// The runtime reaches Vite as source, so Vite defines what a bundle of
+		// the Compiler's own would.
+		config() {
+			return { define: { ...BUNDLE_DEFINES } }
+		},
 		configResolved(config) {
 			serving = config.command === "serve"
 			root = canonicalPath(config.root ?? process.cwd())

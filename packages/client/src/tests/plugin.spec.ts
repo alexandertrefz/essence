@@ -213,6 +213,33 @@ export const pi = PI
 		expect(pi.toString()).toBe("157/50")
 	})
 
+	// Only a spec counts List work, so the build defines the flag false and
+	// nothing of the count is left.
+	it("drops the List work count from what it builds", async () => {
+		let directory = project({
+			"Lists.es": `implementation {
+	function grown(_ count: Integer) -> List<Integer> {
+		<- [1, 2]::prepend(count)::remove(at 1)
+	}
+}
+
+export {
+	grown
+}
+`,
+			"entry.js": `import { grown } from "./Lists.es"
+
+export const lengths = grown(3n).length
+`,
+		})
+		let result = await build(directory, "entry.js")
+
+		expect(result.errors).toEqual([])
+		expect(result.outputFiles![0]!.text).not.toContain(
+			"essenceCountsListWork",
+		)
+	})
+
 	// The entry awaits work. The wrapper, the interpreter and `Future.ts` must
 	// be the copies the host resolved, or the answer would be refused.
 	it("answers a call with a promise a build can await", async () => {

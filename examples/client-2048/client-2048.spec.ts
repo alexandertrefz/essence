@@ -3,6 +3,7 @@ import {
 	existsSync,
 	mkdtempSync,
 	readdirSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from "node:fs"
@@ -179,12 +180,22 @@ describe("examples/client-2048", () => {
 				build: { outDir: directory, emptyOutDir: true },
 			})
 
+			let scripts = readdirSync(path.join(directory, "assets")).filter(
+				(file) => file.endsWith(".js"),
+			)
+
 			expect(existsSync(path.join(directory, "index.html"))).toBe(true)
-			expect(
-				readdirSync(path.join(directory, "assets")).some((file) =>
-					file.endsWith(".js"),
-				),
-			).toBe(true)
+			expect(scripts.length).toBeGreaterThan(0)
+			// Only a spec counts List work, so the plugin has Vite define the
+			// flag false, and nothing of the count is left.
+			for (let script of scripts) {
+				expect(
+					readFileSync(
+						path.join(directory, "assets", script),
+						"utf8",
+					),
+				).not.toContain("essenceCountsListWork")
+			}
 		} finally {
 			rmSync(directory, { recursive: true, force: true })
 		}

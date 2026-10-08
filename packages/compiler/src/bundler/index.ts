@@ -95,6 +95,13 @@ function moduleSourcePlugin(modules: ModuleSources): Plugin {
 	}
 }
 
+// What every bundle defines, here and in the client plugins' hosts. Only a spec
+// counts List work, so a bundle drops every count. See "Counting a List's work"
+// in packages/runtime/DEVELOPMENT.md.
+export const BUNDLE_DEFINES: Readonly<Record<string, string>> = {
+	"globalThis.essenceCountsListWork": "false",
+}
+
 // Writes nothing: the caller decides where the bytes go. A graph enters
 // through the plugin, never `stdin`, or a cycle through the entry would bundle
 // it twice. See "How esbuild reads a bundle" in DEVELOPMENT.md.
@@ -131,9 +138,7 @@ export async function bundle(
 					? (options.sourcemapMode ?? "linked")
 					: false,
 			treeShaking: true,
-			// Only a spec counts List work, so a bundle drops every count. See
-			// "Counting a List's work" in packages/runtime/DEVELOPMENT.md.
-			define: { "globalThis.essenceCountsListWork": "false" },
+			define: { ...BUNDLE_DEFINES },
 			bundle: true,
 			format: "esm",
 			// Absolute, because a relative `outfile` would resolve against

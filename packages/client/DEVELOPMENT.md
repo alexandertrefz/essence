@@ -81,6 +81,11 @@ A plugin compiles a `.es` file when the bundler asks for its text. What comes ba
 modules. There is one JavaScript module per `.es` file and the standard library's prelude, and the runtime is imported
 by its package name. The host resolves, shakes and splits all of it as it does its own code.
 
+A host bundles the runtime as source, so each plugin hands the host `BUNDLE_DEFINES`, as the Compiler's own bundler uses
+them: Vite through the `config()` hook, esbuild through `initialOptions.define` and `Bun.build` through
+`build.config.define`. A host that dropped them would keep the List work count a spec reads, at the cost of its bytes
+and one global read per copy. See "Counting a List's work" in packages/runtime/DEVELOPMENT.md.
+
 ### One module per file
 
 A build may have two `.es` entries, and a value has to pass between them. Two bundles would hold two copies of the

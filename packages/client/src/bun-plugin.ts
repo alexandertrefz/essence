@@ -1,7 +1,7 @@
 import { statSync } from "node:fs"
 import * as path from "node:path"
 
-import { MODULE_SCHEME } from "@essence-lang/compiler/bundler"
+import { BUNDLE_DEFINES, MODULE_SCHEME } from "@essence-lang/compiler/bundler"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import {
@@ -41,8 +41,9 @@ export type BunLoadResult = {
 }
 
 export type BunBuild = {
-	// Present under `Bun.build`, absent under the runtime. Only `root` is read.
-	config?: { root?: string }
+	// Present under `Bun.build`, absent under the runtime. `root` is read, and
+	// `define` set before the build reads it.
+	config?: { root?: string; define?: Record<string, string> }
 	onResolve(
 		options: { filter: RegExp; namespace?: string },
 		callback: (
@@ -104,6 +105,16 @@ export function essenceBun(options: BunPluginOptions = {}): BunPlugin {
 				options.root ?? build.config?.root ?? process.cwd(),
 			)
 			let compiler = createCompiler(options, root)
+
+			// The runtime reaches `Bun.build` as source, so the build defines
+			// what a bundle of the Compiler's own would.
+			if (build.config !== undefined) {
+				build.config.define = {
+					...BUNDLE_DEFINES,
+					...build.config.define,
+				}
+			}
+
 			let resolve =
 				options.resolve ??
 				((specifier: string, from: string) =>

@@ -777,12 +777,13 @@ Array: `materialise`, the trims, the upgrades, the copies `prepend`, `append`, `
 make, and a catch-up from the write log. `ownItemsOf` and `pushItemsOf` count the items a walk the Rewriter writes out
 takes from a whole List. Each counts the items it copies, once, beside the copy.
 
-It counts only while `globalThis.essenceCountsListWork` is `true`, which only a spec sets. The bundler defines it
-`false`, so a Program's bundle carries no count to pay for, and a minified one drops the calls.
-`listPerformance.spec.ts` in the compiler runs a Program in the runner, whose runtime holds the counter, and holds a
-walk linear by the count rather than by its time, which load moves. A native that copies a run for an edit counts the
-copy, or such a spec can not see it go quadratic. A native that walks every item to build a new List, as `map`, `sort`
-or `reverse` does, costs one pass by its nature and is not counted.
+It counts only while `globalThis.essenceCountsListWork` is `true`, which only a spec sets. Every bundle defines it
+`false`, through `BUNDLE_DEFINES` in the Compiler's bundler: the Compiler's own, and those of the hosts the client
+plugins serve, whose bundlers read the runtime as source. So a bundle carries no count to pay for, and a minified one
+drops the calls. `listPerformance.spec.ts` in the compiler runs a Program in the runner, whose runtime holds the
+counter, and holds a walk linear by the count rather than by its time, which load moves. A native that copies a run for
+an edit counts the copy, or such a spec can not see it go quadratic. A native that walks every item to build a new List,
+as `map`, `sort` or `reverse` does, costs one pass by its nature and is not counted.
 
 ### Reading a List while user code runs
 

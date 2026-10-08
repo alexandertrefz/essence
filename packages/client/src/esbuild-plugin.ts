@@ -1,5 +1,6 @@
 import * as path from "node:path"
 
+import { BUNDLE_DEFINES } from "@essence-lang/compiler/bundler"
 import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import {
@@ -39,7 +40,10 @@ export type EsbuildLoadResult = {
 
 export type EsbuildBuild = {
 	// Only what the plugin reads: the build's working directory, its root.
-	initialOptions: { absWorkingDir?: string }
+	initialOptions: {
+		absWorkingDir?: string
+		define?: Record<string, string>
+	}
 	onStart(callback: () => void): void
 	onResolve(
 		options: { filter: RegExp; namespace?: string },
@@ -85,6 +89,14 @@ export function essenceEsbuild(options: PluginOptions = {}): EsbuildPlugin {
 				build.initialOptions.absWorkingDir ?? process.cwd(),
 			)
 			let compiler = createCompiler(options, root)
+
+			// The runtime reaches esbuild as source, so the build defines what
+			// a bundle of the Compiler's own would.
+			build.initialOptions.define = {
+				...BUNDLE_DEFINES,
+				...build.initialOptions.define,
+			}
+
 			// The files the host imported through `?raw`, which get a
 			// `bundle` declaration file. A sibling reached by the graph does not.
 			let rawDoors = new Set<string>()
