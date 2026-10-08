@@ -5615,6 +5615,31 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		// Either move would run `loud()` on the other side of an effect, so
+		// the Help names no edit and nothing is offered.
+		it("should offer nothing where either move would reorder effects", () => {
+			let lines = [
+				"implementation {",
+				"\tfunction loud() -> Integer {",
+				'\t\tTerminal.print("loud")',
+				"",
+				"\t\t<- 0",
+				"\t}",
+				"",
+				"\tTerminal.print(Maths.zero)",
+				"",
+				'\tTerminal.print("b")',
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = loud()",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+
 		// Moved past `Terminal.print("a")`, the first line would print second.
 		it("should offer nothing where the move would pass an effect with one", () => {
 			let lines = [

@@ -165,6 +165,42 @@ describe("Code Generation", () => {
 			).toEqual(["4", '"a"'])
 		})
 
+		// Neither move keeps the written order, so the Help says what the one
+		// it names changes, and the change is what running it shows.
+		it("says when moving a Declaration runs its effects earlier", async () => {
+			let loud = `function loud() -> Integer {
+				Terminal.inspect("loud")
+
+				<- 1
+			}`
+			let loudSizes = `namespace Sizes {
+				static base: Integer = loud()
+			}`
+
+			expect(
+				diagnosticsOf(
+					program([
+						loud,
+						"Terminal.inspect(useIt())",
+						'Terminal.inspect("b")',
+						loudSizes,
+					]),
+				).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual([
+				"Move the Declaration of 'Sizes' above this Statement; its static Properties will then run before the Statements between.",
+			])
+			expect(
+				await run(
+					program([
+						loud,
+						loudSizes,
+						"Terminal.inspect(useIt())",
+						'Terminal.inspect("b")',
+					]),
+				),
+			).toEqual(['"loud"', "1", '"b"'])
+		})
+
 		it("moves a Statement with an effect past Declarations that run nothing", async () => {
 			let declarations = ["type Size = Integer", "constant size = 4"]
 

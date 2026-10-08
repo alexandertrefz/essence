@@ -3633,6 +3633,43 @@ describe("Validator", () => {
 						"constant v = Sizes.base",
 					],
 				],
+				// A Declaration whose values run something passes only Statements
+				// that run nothing. Where neither move keeps the order, the Help
+				// says what the move changes, and offers no edit.
+				[
+					"effects on both sides of either move",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						"Terminal.print(useIt())",
+						'Terminal.print("b")',
+						sizes("loud()"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement; its static Properties will then run before the Statements between.",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						sizes("loud()"),
+						"Terminal.print(useIt())",
+						'Terminal.print("b")',
+					],
+				],
+				[
+					"effects on both sides of either move of several Declarations",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						"Terminal.print(useIt())",
+						'Terminal.print("b")',
+						"constant size = loud()",
+						sizes("size"),
+					],
+					"Move the Declarations of 'size' and 'Sizes' above this Statement, in the order they are written; they will then run before the Statements between.",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						"constant size = loud()",
+						sizes("size"),
+						"Terminal.print(useIt())",
+						'Terminal.print("b")',
+					],
+				],
 				// An assignment stays on its side of every Statement that reads
 				// or assigns its Variable, so the output does not change.
 				[

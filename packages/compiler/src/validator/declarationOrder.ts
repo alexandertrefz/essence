@@ -754,26 +754,45 @@ function moveHelp(
 
 	let { nodes } = simulation.order
 	let crossed = nodes.slice(use + 1, declared + 1)
-	// Effects keep their order, so either side of the move must have none.
+	let passed = nodes
+		.slice(use, declared)
+		.filter((_, offset) => !moving.has(use + offset))
+	// Effects keep their written order, so each move needs one side of what it
+	// passes to run nothing.
 	let statement =
 		crossed.every(
 			(_, offset) => !bound(simulation, use + 1 + offset, use),
 		) &&
 		(runsNothing(nodes[use]) || crossed.every(runsNothing))
+	let upward =
+		[...moving].every((index) => runsNothing(nodes[index])) ||
+		passed.every(runsNothing)
 	let moves = (help: string): Move => ({
 		helps: [help],
 		data: {
 			kind: "declaration-moves",
 			statement,
-			declaration: moving.size === 1,
+			declaration: upward && moving.size === 1,
 		},
 	})
+	let reordered =
+		dependency.kind === "namespace"
+			? "its static Properties will then run before the Statements between"
+			: "its value will then be worked out before the Statements between"
 
 	if (moving.size === 1) {
+		if (upward) {
+			return moves(
+				statement
+					? `Move the Declaration of '${name}' above this Statement, or this Statement below it.`
+					: `Move the Declaration of '${name}' above this Statement.`,
+			)
+		}
+
 		return moves(
 			statement
-				? `Move the Declaration of '${name}' above this Statement, or this Statement below it.`
-				: `Move the Declaration of '${name}' above this Statement.`,
+				? `Move this Statement below the Declaration of '${name}'.`
+				: `Move the Declaration of '${name}' above this Statement; ${reordered}.`,
 		)
 	}
 
@@ -789,12 +808,16 @@ function moveHelp(
 		)
 	}
 
+	let declarations = `Move the Declarations of ${quoted(
+		[...moving]
+			.sort((left, right) => left - right)
+			.flatMap((index) => declaredName(nodes[index]) ?? []),
+	)} above this Statement, in the order they are written`
+
 	return moves(
-		`Move the Declarations of ${quoted(
-			[...moving]
-				.sort((left, right) => left - right)
-				.flatMap((index) => declaredName(nodes[index]) ?? []),
-		)} above this Statement, in the order they are written.`,
+		upward
+			? `${declarations}.`
+			: `${declarations}; they will then run before the Statements between.`,
 	)
 }
 

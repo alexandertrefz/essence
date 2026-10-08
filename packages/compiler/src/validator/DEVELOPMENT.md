@@ -155,12 +155,14 @@ body written in it, since a body sees only the Constants written above it. Both 
 through Scope, so a Property, a Parameter or a Record member that shares a Constant's name needs nothing.
 `Units.declared` holds the bodies each Statement's text holds. `needsOf` also names the top-level Variables a Statement
 reads and assigns while it runs, as `Unit.assigns` records them. Two Statements that clash, one assigning a Variable the
-other reads or assigns, keep their order. Effects keep their order too: the Statement moves down only where it, or every
-Statement it passes, runs nothing, as `runsNothing` in `runsNothing.ts` answers. A Statement runs nothing when it calls
-nothing, starts or completes nothing, and fills no String hole and no Dictionary. A body it declares runs only when
-called. A Declaration tied to the Statement, or to a Statement that declares nothing, such as an assignment, can not
-come first, so the Help names what it needs or clashes over, to change before the move. The Help's `data` says which
-moves it offers, and the Quick Fix makes only those.
+other reads or assigns, keep their order. Effects keep their written order too, so either move is offered as an edit
+only where what moves, or every Statement it passes, runs nothing, as `runsNothing` in `runsNothing.ts` answers. Where
+neither move keeps the order, the Help names the move of the Declaration and says that its values then run before the
+Statements between, and offers no Quick Fix. A Statement runs nothing when it calls nothing, starts or completes
+nothing, and fills no String hole and no Dictionary. A body it declares runs only when called. A Declaration tied to the
+Statement, or to a Statement that declares nothing, such as an assignment, can not come first, so the Help names what it
+needs or clashes over, to change before the move. The Help's `data` says which moves it offers, and the Quick Fix makes
+only those.
 
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its
