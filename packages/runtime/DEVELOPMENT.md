@@ -770,6 +770,20 @@ run drops its log, since the log describes the Array the box let go of.
 edits read through it, and so do the walks that neither shrink nor keep their receiver. The edits reach the trimming
 through their answer, in `sharedWindowOf`.
 
+### Counting a List's work
+
+`countCopied` in `listWork.ts` adds to `listWork.copied` the items the natives that edit a List's runs copy into a fresh
+Array: `materialise`, the trims, the upgrades, the copies `prepend`, `append`, `insert`, `remove`, `replace` and `slice`
+make, and a catch-up from the write log. `ownItemsOf` and `pushItemsOf` count the items a walk the Rewriter writes out
+takes from a whole List. Each counts the items it copies, once, beside the copy.
+
+It counts only while `globalThis.essenceCountsListWork` is `true`, which only a spec sets. The bundler defines it
+`false`, so a Program's bundle carries no count to pay for, and a minified one drops the calls.
+`listPerformance.spec.ts` in the compiler runs a Program in the runner, whose runtime holds the counter, and holds a
+walk linear by the count rather than by its time, which load moves. A native that copies a run for an edit counts the
+copy, or such a spec can not see it go quadratic. A native that walks every item to build a new List, as `map`, `sort`
+or `reverse` does, costs one pass by its nature and is not counted.
+
 ### Reading a List while user code runs
 
 A native that runs user code while it holds a run fixes the run's count once, in its view or in `materialise`. It

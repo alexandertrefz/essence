@@ -1,3 +1,4 @@
+import { countCopied } from "./listWork"
 import type { AnyType } from "./type"
 
 // The undo log that lets a positional write change a shared run Array in
@@ -53,6 +54,8 @@ export function caughtUp<ItemType extends AnyType>(
 
 	let count = originalList.length ?? originalList.value.length
 	let own = originalList.value.slice(0, count)
+
+	countCopied(count)
 	let positions = log.positions
 	let items = log.items
 

@@ -10,6 +10,7 @@ import {
 	freshKeySet,
 	hasKey,
 } from "./keyEncoding"
+import { countCopied } from "./listWork"
 import type { LoggedRun } from "./listWrites"
 import { caughtUp, freshLog } from "./listWrites"
 import type { OptionalType } from "./Optional"
@@ -96,6 +97,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 	if (view.backCount * 2 < view.back.length) {
 		let trimmed = view.back.slice(0, view.backCount)
 
+		countCopied(view.backCount)
 		originalList.value = trimmed
 		originalList.length = view.backCount
 		// The log describes the Array the box let go of.
@@ -106,6 +108,7 @@ function trimUnderHalfRule<ItemType extends AnyType>(
 	if (view.frontCount * 2 < view.front.length) {
 		let trimmed = view.front.slice(0, view.frontCount)
 
+		countCopied(view.frontCount)
 		originalList.front = trimmed
 		originalList.frontLen = view.frontCount
 		view.front = trimmed
@@ -159,6 +162,7 @@ export function materialise<ItemType extends AnyType>(
 
 	if (front === undefined) {
 		if (backCount !== originalList.value.length) {
+			countCopied(backCount)
 			originalList.value = originalList.value.slice(0, backCount)
 			originalList.length = backCount
 			originalList.writes = undefined
@@ -175,6 +179,8 @@ export function materialise<ItemType extends AnyType>(
 	// descending and written forwards.
 	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let combined: Array<ItemType> = new Array(frontCount + backCount)
+
+	countCopied(frontCount + backCount)
 
 	for (let index = 0; index < frontCount; index++) {
 		combined[index] = front[frontCount - 1 - index]
@@ -233,6 +239,8 @@ export function pushItemsOf<ItemType extends AnyType>(
 ): void {
 	let view = viewOf(originalList)
 
+	countCopied(view.total)
+
 	for (let index = view.frontCount - 1; index >= 0; index--) {
 		into.push(view.front[index])
 	}
@@ -248,6 +256,8 @@ export function ownItemsOf<ItemType extends AnyType>(
 	originalList: ListType<ItemType>,
 ): Array<ItemType> {
 	let view = runsOf(originalList)
+
+	countCopied(view.total)
 
 	if (view.frontCount === 0) {
 		return view.back.slice(0, view.backCount)
@@ -323,6 +333,8 @@ function upgradedForSuffix<ItemType extends AnyType>(
 	let front = view.back.slice(0, view.backCount).reverse()
 	let back: Array<ItemType> = []
 
+	countCopied(view.backCount)
+
 	originalList.value = back
 	originalList.length = 0
 	originalList.front = front
@@ -354,6 +366,8 @@ function upgradedAroundWindow<ItemType extends AnyType>(
 	let frontCount = view.frontCount
 	let front: Array<ItemType>
 	let back: Array<ItemType>
+
+	countCopied(total)
 
 	if (frontCount === 0) {
 		front = view.back.slice(0, seam).reverse()
@@ -530,6 +544,7 @@ export function prepend__overload$1<ItemType extends AnyType>(
 
 	let copiedFront = front.slice(0, frontCount)
 
+	countCopied(frontCount)
 	copiedFront.push(item)
 
 	return {
@@ -567,6 +582,7 @@ export function append__overload$1<ItemType extends AnyType>(
 
 	let copied = originalList.value.slice(0, count)
 
+	countCopied(count)
 	copied.push(item)
 
 	return listSharingFrontOf(copied, count + 1, originalList, undefined)
@@ -591,6 +607,7 @@ export function append__overload$2<ItemType extends AnyType>(
 	} else {
 		target = originalList.value.slice(0, count)
 		writes = undefined
+		countCopied(count)
 	}
 
 	pushItemsOf(contentsOf, target)
@@ -864,12 +881,16 @@ export function slice<ItemType extends AnyType>(
 		let front = view.front
 		let highest = view.frontCount - 1 - first
 
+		countCopied(count)
+
 		for (let index = 0; index < count; index++) {
 			items[index] = front[highest - index]
 		}
 
 		return createList(items)
 	}
+
+	countCopied(last - first)
 
 	return createList(
 		view.back.slice(first - view.frontCount, last - view.frontCount),
@@ -913,6 +934,8 @@ export function remove<ItemType extends AnyType>(
 	// whether its item is the one dropped.
 	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let items: Array<ItemType> = new Array(view.total - 1)
+
+	countCopied(view.total - 1)
 	let front = view.front
 	let frontCount = view.frontCount
 	let back = view.back
@@ -978,6 +1001,8 @@ export function insert<ItemType extends AnyType>(
 	// where the item goes.
 	// oxlint-disable-next-line unicorn/no-new-array -- the answer's length
 	let items: Array<ItemType> = new Array(view.total + 1)
+
+	countCopied(view.total)
 	let front = view.front
 	let frontCount = view.frontCount
 	let back = view.back
@@ -1033,6 +1058,7 @@ export function replace__overload$1<ItemType extends AnyType>(
 	if (position < view.frontCount) {
 		let front = view.front.slice(0, view.frontCount)
 
+		countCopied(view.frontCount)
 		front[view.frontCount - 1 - position] = item
 
 		return listRebuildingFront(front, originalList, view)
@@ -1095,6 +1121,7 @@ function writtenInBack<ItemType extends AnyType>(
 	// INVARIANT: a log is minted only on an Array no other box holds.
 	let copied = back.slice(0, count)
 
+	countCopied(count)
 	copied[position] = item
 
 	let answer = listRebuildingBack(copied, originalList, view)

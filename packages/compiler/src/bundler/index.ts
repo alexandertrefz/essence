@@ -131,6 +131,9 @@ export async function bundle(
 					? (options.sourcemapMode ?? "linked")
 					: false,
 			treeShaking: true,
+			// Only a spec counts List work, so a bundle drops every count. See
+			// "Counting a List's work" in packages/runtime/DEVELOPMENT.md.
+			define: { "globalThis.essenceCountsListWork": "false" },
 			bundle: true,
 			format: "esm",
 			// Absolute, because a relative `outfile` would resolve against
