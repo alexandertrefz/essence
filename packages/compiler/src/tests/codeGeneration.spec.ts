@@ -201,6 +201,33 @@ describe("Code Generation", () => {
 			).toEqual(['"loud"', "1", '"b"'])
 		})
 
+		// Every fix runs the Declaration first, so a static that runs
+		// something leaves both moves, and each prints what the other does.
+		it("keeps both moves for a static that runs something", async () => {
+			let doubled = `namespace Sizes {
+				static base: Integer = 2::multiply(with 2)
+			}`
+
+			expect(
+				diagnosticsOf(
+					program([
+						"Terminal.inspect(useIt())",
+						"constant q = 5",
+						doubled,
+					]),
+				).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual([
+				"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+			])
+
+			for (let followed of [
+				[doubled, "Terminal.inspect(useIt())", "constant q = 5"],
+				["constant q = 5", doubled, "Terminal.inspect(useIt())"],
+			]) {
+				expect(await run(program(followed))).toEqual(["4"])
+			}
+		})
+
 		it("moves a Statement with an effect past Declarations that run nothing", async () => {
 			let declarations = ["type Size = Integer", "constant size = 4"]
 

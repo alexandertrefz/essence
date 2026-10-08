@@ -156,7 +156,8 @@ through Scope, so a Property, a Parameter or a Record member that shares a Const
 `Units.declared` holds the bodies each Statement's text holds. `needsOf` also names the top-level Variables a Statement
 reads and assigns while it runs, as `Unit.assigns` records them. Two Statements that clash, one assigning a Variable the
 other reads or assigns, keep their order. Effects keep their written order too, so either move is offered as an edit
-only where what moves, or every Statement it passes, runs nothing, as `runsNothing` in `runsNothing.ts` answers. Where
+only where what moves, or every Statement it passes, runs nothing, as `runsNothing` in `runsNothing.ts` answers. Only
+the Statements written between the two are weighed, since every fix runs the Declaration before the Statement. Where
 neither move keeps the order, the Help names the move of the Declaration and says that its values then run before the
 Statements between, and offers no Quick Fix. A Statement runs nothing when it calls nothing, starts or completes
 nothing, and fills no String hole and no Dictionary. A body it declares runs only when called. A Declaration tied to the

@@ -5615,6 +5615,35 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		// Every fix runs the Namespace first, so a static that calls a Method
+		// with nothing between keeps the move.
+		it("should move a Statement below a Namespace whose static calls a Method", () => {
+			let lines = [
+				"implementation {",
+				"\tTerminal.print(Maths.four)",
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic four: Integer = 2::multiply(with 2)",
+				"\t}",
+				"}",
+			]
+
+			let [fix] = quickFixes(lines)
+			let result = applied(lines, fix!)
+
+			expect(fix?.title).toBe("Move this Statement below 'Maths'")
+			expect(result).toEqual([
+				"implementation {",
+				"\tnamespace Maths {",
+				"\t\tstatic four: Integer = 2::multiply(with 2)",
+				"\t}",
+				"",
+				"\tTerminal.print(Maths.four)",
+				"}",
+			])
+			expect(codesOf(result)).toEqual([])
+		})
+
 		// Either move would run `loud()` on the other side of an effect, so
 		// the Help names no edit and nothing is offered.
 		it("should offer nothing where either move would reorder effects", () => {

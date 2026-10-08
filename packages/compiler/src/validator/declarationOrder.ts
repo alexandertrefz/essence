@@ -754,16 +754,16 @@ function moveHelp(
 
 	let { nodes } = simulation.order
 	let crossed = nodes.slice(use + 1, declared + 1)
-	let passed = nodes
-		.slice(use, declared)
-		.filter((_, offset) => !moving.has(use + offset))
 	// Effects keep their written order, so each move needs one side of what it
-	// passes to run nothing.
+	// passes to run nothing. Every fix puts the Declaration first, so only the
+	// Statements written between the two are passed.
+	let between = nodes.slice(use + 1, declared)
+	let passed = between.filter((_, offset) => !moving.has(use + 1 + offset))
 	let statement =
 		crossed.every(
 			(_, offset) => !bound(simulation, use + 1 + offset, use),
 		) &&
-		(runsNothing(nodes[use]) || crossed.every(runsNothing))
+		(runsNothing(nodes[use]) || between.every(runsNothing))
 	let upward =
 		[...moving].every((index) => runsNothing(nodes[index])) ||
 		passed.every(runsNothing)

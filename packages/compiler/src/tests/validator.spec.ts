@@ -3633,6 +3633,46 @@ describe("Validator", () => {
 						"constant v = Sizes.base",
 					],
 				],
+				// Every fix runs the Declaration before the Statement, so a static
+				// that runs something weighs only against what stands between.
+				[
+					"a static that runs something with nothing between",
+					["Terminal.print(useIt())", sizes("2::multiply(with 2)")],
+					"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+					[sizes("2::multiply(with 2)"), "Terminal.print(useIt())"],
+				],
+				[
+					"a static that runs something past a Constant that runs nothing",
+					[
+						"Terminal.print(useIt())",
+						"constant q = 5",
+						sizes("2::multiply(with 2)"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+					[
+						sizes("2::multiply(with 2)"),
+						"Terminal.print(useIt())",
+						"constant q = 5",
+					],
+				],
+				// The Statement would pass the needed Constant's effect, which
+				// moves up with the Declaration in the other move.
+				[
+					"a needed Constant between that runs something",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						"Terminal.print(useIt())",
+						"constant size = loud()",
+						sizes("size"),
+					],
+					"Move the Declarations of 'size' and 'Sizes' above this Statement, in the order they are written.",
+					[
+						'function loud() -> Integer {\n\t\t\t\t\t\tTerminal.print("loud")\n\n\t\t\t\t\t\t<- 1\n\t\t\t\t\t}',
+						"constant size = loud()",
+						sizes("size"),
+						"Terminal.print(useIt())",
+					],
+				],
 				// A Declaration whose values run something passes only Statements
 				// that run nothing. Where neither move keeps the order, the Help
 				// says what the move changes, and offers no edit.
@@ -3836,6 +3876,45 @@ describe("Validator", () => {
 						program(["constant k = 3", "constant v = useIt()"]),
 					),
 				).toBe(true)
+			})
+
+			it("offers both moves to a Constant whose value runs something past one that runs nothing", () => {
+				let program = (statements: Array<string>) => `implementation {
+					${statements.join("\n\n")}
+
+					function readK() -> Integer {
+						<- k
+					}
+				}`
+
+				expect(
+					diagnosticsFor(
+						program([
+							"Terminal.print(readK())",
+							"constant q = 5",
+							"constant k = 2::multiply(with 3)",
+						]),
+					).map((diagnostic) => diagnostic.helps),
+				).toEqual([
+					[
+						"Move the Declaration of 'k' above this Statement, or this Statement below it.",
+					],
+				])
+
+				for (let followed of [
+					[
+						"constant k = 2::multiply(with 3)",
+						"Terminal.print(readK())",
+						"constant q = 5",
+					],
+					[
+						"constant q = 5",
+						"constant k = 2::multiply(with 3)",
+						"Terminal.print(readK())",
+					],
+				]) {
+					expect(compiles(program(followed))).toBe(true)
+				}
 			})
 
 			it("offers only the move that compiles to a Constant read too early", () => {
