@@ -239,6 +239,21 @@ describe("Round trips", () => {
 		)
 	})
 
+	// A payload is built in the order its Case declares, whatever order the
+	// host wrote, as the compiled Program builds one.
+	it("builds a payload in the order its Case declares", () => {
+		let crossed = through("shape", {
+			height: 4n,
+			$case: "Shape#Rect",
+			width: 3n,
+		}) as Record<string, unknown>
+
+		expect(Object.keys(crossed).filter((key) => key !== "$case")).toEqual([
+			"width",
+			"height",
+		])
+	})
+
 	it("carries a payload-less Case of a mixed Choice", () => {
 		expect(through("shape", { $case: "Shape#Blank" })).toEqual({
 			$case: "Shape#Blank",

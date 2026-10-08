@@ -341,18 +341,19 @@ function fillCasePayloadDefault(
 	}
 
 	let values = caseType.payloadDefault?.values
-
-	if (values === undefined || values === null) {
-		return value
+	let payloadType: common.RecordType = {
+		type: "Record",
+		members: caseType.members,
 	}
 
-	return filledPayloadLevel(
-		value,
-		written,
-		values,
-		{ type: "Record", members: caseType.members },
-		position,
-	)
+	if (values === undefined || values === null) {
+		return {
+			...value,
+			members: inDeclaredOrder(value.members, new Set(), payloadType),
+		}
+	}
+
+	return filledPayloadLevel(value, written, values, payloadType, position)
 }
 
 // One level of the payload. A member a path key wrote, as in
@@ -407,25 +408,39 @@ function filledPayloadLevel(
 		}
 	}
 
+	let ordered = inDeclaredOrder(members, defaulted, type)
+
 	return filled
-		? { ...value, members: inDeclaredOrder(members, defaulted, type), type }
-		: value
+		? { ...value, members: ordered, type }
+		: { ...value, members: ordered }
 }
 
-// A defaulted member stands before the first written member declared after
-// it, so a payload written in declared order prints in it. The written members
-// keep their order, since a Record Literal evaluates its members as written.
-// See "Payload defaults" in DEVELOPMENT.md.
-function inDeclaredOrder<Member>(
-	members: Record<string, Member>,
+// The members in the order the payload declares them. A Record Literal
+// evaluates its members as written, so they are all reordered only where no
+// written member runs anything. Otherwise each defaulted member stands before
+// the first written member declared after it. See "Payload defaults" in
+// DEVELOPMENT.md.
+function inDeclaredOrder(
+	members: Record<string, common.typedSimple.ExpressionNode>,
 	defaulted: Set<string>,
 	type: common.RecordType,
-): Record<string, Member> {
+): Record<string, common.typedSimple.ExpressionNode> {
 	let order = declared(type)
 	let rank = (name: string) =>
 		order.includes(name) ? order.indexOf(name) : order.length
+
+	if (
+		Object.entries(members).every(
+			([name, member]) => defaulted.has(name) || runsNothing(member),
+		)
+	) {
+		return Object.fromEntries(
+			Object.entries(members).sort(([a], [b]) => rank(a) - rank(b)),
+		)
+	}
+
 	let pending = order.filter((name) => defaulted.has(name))
-	let entries: Array<[string, Member]> = []
+	let entries: Array<[string, common.typedSimple.ExpressionNode]> = []
 
 	for (let [name, member] of Object.entries(members)) {
 		if (defaulted.has(name)) {
@@ -446,6 +461,31 @@ function inDeclaredOrder<Member>(
 	}
 
 	return Object.fromEntries(entries)
+}
+
+// Whether evaluating a simplified Expression runs nothing whose order a
+// reader could see. That holds for a literal, a name, and a member read, List,
+// Record or Case built of those.
+function runsNothing(node: common.typedSimple.ExpressionNode): boolean {
+	switch (node.nodeType) {
+		case "Identifier":
+		case "StringValue":
+		case "IntegerValue":
+		case "RationalValue":
+		case "BooleanValue":
+		case "FunctionValue":
+			return true
+		case "Lookup":
+			return runsNothing(node.base)
+		case "RecordValue":
+			return Object.values(node.members).every(runsNothing)
+		case "ListValue":
+			return node.values.every(runsNothing)
+		case "CaseValue":
+			return node.value === null || runsNothing(node.value)
+		default:
+			return false
+	}
 }
 
 // A deep copy of a simplified Expression with one Position stamped

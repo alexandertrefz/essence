@@ -5043,20 +5043,45 @@ describe("Choices", () => {
 			])
 		})
 
-		// A Record Literal evaluates its members as written, so a payload
-		// written out of declared order keeps its order.
-		it("keeps the order of the written members", async () => {
+		// A payload written out of declared order prints in declared order,
+		// with or without a default.
+		it("prints a written payload in its declared order", async () => {
 			expect(
 				await run(`implementation {
 					choice Call {
-						Post { server: String, body: String, port: Integer } = {
+						Post { host: String, body: String, port: Integer } = {
 							port = 80,
 						},
+						Get { host: String, path: String },
 					}
 
-					Terminal.inspect(Call#Post({ body = "x", server = "s" }))
+					Terminal.inspect(Call#Post({ body = "x", host = "s" }))
+					Terminal.inspect(Call#Get({ path = "/", host = "s" }))
 				}`),
-			).toEqual(['Call#Post { body = "x", server = "s", port = 80 }'])
+			).toEqual([
+				'Call#Post { host = "s", body = "x", port = 80 }',
+				'Call#Get { host = "s", path = "/" }',
+			])
+		})
+
+		// A Record Literal evaluates its members as written, so a payload
+		// whose members call something keeps their order.
+		it("keeps the written order of members that call something", async () => {
+			expect(
+				await run(`implementation {
+					choice Call {
+						Get { host: String, path: String },
+					}
+
+					function noted(_ text: String) -> String {
+						Terminal.inspect(text)
+
+						<- text
+					}
+
+					Terminal.inspect(Call#Get({ path = noted("/"), host = noted("s") }))
+				}`),
+			).toEqual(['"/"', '"s"', 'Call#Get { path = "/", host = "s" }'])
 		})
 
 		it("leaves a member the payload wrote alone", async () => {

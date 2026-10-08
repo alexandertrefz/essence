@@ -81,11 +81,12 @@ The filled values are built afresh for each site, so no two constructions share 
 construction's Position, where a debugger step should stop. The default itself may be written in another
 file.
 
-A filled payload prints in the order its Case declares, as a Parameter's rebuilt Record default does and as the
-client's marshaller builds a payload from a host. `inDeclaredOrder` places each defaulted member before the first
-written member declared after it, at every level a path key fills. The written members keep the order they were
-written in, because a Record Literal evaluates its members in that order. So a payload written out of declared
-order keeps that order when it prints.
+A payload prints in the order its Case declares, whether its members are written or filled in, as a Parameter's
+rebuilt Record default does and as the client's marshaller builds a payload from a host. `inDeclaredOrder` sorts
+the members at every level a path key fills. A Record Literal evaluates its members in the order they are written,
+so the written members move only where none of them runs anything (`runsNothing`): a literal, a name, or a member
+read. A payload that calls something keeps its written order, and each defaulted member then stands before the
+first written member declared after it.
 
 ## Test lowering
 
