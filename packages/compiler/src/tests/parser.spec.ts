@@ -2340,6 +2340,32 @@ describe("Parser", () => {
 					).toBe(true)
 				})
 
+				// Only a `_` on its own, under a Parameter written `_`, can have
+				// meant that Parameter. One glued to a name or a Number is part of
+				// another spelling.
+				it.each([
+					"constant x = _",
+					"constant f = (value: Integer) -> Integer { <- _ }",
+					"constant f = (_: Integer) -> Integer { <- my_value }",
+					"constant f = (_: Integer) -> Integer { <- __print(1) }",
+					"constant f = (_: Integer) -> Integer { <- 1_ }",
+					"constant f = (_: Integer) -> Integer { <- foo_bar(1) }",
+				])(
+					"should not name a Parameter when reading %s",
+					(statement) => {
+						let { diagnostics } = parseWithDiagnostics(
+							`implementation { ${statement} }`,
+						)
+
+						expect(containsErrors(diagnostics)).toBe(true)
+						expect(
+							diagnostics.flatMap(
+								(diagnostic) => diagnostic.helps,
+							),
+						).toEqual([])
+					},
+				)
+
 				// The Help is followed for both spellings it names.
 				it("should refuse a read of `_` with a Help that names the Parameter", () => {
 					let { diagnostics } = parseWithDiagnostics(

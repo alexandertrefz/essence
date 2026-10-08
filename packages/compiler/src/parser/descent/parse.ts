@@ -28,8 +28,8 @@ import {
 } from "./misplacedDefaults"
 import {
 	expressionExpected,
+	parameterLabel,
 	reportRedundantLabel,
-	reportReservedLabel,
 } from "./parameterNames"
 import {
 	refusedMatcherAfterValue,
@@ -784,6 +784,9 @@ class DescentParser {
 	// The levels of Expressions, Types and blocks being read. One shared
 	// budget, since all three recur into each other on one call stack.
 	protected nestingDepth = 0
+	// Whether a Function body being read has a Parameter that binds no name,
+	// its own or an enclosing Function's. See `expressionExpected`.
+	protected namelessParameter = false
 	// Whether the Statement being read stands in a test's own body. A
 	// Function body inside clears it, and a `suite` body, which is setup,
 	// never sets it.
@@ -4379,7 +4382,7 @@ class DescentParser {
 			case TokenType.KeywordOtherwise:
 				return this.parseIdentifier()
 			default:
-				throw expressionExpected(token)
+				throw expressionExpected(this.tokens, this.namelessParameter)
 		}
 	}
 
@@ -6357,8 +6360,8 @@ class DescentParser {
 		let documentation = ownsDocumentation ? this.documentationHere() : null
 		let parameterList = this.parseParameterList(allowsInferredTypes)
 		let returnType = this.parseOptionalReturnType(allowsInferredTypes)
-		let { result: block, completes } = this.completingBody(() =>
-			this.outsideTestBody(() => this.parseBlock()),
+		let { result: block, completes } = this.parseFunctionBody(
+			parameterList.parameters,
 		)
 
 		return generators.functionValueNode(
@@ -6377,6 +6380,22 @@ class DescentParser {
 		)
 	}
 
+	protected parseFunctionBody(parameters: Array<parser.ParameterNode>) {
+		let outer = this.namelessParameter
+
+		this.namelessParameter ||= parameters.some(
+			(parameter) => parameter.internalName === null,
+		)
+
+		try {
+			return this.completingBody(() =>
+				this.outsideTestBody(() => this.parseBlock()),
+			)
+		} finally {
+			this.namelessParameter = outer
+		}
+	}
+
 	protected parseGenericFunctionLiteral(
 		ownsDocumentation = true,
 	): parser.FunctionValueNode {
@@ -6384,8 +6403,8 @@ class DescentParser {
 		let genericList = this.parseGenericList()
 		let parameterList = this.parseParameterList()
 		let returnType = this.parseReturnType()
-		let { result: block, completes } = this.completingBody(() =>
-			this.outsideTestBody(() => this.parseBlock()),
+		let { result: block, completes } = this.parseFunctionBody(
+			parameterList.parameters,
 		)
 
 		return generators.functionValueNode(
@@ -6599,21 +6618,6 @@ class DescentParser {
 		return parameter
 	}
 
-	// `start` and `complete` can not be a Parameter's label, since no call
-	// could pass one. See "Asynchrony keywords" in DEVELOPMENT.md. The label is
-	// dropped and the Parameter keeps its name.
-	protected parameterLabel(
-		name: parser.IdentifierNode,
-	): parser.IdentifierNode | null {
-		if (name.content !== "start" && name.content !== "complete") {
-			return name
-		}
-
-		reportReservedLabel(name)
-
-		return null
-	}
-
 	protected parseParameterHead(
 		allowsInferredTypes = false,
 	): parser.ParameterNode {
@@ -6718,7 +6722,7 @@ class DescentParser {
 		// internal name goes.
 		if (this.tokens.peek()?.type === TokenType.SymbolLeftBrace) {
 			return this.parsePatternParameter(
-				this.parameterLabel(name),
+				parameterLabel(name),
 				null,
 				documentation,
 			)
@@ -6763,7 +6767,7 @@ class DescentParser {
 			let type = this.parseType()
 
 			return generators.parameter(
-				this.parameterLabel(name),
+				parameterLabel(name),
 				internalName,
 				type,
 				{ start: name.position.start, end: type.position.end },
@@ -6788,7 +6792,7 @@ class DescentParser {
 		let type = this.parseType()
 
 		return generators.parameter(
-			this.parameterLabel(name),
+			parameterLabel(name),
 			name,
 			type,
 			{ start: name.position.start, end: type.position.end },
