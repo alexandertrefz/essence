@@ -3049,6 +3049,32 @@ Delete the `() -> String` entry. Without it, `"hi"::greet()` reaches the first e
 
 Taught on: [Namespaces and methods › Overloads](/docs/language/namespaces-and-methods#overloads)
 
+### `ambiguous-overload-answer`
+
+**Error.** A function passed to an overloaded call answers a type more than one entry takes: the type its body answers, the answer type a literal writes, or a named function's answer type. The entry whose answer type every other one takes is selected, and no entry's answer type is taken by all the others, so the call has more than one reading.
+
+<div class="error-output">
+
+```
+[ambiguous-overload-answer]
+Error: More than one Overload takes what this Function answers
+    ╭─┤ OverloadAnswers.es:26:34 │
+    │
+ 26 │     constant picked = Picks.pick(on (v) { <- v })
+    │                                     ─┬─  
+    │                                      ╰─── this answers an Integer, which 'Integer | String' and 'Integer | Boolean' both take
+    │ 
+    │ Help 1: Write the return Type after the Parameter list — '-> Integer | String', for the entry that answers it.
+    │ Help 2: Or write the return Type after the Parameter list — '-> Integer | Boolean', for the entry that answers it.
+    │ 
+    │ Note: An Overload is selected by the Types its Arguments write, and a Function by what it answers. The entry whose answer every other one takes is selected, and none does here.
+────╯
+```
+
+</div>
+
+Write the answer type the entry you mean takes: `Picks.pick(on (v) -> Integer | Boolean { <- v })`. For a named function, pass a literal that calls it and writes that type. A written answer type is the function's own answer, so the narrowest entry that takes it is selected, even where a wider entry is written first. Where every other entry's answer type takes one entry's, as `Scalar` takes `Integer`, that entry is selected without a report, whichever entry is written first. The refused call answers nothing to check, so using its answer reports nothing more.
+
 ### `fallback-never-used`
 
 **Warning.** A `defaultingTo` argument can never be used, because the call without it already returns a value that is never empty. A written list proves it has items, so `[3, 1, 2]::firstItem()` returns an `Integer`.

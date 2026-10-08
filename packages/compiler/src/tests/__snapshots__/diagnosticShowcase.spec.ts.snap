@@ -2201,6 +2201,25 @@ Warning: This Argument fits the receiver and what it holds
 "
 `;
 
+exports[`Diagnostic Showcase OverloadAnswers.es should render the same report every time 1`] = `
+"[ambiguous-overload-answer]
+Error: More than one Overload takes what this Function answers
+    ╭─┤ OverloadAnswers.es:26:34 │
+    │
+ 26 │     constant picked = Picks.pick(on (v) { <- v })
+    │                                     ─┬─  
+    │                                      ╰─── this answers an Integer, which 'Integer | String' and 'Integer | Boolean' both take
+    │ 
+    │ Help 1: Write the return Type after the Parameter list — '-> Integer | String', for the entry that answers it.
+    │ Help 2: Or write the return Type after the Parameter list — '-> Integer | Boolean', for the entry that answers it.
+    │ 
+    │ Note: An Overload is selected by the Types its Arguments write, and a Function by what it answers. The entry whose answer every other one takes is selected, and none does here.
+────╯
+
+─── 1 error
+"
+`;
+
 exports[`Diagnostic Showcase PathKeyDefaults.es should render the same report every time 1`] = `
 "[path-key-without-default]
 Error: A path key reaches into a member no default fills in

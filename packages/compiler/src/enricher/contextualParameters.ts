@@ -8,7 +8,8 @@ import {
 	report,
 	reportError,
 } from "../diagnostics/index"
-import { countOf, describeType } from "../helpers/describe"
+import { countOf, describeType, withArticle } from "../helpers/describe"
+import { eraseRefinements } from "../helpers/eraseRefinements"
 import { parameterInternalName } from "../helpers/names"
 import { pairedByPlace } from "../helpers/readerPairing"
 import {
@@ -17,9 +18,12 @@ import {
 	type GenericBindings,
 	type MatchableArgument,
 	matchArguments,
+	matchesType,
 	mentionsUnsolvedTypeParameter,
 	pairArguments,
 	insideHoist,
+	typeContainsError,
+	typeContainsRefinement,
 } from "../helpers/types"
 import { findParserChild, type ParserNode } from "../visitor/index"
 import { type ArgumentTyper, inferReturnTypeFromBody } from "./enrichers"
@@ -40,6 +44,10 @@ type HeldReports = {
 	// Whether more candidates than one take the call's labels, so a literal's
 	// body may be what tells them apart.
 	several: boolean
+	// What each candidate's literals answer, for `chooseByAnswers`.
+	answers: Map<number, Map<parser.ExpressionNode, LiteralAnswer>>
+	// The candidates found to fit so far, in the order they were probed.
+	fitting: Array<number>
 	byLiteral: Map<
 		parser.FunctionDefinitionNode,
 		Array<{ candidate: number; diagnostics: Array<common.Diagnostic> }>
@@ -127,6 +135,8 @@ export function probingCandidates<T extends { index: number }>(
 			candidates.filter((candidate) =>
 				pairsLabels(candidate.parameterTypes, matchableArguments),
 			).length > 1,
+		answers: new Map(),
+		fitting: [],
 		byLiteral: new Map(),
 	}
 	let into = holding
@@ -407,6 +417,15 @@ export function returnTypeHelpIn(
 	return help
 }
 
+// What a literal's body answers under the Parameter Types one candidate gives
+// it, beside the answer that candidate declares.
+type LiteralAnswer = {
+	answer: common.Type
+	declared: common.Type
+	// The Argument's Function Type, whose labels a Help spells a call with.
+	type: common.FunctionType
+}
+
 // A literal's body read silently under one candidate's Parameter Types.
 type BodyReading = {
 	node: parser.FunctionDefinitionNode
@@ -534,9 +553,10 @@ function readsSelf(node: ParserNode): true | undefined {
 	return node.nodeType === "Self" ? true : findParserChild(node, readsSelf)
 }
 
-// A literal whose body has errors of its own under one of several candidates
-// reads as an Error Argument there. A later candidate it fits is selected
-// then. See "Literals a candidate does not fit" in DEVELOPMENT.md.
+// A literal read under one of several candidates reads as an Error Argument
+// there where its body has errors of its own. So it does where its answer
+// does not fit the candidate's. See "Literals a candidate does not fit" in
+// DEVELOPMENT.md.
 export function typerReadingLiteralBodies(
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
@@ -585,19 +605,49 @@ export function typerReadingLiteralBodies(
 				declaredType,
 			)
 			let held = heldReports.at(-1)
+			let read = decidedReading(type, expectedType, bindings)
 
-			if (value.nodeType !== "FunctionValue" || held?.several !== true) {
+			if (held?.several !== true || read === null) {
 				return type
 			}
 
-			let read = decidedReading(value.value, type, expectedType, bindings)
-
-			if (read === null) {
-				return type
-			}
-
-			if (readingOf(value.value, read.parameters).refused) {
+			// An entry whose answer takes what one that fits answers can not
+			// be the narrowest, so its body is not read.
+			if (dominated(held, value, read.declared)) {
 				typer.noteErrorArgument()
+
+				return type
+			}
+
+			let literal =
+				value.nodeType === "FunctionValue" ? value.value : null
+			let reading =
+				literal !== null && needsContext(literal)
+					? readingOf(literal, read.parameters)
+					: null
+			// A written `-> Type`, or the Type of a named Function, is the
+			// answer as it stands.
+			let answer =
+				literal?.returnType === null
+					? (reading?.answer ?? null)
+					: read.answer
+
+			if (
+				reading?.refused === true ||
+				(answer !== null && !admits(read.declared, answer))
+			) {
+				typer.noteErrorArgument()
+			} else if (answer !== null) {
+				let answers = held.answers.get(held.candidate) ?? new Map()
+
+				held.answers.set(
+					held.candidate,
+					answers.set(value, {
+						answer,
+						declared: read.declared,
+						type: read.type,
+					}),
+				)
 			}
 
 			return type
@@ -605,20 +655,41 @@ export function typerReadingLiteralBodies(
 	}
 }
 
-// The Parameter Types a candidate gives a literal, where they are decided. A
+// Whether a candidate fitting already answers only this Argument, with an
+// answer the asking candidate's declared answer takes. The asking one then
+// can not be the narrowest, and takes whichever is.
+function dominated(
+	held: HeldReports,
+	argument: parser.ExpressionNode,
+	declared: common.Type,
+): boolean {
+	return held.fitting.some((candidate) => {
+		let answers = held.answers.get(candidate)
+		let theirs = answers?.get(argument)
+
+		return (
+			answers?.size === 1 &&
+			theirs !== undefined &&
+			admits(declared, theirs.declared)
+		)
+	})
+}
+
+// What a candidate makes of a Function-typed Argument, where it is decided:
+// the Parameter Types it gives, the Argument's answer and the candidate's. A
 // return Type still open was read off the body while matching, and open
 // Parameter Types decide nothing yet.
 function decidedReading(
-	node: parser.FunctionDefinitionNode,
 	type: common.Type,
 	expectedType: common.Type,
 	bindings: GenericBindings | null | undefined,
-): { parameters: Array<common.Parameter> } | null {
-	if (
-		!needsContext(node) ||
-		type.type !== "Function" ||
-		expectedType.type !== "Function"
-	) {
+): {
+	type: common.FunctionType
+	parameters: Array<common.Parameter>
+	answer: common.Type
+	declared: common.Type
+} | null {
+	if (type.type !== "Function" || expectedType.type !== "Function") {
 		return null
 	}
 
@@ -639,5 +710,188 @@ function decidedReading(
 		return null
 	}
 
-	return { parameters }
+	return { type, parameters, answer: decided(type.returnType), declared }
+}
+
+// Whether a declared answer takes what a body answers. A refinement is judged
+// by its base, since the validator proves a written answer against it.
+function admits(declared: common.Type, answer: common.Type): boolean {
+	return (
+		typeContainsError(answer) ||
+		matchesType(declared, answer) ||
+		(typeContainsRefinement(declared) &&
+			matchesType(eraseRefinements(declared), answer))
+	)
+}
+
+// Whether a candidate's literals were measured by their answers, which then
+// choose among the candidates that fit.
+export function answeredBy(candidate: number): boolean {
+	return heldReports.at(-1)?.answers.has(candidate) === true
+}
+
+// Notes a candidate that fits, so a later one its answer dominates is not read.
+export function noteFitting(candidate: number): void {
+	heldReports.at(-1)?.fitting.push(candidate)
+}
+
+// The candidate whose declared answers every other fitting one takes, whatever
+// order they are written in. Where none does, the call is refused, and the
+// first stands for it. See "Literals a candidate does not fit" in
+// DEVELOPMENT.md.
+export function chooseByAnswers(fitting: Array<number>): {
+	candidate: number
+	// The refusal, which the caller reports only where it commits the call.
+	refusal: Array<common.Diagnostic> | null
+} {
+	let held = heldReports.at(-1)
+	let answered = fitting.filter((candidate) => held?.answers.has(candidate))
+
+	if (held === null || held === undefined || answered.length < 2) {
+		return { candidate: fitting[0]!, refusal: null }
+	}
+
+	let answersOf = (candidate: number) => held.answers.get(candidate)!
+	let takes = (wider: number, narrower: number): boolean =>
+		[...answersOf(narrower)].every(([literal, mine]) => {
+			let theirs = answersOf(wider).get(literal)
+
+			return (
+				theirs === undefined || admits(theirs.declared, mine.declared)
+			)
+		})
+	let minimum = answered.find((candidate) =>
+		answered.every((other) => takes(other, candidate)),
+	)
+
+	if (minimum !== undefined) {
+		return { candidate: minimum, refusal: null }
+	}
+
+	let { diagnostics } = collectDiagnostics(() =>
+		reportAmbiguousAnswers(answered.map(answersOf)),
+	)
+
+	return { candidate: fitting[0]!, refusal: diagnostics }
+}
+
+// Reports the first literal whose answer the fitting candidates disagree on,
+// with a Help writing each one's declared answer as its `-> Type`.
+function reportAmbiguousAnswers(
+	answers: Array<Map<parser.ExpressionNode, LiteralAnswer>>,
+): void {
+	let [first] = answers
+	let argument = [...(first?.keys() ?? [])].find(
+		(node) =>
+			new Set(
+				answers.map((each) =>
+					describeType(each.get(node)?.declared ?? { type: "Error" }),
+				),
+			).size > 1,
+	)
+	let mine = argument === undefined ? undefined : first?.get(argument)
+
+	if (argument === undefined || mine === undefined) {
+		return
+	}
+
+	let position =
+		argument.nodeType === "FunctionValue"
+			? argument.value.parameterListPosition
+			: argument.position
+	let spellings = [
+		...new Set(
+			answers.flatMap((each) => {
+				let declared = each.get(argument)?.declared
+
+				return declared === undefined ? [] : [describeType(declared)]
+			}),
+		),
+	].filter(
+		(spelling) => !spelling.includes("…") && !spelling.includes("Unknown"),
+	)
+	let quoted = spellings.map((spelling) => `'${spelling}'`)
+	let listed =
+		quoted.length < 2
+			? "more than one entry takes"
+			: `${quoted.slice(0, -1).join(", ")} and ${quoted.at(-1)} ${quoted.length === 2 ? "both" : "all"} take`
+
+	reportError(
+		"More than one Overload takes what this Function answers",
+		position,
+		{
+			code: "ambiguous-overload-answer",
+			labels: [
+				primary(
+					position,
+					`this answers ${withArticle(describeType(mine.answer))}, which ${listed}`,
+				),
+			],
+			notes: [
+				"An Overload is selected by the Types its Arguments write, and a Function by what it answers. The entry whose answer every other one takes is selected, and none does here.",
+			],
+			helps: answerHelps(argument, mine.type, spellings),
+		},
+	)
+}
+
+// A Help per answer that writes it: after a literal's Parameter list, or as a
+// literal calling a named Function in its place.
+function answerHelps(
+	argument: parser.ExpressionNode,
+	type: common.FunctionType,
+	spellings: Array<string>,
+): Array<string> {
+	let lead = (index: number) => (index === 0 ? "Write" : "Or write")
+
+	if (argument.nodeType === "FunctionValue") {
+		return spellings.map(
+			(spelling, index) =>
+				`${lead(index)} the return Type after the Parameter list — '-> ${spelling}', for the entry that answers it.`,
+		)
+	}
+
+	let callee = spelledName(argument)
+
+	if (callee === null) {
+		return [
+			"Pass a Function literal that writes the answer Type of the entry you mean in its place.",
+		]
+	}
+
+	// Named apart from the name the literal calls, so none shadows it.
+	let root = callee.split(".")[0]
+	let names: Array<string> = []
+
+	for (let next = 1; names.length < type.parameterTypes.length; next += 1) {
+		if (`p${next}` !== root) {
+			names.push(`p${next}`)
+		}
+	}
+
+	let passed = type.parameterTypes.map((parameter, index) =>
+		parameter.name === null || parameter.name === "_"
+			? names[index]
+			: `${parameter.name} ${names[index]}`,
+	)
+
+	return spellings.map(
+		(spelling, index) =>
+			`${lead(index)} a Function literal in its place — '(${names.join(", ")}) -> ${spelling} { <- ${callee}(${passed.join(", ")}) }', for the entry that answers it.`,
+	)
+}
+
+// A name or a chain of member reads over one, as written.
+function spelledName(node: parser.ExpressionNode): string | null {
+	if (node.nodeType === "Identifier") {
+		return node.content
+	}
+
+	if (node.nodeType === "Lookup") {
+		let base = spelledName(node.base)
+
+		return base === null ? null : `${base}.${node.member.content}`
+	}
+
+	return null
 }

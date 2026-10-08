@@ -116,10 +116,7 @@ import { wrapSingleMemberShorthand } from "./caseShorthand"
 import {
 	enteringCall,
 	holdLiteralReports,
-	holeDecided,
 	needsContext,
-	probingCandidate,
-	probingCandidates,
 	readingArgumentLiteral,
 	readLiteralsByPlace,
 	resolveContextualParameterTypes,
@@ -133,6 +130,7 @@ import {
 } from "./dispatchReceivers"
 import { namespaceCallHelps, valueOf } from "./namespaceValues"
 import { noteOuterRead, refuseShadowingAfterRead } from "./outerReads"
+import { selectOverload } from "./overloadSelection"
 import {
 	bindsLastStep,
 	refuseBareNames,
@@ -10047,7 +10045,7 @@ function resolveFunctionDefinitionType(
 // One Invocation inferred against one signature. `unboundGenerics` are the Type
 // Parameters nothing bound, substituted as Error in `returnType` and reported
 // once a candidate is selected.
-type InferredInvocation = {
+export type InferredInvocation = {
 	returnType: common.Type
 	unboundGenerics: Array<string>
 	// What each Type Parameter was bound to, read for the winner's
@@ -10480,7 +10478,7 @@ function substituteInferredReturnType(
 
 // The Overload an Invocation settled on. `diagnostics` are what probing it
 // reported, held until the candidate is committed.
-type SelectedOverload = {
+export type SelectedOverload = {
 	index: number
 	inferred: InferredInvocation
 	conformances: Array<common.Conformance>
@@ -10500,7 +10498,7 @@ type ProbedOverload = {
 
 // One candidate matched and its bounds solved, with its reports and Argument
 // Errors handed back separately.
-function probeOverload(
+export function probeOverload(
 	overload: common.BaseFunction,
 	matchableArguments: Array<MatchableArgument>,
 	scope: enricher.Scope,
@@ -10535,132 +10533,6 @@ function probeOverload(
 	}
 
 	return { ...result, sawErrorArgument }
-}
-
-// The order candidates are probed in: entries asking for a refinement first,
-// then the rest, stably. See "Choosing an Overload" in DEVELOPMENT.md.
-function overloadProbeOrder(
-	overloads: Array<common.BaseFunction>,
-	receiverParameters: number,
-): Array<[number, common.BaseFunction]> {
-	let candidates = [...overloads.entries()]
-
-	if (candidates.length < 2) {
-		return candidates
-	}
-
-	let asking: Array<[number, common.BaseFunction]> = []
-	let rest: Array<[number, common.BaseFunction]> = []
-
-	for (let candidate of candidates) {
-		let [, overload] = candidate
-
-		if (
-			overload.parameterTypes
-				.slice(receiverParameters)
-				.some((parameter) => typeContainsRefinement(parameter.type))
-		) {
-			asking.push(candidate)
-		} else {
-			rest.push(candidate)
-		}
-	}
-
-	return asking.length === 0 ? candidates : [...asking, ...rest]
-}
-
-// Selects an Overload, counting bounds and Error Arguments as part of fitting.
-// Falls back on the first candidate whose Arguments matched. A literal's report
-// against a candidate it does not fit waits for the selection. See "Choosing an
-// Overload" in DEVELOPMENT.md.
-export function selectOverload(
-	...args: Parameters<typeof selectFittingOverload>
-): SelectedOverload | undefined {
-	return probingCandidates(
-		() => selectFittingOverload(...args),
-		args[0],
-		args[1],
-	)
-}
-
-function selectFittingOverload(
-	overloads: Array<common.BaseFunction>,
-	matchableArguments: Array<MatchableArgument>,
-	scope: enricher.Scope,
-	position: common.Position,
-	typer: ArgumentTyper,
-	// How many leading Parameters the call did not write: one for a Method's
-	// receiver, else none. Read only by `overloadProbeOrder`.
-	receiverParameters = 0,
-	// Handed to every probe for the one Help it decides.
-	atPrintingCall = false,
-): SelectedOverload | undefined {
-	let firstArgumentMatch:
-		| { selected: SelectedOverload; sawErrorArgument: boolean }
-		| undefined
-
-	for (let [index, overload] of overloadProbeOrder(
-		overloads,
-		receiverParameters,
-	)) {
-		// Up to the first candidate whose Arguments match, a probe reports and
-		// records. Later probes are speculative, so their reports and
-		// recordings are held until one is committed.
-		let probe = () =>
-			probingCandidate(index, () =>
-				probeOverload(
-					overload,
-					matchableArguments,
-					scope,
-					position,
-					typer,
-					atPrintingCall,
-				),
-			)
-		let held =
-			firstArgumentMatch === undefined
-				? undefined
-				: probeContextualFunctionTypes(() => collectDiagnostics(probe))
-		let { result: probed, diagnostics: argumentDiagnostics } =
-			held?.result ?? { result: probe(), diagnostics: [] }
-
-		if (probed === undefined) {
-			continue
-		}
-
-		let candidate = {
-			index,
-			inferred: probed.inferred,
-			conformances: probed.conformances,
-			diagnostics: [...argumentDiagnostics, ...probed.diagnostics],
-		}
-
-		if (
-			!containsErrors(candidate.diagnostics) &&
-			!probed.sawErrorArgument
-		) {
-			commitContextualFunctionTypes(held?.recording)
-
-			return candidate
-		}
-
-		firstArgumentMatch ??= {
-			selected: candidate,
-			sawErrorArgument: probed.sawErrorArgument,
-		}
-	}
-
-	if (firstArgumentMatch === undefined) {
-		return undefined
-	}
-
-	// Nothing held up, so the Invocation owns this candidate's Error Argument,
-	// which `reportUnboundGenerics` asks about.
-	if (firstArgumentMatch.sawErrorArgument) {
-		typer.noteErrorArgument()
-	}
-
-	return holeDecided(firstArgumentMatch)
 }
 
 // The one written Argument that is a Function literal without `-> Type`. Null
@@ -15479,7 +15351,7 @@ export function probeContextualFunctionTypes<Result>(probe: () => Result): {
 	}
 }
 
-function commitContextualFunctionTypes(
+export function commitContextualFunctionTypes(
 	recording: ContextualFunctionTypeRecording | undefined,
 ): void {
 	if (recording === undefined) {

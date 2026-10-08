@@ -6104,6 +6104,437 @@ ${declared}
 				})
 			})
 
+			// A literal without `-> Type` is measured by what its body answers,
+			// so the entry whose declared answer takes it is selected.
+			describe("told apart by a callback's answer", () => {
+				let items = `type Item = { price: Rational, count: Integer }
+
+					constant items: List<Item> = [{ price = 1/2, count = 2 }]`
+				let picks = `namespace Picks for Integer {
+						overload static pick {
+							(on key: (_ v: Integer) -> Integer | String) -> String {
+								<- "text"
+							}
+							(on key: (_ v: Integer) -> Integer | Boolean) -> String {
+								<- "flag"
+							}
+						}
+					}`
+				// The widest entry is written first.
+				let threePicks = `namespace Picks for Integer {
+						overload static pick {
+							(on key: (_ v: Integer) -> Integer | String | Boolean) -> String {
+								<- "any"
+							}
+							(on key: (_ v: Integer) -> Integer | String) -> String {
+								<- "text"
+							}
+							(on key: (_ v: Integer) -> Integer | Boolean) -> String {
+								<- "flag"
+							}
+						}
+					}`
+
+				it("should select the entry whose declared answer takes the body's", () => {
+					let source = `implementation {
+						${items}
+
+						constant byPrice = items::sum(on (item) { <- item.price })
+						constant byCount = items::sum(on (item) { <- item.count })
+					}`
+					let program = enrich(parse(source))
+
+					expect(program.diagnostics).toEqual([])
+					expect(
+						program.program.implementation.nodes.flatMap((node) =>
+							node.nodeType === "ConstantDeclarationStatement"
+								? [printType(node.value.type)]
+								: [],
+						),
+					).toEqual([
+						"List<{ price: Rational, count: Integer }>",
+						"Rational",
+						"Integer",
+					])
+				})
+
+				// The entry whose answer every other one takes is selected, so
+				// the order the entries are written in decides nothing.
+				it("should select the narrowest answer whichever entry comes first", () => {
+					let measured = (
+						first: string,
+						second: string,
+					) => `implementation {
+						namespace Measures for Integer {
+							overload measure {
+								(by key: (_ v: Integer) -> ${first}) -> String {
+									<- "${first}"
+								}
+								(by key: (_ v: Integer) -> ${second}) -> String {
+									<- "${second}"
+								}
+							}
+						}
+
+						constant measured = 1::measure(by (v) { <- v })
+					}`
+
+					for (let [source, index] of [
+						[measured("Scalar", "Integer"), 1],
+						[measured("Integer", "Scalar"), 0],
+					] as const) {
+						expect(diagnosticsFor(source)).toEqual([])
+						expect(
+							lastConstantMethodInvocation(source)
+								.overloadedMethodIndex,
+						).toBe(index)
+					}
+				})
+
+				// A named Function, a Function-typed Constant and a literal,
+				// annotated or not, all count by their answer Type.
+				it("should measure every Function-typed Argument by its answer", () => {
+					let measured = (argument: string) => `implementation {
+						namespace Measures for Integer {
+							overload measure {
+								(by key: (_ v: Integer) -> Scalar) -> String {
+									<- "scalar"
+								}
+								(by key: (_ v: Integer) -> Integer) -> String {
+									<- "integer"
+								}
+							}
+						}
+
+						function named(_ v: Integer) -> Integer {
+							<- v
+						}
+
+						constant kept: (_ v: Integer) -> Integer = named
+
+						constant measured = 1::measure(by ${argument})
+					}`
+
+					for (let argument of [
+						"(_ v: Integer) -> Integer { <- v }",
+						"(v) -> Integer { <- v }",
+						"(v) { <- v }",
+						"named",
+						"kept",
+					]) {
+						let source = measured(argument)
+
+						expect(diagnosticsFor(source)).toEqual([])
+						expect(
+							lastConstantMethodInvocation(source)
+								.overloadedMethodIndex,
+						).toBe(1)
+					}
+				})
+
+				// A named Function's refusal writes a literal calling it, and
+				// either compiles.
+				it("should write a literal calling a named Function the answers refuse", () => {
+					let call = (argument: string) => `implementation {
+						${picks}
+
+						function named(_ v: Integer) -> Integer {
+							<- v
+						}
+
+						constant picked = Picks.pick(on ${argument})
+					}`
+
+					expect(
+						helpsOfCode(call("named"), "ambiguous-overload-answer"),
+					).toEqual([
+						"Write a Function literal in its place — '(p1) -> Integer | String { <- named(p1) }', for the entry that answers it.",
+						"Or write a Function literal in its place — '(p1) -> Integer | Boolean { <- named(p1) }', for the entry that answers it.",
+					])
+
+					for (let [answer, entry] of [
+						["Integer | String", 0],
+						["Integer | Boolean", 1],
+					] as const) {
+						let followed = call(
+							`(p1) -> ${answer} { <- named(p1) }`,
+						)
+
+						expect(compiles(followed)).toBe(true)
+						expect(
+							lastConstantFunctionInvocation(followed)
+								.overloadedMethodIndex,
+						).toBe(entry)
+					}
+				})
+
+				// The literal's Parameters are named apart from the name it
+				// calls, so none shadows it.
+				it("should name a written literal's Parameters apart from the Function it calls", () => {
+					let call = (argument: string) => `implementation {
+						${picks}
+
+						function named(_ v: Integer) -> Integer {
+							<- v
+						}
+
+						constant p1: (_ v: Integer) -> Integer = named
+
+						constant picked = Picks.pick(on ${argument})
+					}`
+					let helps = helpsOfCode(
+						call("p1"),
+						"ambiguous-overload-answer",
+					)
+
+					expect(helps).toEqual([
+						"Write a Function literal in its place — '(p2) -> Integer | String { <- p1(p2) }', for the entry that answers it.",
+						"Or write a Function literal in its place — '(p2) -> Integer | Boolean { <- p1(p2) }', for the entry that answers it.",
+					])
+
+					for (let [help, entry] of helps.map(
+						(text, index) => [text, index] as const,
+					)) {
+						let followed = call(help.split("'")[1]!)
+
+						expect(compiles(followed)).toBe(true)
+						expect(
+							lastConstantFunctionInvocation(followed)
+								.overloadedMethodIndex,
+						).toBe(entry)
+					}
+				})
+
+				// The answers of three entries take an Integer, and none takes
+				// both others'. Each Help writes one of them, and compiles.
+				it("should refuse an answer no one entry takes most narrowly", () => {
+					let call = (literal: string) => `implementation {
+						${threePicks}
+
+						constant picked = Picks.pick(on ${literal})
+					}`
+					let source = call("(v) { <- v }")
+					let helps = helpsOfCode(source, "ambiguous-overload-answer")
+
+					expect(codesOfSource(source)).toEqual([
+						"ambiguous-overload-answer",
+					])
+					expect(helps).toHaveLength(3)
+
+					// A written answer is the literal's own, so the narrowest
+					// entry taking it is selected, though a wider one comes
+					// first.
+					for (let [answer, entry] of [
+						["Integer | String | Boolean", 0],
+						["Integer | String", 1],
+						["Integer | Boolean", 2],
+					] as const) {
+						let followed = call(`(v) -> ${answer} { <- v }`)
+
+						expect(
+							helps.some((help) =>
+								help.includes(`'-> ${answer}'`),
+							),
+						).toBe(true)
+						expect(compiles(followed)).toBe(true)
+						expect(
+							lastConstantFunctionInvocation(followed)
+								.overloadedMethodIndex,
+						).toBe(entry)
+					}
+				})
+
+				// Every entry fits, with the same answer, so only the first is
+				// read. Each literal reads the Parameter of the one around it.
+				// Counted, not timed.
+				it("should read a nesting of entries that all fit a number of times that grows by level", () => {
+					let chained = (depth: number, level = 1): string =>
+						level > depth
+							? "1"
+							: `Three.pick(on (v${level}) { <- v${level}.z::add(${chained(depth, level + 1)})${level > 1 ? `::add(v${level - 1}.z)` : ""} })`
+					let program = parse(`implementation {
+						type A = { a: Integer, z: Integer }
+						type B = { b: Integer, z: Integer }
+						type C = { c: Integer, z: Integer }
+
+						namespace Three for Integer {
+							overload static pick {
+								(on key: (_ v: A) -> Integer) -> Integer { <- 1 }
+								(on key: (_ v: B) -> Integer) -> Integer { <- 2 }
+								(on key: (_ v: C) -> Integer) -> Integer { <- 3 }
+							}
+						}
+
+						constant x = ${chained(6)}
+					}`)
+					let reads: Array<number> = []
+					let count = (node: ParserNode): void => {
+						forEachParserChild(node, count)
+
+						if (
+							node.nodeType !== "FunctionDefinition" ||
+							node.returnType !== null
+						) {
+							return
+						}
+
+						let { body } = node
+						let index = reads.push(0) - 1
+
+						Object.defineProperty(node, "body", {
+							get: () => {
+								reads[index] += 1
+
+								return body
+							},
+						})
+					}
+
+					count(program)
+
+					expect(enrich(program).diagnostics).toEqual([])
+					expect(reads).toHaveLength(6)
+					expect(Math.max(...reads)).toBeLessThanOrEqual(3 * 6)
+				})
+
+				// A value call probes every Namespace declaring the Method, and
+				// only the one it commits reports its refusal, once per spelling.
+				it("should refuse an answer only from the Namespace the call commits", () => {
+					let namespaces = (
+						wide: string,
+						narrow: string,
+					) => `implementation {
+						namespace Wide for Integer | String {
+							overload pick {
+								${wide}
+							}
+						}
+
+						namespace Narrow for Integer {
+							overload pick {
+								${narrow}
+							}
+						}
+
+						constant valued = 1::pick(on (v) { <- v })
+						constant named = Narrow.pick(1, on (v) { <- v })
+					}`
+					let entries = (answers: Array<string>) =>
+						answers
+							.map(
+								(answer) =>
+									`(on key: (_ v: Integer) -> ${answer}) -> String { <- "${answer}" }`,
+							)
+							.join("\n")
+					let ambiguous = entries([
+						"Integer | String",
+						"Integer | Boolean",
+					])
+
+					expect(
+						codesOfSource(
+							namespaces(
+								ambiguous,
+								entries(["Integer", "Scalar"]),
+							),
+						),
+					).toEqual([])
+					expect(
+						codesOfSource(
+							namespaces(entries(["Integer"]), ambiguous),
+						),
+					).toEqual([
+						"ambiguous-overload-answer",
+						"ambiguous-overload-answer",
+					])
+					expect(
+						codesOfSource(namespaces(ambiguous, ambiguous)),
+					).toEqual([
+						"ambiguous-overload-answer",
+						"ambiguous-overload-answer",
+					])
+				})
+
+				// The refused call answers the hole, so nothing done with its
+				// answer is reported again.
+				it("should answer the hole where it refuses an answer", () => {
+					expect(
+						codesOfSource(`implementation {
+							${picks.replace('-> Integer | Boolean) -> String {\n\t\t\t\t\t\t\t\t<- "flag"', "-> Integer | Boolean) -> Integer {\n\t\t\t\t\t\t\t\t<- 2")}
+
+							constant n: Integer = Picks.pick(on (v) { <- v })
+							constant m = Picks.pick(on (v) { <- v })::add(1)
+							constant s: String = Picks.pick(on (v) { <- v })
+						}`),
+					).toEqual([
+						"ambiguous-overload-answer",
+						"ambiguous-overload-answer",
+						"ambiguous-overload-answer",
+					])
+				})
+
+				// Both entries take an Integer, and neither takes the other's
+				// answer. Each Help writes one of them, and compiles.
+				it("should refuse an answer two entries take, with a Help for each", () => {
+					let call = (literal: string) => `implementation {
+						${picks}
+
+						Terminal.print(Picks.pick(on ${literal}))
+					}`
+					let source = call("(v) { <- v }")
+
+					expect(codesOfSource(source)).toEqual([
+						"ambiguous-overload-answer",
+					])
+					expect(
+						helpsOfCode(source, "ambiguous-overload-answer"),
+					).toEqual([
+						"Write the return Type after the Parameter list — '-> Integer | String', for the entry that answers it.",
+						"Or write the return Type after the Parameter list — '-> Integer | Boolean', for the entry that answers it.",
+					])
+					expect(
+						compiles(call("(v) -> Integer | String { <- v }")),
+					).toBe(true)
+					expect(
+						compiles(call("(v) -> Integer | Boolean { <- v }")),
+					).toBe(true)
+				})
+
+				// Each candidate reads the body silently, and the real pass
+				// reports its mistake once.
+				it("should report a mistake in the body once", () => {
+					expect(
+						codesOfSource(`implementation {
+							${items}
+
+							constant misspelt = items::sum(on (item) { <- item.prise })
+							constant missing = items::sum(on (item) { <- zz })
+						}`),
+					).toEqual(["unknown-member", "unknown-name"])
+				})
+
+				// The inner call is read inside each reading of the outer body,
+				// and answers a Rational in every one of them.
+				it("should read a literal's answer through a literal inside it", () => {
+					let source = `implementation {
+						type Part = { price: Rational, count: Integer }
+						type Item = { parts: List<Part> }
+
+						constant items: List<Item> = []
+						constant total = items::sum(on (item) { <- item.parts::sum(on (part) { <- part.price }) })
+					}`
+					let program = enrich(parse(source))
+					let total = program.program.implementation.nodes.at(-1)
+
+					expect(program.diagnostics).toEqual([])
+					expect(
+						total?.nodeType === "ConstantDeclarationStatement"
+							? printType(total.value.type)
+							: null,
+					).toBe("Rational")
+				})
+			})
+
 			// The call carries the conformances solved during selection, not a
 			// second solve.
 			it("should carry the conformances the selected Overload was probed with", () => {

@@ -150,6 +150,7 @@ export const COMPILE_CHECKED_HELP_CODES: ReadonlyArray<common.DiagnosticCode> =
 		"ambiguous-case",
 		"ambiguous-namespace",
 		"ambiguous-nesting-level",
+		"ambiguous-overload-answer",
 		"at-in-static-method",
 		"case-application-across-lines",
 		"case-default-without-payload",

@@ -770,7 +770,8 @@ literal bound to a name holds is decided at its Declaration.
 
 ### Choosing an Overload
 
-`selectOverload` takes the first candidate that fits. A refinement is assignable to its base, so an entry taking
+`selectOverload` in `overloadSelection.ts` takes the first candidate that fits, unless a literal's answer chooses
+among several (see "Literals a candidate does not fit"). A refinement is assignable to its base, so an entry taking
 the base Type accepts every Argument a refined entry would. A refined entry written after it could never win.
 `overloadProbeOrder` therefore probes the entries that ask for a refinement first, in a stable partition. The
 standard library can then append its refined entries, whose slots are fixed by their emitted names
@@ -809,13 +810,27 @@ Parameter every resolution left without a Type is reported, with the closest can
 call's own refusal stands beside it. A lone signature's re-match reports from outside the hold, so the report there
 is the same one.
 
-A literal's body can tell candidates apart too. Where more candidates than one take the call's labels, a literal
-whose expected return Type is decided is read under each candidate's Parameter Types, silently
-(`typerReadingLiteralBodies`). It is read once per list of Parameter Types, whichever candidates share it. A body
-with errors of its own there reads as an Error Argument, so the candidate does not fit while a later one does.
-`1::run(step (a, b) { <- a::length() })` then selects the entry taking Strings. Where no candidate reads the body
-cleanly, the first match is selected, and its real pass reports the body's mistake. A return Type the call has not
-solved is read off the body while matching, so it is not read again.
+A literal's body can tell candidates apart too. Where more candidates than one take the call's labels, a literal whose
+Parameter Types a candidate decides is read under them, silently (`typerReadingLiteralBodies`). It is read once per
+list of Parameter Types, whichever candidates share it. A body with errors of its own there reads as an Error
+Argument, so the candidate does not fit while a later one does. `1::run(step (a, b) { <- a::length() })` then
+selects the entry taking Strings. Every Function-typed Argument is measured by its answer too: what a literal's body
+answers, the `-> Type` a literal writes, or the answer Type of a named Function or a Function-typed Constant. A
+candidate whose declared answer does not take it does not fit. So `items::sum(on (item) { <- item.price })` reaches
+the entry answering a Rational, and so does passing a named Function answering one. Where no candidate fits, the first
+match is selected, and its real pass reports the body's mistake once. A return Type the call has not solved is read
+off the body while matching, so it is not read again.
+
+Where a literal's answer is measured, every candidate is probed, and the answers choose among those that fit
+(`chooseByAnswers`). The one whose declared answer every other one takes is selected, whatever order the entries are
+written in. An entry answering `Scalar` written before one answering `Integer` leaves the Integer entry selected for a
+body answering an Integer. Entries declaring the same answer are told apart by the order they are probed in. Where no
+entry's answer is taken by all the others, as `Integer | String` beside `Integer | Boolean`, the call is refused as
+`ambiguous-overload-answer`. Its Helps write each entry's answer as the literal's `-> Type`, or as a literal calling
+a named Function in its place. That literal names its Parameters apart from the name it calls, so none shadows it.
+The refused call answers an Error, so its answer is measured against nothing. The refusal waits with the candidate's
+own reports, so a Namespace a value call does not commit reports nothing. A candidate whose declared answer takes the
+answer of one that already fits can not be the narrowest, so its body is not read (`dominated`).
 
 Each reading of a literal reads the calls in its body again, and those read their own literals. A literal reads the
 same under the same Parameter Types wherever the bindings around its call that its body reads hold the same Types.

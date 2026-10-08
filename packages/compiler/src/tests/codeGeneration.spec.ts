@@ -2482,6 +2482,95 @@ describe("Code Generation", () => {
 			).toEqual(["11"])
 		})
 
+		// A callback without `-> Type` runs the entry whose declared answer
+		// takes what its body answers, a literal inside it included.
+		it("should run the Overload a callback's answer selects", async () => {
+			expect(
+				await run(`implementation {
+					type Part = { price: Rational, count: Integer }
+					type Item = { price: Rational, count: Integer, parts: List<Part> }
+
+					constant items: List<Item> = [
+						{ price = 1/2, count = 2, parts = [{ price = 1/2, count = 1 }, { price = 1/4, count = 2 }] },
+						{ price = 3/4, count = 5, parts = [{ price = 1/8, count = 3 }] },
+					]
+
+					Terminal.inspect(items::sum(on (item) { <- item.price }))
+					Terminal.inspect(items::sum(on (item) { <- item.count }))
+					Terminal.inspect(items::sum(on (item) { <- item.parts::sum(on (part) { <- part.price }) }))
+					Terminal.inspect(items::sum(on (item) { <- item.parts::sum(on (part) { <- part.count }) }))
+				}`),
+			).toEqual(["5/4", "7", "7/8", "6"])
+		})
+
+		// The entry whose answer every other one takes runs, whichever entry
+		// is written first.
+		it("should run the narrowest entry a callback's answer fits", async () => {
+			expect(
+				await run(`implementation {
+					namespace Wide for Integer {
+						overload static measure {
+							(by key: (_ v: Integer) -> Scalar) -> String {
+								<- "scalar"
+							}
+							(by key: (_ v: Integer) -> Integer) -> String {
+								<- "integer"
+							}
+						}
+					}
+
+					namespace Narrow for Integer {
+						overload static measure {
+							(by key: (_ v: Integer) -> Integer) -> String {
+								<- "integer"
+							}
+							(by key: (_ v: Integer) -> Scalar) -> String {
+								<- "scalar"
+							}
+						}
+					}
+
+					Terminal.inspect(Wide.measure(by (v) { <- v }))
+					Terminal.inspect(Narrow.measure(by (v) { <- v }))
+					Terminal.inspect(Wide.measure(by (v) { <- 1/2 }))
+					Terminal.inspect(Narrow.measure(by (v) { <- 1/2 }))
+				}`),
+			).toEqual(['"integer"', '"integer"', '"scalar"', '"scalar"'])
+		})
+
+		// A Namespace refusing the answer leaves no report where the value
+		// call commits another one, which runs.
+		it("should run the Namespace a value call commits beside a refusing one", async () => {
+			expect(
+				await run(`implementation {
+					namespace Wide for Integer | String {
+						overload pick {
+							(on key: (_ v: Integer) -> Integer | String) -> String {
+								<- "wide text"
+							}
+							(on key: (_ v: Integer) -> Integer | Boolean) -> String {
+								<- "wide flag"
+							}
+						}
+					}
+
+					namespace Narrow for Integer {
+						overload pick {
+							(on key: (_ v: Integer) -> Integer) -> String {
+								<- "narrow int"
+							}
+							(on key: (_ v: Integer) -> Scalar) -> String {
+								<- "narrow scalar"
+							}
+						}
+					}
+
+					Terminal.inspect(1::pick(on (v) { <- v }))
+					Terminal.inspect(Narrow.pick(1, on (v) { <- v }))
+				}`),
+			).toEqual(['"narrow int"', '"narrow int"'])
+		})
+
 		// A callback's body that reads only under a later entry runs that one.
 		it("should run the Overload a callback's body reads under", async () => {
 			expect(

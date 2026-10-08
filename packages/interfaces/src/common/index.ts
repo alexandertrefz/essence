@@ -378,6 +378,7 @@ export type DiagnosticCode =
 	| "native-property-without-type"
 	| "indistinguishable-default-parameter"
 	| "ambiguous-overload-default"
+	| "ambiguous-overload-answer"
 	| "fallback-never-used"
 	| "redundant-key-check"
 	| "ambiguous-nesting-level"

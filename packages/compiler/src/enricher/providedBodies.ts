@@ -10,8 +10,8 @@ import {
 	type ArgumentTyper,
 	argumentMatchables,
 	probeContextualFunctionTypes,
-	selectOverload,
 } from "./enrichers"
+import { selectOverload } from "./overloadSelection"
 import {
 	describeProtocol,
 	protocolGrants,
