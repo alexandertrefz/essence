@@ -1603,6 +1603,118 @@ describe("Dispatch and Resolution", () => {
 			})
 		})
 
+		// A Type Argument that some payload of the Choice names is matched as
+		// the target reads it. Each one binds on its own, and a Type Parameter
+		// the matched Case's payload names stays the payload's.
+		describe("a Type Argument a payload of its Choice names", () => {
+			let results = (body: string) => `implementation {
+				${defaults}
+
+				choice Res<V, F> {
+					Ok { value: V },
+					Bad { reason: F },
+				}
+
+				namespace Nested<infer V, infer F> for Res<Res<V, F>, F> {
+					fallback<V is Defaultable>() -> V {
+						<- V.default()
+					}
+				}
+
+				namespace Flags for Boolean {
+					fallback() -> Boolean {
+						<- @
+					}
+				}
+
+				${body}
+			}`
+
+			// `Res<V, F>` mentions `F`, which `#Bad`'s payload binds, and `V`,
+			// which only the Type Argument does.
+			it("binds the Type Parameter a mixed one names beside the payload's", async () => {
+				expect(
+					await run(
+						results(`function show(_ r: Res<Res<String, Integer>, Integer> | Boolean) -> String | Boolean {
+							<- r::fallback()
+						}
+
+						Terminal.inspect(show(Res<Res<String, Integer>, Integer>#Bad({ reason = 1 })))
+						Terminal.inspect(show(Res<Res<String, Integer>, Integer>#Ok({ value = #Ok({ value = "v" }) })))
+						Terminal.inspect(show(false))
+						Terminal.inspect(Res<Res<String, Integer>, Integer>#Bad({ reason = 1 })::fallback())
+						Terminal.inspect(Result<Result<Integer, String>, Integer>#Failure(5)::flatten())`),
+					),
+				).toEqual([
+					'"none"',
+					'"none"',
+					"false",
+					'"none"',
+					"Result#Failure(5)",
+				])
+			})
+
+			// `Pending` carries no payload, but `V` and `F` are named by the
+			// other Cases. Each Case binds `T` on its own, as before.
+			describe("beside a Case without a payload", () => {
+				let joined = (body: string) => `implementation {
+					choice Res<V, F> {
+						Ok { value: V },
+						Bad { reason: F },
+						Pending,
+					}
+
+					namespace Joined<infer T> for Res<T, T> {
+						either() -> List<T> {
+							<- match @ -> List<T> {
+								case #Ok(value) { <- [value] }
+								case #Bad(reason) { <- [reason] }
+								case #Pending { <- [] }
+							}
+						}
+					}
+
+					namespace Flags for Boolean {
+						either() -> List<Boolean> {
+							<- [@]
+						}
+					}
+
+					constant r: Res<Integer, String> = #Bad({ reason = "x" })
+					constant o: Res<Integer, String> = #Ok({ value = 1 })
+
+					${body}
+				}`
+
+				it("joins each Case's binding, called directly or dispatched", async () => {
+					expect(
+						await run(
+							joined(`function show(_ v: Res<Integer, String> | Boolean) -> List<Integer | String> | List<Boolean> {
+								<- v::either()
+							}
+
+							Terminal.inspect(r::either())
+							Terminal.inspect(o::either())
+							Terminal.inspect(Res<Integer, String>#Bad({ reason = "y" })::either())
+							Terminal.inspect(show(r))
+							Terminal.inspect(show(Res<Integer, String>#Pending))`),
+						),
+					).toEqual(['[ "x" ]', "[ 1 ]", '[ "y" ]', '[ "x" ]', "[]"])
+				})
+
+				// Alone, `Pending` binds `T` nowhere, as a direct call reports.
+				it("leaves the Type Parameter of a lone one undecided", () => {
+					expect(
+						diagnosticsFor(
+							joined(
+								"Terminal.inspect(Res<Integer, String>#Pending::either())",
+							),
+						).map((diagnostic) => diagnostic.code),
+					).toEqual(["uninferable-type-parameter"])
+				})
+			})
+		})
+
 		// No payload of `Pair` names `B`, so only its Type Argument says what a
 		// value's `B` is. A payload binds `Item` to Integer, and `B` must agree.
 		// See "Phantom Type Arguments" in

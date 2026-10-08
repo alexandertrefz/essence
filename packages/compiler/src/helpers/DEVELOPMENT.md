@@ -369,18 +369,23 @@ server outlives any one analysis, and a name key would answer a new analysis wit
 rebuilt when another Generics array arrives for the same Type, since two Namespaces may share a target object.
 
 Matching reads only payloads, so a Case carries the Type Arguments its payload does not name in its spelling alone.
-`bindCaseTypeArguments` reads them for each Case of the subject. They are matched against the pattern's Case of the
-same tag, except where its Type Argument mentions a Generic its own payload names, which the payload decides. A Case
-whose Type Arguments fit no such Case names another application, and the target does not cover the subject. So
-`Tag<Integer>#Empty` is no `Tag<List<Integer>>`, and `Pair<Integer, String>#Neither` is no `Pair<Item, Item>`.
-Leaving the named ones to the payload keeps `flatten()` on a `Result<Result<Integer, String>, Integer>`, whose
-`#Value` binds the failure Type from its payload. A `::` call also checks the Type Arguments no payload of the Choice
-names; see "Phantom Type Arguments" in `packages/compiler/src/enricher/DEVELOPMENT.md`.
+`bindCaseTypeArguments` reads them for each Case of the subject. Each is matched on its own against the pattern's
+Case of the same tag, as the target reads it, and one that fits nowhere names another application. So
+`Tag<Integer>#Empty` is no `Tag<List<Integer>>`, and `Box<String>#Empty` is no `Box<List<Item>>`. A Generic the
+pattern's payload names stays the payload's, so `flatten()` on a `Result<Result<Integer, String>, Integer>` still
+joins two failure Types. The `Res<V, F>` in a target `Res<Res<V, F>, F>` still binds `V` where `#Bad`'s payload binds
+only `F`.
 
-A Generic the Type Arguments decide binds where every Case of the subject that decides it agrees.
-`[Tag<Integer>#A, Tag<String>#B]` holds Cases that disagree, so it stays open, and `disagreeingTypeArguments` says
-why. `typeArgumentBindings` answers the Generics bound this way, which a `::` call pins before it matches its
-Arguments.
+Each Type Argument binds alone, and a Generic two of them bind differently stays open. So `Pending`, a Case without a
+payload beside `Ok { value: V }` and `Bad { reason: F }`, does not turn `Res<T, T>` away from a `Res<Integer, String>`.
+A Generic binds where every Case of the subject that binds it agrees. `[Tag<Integer>#A, Tag<String>#B]` holds Cases
+that disagree, so it stays open, and `disagreeingTypeArguments` says why. `typeArgumentBindings` answers the Generics
+bound this way, which a `::` call pins before it matches its Arguments.
+
+A phantom Type Argument, one no payload of the Choice names, is the one exception. `phantomMismatchOf` compares it
+strictly once everything else binds, so `Pair<Integer, String>#Neither` is no `Pair<Item, Item>`. Which positions
+are phantom is read off the Choice's declaration, which only the caller can reach; see "Phantom Type Arguments" in
+`packages/compiler/src/enricher/DEVELOPMENT.md`.
 
 ### Specificity
 

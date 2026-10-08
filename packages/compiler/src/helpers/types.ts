@@ -559,39 +559,161 @@ function bindCaseTypeArguments(
 }
 
 // What a pattern's Case binds from a subject Case's Type Arguments, or null
-// where they do not fit. A Type Argument naming a Generic the pattern's payload
-// names is the payload's, and so is one the subject leaves undecided.
+// where one does not fit. Each Type Argument is matched on its own, so two
+// that bind a Generic differently leave it open. A Generic the pattern's
+// payload names is the payload's, so its binding here is dropped.
 function typeArgumentsFit(
 	arm: common.CaseType,
 	carrier: common.CaseType,
 	bindableNames: Set<common.GenericName>,
 ): GenericBindings | null {
-	let context: GenericInferenceContext = {
-		bindableNames,
-		bindings: new Map(),
-	}
 	let payloadNames = payloadGenericNames(arm)
 	let carried = carrier.typeArguments ?? []
+	let kept: GenericBindings = new Map()
+	let clashing = new Set<common.GenericName>()
 
 	for (let [index, argument] of (arm.typeArguments ?? []).entries()) {
 		let actual = carried[index]
+		let scratch: GenericInferenceContext = {
+			bindableNames,
+			bindings: new Map(),
+		}
 
-		if (
-			actual === undefined ||
-			typeContainsUnknown(actual) ||
-			[...genericNamesMentioned(argument)].some((name) =>
-				payloadNames.has(name),
-			)
-		) {
+		if (actual === undefined || typeContainsUnknown(actual)) {
 			continue
 		}
 
-		if (!matchTypes(argument, actual, context, NESTED)) {
+		if (!matchTypes(argument, actual, scratch, NESTED)) {
 			return null
+		}
+
+		for (let [name, type] of scratch.bindings) {
+			let held = kept.get(name)
+
+			if (payloadNames.has(name)) {
+				continue
+			}
+
+			if (held === undefined) {
+				kept.set(name, type)
+			} else if (!matchesType(held, type) || !matchesType(type, held)) {
+				clashing.add(name)
+			}
 		}
 	}
 
-	return context.bindings
+	for (let name of clashing) {
+		kept.delete(name)
+	}
+
+	return kept
+}
+
+// The positions of a Case's Type Arguments that name a phantom Type Parameter
+// of its Choice, one no payload of any of its Cases names.
+export type PhantomPositions = (carrier: common.CaseType) => Array<number>
+
+export type PhantomMismatch = {
+	carrier: common.CaseType
+	index: number
+	target: common.Type
+	actual: common.Type
+}
+
+// The first phantom Type Argument of a subject's Cases that the target does
+// not take, compared strictly once the target is bound by everything else.
+// Null where each one fits. See "Phantom Type Arguments" in
+// packages/compiler/src/enricher/DEVELOPMENT.md.
+export function phantomMismatchOf(
+	pattern: NamespaceTarget & { targetType: common.Type },
+	subject: common.Type,
+	phantom: PhantomPositions,
+): PhantomMismatch | null {
+	let renamed = renamedNamespaceTarget(pattern.targetType, pattern.generics)
+	let context = createInferenceContext(renamed.generics)
+
+	if (
+		!matchesTypeWithBindings(renamed.target, subject, context) ||
+		bindCaseTypeArguments(renamed.target, subject, context) === null
+	) {
+		return null
+	}
+
+	let arms = choiceCasesOf(renamed.target)
+
+	for (let carrier of choiceCasesOf(subject)) {
+		let positions = phantom(carrier)
+		let mismatches = arms
+			.filter(
+				(arm) =>
+					positions.length > 0 &&
+					arm.choice === carrier.choice &&
+					arm.name === carrier.name,
+			)
+			.map((arm) =>
+				strictPhantomMismatch(arm, carrier, positions, context),
+			)
+
+		if (mismatches.length > 0 && !mismatches.includes(null)) {
+			let first = mismatches[0]!
+			let original: GenericBindings = new Map(
+				[...renamed.freshToOriginal].map(([fresh, name]) => [
+					fresh,
+					{ type: "GenericUse", name },
+				]),
+			)
+
+			return {
+				...first,
+				target: applyGenericBindings(first.target, original),
+			}
+		}
+	}
+
+	return null
+}
+
+// One pattern Case's first phantom Type Argument the subject Case contradicts.
+// The other Type Arguments bind first, each where it fits.
+function strictPhantomMismatch(
+	arm: common.CaseType,
+	carrier: common.CaseType,
+	positions: Array<number>,
+	context: GenericInferenceContext,
+): PhantomMismatch | null {
+	let bound: GenericInferenceContext = {
+		bindableNames: context.bindableNames,
+		bindings: new Map(context.bindings),
+	}
+	let pairs = (arm.typeArguments ?? []).flatMap((target, index) => {
+		let actual = carrier.typeArguments?.[index]
+
+		return actual === undefined || typeContainsUnknown(actual)
+			? []
+			: [{ index, target, actual }]
+	})
+
+	for (let pair of pairs.filter(({ index }) => !positions.includes(index))) {
+		let mark = markBindings(bound)
+
+		if (!matchTypes(pair.target, pair.actual, bound, NESTED)) {
+			restoreBindings(bound, mark)
+		}
+	}
+
+	let mismatch = pairs.find(
+		({ index, target, actual }) =>
+			positions.includes(index) &&
+			!matchTypes(target, actual, bound, NESTED),
+	)
+
+	return mismatch === undefined
+		? null
+		: {
+				...mismatch,
+				carrier,
+				target: applyGenericBindings(mismatch.target, bound.bindings),
+			}
 }
 
 // Remembered per Case, which a Namespace renames once.

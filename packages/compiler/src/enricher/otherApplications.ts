@@ -2,15 +2,12 @@ import type { common, enricher } from "@essence-lang/interfaces"
 
 import { choiceCarried, describeType } from "../helpers/describe"
 import {
-	applyGenericBindings,
 	bindNamespaceTarget,
 	coversApartFromTypeArguments,
 	flattenUnionMembers,
 	type GenericBindings,
 	genericNamesMentioned,
-	matchesType,
-	typeContainsUnknown,
-	typeMentionsGeneric,
+	phantomMismatchOf,
 } from "../helpers/types"
 import {
 	describeProtocol,
@@ -68,102 +65,49 @@ type PhantomMismatch = {
 // a Choice without phantom Type Parameters to none, without a clock.
 export const phantomTargetChecks = { count: 0 }
 
-// The first phantom Type Argument of a receiver's Case that the target's Case
-// of the same tag does not take, once the target is bound. Null where each
-// one fits.
+// The first phantom Type Argument of a receiver's Case that the target does
+// not take, or null. A Union target is read whole or by the member covering
+// the receiver, as the lookup reads it.
 function phantomMismatch(
 	namespace: common.NamespaceType,
 	receiver: common.Type,
 	scope: enricher.Scope,
 ): PhantomMismatch | null {
-	let carriers = phantomCarriers(receiver, scope)
-
-	if (carriers.length === 0) {
+	if (phantomCarriers(receiver, scope).length === 0) {
 		return null
 	}
 
 	phantomTargetChecks.count += 1
 
-	let bound = boundTarget(namespace, receiver)
-
-	if (bound === null) {
-		return null
-	}
-
-	for (let carrier of carriers) {
-		let mismatches = casesOf(bound.target)
-			.filter(
-				(arm) =>
-					arm.choice === carrier.choice && arm.name === carrier.name,
-			)
-			.map((arm) =>
-				armMismatch(arm, carrier, bound.bindings, namespace, scope),
-			)
-
-		if (mismatches.length > 0 && !mismatches.includes(null)) {
-			return mismatches[0]!
-		}
-	}
-
-	return null
-}
-
-function armMismatch(
-	arm: common.CaseType,
-	carrier: common.CaseType,
-	bindings: GenericBindings,
-	namespace: common.NamespaceType,
-	scope: enricher.Scope,
-): PhantomMismatch | null {
-	// A Type Parameter the target leaves unbound takes any Type Argument.
-	let open = namespace.generics.filter(
-		(generic) => !bindings.has(generic.name),
-	)
-
-	for (let [index, parameter] of phantomParameters(carrier, scope)) {
-		let target = arm.typeArguments?.[index]
-		let actual = carrier.typeArguments?.[index]
-
-		if (
-			target !== undefined &&
-			actual !== undefined &&
-			!typeContainsUnknown(actual) &&
-			!open.some((generic) =>
-				typeMentionsGeneric(target, generic.name),
-			) &&
-			!matchesType(target, actual)
-		) {
-			return { parameter, target, receiver: actual }
-		}
-	}
-
-	return null
-}
-
-// The target bound from the receiver, whole or by the member of a Union
-// target that covers it, as the lookup asks.
-function boundTarget(
-	namespace: common.NamespaceType,
-	receiver: common.Type,
-): { target: common.Type; bindings: GenericBindings } | null {
 	let target = namespace.targetType
 	let members = target?.type === "UnionType" ? target.types : []
+	let positions = (carrier: common.CaseType) =>
+		phantomParameters(carrier, scope).map(([index]) => index)
 
 	for (let targetType of [target, ...members]) {
-		let bindings =
+		let pattern =
 			targetType === null
 				? null
-				: bindNamespaceTarget(
-						{ targetType, generics: namespace.generics },
-						receiver,
-					)
+				: { targetType, generics: namespace.generics }
 
-		if (targetType !== null && bindings !== null) {
-			return {
-				target: applyGenericBindings(targetType, bindings),
-				bindings,
-			}
+		if (
+			pattern === null ||
+			bindNamespaceTarget(pattern, receiver) === null
+		) {
+			continue
 		}
+
+		let mismatch = phantomMismatchOf(pattern, receiver, positions)
+		let parameter =
+			mismatch === null
+				? undefined
+				: phantomParameters(mismatch.carrier, scope).find(
+						([index]) => index === mismatch.index,
+					)?.[1]
+
+		return mismatch === null || parameter === undefined
+			? null
+			: { parameter, target: mismatch.target, receiver: mismatch.actual }
 	}
 
 	return null

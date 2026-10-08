@@ -350,8 +350,8 @@ describe("Result", () => {
 
 		// `NestedResult` names one failure Type at both levels, but each Case of
 		// the receiver is matched on its own, so the failure Types are joined.
-		// The `#Failure` half binds no value Type and carries the poison Type,
-		// which a Diagnostic must not print as `Error`.
+		// The `#Failure` half reads its value Type off the Type Argument its
+		// payload leaves out, and no Diagnostic prints `Error`.
 		it("joins two failure Types, and names neither of them Error", () => {
 			let diagnostics = diagnosticsOf(`implementation {
 				constant mismatched: Result<Result<Integer, String>, Integer> = #Value(#Value(1))
@@ -362,7 +362,7 @@ describe("Result", () => {
 				"assignment-type-mismatch",
 			])
 			expect(diagnostics[0].labels?.[0]?.message).toBe(
-				"this is a Result<Integer, String> | Result<…, Integer>",
+				"this is a Result<Integer, String> | Result<Integer, Integer>",
 			)
 		})
 	})
