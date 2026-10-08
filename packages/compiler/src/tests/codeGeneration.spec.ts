@@ -142,6 +142,54 @@ describe("Code Generation", () => {
 				static base: Integer = 4
 			}`
 
+		// Moving a Statement with an effect past another effect would swap
+		// what they print, so only the Declaration moves.
+		it("moves no Statement with an effect past another", async () => {
+			expect(
+				diagnosticsOf(
+					program([
+						"Terminal.inspect(useIt())",
+						'Terminal.inspect("a")',
+						sizes,
+					]),
+				).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual(["Move the Declaration of 'Sizes' above this Statement."])
+			expect(
+				await run(
+					program([
+						sizes,
+						"Terminal.inspect(useIt())",
+						'Terminal.inspect("a")',
+					]),
+				),
+			).toEqual(["4", '"a"'])
+		})
+
+		it("moves a Statement with an effect past Declarations that run nothing", async () => {
+			let declarations = ["type Size = Integer", "constant size = 4"]
+
+			expect(
+				diagnosticsOf(
+					program([
+						"Terminal.inspect(useIt())",
+						...declarations,
+						sizes,
+					]),
+				).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual([
+				"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+			])
+			expect(
+				await run(
+					program([
+						...declarations,
+						sizes,
+						"Terminal.inspect(useIt())",
+					]),
+				),
+			).toEqual(["4"])
+		})
+
 		it("moves no assignment past a read of its Variable", async () => {
 			expect(
 				diagnosticsOf(

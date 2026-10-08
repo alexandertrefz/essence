@@ -3587,6 +3587,52 @@ describe("Validator", () => {
 						],
 					],
 				),
+				// Effects keep their order, so a Statement with one passes only
+				// Statements that run nothing, and one that runs nothing passes any.
+				[
+					"an effect between that this Statement's own effect would pass",
+					[
+						"Terminal.print(useIt())",
+						'Terminal.print("a")',
+						sizes("4"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[
+						sizes("4"),
+						"Terminal.print(useIt())",
+						'Terminal.print("a")',
+					],
+				],
+				[
+					"Declarations between that run nothing",
+					[
+						"Terminal.print(useIt())",
+						"type Size = Integer",
+						"function one() -> Integer { <- 1 }",
+						sizes("4"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+					[
+						"type Size = Integer",
+						"function one() -> Integer { <- 1 }",
+						sizes("4"),
+						"Terminal.print(useIt())",
+					],
+				],
+				[
+					"an effect between that a Statement running nothing passes",
+					[
+						"constant v = Sizes.base",
+						'Terminal.print("a")',
+						sizes("4"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement, or this Statement below it.",
+					[
+						'Terminal.print("a")',
+						sizes("4"),
+						"constant v = Sizes.base",
+					],
+				],
 				// An assignment stays on its side of every Statement that reads
 				// or assigns its Variable, so the output does not change.
 				[

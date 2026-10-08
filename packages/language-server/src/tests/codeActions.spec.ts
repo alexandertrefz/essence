@@ -5615,6 +5615,24 @@ describe("Code Actions", () => {
 			expect(codesOf(result)).toEqual([])
 		})
 
+		// Moved past `Terminal.print("a")`, the first line would print second.
+		it("should offer nothing where the move would pass an effect with one", () => {
+			let lines = [
+				"implementation {",
+				"\tTerminal.print(Maths.zero)",
+				"",
+				'\tTerminal.print("a")',
+				"",
+				"\tnamespace Maths {",
+				"\t\tstatic zero: Integer = 0",
+				"\t}",
+				"}",
+			]
+
+			expect(codesOf(lines)).toEqual(["use-before-declaration"])
+			expect(titles(quickFixes(lines))).toEqual([])
+		})
+
 		// Moved past `Terminal.print(total)`, the assignment would leave it
 		// printing the Variable's first value.
 		it("should offer nothing where moving an assignment would pass a read of its Variable", () => {

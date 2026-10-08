@@ -8,6 +8,7 @@ import {
 	type Unit,
 	type Units,
 } from "./reachUnits"
+import { runsNothing } from "./runsNothing"
 import { forgetRefusedUses, refuseUse } from "./untypedReads"
 
 // Each top-level Namespace's index in the Statement list and its name's
@@ -751,9 +752,14 @@ function moveHelp(
 		}
 	}
 
-	let statement = simulation.order.nodes
-		.slice(use + 1, declared + 1)
-		.every((_, offset) => !bound(simulation, use + 1 + offset, use))
+	let { nodes } = simulation.order
+	let crossed = nodes.slice(use + 1, declared + 1)
+	// Effects keep their order, so either side of the move must have none.
+	let statement =
+		crossed.every(
+			(_, offset) => !bound(simulation, use + 1 + offset, use),
+		) &&
+		(runsNothing(nodes[use]) || crossed.every(runsNothing))
 	let moves = (help: string): Move => ({
 		helps: [help],
 		data: {
@@ -775,7 +781,7 @@ function moveHelp(
 		return moves(`Move this Statement below the Declaration of '${name}'.`)
 	}
 
-	let stuck = (index: number) => stays(simulation.order.nodes, index, use)
+	let stuck = (index: number) => stays(nodes, index, use)
 
 	if ([...moving].some(stuck)) {
 		return moves(
@@ -787,10 +793,7 @@ function moveHelp(
 		`Move the Declarations of ${quoted(
 			[...moving]
 				.sort((left, right) => left - right)
-				.flatMap(
-					(index) =>
-						declaredName(simulation.order.nodes[index]) ?? [],
-				),
+				.flatMap((index) => declaredName(nodes[index]) ?? []),
 		)} above this Statement, in the order they are written.`,
 	)
 }
