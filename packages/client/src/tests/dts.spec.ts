@@ -399,6 +399,17 @@ export declare const Rectangle: {
 }`)
 	})
 
+	it("declares the provided Methods of a Namespace a cycle forwards", async () => {
+		expect(
+			await declarationsOf(
+				clientFixture(path.join("cycle", "Walking.es")),
+			),
+		).toContain(`export declare const Walkers: {
+	step(p0: Input<Walker>): bigint
+	twice(p0: Input<Walker>): bigint
+}`)
+	})
+
 	it("declares a Protocol as a Type nothing holds", async () => {
 		expect(
 			await declarationsOf(clientFixture("Declarations.es")),

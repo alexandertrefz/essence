@@ -75,7 +75,7 @@ export type ExportSurface = {
 	// import reaches them. A Help about a Choice it keeps private reads them.
 	moduleTypes: Record<string, common.Type>
 	// The provided Methods each exported Namespace offers a host, filled only
-	// in an `embed` compile once the Module is linked.
+	// in an `embed` compile once the Module's group is enriched.
 	exposed?: Record<string, Array<common.ExposedMethod>>
 }
 
@@ -260,6 +260,10 @@ type ModuleState = {
 	// Statements are enriched. See "Constants across a cycle" in
 	// DEVELOPMENT.md.
 	writtenConstantTypes: Map<string, common.Type>
+	// The provided Methods each exported Namespace declared here offers a
+	// host, by exported name. Set in an `embed` compile once the group is
+	// enriched.
+	exposed?: Record<string, Array<common.ExposedMethod>>
 }
 
 // Whether the emitted JavaScript binds a published name. Type Aliases, Choices
@@ -890,6 +894,14 @@ function linkGroup(
 		},
 	)
 
+	// Before any final surface is built, so a Module of the cycle that forwards
+	// a Namespace reads what its own Module found.
+	if (options.embed === true) {
+		for (let state of states.values()) {
+			state.exposed = exposedOf(state)
+		}
+	}
+
 	return [...states.values()].map((state, index) => {
 		let { diagnostics } = collectDiagnostics(() => {
 			reportExportProblems(state, declares, surfaceFor)
@@ -905,10 +917,6 @@ function linkGroup(
 		})
 
 		let surface = surfaceFor(state.module.filePath) ?? emptySurface()
-
-		if (options.embed === true) {
-			surface.exposed = exposedOf(state, surface)
-		}
 
 		return {
 			module: state.module,
@@ -937,20 +945,23 @@ function linkGroup(
 	})
 }
 
-// The provided Methods each Namespace this Module exports offers a host. A
-// forwarded name keeps what its own Module found. The declaration proved each
-// conformance already, so nothing solved here is reported again.
+// The provided Methods each Namespace this Module declares and exports offers
+// a host. The declaration proved each conformance already, so nothing solved
+// here is reported again.
 function exposedOf(
 	state: ModuleState,
-	surface: ExportSurface,
 ): Record<string, Array<common.ExposedMethod>> {
-	let exposed = { ...surface.exposed }
+	let exposed: Record<string, Array<common.ExposedMethod>> = {}
 
 	collectDiagnostics(() => {
 		for (let [publicName, entry] of state.exports) {
-			let value = surface.values[publicName]
+			let value =
+				entry.source === null &&
+				state.declarations.has(entry.name.content)
+					? state.scope.members[entry.name.content]
+					: undefined
 
-			if (entry.source !== null || value?.type !== "Namespace") {
+			if (value?.type !== "Namespace") {
 				continue
 			}
 
@@ -1066,6 +1077,12 @@ function surfaceOf(
 				) {
 					surface.constants.add(publicName)
 				}
+			}
+
+			let exposed = state.exposed?.[publicName]
+
+			if (exposed !== undefined) {
+				surface.exposed = { ...surface.exposed, [publicName]: exposed }
 			}
 
 			let type = state.scope.types[exportedName]

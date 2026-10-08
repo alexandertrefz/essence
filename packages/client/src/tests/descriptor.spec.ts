@@ -7,10 +7,7 @@ import {
 	carriesFuture,
 	linkToMemory,
 } from "@essence-lang/compiler/embed"
-import {
-	canonicalPath,
-	type ExportSurface,
-} from "@essence-lang/compiler/modules"
+import { canonicalPath } from "@essence-lang/compiler/modules"
 
 import {
 	type DeclaredType,
@@ -36,10 +33,29 @@ const FIXTURES = [
 
 // Linked rather than compiled, since a Descriptor is decided before anything is
 // emitted.
-function moduleDescriptor(fileName: string): ModuleDescriptor {
+function moduleDescriptor(fileName: string, embed = false): ModuleDescriptor {
 	let entry = canonicalPath(path.join(FILES, fileName))
 
-	return describeModule(linkToMemory(entry).surface, entry)
+	return describeModule(linkToMemory(entry, { embed }).surface, entry)
+}
+
+// Each Method of an exported Namespace with its signature, as an `embed`
+// compile describes it unless `embed` says otherwise.
+function namespaceSignatures(
+	fileName: string,
+	name: string,
+	embed = true,
+): Record<string, string | null> | null {
+	let described = moduleDescriptor(fileName, embed).exports[name]
+
+	return described?.kind === "namespace"
+		? Object.fromEntries(
+				Object.entries(described.methods).map(([member, method]) => [
+					member,
+					method.kind === "function" ? method.of.shown : null,
+				]),
+			)
+		: null
 }
 
 // The Types the Module names, which the door questions ask about too.
@@ -60,33 +76,25 @@ describe("A Module described", () => {
 
 	// Only an `embed` compile binds them, so a plain build is left as it was.
 	it("lists the provided Methods an exported Namespace offers a host", () => {
-		let entry = canonicalPath(path.join(FILES, "Provided.es"))
-		let signatures = (surface: ExportSurface): unknown => {
-			let rectangles = describeModule(surface, entry).exports.Rectangles
-
-			return rectangles?.kind === "namespace"
-				? Object.fromEntries(
-						Object.entries(rectangles.methods).map(
-							([name, method]) => [
-								name,
-								method.kind === "function"
-									? method.of.shown
-									: null,
-							],
-						),
-					)
-				: null
-		}
-
-		expect(
-			signatures(linkToMemory(entry, { embed: true }).surface),
-		).toEqual({
+		expect(namespaceSignatures("Provided.es", "Rectangles")).toEqual({
 			area: "(_ { width: Integer, height: Integer }) -> Integer",
 			isEmpty: "(_ { width: Integer, height: Integer }) -> Boolean",
 			scaled: "(_ { width: Integer, height: Integer }, by: Integer) -> Integer",
 		})
-		expect(signatures(linkToMemory(entry).surface)).toEqual({
-			area: "(_ { width: Integer, height: Integer }) -> Integer",
+		expect(namespaceSignatures("Provided.es", "Rectangles", false)).toEqual(
+			{
+				area: "(_ { width: Integer, height: Integer }) -> Integer",
+			},
+		)
+	})
+
+	// The re-exporting Module of a cycle reads what the declaring one found.
+	it("lists the provided Methods of a Namespace a cycle forwards", () => {
+		expect(
+			namespaceSignatures(path.join("cycle", "Walking.es"), "Walkers"),
+		).toEqual({
+			step: "(_ { stride: Integer }) -> Integer",
+			twice: "(_ { stride: Integer }) -> Integer",
 		})
 	})
 

@@ -201,6 +201,20 @@ describe("Loading a Module", () => {
 		expect(squares.scaled!({ side: 3n }, 2n)).toBe(18n)
 	})
 
+	// The re-exporting Module of a cycle hands on what the declaring one found.
+	it("binds the provided Methods of a Namespace a cycle forwards", async () => {
+		let walking = await loadModule(
+			clientFixture(path.join("cycle", "Walking.es")),
+			{ cacheDirectory },
+		)
+		let walkers = walking.exports.Walkers as Record<
+			string,
+			(value: { stride: bigint }) => bigint
+		>
+
+		expect(walkers.twice!({ stride: 4n })).toBe(8n)
+	})
+
 	it("undoes the Rewriter's escaping", async () => {
 		let escaped = await loadModule(clientFixture("Escaped.es"), {
 			cacheDirectory,

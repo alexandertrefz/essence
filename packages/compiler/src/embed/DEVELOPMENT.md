@@ -131,6 +131,9 @@ and the export entry. `describeModule` lists them with the Namespace's own Metho
 one more Method of the Namespace, whose body hands the receiver, the Arguments and the witness to the provided
 body.
 
+The linker asks once every Module of a group is enriched, before it builds the group's surfaces. A Module of a
+cycle that forwards the Namespace then hands on what the declaring Module found.
+
 The `embed` facet of the compile mode gates all of it, so a build that is not for a host emits none, and its
 bundle carries no provided body it never calls. A generic Namespace offers none, since a host can not hand over
 the witnesses its Type Parameters need. Neither does a name two Protocols provide without one extending the
