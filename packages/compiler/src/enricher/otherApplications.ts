@@ -1,6 +1,6 @@
 import type { common, enricher } from "@essence-lang/interfaces"
 
-import { choiceCarried, describeType } from "../helpers/describe"
+import { choiceCarried, describeType, withArticle } from "../helpers/describe"
 import {
 	bindNamespaceTarget,
 	coversApartFromTypeArguments,
@@ -8,6 +8,7 @@ import {
 	type GenericBindings,
 	phantomMismatchOf,
 	phantomParametersOf,
+	typeMentionsGeneric,
 } from "../helpers/types"
 import {
 	describeProtocol,
@@ -158,28 +159,40 @@ function phantomParameters(
 }
 
 // A Note for each Namespace in scope that declares the Method for another
-// application of the receiver's Choice. Its target covers the receiver's
-// payloads, and only the receiver's Type Arguments turn it away. See
-// "Namespace targets" in packages/compiler/src/helpers/DEVELOPMENT.md.
+// application of a receiver's Choice, the first receiver it turns away read.
+// Its target covers the payloads, and only the Type Arguments turn it away.
+// See "Namespace targets" in packages/compiler/src/helpers/DEVELOPMENT.md.
 export function otherApplicationNotes(
 	methodName: string,
-	receiver: common.Type,
+	receivers: Array<common.Type>,
 	scope: enricher.Scope,
 ): Array<string> {
 	let namespaces = getAllNamespacesInScope(scope, null)
-	let targeting = namespacesTargeting(namespaces, receiver)
-
-	return [...namespaces].flatMap(([name, namespace]) =>
-		Object.hasOwn(namespace.methods, methodName)
-			? turnedAwayNotes(
-					`'${name}' declares '${methodName}'`,
-					namespace,
-					receiver,
-					targeting.has(name),
-					scope,
-				)
-			: [],
+	let targeting = receivers.map((receiver) =>
+		namespacesTargeting(namespaces, receiver),
 	)
+
+	return [...namespaces].flatMap(([name, namespace]) => {
+		if (!Object.hasOwn(namespace.methods, methodName)) {
+			return []
+		}
+
+		for (let [index, receiver] of receivers.entries()) {
+			let notes = turnedAwayNotes(
+				`'${name}' declares '${methodName}'`,
+				namespace,
+				receiver,
+				targeting[index]!.has(name),
+				scope,
+			)
+
+			if (notes.length > 0) {
+				return notes
+			}
+		}
+
+		return []
+	})
 }
 
 // A conformance's target bound from a Type, as a `::` call reads it. Null
@@ -241,9 +254,19 @@ function turnedAwayNotes(
 		]
 	}
 
-	return !covers && coversApartFromTypeArguments(namespace, receiver)
-		? [
-				`${declares}, another application of '${choiceNameIn(choice, scope)}'.`,
-			]
-		: []
+	if (covers || !coversApartFromTypeArguments(namespace, receiver)) {
+		return []
+	}
+
+	// A target with Type Parameters stands for many applications, none of
+	// them the receiver's.
+	let generic = namespace.generics.some((parameter) =>
+		typeMentionsGeneric(namespace.targetType!, parameter.name),
+	)
+
+	return [
+		generic
+			? `${declares}, which ${withArticle(describeType(receiver))} is not.`
+			: `${declares}, another application of '${choiceNameIn(choice, scope)}'.`,
+	]
 }

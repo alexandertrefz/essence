@@ -27,17 +27,13 @@ export function dividedUnionNotes(
 		}
 	}
 
-	let turnedAway = lacking.flatMap((member) =>
-		otherApplicationNotes(node.member.content, member, scope),
-	)
-
 	return [
 		...(providing.length === 0 || lacking.length === 0
 			? []
 			: [
 					`'${node.member.content}' answers for ${joinedWithAnd(providing)}, and not for ${joinedWithAnd(lacking.map((member) => describeType(member)))}.`,
 				]),
-		...new Set(turnedAway),
+		...otherApplicationNotes(node.member.content, lacking, scope),
 	]
 }
 

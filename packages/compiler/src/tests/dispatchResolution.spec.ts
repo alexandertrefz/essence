@@ -1775,6 +1775,43 @@ describe("Dispatch and Resolution", () => {
 				).toEqual(refusal("Pair<Integer, String>#Left"))
 			})
 
+			// A target with Type Parameters is no one application, so the Note
+			// says the value is none of them. Both Cases of a whole `Tag<Integer>`
+			// turn `Lists` away, and the refusal names it once.
+			it("names a generic target the value is not, once", () => {
+				let notesOf = (body: string) =>
+					diagnosticsFor(`implementation {
+						choice Tag<Item> {
+							On,
+							Off,
+						}
+
+						namespace Lists<infer Item> for Tag<List<Item>> {
+							describe() -> String {
+								<- "list tag"
+							}
+						}
+
+						constant on: Tag<Integer> = #On
+
+						${body}
+					}`).flatMap((diagnostic) => diagnostic.notes)
+
+				expect(
+					notesOf("Terminal.inspect(Tag<Integer>#On::describe())"),
+				).toEqual([
+					"No Namespace in scope targets Tag<Integer>#On.",
+					"'Lists' declares 'describe' for Tag<List<Item>>, which a Tag<Integer>#On is not.",
+				])
+				expect(
+					notesOf("Terminal.inspect(on::describe())").filter((note) =>
+						note.startsWith("'Lists'"),
+					),
+				).toEqual([
+					"'Lists' declares 'describe' for Tag<List<Item>>, which a Tag<Integer>#On is not.",
+				])
+			})
+
 			it("lets a payload-free or an Alias-applied Case of the application it takes through", async () => {
 				expect(
 					await run(

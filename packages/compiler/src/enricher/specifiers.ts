@@ -81,7 +81,11 @@ function namespaceLookupWording(
 		return {
 			notes: [
 				`No Namespace in scope targets ${describeType(baseType)}.`,
-				...otherApplicationNotes(node.member.content, baseType, scope),
+				...otherApplicationNotes(
+					node.member.content,
+					[baseType],
+					scope,
+				),
 			],
 			helps: [],
 		}
