@@ -126,6 +126,18 @@ describe("A Module described", () => {
 		})
 	})
 
+	it("leaves out a provided Method named like a Case of its generic Choice", () => {
+		expect(namespaceSignatures("Provided.es", "Tag")).toEqual({
+			label: "<Value>(_ Tag<Value>) -> String",
+			shout: "<Value>(_ Tag<Value>) -> String",
+		})
+		expect(moduleDescriptor("Provided.es", true).exports.Tag).toMatchObject(
+			{
+				cases: [{ name: "Red" }, { name: "Wrapped" }],
+			},
+		)
+	})
+
 	it("shows a bound by its Protocol's name and never its path", () => {
 		let measure = moduleDescriptor("Bounded.es").exports.measure
 

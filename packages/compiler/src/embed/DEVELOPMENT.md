@@ -141,8 +141,8 @@ bundle carries no provided body it never calls. Some provided Methods are left o
   call that knows the Type Arguments can build. A generic Namespace without conditions offers its provided
   Methods as it offers its own, and the boundary refuses a Parameter that names a Type Parameter in both alike.
 - A name two Protocols provide without one extending the other, since a call has to pick one.
-- A name of a Case of the Choice the Namespace shares its name with. The host finds that Case's constructor on
-  the Namespace under that name, and a declared Case wins.
+- A name of a Case of the Choice the Namespace shares its name with, generic or not. The host finds that Case's
+  constructor on the Namespace under that name, and a declared Case wins.
 
 `describeTypes` lists declared Types and Protocols in export order, kept beside the `ModuleDescriptor` because
 nothing at run time reads a Type Alias. `carriesDictionary` and `carriesFuture` ask both, since a Dictionary in an

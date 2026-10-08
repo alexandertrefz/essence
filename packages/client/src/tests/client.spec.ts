@@ -214,6 +214,16 @@ describe("Loading a Module", () => {
 		)
 	})
 
+	it("keeps a generic Choice's Case over a provided Method of its name", async () => {
+		let provided = await loadModule(clientFixture("Provided.es"), {
+			cacheDirectory,
+		})
+		let tag = provided.exports.Tag as Record<string, unknown>
+
+		expect(tag.Red).toEqual({ $case: "Tag#Red" })
+		expect(typeof tag.shout).toBe("function")
+	})
+
 	// The re-exporting Module of a cycle hands on what the declaring one found.
 	it("binds the provided Methods of a Namespace a cycle forwards", async () => {
 		let walking = await loadModule(

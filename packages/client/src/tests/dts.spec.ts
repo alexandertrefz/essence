@@ -410,6 +410,16 @@ export declare const Rectangle: {
 }`)
 	})
 
+	it("declares a generic Choice's Case over a provided Method of its name", async () => {
+		let text = await declarationsOf(clientFixture("Provided.es"))
+		let start = text.indexOf("export declare const Tag: {")
+		let tag = text.slice(start, text.indexOf("\n}\n", start))
+
+		expect(tag).toContain('\tRed: { $case: "Tag#Red" }\n')
+		expect(tag).toContain("\tshout(p0: ")
+		expect(tag).not.toContain("\tRed(")
+	})
+
 	it("declares the provided Methods of a Namespace a cycle forwards", async () => {
 		expect(
 			await declarationsOf(

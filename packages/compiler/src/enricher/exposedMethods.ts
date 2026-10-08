@@ -1,6 +1,6 @@
 import type { common, enricher } from "@essence-lang/interfaces"
 
-import { flattenUnionMembers } from "../helpers/types"
+import { declaredCases } from "../helpers/describe"
 import { providedNamespaceAnswers } from "./providedBodies"
 import { knownProtocol, solveConformance } from "./resolvers"
 
@@ -110,24 +110,16 @@ function providedNames(
 		.map(([name]) => name)
 }
 
-// The Cases of the Choice the Namespace shares its name with. A host finds each
-// Case's constructor on the Namespace under the Case's name, and a declared
-// Case wins over a provided Method.
+// The Cases of the Choice the Namespace shares its name with, generic or not.
+// A host finds each Case's constructor on the Namespace under the Case's name,
+// and a declared Case wins over a provided Method.
 function caseNames(
 	namespace: common.NamespaceType,
 	scope: enricher.Scope,
 ): Set<string> {
 	let choice = scope.types[namespace.name]
-	let members =
-		choice === undefined
-			? []
-			: choice.type === "UnionType"
-				? flattenUnionMembers(choice)
-				: [choice]
+	let cases =
+		choice === undefined ? null : declaredCases(choice, namespace.name)
 
-	return new Set(
-		members.flatMap((member) =>
-			member.type === "Case" ? [member.name] : [],
-		),
-	)
+	return new Set((cases ?? []).map((declared) => declared.name))
 }
