@@ -6019,6 +6019,89 @@ ${declared}
 						],
 					])
 				})
+
+				// Each level reads its literal once per Parameter Types and once
+				// for real. The readings of a literal inside another are shared
+				// where the bindings it reads hold the same Types, so the reads
+				// grow by level. Counted, not timed.
+				it("should read nested callbacks a number of times that grows by level", () => {
+					// Each level also reads the Parameter of the literal around it.
+					let chained = (depth: number, level = 1): string =>
+						level > depth
+							? "1"
+							: `items::sum(on (i${level}) { <- i${level}.count::add(${chained(depth, level + 1)})${level > 1 ? `::add(i${level - 1}.count)` : ""} })`
+					let shapes = [
+						{
+							header: "type Item = { price: Rational, count: Integer }\n constant items: List<Item> = []",
+							wrap: (inner: string) =>
+								`items::sum(on (item) { <- ${inner}::add(item.count) })`,
+							leaf: "item.count",
+							extra: chained(4),
+							literals: 8,
+							perLevel: 3,
+						},
+						{
+							header: `${Array.from({ length: 10 }, (_, index) => `type T${index} = { tag${index}: Integer }`).join("\n")}
+							namespace Tens for Integer {
+								overload static pick {
+									${Array.from({ length: 10 }, (_, index) => `(on key: (_ v: T${index}) -> Integer) -> Integer { <- ${index} }`).join("\n")}
+								}
+							}`,
+							wrap: (inner: string) =>
+								`Tens.pick(on (v) { <- v.tag9::add(${inner}) })`,
+							leaf: "1",
+							extra: "1",
+							literals: 4,
+							perLevel: 11,
+						},
+					]
+
+					for (let {
+						header,
+						wrap,
+						leaf,
+						extra,
+						literals,
+						perLevel,
+					} of shapes) {
+						let program = parse(`implementation {
+							${header}
+
+							constant x = ${Array.from({ length: 4 }).reduce<string>(wrap, leaf)}
+							constant y = ${extra}
+						}`)
+						let reads: Array<number> = []
+						let count = (node: ParserNode): void => {
+							forEachParserChild(node, count)
+
+							if (
+								node.nodeType !== "FunctionDefinition" ||
+								node.returnType !== null
+							) {
+								return
+							}
+
+							let { body } = node
+							let index = reads.push(0) - 1
+
+							Object.defineProperty(node, "body", {
+								get: () => {
+									reads[index] += 1
+
+									return body
+								},
+							})
+						}
+
+						count(program)
+
+						expect(enrich(program).diagnostics).toEqual([])
+						expect(reads).toHaveLength(literals)
+						expect(Math.max(...reads)).toBeLessThanOrEqual(
+							perLevel * 4,
+						)
+					}
+				})
 			})
 
 			// The call carries the conformances solved during selection, not a

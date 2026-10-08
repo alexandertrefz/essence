@@ -810,12 +810,25 @@ call's own refusal stands beside it. A lone signature's re-match reports from ou
 is the same one.
 
 A literal's body can tell candidates apart too. Where more candidates than one take the call's labels, a literal
-whose expected return Type is decided is read once more under each candidate's Parameter Types, silently
-(`typerReadingLiteralBodies`). Any other call reads no body for this, which keeps nested literals from being read
-again at every level. A body with errors of its own there reads as an Error Argument, so the candidate
-does not fit while a later one does. `1::run(step (a, b) { <- a::length() })` then selects the entry taking
-Strings. Where no candidate reads the body cleanly, the first match is selected, and its real pass reports the
-body's mistake. A return Type the call has not solved is read off the body while matching, so it is not read again.
+whose expected return Type is decided is read under each candidate's Parameter Types, silently
+(`typerReadingLiteralBodies`). It is read once per list of Parameter Types, whichever candidates share it. A body
+with errors of its own there reads as an Error Argument, so the candidate does not fit while a later one does.
+`1::run(step (a, b) { <- a::length() })` then selects the entry taking Strings. Where no candidate reads the body
+cleanly, the first match is selected, and its real pass reports the body's mistake. A return Type the call has not
+solved is read off the body while matching, so it is not read again.
+
+Each reading of a literal reads the calls in its body again, and those read their own literals. A literal reads the
+same under the same Parameter Types wherever the bindings around its call that its body reads hold the same Types.
+So its readings are kept per Program, keyed by the spelling of those Types and checked against the Types themselves
+(`sharedReadings`). Where each binding a literal reads has one Type per reading around it, nested calls add reads
+level by level rather than multiplying them. A hoist shares nothing, since a name it misses may arrive in a later
+round.
+
+That has a limit. A literal reading the Parameters of several enclosing literals, each read under several
+Parameter Types, has one context per combination of their Types, and the combinations multiply with the depth.
+Each needs its own reading, since what the body answers may differ in each. Choosing an Overload through nested
+literals is exponential in that depth in the worst case, as overload resolution through nested Function literals is
+in general.
 
 A literal inside another Argument, as a Record member, a List item, a Case payload or a Match arm, is no Argument and
 takes no Types from the call. It reads the same against every candidate, so its report is never held, and it

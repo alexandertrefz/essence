@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util"
+
 import type { common, enricher, parser } from "@essence-lang/interfaces"
 
 import {
@@ -6,7 +8,7 @@ import {
 	report,
 	reportError,
 } from "../diagnostics/index"
-import { countOf } from "../helpers/describe"
+import { countOf, describeType } from "../helpers/describe"
 import { parameterInternalName } from "../helpers/names"
 import { pairedByPlace } from "../helpers/readerPairing"
 import {
@@ -17,7 +19,9 @@ import {
 	matchArguments,
 	mentionsUnsolvedTypeParameter,
 	pairArguments,
+	insideHoist,
 } from "../helpers/types"
+import { findParserChild, type ParserNode } from "../visitor/index"
 import { type ArgumentTyper, inferReturnTypeFromBody } from "./enrichers"
 import { insideRefusedCall, underRefusedCall } from "./refusedCalls"
 import {
@@ -26,6 +30,7 @@ import {
 	resolveDeclaredType,
 	scopeWithGenerics,
 } from "./resolvers"
+import { firstRead } from "./waitingReads"
 
 // What Function literals reported while a call's candidates were probed: per
 // literal, a list per resolution with the candidate it was read against. See
@@ -402,6 +407,133 @@ export function returnTypeHelpIn(
 	return help
 }
 
+// A literal's body read silently under one candidate's Parameter Types.
+type BodyReading = {
+	node: parser.FunctionDefinitionNode
+	parameterTypes: Array<common.Type>
+	refused: boolean
+	answer: common.Type | null
+}
+
+// A literal's readings, kept per Program, per literal and per the Types of the
+// bindings around its call that its body reads. The spelling of those Types
+// keys a bucket, which is searched for the Types themselves. See "Literals a
+// candidate does not fit" in DEVELOPMENT.md.
+type Shared = {
+	context: Array<[string, common.Type]>
+	readings: Array<BodyReading>
+}
+
+const sharedByContext = new WeakMap<
+	enricher.Scope,
+	WeakMap<parser.FunctionDefinitionNode, Map<string, Array<Shared>>>
+>()
+
+// The readings a literal shares with every call reading it again where the
+// bindings its body reads hold the same Types. A hoist may still miss a name,
+// so it shares nothing.
+function sharedReadings(
+	node: parser.FunctionDefinitionNode,
+	scope: enricher.Scope,
+): Array<BodyReading> | null {
+	let locals = new Map<string, common.Type>()
+	let top = scope
+
+	while (top.programTop !== true && top.parent !== null) {
+		for (let [name, type] of Object.entries(top.members)) {
+			if (!locals.has(name)) {
+				locals.set(name, type)
+			}
+		}
+
+		top = top.parent
+	}
+
+	if (insideHoist() || top.programTop !== true) {
+		return null
+	}
+
+	let context = namesRead(node, new Set(locals.keys())).map(
+		(name): [string, common.Type] => [name, locals.get(name)!],
+	)
+	let key = context
+		.map(([name, type]) => `${name}: ${spellingOf(type)}`)
+		.join(", ")
+	let byNode =
+		sharedByContext.get(top) ??
+		new WeakMap<parser.FunctionDefinitionNode, Map<string, Array<Shared>>>()
+	let byKey = byNode.get(node) ?? new Map<string, Array<Shared>>()
+	let bucket = byKey.get(key) ?? []
+	let shared = bucket.find((entry) =>
+		isDeepStrictEqual(entry.context, context),
+	)
+
+	if (shared === undefined) {
+		shared = { context, readings: [] }
+		bucket.push(shared)
+	}
+
+	sharedByContext.set(top, byNode.set(node, byKey.set(key, bucket)))
+
+	return shared.readings
+}
+
+// A Type's spelling, kept per Type object, since each lookup asks again.
+const spellings = new WeakMap<common.Type, string>()
+
+function spellingOf(type: common.Type): string {
+	let spelling = spellings.get(type) ?? describeType(type)
+
+	spellings.set(type, spelling)
+
+	return spelling
+}
+
+// The names among `locals` a literal's body reads, sorted. Asked once per
+// literal and set of names, since the walk reads the body.
+const namesReadMemo = new WeakMap<
+	parser.FunctionDefinitionNode,
+	Map<string, Array<string>>
+>()
+
+function namesRead(
+	node: parser.FunctionDefinitionNode,
+	locals: ReadonlySet<string>,
+): Array<string> {
+	let byNames = namesReadMemo.get(node) ?? new Map<string, Array<string>>()
+	let key = [...locals].sort().join(",")
+	let known = byNames.get(key)
+
+	if (known !== undefined) {
+		return known
+	}
+
+	let read: Array<string> = []
+	let left = new Set(locals)
+
+	for (
+		let found = firstRead(node, left);
+		found !== undefined;
+		found = firstRead(node, left)
+	) {
+		read.push(found.content)
+		left.delete(found.content)
+	}
+
+	if (locals.has("@") && readsSelf(node) !== undefined) {
+		read.push("@")
+	}
+
+	read.sort()
+	namesReadMemo.set(node, byNames.set(key, read))
+
+	return read
+}
+
+function readsSelf(node: ParserNode): true | undefined {
+	return node.nodeType === "Self" ? true : findParserChild(node, readsSelf)
+}
+
 // A literal whose body has errors of its own under one of several candidates
 // reads as an Error Argument there. A later candidate it fits is selected
 // then. See "Literals a candidate does not fit" in DEVELOPMENT.md.
@@ -409,6 +541,40 @@ export function typerReadingLiteralBodies(
 	scope: enricher.Scope,
 	typer: ArgumentTyper,
 ): ArgumentTyper {
+	// One reading per literal and Parameter Types, whichever candidate asks.
+	let readings: Array<BodyReading> = []
+
+	let readingOf = (
+		node: parser.FunctionDefinitionNode,
+		parameters: Array<common.Parameter>,
+	): BodyReading => {
+		let parameterTypes = parameters.map((parameter) => parameter.type)
+		let shared = sharedReadings(node, scope)
+		let found = [...readings, ...(shared ?? [])].find(
+			(reading) =>
+				reading.node === node &&
+				isDeepStrictEqual(reading.parameterTypes, parameterTypes),
+		)
+
+		if (found !== undefined) {
+			return found
+		}
+
+		let refused = { body: false }
+		let answer = inferReturnTypeFromBody(
+			node,
+			parameters,
+			scopeWithGenerics(node.generics, scope),
+			refused,
+		)
+		let reading = { node, parameterTypes, refused: refused.body, answer }
+
+		readings.push(reading)
+		shared?.push(reading)
+
+		return reading
+	}
+
 	return {
 		...typer,
 		getType(value, expectedType, bindings, declaredType) {
@@ -418,12 +584,19 @@ export function typerReadingLiteralBodies(
 				bindings,
 				declaredType,
 			)
+			let held = heldReports.at(-1)
 
-			if (
-				value.nodeType === "FunctionValue" &&
-				heldReports.at(-1)?.several === true &&
-				bodyRefuses(value.value, type, expectedType, bindings, scope)
-			) {
+			if (value.nodeType !== "FunctionValue" || held?.several !== true) {
+				return type
+			}
+
+			let read = decidedReading(value.value, type, expectedType, bindings)
+
+			if (read === null) {
+				return type
+			}
+
+			if (readingOf(value.value, read.parameters).refused) {
 				typer.noteErrorArgument()
 			}
 
@@ -432,48 +605,39 @@ export function typerReadingLiteralBodies(
 	}
 }
 
-// Whether a literal's body has errors of its own under the Parameter Types a
-// candidate gave it. A return Type still open was read off the body while
-// matching, and open Parameter Types decide nothing yet.
-function bodyRefuses(
+// The Parameter Types a candidate gives a literal, where they are decided. A
+// return Type still open was read off the body while matching, and open
+// Parameter Types decide nothing yet.
+function decidedReading(
 	node: parser.FunctionDefinitionNode,
 	type: common.Type,
 	expectedType: common.Type,
 	bindings: GenericBindings | null | undefined,
-	scope: enricher.Scope,
-): boolean {
+): { parameters: Array<common.Parameter> } | null {
 	if (
 		!needsContext(node) ||
 		type.type !== "Function" ||
 		expectedType.type !== "Function"
 	) {
-		return false
+		return null
 	}
 
 	let decided = (open: common.Type): common.Type =>
 		bindings == null ? open : applyGenericBindings(open, bindings)
-	let parameterTypes = type.parameterTypes.map((parameter) => ({
+	let parameters = type.parameterTypes.map((parameter) => ({
 		...parameter,
 		type: decided(parameter.type),
 	}))
+	let declared = decided(expectedType.returnType)
 
 	if (
-		mentionsUnsolvedTypeParameter(decided(expectedType.returnType)) ||
-		parameterTypes.some((parameter) =>
+		mentionsUnsolvedTypeParameter(declared) ||
+		parameters.some((parameter) =>
 			mentionsUnsolvedTypeParameter(parameter.type),
 		)
 	) {
-		return false
+		return null
 	}
 
-	let refused = { body: false }
-
-	inferReturnTypeFromBody(
-		node,
-		parameterTypes,
-		scopeWithGenerics(node.generics, scope),
-		refused,
-	)
-
-	return refused.body
+	return { parameters }
 }

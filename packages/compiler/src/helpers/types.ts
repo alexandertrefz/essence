@@ -974,6 +974,12 @@ export function openPendingRefinementCopies(): void {
 	openHoists += 1
 }
 
+// Whether a hoist is resolving declarations, when a name may still be missing
+// that the in-order enrichment finds.
+export function insideHoist(): boolean {
+	return openHoists > 0
+}
+
 export function closePendingRefinementCopies(): void {
 	openHoists -= 1
 
