@@ -1,6 +1,7 @@
 import type { common } from "@essence-lang/interfaces"
 
-import { undeclaredMembers } from "./undeclaredMembers"
+import { declaresMembers, undeclaredMembers } from "./undeclaredMembers"
+import { carryingArms, withArmsOf, writtenRecords } from "./writtenArms"
 
 // The suffix the Simplifier mangles an Overload's name with.
 const OVERLOAD_SUFFIX = "__overload$"
@@ -1209,6 +1210,18 @@ export function applyGenericBindings(
 					name: type.alias.name,
 					typeArguments: aliasArguments,
 				}
+			}
+
+			// The written arms substitute along, so `Box<Integer>` still declares
+			// the wider arm's `value`.
+			if (type.writtenArms !== undefined) {
+				substituted.writtenArms = type.writtenArms.map(
+					(arm) =>
+						applyGenericBindings(
+							arm,
+							bindings,
+						) as common.RecordType,
+				)
 			}
 
 			return substituted
@@ -2827,14 +2840,28 @@ export function buildUnion(members: Array<common.Type>): common.Type {
 			return
 		}
 
-		if (distinct.some((existing) => subsumesForUnion(existing, member))) {
+		let subsuming = distinct.find((existing) =>
+			subsumesForUnion(existing, member),
+		)
+
+		// A Record kept in place of another keeps the written arms the other
+		// carried.
+		if (subsuming !== undefined) {
+			distinct = distinct.map((existing) =>
+				existing === subsuming
+					? carryingArms(existing, member)
+					: existing,
+			)
+
 			return
 		}
 
-		distinct = distinct.filter(
-			(existing) => !subsumesForUnion(member, existing),
+		let taken = distinct.filter((existing) =>
+			subsumesForUnion(member, existing),
 		)
-		distinct.push(member)
+
+		distinct = distinct.filter((existing) => !taken.includes(existing))
+		distinct.push(taken.reduce(carryingArms, member))
 	}
 
 	for (let member of members) {
@@ -2888,10 +2915,12 @@ export function buildWrittenUnion(members: Array<common.Type>): common.Type {
 	let known = members.filter((member) => member.type !== "Error")
 
 	if (known.length === members.length || known.length === 0) {
-		return known.length === 0 ? { type: "Error" } : buildUnion(known)
+		return known.length === 0
+			? { type: "Error" }
+			: withWrittenArms(buildUnion(known), known)
 	}
 
-	let union = buildUnion(known)
+	let union = withWrittenArms(buildUnion(known), known)
 
 	return {
 		type: "UnionType",
@@ -2902,6 +2931,29 @@ export function buildWrittenUnion(members: Array<common.Type>): common.Type {
 			},
 		],
 	}
+}
+
+// A written Union's Record arm may take in a wider arm by width. A Literal may
+// still name the wider arm's members, so the survivor keeps every arm it took
+// in. See "Undeclared members" in DEVELOPMENT.md.
+function withWrittenArms(
+	union: common.Type,
+	written: Array<common.Type>,
+): common.Type {
+	let records = writtenRecords(written)
+	let stamp = (survivor: common.Type | common.GenericUse) => {
+		if (survivor.type !== "Record") {
+			return survivor
+		}
+
+		return records
+			.filter((arm) => arm !== survivor && matchesType(survivor, arm))
+			.reduce(withArmsOf, survivor)
+	}
+
+	return union.type === "UnionType"
+		? { ...union, types: union.types.map(stamp) }
+		: (stamp(union) as common.Type)
 }
 
 // The deduped member list `buildUnion` would make, for a caller that finishes
@@ -3456,6 +3508,8 @@ export type MatchableArgument = {
 	getType: (
 		expectedType: common.Type,
 		bindings: GenericBindings | null,
+		// The Parameter's Type as declared, its Type Parameters left open.
+		declaredType?: common.Type,
 	) => common.Type
 	// Set on an Argument that binds no Type Parameter, a prefixed Case construction
 	// with no Type Arguments, which its Parameter decides.
@@ -3471,6 +3525,9 @@ export type MatchableArgument = {
 	// Set on an Argument written as a Record Literal, the only kind that may be
 	// partial. See "Partial Record Arguments" in DEVELOPMENT.md.
 	spellsItsMembers?: boolean
+	// Set on an Argument written as a Record, List or Dictionary Literal. See
+	// "Undeclared members" in DEVELOPMENT.md.
+	writtenLiteral?: boolean
 }
 
 // Which Argument each Parameter was given, or null for a default, and the
@@ -3678,7 +3735,8 @@ function argumentFits(
 	// A Literal names only members its Parameter declares. See "Undeclared
 	// members" in DEVELOPMENT.md.
 	if (
-		argument.spellsItsMembers === true &&
+		argument.writtenLiteral === true &&
+		declaresMembers(expectedType) &&
 		undeclaredMembers(expectedType, argument.mergedValue?.(expectedType))
 			.length > 0
 	) {
@@ -3819,6 +3877,7 @@ export function matchArguments(
 			let argumentType = argument.getType(
 				expectedType,
 				inferenceContext?.bindings ?? null,
+				parameter.type,
 			)
 
 			if (

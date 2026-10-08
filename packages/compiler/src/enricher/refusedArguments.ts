@@ -30,8 +30,13 @@ export function typerAroundRefusedFunctions(
 
 	return {
 		...typer,
-		getType(value, expectedType, bindings) {
-			let type = typer.getType(value, expectedType, bindings)
+		getType(value, expectedType, bindings, declaredType) {
+			let type = typer.getType(
+				value,
+				expectedType,
+				bindings,
+				declaredType,
+			)
 
 			if (
 				value.nodeType === "FunctionValue" ||

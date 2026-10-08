@@ -31,11 +31,7 @@ import {
 } from "../helpers/describe"
 import { eraseRefinements } from "../helpers/eraseRefinements"
 import { conformanceParameterName } from "../helpers/names"
-import {
-	admittedMergeValue,
-	admittedTypeOf,
-	fitsWritten,
-} from "../helpers/predicateEval"
+import { admittedMergeValue, admittedTypeOf } from "../helpers/predicateEval"
 import { bodyDefinitelyReturns } from "../helpers/returns"
 import {
 	applyGenericBindings,
@@ -62,7 +58,7 @@ import {
 	typeContainsRefinement,
 	typeContainsUnknown,
 } from "../helpers/types"
-import { undeclaredMembers } from "../helpers/undeclaredMembers"
+import { isWrittenLiteral } from "../helpers/undeclaredMembers"
 import {
 	reportApplicationOverlap,
 	reportDispatchApplicationOverlap,
@@ -79,9 +75,13 @@ import {
 	reportDispatchEmptyContainerOverlap,
 	reportEmptyContainerOverlap,
 } from "./emptyOverlap"
+import { declaredReturnType, fitsExpectedType } from "./expectedTypes"
 import { holesShiftTheCall } from "./holes"
 import { reportMissingCases } from "./missingCases"
-import { payloadWritesTheCasesRecord } from "./payloadRecords"
+import {
+	payloadNamesUndeclared,
+	payloadWritesTheCasesRecord,
+} from "./payloadRecords"
 import { argumentEvidence, refinementEvidence } from "./refinementEvidence"
 import {
 	resetRefusedValues,
@@ -1702,7 +1702,9 @@ function checkDefineAnswer(
 
 	let measured = measuredValue(value)
 
-	if (fitsExpectedType(node.type, measured)) {
+	if (
+		fitsExpectedType(node.type, measured, node.declared ? node.type : null)
+	) {
 		return
 	}
 
@@ -2156,7 +2158,7 @@ function validateCaseValue(
 		}
 	} else if (
 		!matchesType(payloadType, casePayloadType(node.type, node.value)) ||
-		undeclaredMembers(payloadType, node.value).length > 0
+		payloadNamesUndeclared(node.type, node.value)
 	) {
 		// An undecided Type Argument can be what refuses the payload.
 		let undecided = undecidedSlotEvidence(
@@ -2173,7 +2175,6 @@ function validateCaseValue(
 			{
 				filled: node.type.payloadDefault?.members,
 				subject: `'#${node.type.name}'`,
-				refusesUndeclared: true,
 			},
 		)
 
@@ -2217,8 +2218,8 @@ function validateCaseValue(
 }
 
 // A Record Literal payload for a Case with a payload default is measured as a
-// partial. Any other payload may carry more than its Type names, so it is held
-// to the whole payload, as a Record Argument is.
+// partial. A payload value may carry more than its Type names, so it is held
+// to the whole payload, as a Record Argument value is.
 function casePayloadIsPartial(
 	caseType: common.CaseType,
 	value: common.typed.ExpressionNode,
@@ -2894,6 +2895,7 @@ function validateReturnStatement(
 				currentFunctionContext.completing === true,
 			),
 			node.expression,
+			declaredReturnType(currentFunctionContext),
 		)
 	) {
 		let returned = measuredValue(node.expression)
@@ -3109,23 +3111,6 @@ function validateDefiniteReturn(
 	}
 }
 
-// Whether a value fits where it was written. A written literal carries its
-// own evidence for a refinement, so `constant d: NonZeroInteger = 3` fits. A
-// hole fits, and so does a Function refused as a value, which a value holding
-// one is measured around. See "Holes" in DEVELOPMENT.md.
-function fitsExpectedType(
-	expected: common.Type,
-	value: common.typed.ExpressionNode,
-): boolean {
-	let measured = measuredValue(value)
-
-	return (
-		typeContainsError(expected) ||
-		measured.type.type === "Error" ||
-		fitsWritten(expected, measured)
-	)
-}
-
 // Arguments are asked exactly what the enricher asked them, literals and
 // `refinementDecidedBy` included. A Function refused as a value is a hole in
 // one. A committed Overload that fails to match is an internal error here.
@@ -3136,6 +3121,7 @@ function matchableArgumentsFromTypedNodes(
 		name: argumentNode.name,
 		mergedValue: (into) => admittedMergeValue(into, argumentNode.value),
 		spellsItsMembers: argumentNode.value.nodeType === "RecordValue",
+		writtenLiteral: isWrittenLiteral(argumentNode.value),
 		// An Argument with an undecided slot binds nothing and is matched after
 		// the Arguments that decide a Type Parameter. See "Re-matching a
 		// committed call" in DEVELOPMENT.md.
@@ -3511,7 +3497,6 @@ function reportArgumentMismatch(
 					{
 						filled: parameter.defaultMembers,
 						subject: "the Parameter's Type",
-						refusesUndeclared: true,
 					},
 				)
 

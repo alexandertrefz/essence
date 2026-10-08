@@ -28,12 +28,10 @@ implementation {
 	§ Only an Argument WRITTEN as a Record literal may leave a member out. Any
 	§ other Record carries whatever its value holds — width subtyping admits a
 	§ value with more members than its Type names — and the members the callee
-	§ fills in are exactly the ones it would read off it.
-	constant partial: { host: String, tls: Boolean } = {
-		host = "h",
-		tls = true,
-		retries = 1,
-	}
+	§ fills in are exactly the ones it would read off it. A literal names only
+	§ the members its Type declares, so the wider value is bound first.
+	constant wide = { host = "h", tls = true, retries = 1 }
+	constant partial: { host: String, tls: Boolean } = wide
 
 	Terminal.print(connect("essence.lang", using partial))
 

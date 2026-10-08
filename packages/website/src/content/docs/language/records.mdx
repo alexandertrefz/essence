@@ -159,7 +159,8 @@ implementation {
 	}
 
 	constant home: Coordinate = { x = 5, y = 6 }
-	constant start: Point     = { x = 1, y = 2, label = "start" }
+	constant labelled         = { x = 1, y = 2, label = "start" }
+	constant start: Point     = labelled
 
 	Terminal.print(describe(home)) § (5, 6)
 	Terminal.print(describe(start)) § (1, 2)
@@ -169,7 +170,7 @@ implementation {
 
 Typing is structural. `Point` is not a box a value has to be put into but a description of a shape. Any record with an [`Integer`](/docs/library/integer) `x` and an `Integer` `y` is a `Point`, whether or not anybody said so. `Coordinate` names the same shape, so a `Coordinate` passes wherever a `Point` is asked for, and the other way round.
 
-A record may also have more members than the type names. `start` carries a `label` that `Point` does not mention, and the annotation admits it. The extra member is kept, not dropped: `start` prints with its `label`, and a `with` update of `start` keeps it too. It cannot be read through `Point`, though: `start.label` is [`unknown-member`](/docs/reference/diagnostics#unknown-member), because the type names only `x` and `y`. The same holds for the payload of a case, on [Choices and `match`](/docs/language/choices-and-match). A literal written as an argument or a payload is the exception: it may name only the members its parameter or case declares, so `describe({ x = 1, y = 2, label = "start" })` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch), with the help "Remove 'label'.". `describe(start)` passes the same members as a value, and compiles. A `match` can still ask for it: `case { label: String }` tests whether the value carries a `String` `label`, and binds it as one. Written bare, `case { label }` names a member no type declares, which the compiler takes for a misspelling, as [Patterns](/docs/language/patterns#in-a-match-arm) explains.
+A record may also have more members than the type names. `start` holds `labelled`, which carries a `label` that `Point` does not mention, and the annotation admits it. The extra member is kept, not dropped: `start` prints with its `label`, and a `with` update of `start` keeps it too. It cannot be read through `Point`, though: `start.label` is [`unknown-member`](/docs/reference/diagnostics#unknown-member), because the type names only `x` and `y`. The same holds for the payload of a case, on [Choices and `match`](/docs/language/choices-and-match). A literal is the exception. Written where a type is declared, as an argument, a payload, a default, an annotated constant or variable, an assignment or a `<-`, it may name only the members that type declares. `constant start: Point = { x = 1, y = 2, label = "start" }` is [`assignment-type-mismatch`](/docs/reference/diagnostics#assignment-type-mismatch), with the help "Remove 'label'.", and `describe({ x = 1, y = 2, label = "start" })` is [`argument-type-mismatch`](/docs/reference/diagnostics#argument-type-mismatch). `describe(labelled)` passes the same members as a value, and compiles. A `match` can still ask for it: `case { label: String }` tests whether the value carries a `String` `label`, and binds it as one. Written bare, `case { label }` names a member no type declares, which the compiler takes for a misspelling, as [Patterns](/docs/language/patterns#in-a-match-arm) explains.
 
 The check goes down through nested records:
 
@@ -205,7 +206,7 @@ const start: Point = { x: 1, y: 2, label: "start" }
 // and 'label' does not exist in type 'Point'.
 ```
 
-If you know TypeScript: its `type` is structural in the same way. Its excess-property check refuses the extra `label` in a literal, where Essence admits the member and keeps it in an annotated constant. A literal written as an argument or a payload is checked as TypeScript checks it. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
+If you know TypeScript: its `type` is structural in the same way. Its excess-property check refuses the extra `label` in a literal, and so does Essence. Both admit the member once it is a value, as `labelled` is, and Essence keeps it. More on [Coming from JavaScript › Types](/docs/getting-started/coming-from-javascript#types).
 
 ## Changing a record
 
@@ -430,7 +431,8 @@ implementation {
 	type Point = { x: Integer, y: Integer }
 
 	constant here: Point  = { x = 1, y = 2 }
-	constant start: Point = { x = 1, y = 2, label = "start" }
+	constant labelled     = { x = 1, y = 2, label = "start" }
+	constant start: Point = labelled
 
 	Terminal.print(here::is({ y = 2, x = 1 })) § true
 	Terminal.print(here::isNot({ x = 2, y = 2 })) § true

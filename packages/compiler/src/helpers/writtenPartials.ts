@@ -29,7 +29,7 @@ export function updateRefusal(
 
 	return recordMismatchEvidence(whole, part, written ?? null, {
 		partial: true,
-		refusesUndeclared: !emptied,
+		offersRemoval: !emptied,
 		subject: "the value it updates",
 	})
 }

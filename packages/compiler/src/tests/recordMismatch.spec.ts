@@ -104,19 +104,22 @@ describe("a Record that does not fit another", () => {
 		})
 	})
 
-	// A member the value already writes is no near miss. The Quick Fix reads
-	// the Help's `data`, so offering it would write the member twice.
+	// A member the value already writes is no near miss, since renaming to it
+	// would write the member twice. The Help removes the undeclared one.
 	describe("a near miss the value already writes", () => {
 		let source = implementation(`${standing}
 	constant twice: Standing = { team = { name = "a", code = "b" }, points = 0, point = 1 }`)
 		let error = onlyError(source)
 
-		it("says the member is not declared and offers nothing", () => {
+		it("says the member is not declared and offers only its removal", () => {
 			expect(labelsOf(error)).toEqual([
 				"'point' is not a member of Standing",
 			])
-			expect(error.helps).toEqual([])
-			expect(error.data).toBeUndefined()
+			expect(error.helps).toEqual(["Remove 'point'."])
+			expect(error.data).toMatchObject({
+				kind: "undeclared-member",
+				member: "point",
+			})
 		})
 
 		it("still names the member nobody wrote", () => {
@@ -289,13 +292,14 @@ describe("a Record that does not fit another", () => {
 			expect(error.notes).toEqual(["'row' is declared as Row."])
 		})
 
-		// Record assignability is width subtyping, so a member the Type does
-		// not declare refuses nothing outside a partial position.
-		it("reports nothing for an extra member where one is allowed", () => {
+		// Record assignability is width subtyping, so a value carrying a member
+		// the Type does not declare is refused nothing. A Literal is.
+		it("reports nothing for an extra member a value carries", () => {
 			expect(
 				errorsFor(
 					implementation(`	type Point = { x: Integer }
-	constant wide: Point = { x = 1, y = 2 }`),
+	constant raw = { x = 1, y = 2 }
+	constant wide: Point = raw`),
 				),
 			).toEqual([])
 		})

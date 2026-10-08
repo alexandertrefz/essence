@@ -555,6 +555,10 @@ export type RecordType = {
 		name: string
 		typeArguments: Array<Type | GenericUse>
 	}
+	// The arms of a written Union this Record took in by width, itself among
+	// them. A Literal may name a member any of them declares. See "Undeclared
+	// members" in packages/compiler/src/helpers/DEVELOPMENT.md.
+	writtenArms?: Array<RecordType>
 }
 
 // The `= { … }` a Case's payload shape carries: the members a construction

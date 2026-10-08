@@ -103,6 +103,10 @@ import {
 	unfreshenBindings,
 	unionMembersKeepingNames,
 } from "../helpers/types"
+import {
+	isWrittenLiteral,
+	undeclaredMembers,
+} from "../helpers/undeclaredMembers"
 import { printSignature, printType, signaturesOf } from "../printType"
 import { aliasTypeParameters, offeredCases } from "./aliasCases"
 import { reportAmbiguousNamespace } from "./ambiguousNamespaces"
@@ -247,7 +251,7 @@ import {
 } from "./spelling"
 import { reportStaticMethodOnValue } from "./staticMethods"
 import { settleProperty, typeBodiedProperties } from "./staticProperties"
-import { reportPropertyParameters } from "./tests"
+import { reportPropertyParameters, reportRowTypeMismatch } from "./tests"
 import {
 	boundNamespaceGenerics,
 	conformanceBoundHelps,
@@ -1878,10 +1882,23 @@ function enrichFunctionDefinition(
 		],
 		returnType,
 		inferredReturnType: node.returnType === null ? returnType : null,
+		...declaredReturnShape(node),
 		parameterListPosition: node.parameterListPosition,
 		headPosition: signatureHeadPositionOf(node),
 		...(completing ? { completing: true as const } : {}),
 	}
+}
+
+// The return Type the expected signature declared for an omitted one, its
+// Type Parameters left open, which a `<-` names members against.
+function declaredReturnShape(node: parser.FunctionDefinitionNode): {
+	returnShape?: common.Type
+} {
+	let shape = recordedContextualFunctionType(node)?.declaredReturn ?? null
+
+	return node.returnType === null && shape !== null
+		? { returnShape: shape }
+		: {}
 }
 
 // A Scope where the injected Namespace Type Parameters carry their `where`
@@ -3913,6 +3930,7 @@ function enrichDefine(
 		otherwise,
 		position: node.position,
 		type,
+		...(declaredType === null ? {} : { declared: true as const }),
 	}
 }
 
@@ -4186,12 +4204,13 @@ function enrichTableRows(
 			// The one place a row is checked. The declared Type only hints to
 			// `enrichExpression`, which refuses nothing. `fitsWritten` reads a
 			// written row's evidence, so `across [1, 2] (n: NonZeroInteger)`
-			// decides each predicate.
+			// decides each predicate. A written row names only declared members.
 			if (
 				declaredType !== null &&
 				!typeContainsError(declaredType) &&
 				!typeContainsError(row.type) &&
-				!fitsWritten(declaredType, row)
+				(!fitsWritten(declaredType, row) ||
+					undeclaredMembers(declaredType, row).length > 0)
 			) {
 				reportRowTypeMismatch(row, declaredType, nameReadsTheRow)
 			}
@@ -4216,50 +4235,6 @@ function enrichTableRows(
 	)
 
 	return []
-}
-
-// Reported once per row, since every row is a test of its own.
-function reportRowTypeMismatch(
-	row: common.typed.ExpressionNode,
-	declaredType: common.Type,
-	nameReadsTheRow: boolean,
-): void {
-	let record = recordMismatchEvidence(declaredType, row.type, row, {
-		subject: "the row Parameter's Type",
-	})
-
-	reportError(
-		"This row does not fit the row Parameter",
-		record.lead?.position ?? row.position,
-		{
-			code: "table-row-type-mismatch",
-			labels: [
-				record.lead ??
-					primary(
-						row.position,
-						`this is ${withArticle(describeType(row.type))}`,
-					),
-				...record.labels,
-			],
-			notes: [
-				`The row Parameter is declared as ${describeType(
-					declaredType,
-				)}, and that is the Type the body — and an interpolated name — reads every row under.`,
-				...record.notes,
-			],
-			helps: [
-				...record.helps,
-				`Write a row of Type ${describeType(
-					declaredType,
-				)}, or widen the row Parameter's Type to one this row is a value of${
-					nameReadsTheRow
-						? " — a widened Type has to stay Printable, since this test's name interpolates the row"
-						: ""
-				}.`,
-			],
-			data: record.data,
-		},
-	)
 }
 
 // `for any (a: Integer, b: NonEmptyList<String>)`: the Parameters a property
@@ -8630,9 +8605,13 @@ function enrichParameterDefault(
 	// a hole here.
 	let measured = measuredValue(value)
 
+	// A Literal default names only what its Type declares. See "Undeclared
+	// members" in packages/compiler/src/helpers/DEVELOPMENT.md.
+	let undeclared = undeclaredMembers(type, value).length > 0
+
 	// A written default is admitted by deciding a refinement's predicate, as a
 	// written Argument is.
-	if (fitsWritten(type, measured)) {
+	if (!undeclared && fitsWritten(type, measured)) {
 		return value
 	}
 
@@ -8640,6 +8619,7 @@ function enrichParameterDefault(
 	// records what it leaves out, agreeing with `recordDefaultMembers`. Its
 	// written members carry their own evidence for a refinement.
 	if (
+		!undeclared &&
 		type.type === "Record" &&
 		valueType.type === "Record" &&
 		node.defaultValue.nodeType === "RecordValue" &&
@@ -8651,7 +8631,7 @@ function enrichParameterDefault(
 	if (
 		!typeContainsError(type) &&
 		!typeContainsError(valueType) &&
-		!matchesType(type, measured.type)
+		(undeclared || !matchesType(type, measured.type))
 	) {
 		let name =
 			parameterInternalName(node)?.content ??
@@ -9660,6 +9640,7 @@ export type ArgumentTyper = {
 		value: parser.ExpressionNode,
 		expectedType: common.Type,
 		bindings?: GenericBindings | null,
+		declaredType?: common.Type,
 	) => common.Type
 	enrichArgumentNode: (
 		argument: parser.ArgumentNode,
@@ -9890,21 +9871,22 @@ function makeArgumentTyper(
 
 	return {
 		expectedType,
-		getType(value, expectedType, bindings = null) {
+		getType(value, expectedType, bindings = null, declaredType) {
 			// A Function literal without annotations is resolved fresh per
-			// probe. `resolveFunctionValueType` records the resolution and its
-			// position for the final Node.
+			// probe. `resolveFunctionDefinitionType` records the resolution and
+			// its position for the final Node.
 			if (
 				value.nodeType === "FunctionValue" &&
 				needsContext(value.value)
 			) {
 				return noteErrors(
 					readingArgumentLiteral(value.value, () =>
-						resolveFunctionValueType(
-							value,
+						resolveFunctionDefinitionType(
+							value.value,
 							scope,
 							expectedType,
 							bindings,
+							declaredType,
 						),
 					),
 				)
@@ -10013,6 +9995,8 @@ function resolveFunctionDefinitionType(
 	scope: enricher.Scope,
 	expectedType: common.Type | null = null,
 	bindings: GenericBindings | null = null,
+	// The Parameter's Type as declared, whose return shape a `<-` is held to.
+	declaredType: common.Type | null = null,
 ): common.FunctionType {
 	if (!needsContext(node)) {
 		return resolveFunctionSignatureType(node, scope)
@@ -10060,6 +10044,8 @@ function resolveFunctionDefinitionType(
 		resolved,
 		expectedType: expectedFunction,
 		bindings,
+		declaredReturn:
+			declaredType?.type === "Function" ? declaredType.returnType : null,
 	})
 
 	return resolved
@@ -10817,7 +10803,9 @@ export function argumentMatchables(
 		getType: (
 			expectedType: common.Type,
 			bindings: GenericBindings | null,
-		) => typer.getType(argument.value, expectedType, bindings),
+			declaredType?: common.Type,
+		) =>
+			typer.getType(argument.value, expectedType, bindings, declaredType),
 		bindsNothing: bindsNoTypeParameter(argument),
 		decide: (decided: common.Type) =>
 			typer.decideArgument(argument.value, decided),
@@ -10827,6 +10815,7 @@ export function argumentMatchables(
 				typer.enrichedArgumentValue(argument.value),
 			),
 		spellsItsMembers: argument.value.nodeType === "RecordValue",
+		writtenLiteral: isWrittenLiteral(argument.value),
 	}))
 }
 
@@ -15265,7 +15254,8 @@ function decidedContextualFunctionType(
 		return recorded.resolved
 	}
 
-	let decided = applyGenericBindings(recorded.expectedType, recorded.bindings)
+	let expectedFunction = recorded.expectedType
+	let decided = applyGenericBindings(expectedFunction, recorded.bindings)
 
 	// Still open, so only the body can decide it, as `map`'s `Result` is
 	// decided by the literal.
@@ -15274,7 +15264,15 @@ function decidedContextualFunctionType(
 	}
 
 	let { result } = collectDiagnostics(() =>
-		resolveFunctionDefinitionType(node, scope, decided, recorded.bindings),
+		resolveFunctionDefinitionType(
+			node,
+			scope,
+			decided,
+			recorded.bindings,
+			recorded.declaredReturn === null
+				? null
+				: { ...expectedFunction, returnType: recorded.declaredReturn },
+		),
 	)
 
 	return result
@@ -15287,6 +15285,8 @@ type RecordedContextualFunctionType = {
 	resolved: common.FunctionType
 	expectedType: common.FunctionType | null
 	bindings: GenericBindings | null
+	// The return Type the Parameter declared, its Type Parameters left open.
+	declaredReturn: common.Type | null
 }
 
 const contextualFunctionTypes = new WeakMap<

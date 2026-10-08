@@ -646,14 +646,17 @@ export {
 })
 
 // A Record member no Type names may hold a Dictionary with no door. The
-// refusal must not blame another compile.
+// refusal must not blame another compile. A Literal names only declared
+// members, so the wider value is bound first.
 describe("A Dictionary at a position the boundary does not name", () => {
 	it("is refused with the reason the bundle has no door", async () => {
 		await withProject(
 			{
 				"Widen.es": `implementation {
 	function widened() -> { width: Integer } {
-		<- { width = 1, extra = ["a" = 1] }
+		constant wide = { width = 1, extra = ["a" = 1] }
+
+		<- wide
 	}
 }
 

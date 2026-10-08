@@ -1,6 +1,11 @@
 import type { common, parser } from "@essence-lang/interfaces"
 
 import { primary, reportError, secondary } from "../diagnostics/index"
+import {
+	describeType,
+	recordMismatchEvidence,
+	withArticle,
+} from "../helpers/describe"
 import { closestMatch } from "../helpers/suggest"
 import { flattenUnionMembers } from "../helpers/types"
 
@@ -658,3 +663,47 @@ function takingItApart(value: common.typed.ExpressionNode): string | null {
 }
 
 // #endregion
+
+// Reported once per row, since every row is a test of its own.
+export function reportRowTypeMismatch(
+	row: common.typed.ExpressionNode,
+	declaredType: common.Type,
+	nameReadsTheRow: boolean,
+): void {
+	let record = recordMismatchEvidence(declaredType, row.type, row, {
+		subject: "the row Parameter's Type",
+	})
+
+	reportError(
+		"This row does not fit the row Parameter",
+		record.lead?.position ?? row.position,
+		{
+			code: "table-row-type-mismatch",
+			labels: [
+				record.lead ??
+					primary(
+						row.position,
+						`this is ${withArticle(describeType(row.type))}`,
+					),
+				...record.labels,
+			],
+			notes: [
+				`The row Parameter is declared as ${describeType(
+					declaredType,
+				)}, and that is the Type the body — and an interpolated name — reads every row under.`,
+				...record.notes,
+			],
+			helps: [
+				...record.helps,
+				`Write a row of Type ${describeType(
+					declaredType,
+				)}, or widen the row Parameter's Type to one this row is a value of${
+					nameReadsTheRow
+						? " — a widened Type has to stay Printable, since this test's name interpolates the row"
+						: ""
+				}.`,
+			],
+			data: record.data,
+		},
+	)
+}

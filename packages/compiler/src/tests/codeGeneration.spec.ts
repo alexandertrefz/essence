@@ -880,12 +880,14 @@ describe("Code Generation", () => {
 	// Dictionary updates" in packages/compiler/src/rewriter/DEVELOPMENT.md.
 	describe("a Record Combination's expression right-hand side", () => {
 		// `partial`'s Type names `port` alone, but its value also carries a String
-		// `tls`, which must not replace the Boolean.
+		// `tls`, which must not replace the Boolean. A Literal names only declared
+		// members, so the wider value is bound first.
 		const widened = `implementation {
 	type Server = { port: Integer, tls: Boolean }
 
 	constant server: Server = { port = 80, tls = true }
-	constant partial: { port: Integer } = { port = 8080, tls = "nope" }
+	constant raw = { port = 8080, tls = "nope" }
+	constant partial: { port: Integer } = raw
 	constant merged: Server = { server with partial }
 
 	Terminal.inspect(merged)

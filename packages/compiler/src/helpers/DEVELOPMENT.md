@@ -29,24 +29,46 @@ signatures carry equal lists.
 
 ## Undeclared members
 
-A Record Literal written as an Argument or as a Case's payload may name only the members its Type declares. That
-holds for a whole Literal and for a partial one a default completes, and at every level its Literals reach.
-`undeclaredMembers` lists what it names beyond them. A value that is not a Literal is not walked, since Record
-assignability is width subtyping, and a value passed along keeps whatever it holds. So `describe(start)` compiles
-where `describe({ x = 1, y = 2, label = "start" })` does not.
+A Record Literal written where a Type is declared may name only the members that Type declares. The positions are
+an Argument, a Case's payload, a Parameter's default, an annotated Constant or Variable, an assignment, a `<-`
+against a declared return Type, and a table test's row. It holds for a whole Literal and for a partial one a
+default completes, and at every level its Literals reach, through Records, Lists, Dictionaries, generic Cases and a
+`define`'s arms.
+`undeclaredMembers` lists what a Literal names beyond its Type. A value that is not a Literal is not walked, since
+Record assignability is width subtyping, and a value passed along keeps whatever it holds. So `describe(labelled)`
+compiles where `describe({ x = 1, y = 2, label = "start" })` does not.
+
+A Type worked out from the value declares nothing, so it is measured by width alone. That is an unannotated
+Constant and a `define` with no arrow. A `define` with an arrow carries `declared`.
+
+A Function literal that omits its return Type answers to the shape the Parameter it is passed to declared, with
+that signature's Type Parameters left open, not to the Type the call bound. So `apply((x) { <- { a = x, b = 1 } })`
+is refused where `apply` declares `-> { a: T }`, whichever Argument bound `T` first. A bare `T`, as in
+`reduce`'s `Result` or `map`'s `Other`, declares nothing and takes any member. Every reading of a literal records
+the Parameter's declared return (`declaredReturn`), and the Function Definition carries it as `returnShape`.
+`declaredReturnType` in the Validator reads it.
 
 A Type that declares nothing takes any member. That is `{}`, a Type Parameter, and a Union holding anything but
-Records. A Union of Records takes a member any of its Records declares, and walks into it only where one Record
-declares it.
+Records. A Union of Records takes a member any of its Records declares. A written Union can collapse:
+`{ kind: String } | { kind: String, radius: Integer }` builds the narrower Record alone, since it takes in the wider
+one by width. `buildWrittenUnion` keeps every arm it took in as `writtenArms` on the survivor, so a Literal may
+still name `radius`. The arms are flattened, so `Shape | { kind: String }` keeps `Shape`'s. `buildUnion` carries a
+Record's arms to whichever Record its dedupe keeps, and `applyGenericBindings` substitutes them along, so
+`Box<T>` still declares its wider arm's `value`. A mismatch's Labels name only what no arm declares.
 
-Three sites ask. `argumentFits` refuses the Argument, so the call reports `argument-type-mismatch`, or no Overload
-matches and `argumentTypeRefusal` reports `no-matching-overload`. The Validator refuses a payload as
-`payload-type-mismatch`. `updateRefusal` holds an update's right-hand side to it, which matters only below the top
-level, since `isPartialOf` already refuses an undeclared member there. Each report reads `recordMismatchEvidence`
-with `refusesUndeclared`, which walks into a nested Literal that fits only by width. `removalEvidence` adds the Help
-that removes the member. A misspelled member gets its near miss instead, and an update that writes nothing else gets
-no removal, since an empty update does not parse. An annotated Constant is no such position, and keeps an extra
-member.
+A Case of a Choice with no Type Parameters is measured where it is constructed, by the Validator. A generic Case
+is measured there too once its Type Arguments are applied, which an expected Type does. Only an unapplied one is
+measured against the Case the enclosing position declares. The single-member shorthand wraps the value it was
+handed at the value's own Position, and a path reads past that wrapper, so `#Value({ a = 1, b = 2 })` names `b`.
+
+An Argument is read for the walk only where its Parameter's Type declares members (`declaresMembers`), since
+reading it enriches. `argumentFits` refuses it, so the call reports `argument-type-mismatch`, or no Overload matches
+and `argumentTypeRefusal` reports `no-matching-overload`. The Validator's `fitsExpectedType` refuses the declared
+positions, and `updateRefusal` holds an update's right-hand side to the rule below the top level, where
+`isPartialOf` already refuses an undeclared member. Each report reads `recordMismatchEvidence`, which walks into a
+nested Literal that fits only by width, and `removalEvidence` adds the Help that removes the member. A misspelled
+member gets its near miss instead. An update that writes nothing else gets no removal, since an empty update does
+not parse.
 
 ## Erasing refinements
 

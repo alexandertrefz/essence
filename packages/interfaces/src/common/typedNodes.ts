@@ -545,6 +545,9 @@ export interface DefineNode {
 	otherwise: DefineOtherwiseArm
 	position: Position
 	type: Type
+	// Set where its arrow wrote the Type, which the arms are then held to as a
+	// declared one.
+	declared?: true
 }
 
 export type DefineArm = {
@@ -881,6 +884,9 @@ export interface FunctionDefinitionNode {
 	// Set only where no `-> Type` was written, as a Parameter's
 	// `inferredType` is.
 	inferredReturnType: Type | null
+	// The return Type an expected signature declared for an omitted one, its
+	// Type Parameters left open. A `<-` names only the members it declares.
+	returnShape?: Type
 	// Where an omitted `-> Type` would have gone, for the Inlay Hint.
 	parameterListPosition: Position
 	// The signature from its `<` or `(` to the end of the return annotation,

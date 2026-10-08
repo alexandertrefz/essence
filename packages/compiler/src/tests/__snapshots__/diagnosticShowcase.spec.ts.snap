@@ -311,7 +311,8 @@ Error: This default does not fit Case '#Get'
     │                                          ▲  
     │                                          ╰── 'retries' is not a member of '#Get'
     │ 
-    │ Help: Write the members of { url: String } this default means to fill in.
+    │ Help 1: Remove 'retries'.
+    │ Help 2: Write the members of { url: String } this default means to fill in.
     │ 
     │ Note 1: '#Get' carries a { url: String }.
     │ Note 2: A payload default may fill in only some of those members; it may not name one the payload does not declare, nor give one a value of another Type.
@@ -2619,9 +2620,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [argument-type-mismatch]
 Error: This Argument does not fit Parameter 'using'
-    ╭─┤ RecordDefaults.es:38:47 │
+    ╭─┤ RecordDefaults.es:36:47 │
     │
- 38 │     Terminal.print(connect("essence.lang", using partial))
+ 36 │     Terminal.print(connect("essence.lang", using partial))
     │                                                  ───┬───  
     │                                                     ╰───── this is a { host: String, tls: Boolean }
     │ 
@@ -2633,9 +2634,9 @@ Error: This Argument does not fit Parameter 'using'
 
 [incomplete-record-argument]
 Error: This payload is missing 1 member the default does not fill in
-    ╭─┤ RecordDefaults.es:48:36 │
+    ╭─┤ RecordDefaults.es:46:36 │
     │
- 48 │     constant incomplete: Fetch = #Get({})
+ 46 │     constant incomplete: Fetch = #Get({})
     │                                       ─┐  
     │                                        ╰── 'url' not written here
     │ 
@@ -2647,9 +2648,9 @@ Error: This payload is missing 1 member the default does not fill in
 
 [missing-payload]
 Error: Case '#Blank' requires a payload
-    ╭─┤ RecordDefaults.es:53:25 │
+    ╭─┤ RecordDefaults.es:51:25 │
     │
- 53 │     constant bare: Fetch = #Blank
+ 51 │     constant bare: Fetch = #Blank
     │                            ───┬──  
     │                               ╰──── no payload was given
     │ 
@@ -2708,6 +2709,8 @@ Error: This value does not fit the declared Type of Constant 'twice'
  73 │        goalAgainst = 0,
     │                      ▲  
     │                      ╰── 'goalAgainst' is not a member of Standing
+    │ 
+    │ Help: Remove 'goalAgainst'.
     │ 
     │ Note 1: 'twice' is declared as Standing.
     │ Note 2: 'points' is missing.
