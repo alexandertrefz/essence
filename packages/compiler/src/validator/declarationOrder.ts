@@ -70,7 +70,7 @@ type Simulation = {
 	late: Array<Started>
 	scheduled: Set<Unit>
 	// The Statements each Statement needs declared first, by index.
-	needs: Map<number, Set<number>>
+	needs: Map<number, Needs>
 }
 
 // The part of a body after its first suspension, and where it was started.
@@ -731,32 +731,29 @@ type Move = {
 	}
 }
 
-// Offers only the moves after which nothing runs before what it needs. See
-// "Use before declaration" in DEVELOPMENT.md.
+// Offers only the moves after which nothing runs before what it needs. No
+// assignment passes a Statement that reads or assigns its Variable. See "Use
+// before declaration" in DEVELOPMENT.md.
 function moveHelp(
 	simulation: Simulation,
 	use: number,
 	dependency: Dependency,
 ): Move {
-	let { nodes } = simulation.order
 	let { name } = dependency
 	let declared = Math.floor(
 		availableFrom(dependency, simulation.order) / STEPS,
 	)
-	let between = (index: number) => index >= use && index < declared
 	let moving = new Set([declared])
 
 	for (let index of moving) {
-		for (let needed of needsOf(simulation, index)) {
-			if (between(needed)) {
-				moving.add(needed)
-			}
+		for (let tied of tiesOf(simulation, index, use, declared)) {
+			moving.add(tied)
 		}
 	}
 
-	let statement = nodes
+	let statement = simulation.order.nodes
 		.slice(use + 1, declared + 1)
-		.every((_, offset) => !needsOf(simulation, use + 1 + offset).has(use))
+		.every((_, offset) => !bound(simulation, use + 1 + offset, use))
 	let moves = (help: string): Move => ({
 		helps: [help],
 		data: {
@@ -778,63 +775,174 @@ function moveHelp(
 		return moves(`Move this Statement below the Declaration of '${name}'.`)
 	}
 
-	if (moving.has(use)) {
-		let culprits = [...needsOf(simulation, declared)].filter(
-			(needed) => between(needed) && leadsTo(simulation, needed, use),
-		)
+	let stuck = (index: number) => stays(simulation.order.nodes, index, use)
 
+	if ([...moving].some(stuck)) {
 		return moves(
-			`Change '${name}' so it does not need ${quotedNames(nodes, culprits) ?? "what this Statement declares"}, then move its Declaration above this Statement.`,
+			`Change '${name}' so it does not need ${quoted(culprits(simulation, use, declared, stuck)) ?? "what this Statement declares"}, then move its Declaration above this Statement.`,
 		)
 	}
 
 	return moves(
-		`Move the Declarations of ${quotedNames(nodes, [...moving])} above this Statement, in the order they are written.`,
+		`Move the Declarations of ${quoted(
+			[...moving]
+				.sort((left, right) => left - right)
+				.flatMap(
+					(index) =>
+						declaredName(simulation.order.nodes[index]) ?? [],
+				),
+		)} above this Statement, in the order they are written.`,
 	)
 }
 
-// Whether a Statement needs the one at `use`, at once or through Statements
-// written after it.
-function leadsTo(simulation: Simulation, from: number, use: number): boolean {
+// The Statements from `use` on that must move up with the one at `index`.
+// They are those it needs, written before `declared`, and those written
+// before it that clash with it over a Variable.
+function tiesOf(
+	simulation: Simulation,
+	index: number,
+	use: number,
+	declared: number,
+): Array<number> {
+	let ties: Array<number> = []
+
+	for (let other = use; other < declared; other++) {
+		if (
+			other !== index &&
+			(needsOf(simulation, index).statements.has(other) ||
+				(other < index &&
+					clashes(
+						needsOf(simulation, index),
+						needsOf(simulation, other),
+					).length > 0))
+		) {
+			ties.push(other)
+		}
+	}
+
+	return ties
+}
+
+// Whether the Statement at `later` must stay below the one at `earlier`: it
+// needs it, or they clash over a Variable.
+function bound(
+	simulation: Simulation,
+	later: number,
+	earlier: number,
+): boolean {
+	let needs = needsOf(simulation, later)
+
+	return (
+		needs.statements.has(earlier) ||
+		clashes(needs, needsOf(simulation, earlier)).length > 0
+	)
+}
+
+// The Variables two Statements clash over: one assigns what the other reads
+// or assigns.
+function clashes(left: Needs, right: Needs): Array<string> {
+	return [
+		...new Set([
+			...[...left.assigns].filter(
+				(name) => right.reads.has(name) || right.assigns.has(name),
+			),
+			...[...right.assigns].filter((name) => left.reads.has(name)),
+		]),
+	]
+}
+
+// Whether a Statement can not move up with a Declaration: the Statement at
+// `use`, or one that declares nothing to name, such as an assignment. A
+// Pattern's base moves with the bindings that name it.
+function stays(
+	nodes: Array<common.typed.ImplementationNode>,
+	index: number,
+	use: number,
+): boolean {
+	let node = nodes[index]
+
+	return (
+		index === use ||
+		(declaredName(node) === null &&
+			!(
+				node.nodeType === "ConstantDeclarationStatement" &&
+				node.synthesized === "base"
+			))
+	)
+}
+
+// What ties the Declaration at `declared` to a Statement that can not move up
+// with it. That is the Declarations it needs and the Variables it clashes over.
+function culprits(
+	simulation: Simulation,
+	use: number,
+	declared: number,
+	stuck: (index: number) => boolean,
+): Array<string> {
+	let needs = needsOf(simulation, declared)
+
+	return [
+		...new Set(
+			tiesOf(simulation, declared, use, declared)
+				.filter((tied) =>
+					leadsTo(simulation, tied, use, declared, stuck),
+				)
+				.flatMap((tied) => [
+					...(needs.statements.has(tied)
+						? [
+								declaredName(simulation.order.nodes[tied]) ??
+									[],
+							].flat()
+						: []),
+					...clashes(needs, needsOf(simulation, tied)),
+				]),
+		),
+	]
+}
+
+// Whether a Statement is one that can not move up, or is tied to one.
+function leadsTo(
+	simulation: Simulation,
+	from: number,
+	use: number,
+	declared: number,
+	stuck: (index: number) => boolean,
+): boolean {
 	let reached = new Set([from])
 
 	for (let index of reached) {
-		if (index === use) {
+		if (stuck(index)) {
 			return true
 		}
 
-		for (let needed of needsOf(simulation, index)) {
-			if (needed >= use) {
-				reached.add(needed)
-			}
+		for (let tied of tiesOf(simulation, index, use, declared)) {
+			reached.add(tied)
 		}
 	}
 
 	return false
 }
 
-// The names the Statements declare, in written order, or null for none.
-function quotedNames(
-	nodes: Array<common.typed.ImplementationNode>,
-	indices: Array<number>,
-): string | null {
-	let names = indices
-		.sort((left, right) => left - right)
-		.flatMap((index) => {
-			let declared = declaredName(nodes[index])
+// The names quoted and listed, or null for none.
+function quoted(names: Array<string>): string | null {
+	let quotes = names.map((name) => `'${name}'`)
 
-			return declared === null ? [] : [`'${declared}'`]
-		})
-
-	return names.length < 2
-		? (names[0] ?? null)
-		: `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+	return quotes.length < 2
+		? (quotes[0] ?? null)
+		: `${quotes.slice(0, -1).join(", ")} and ${quotes.at(-1)}`
 }
 
-// The Statements whose Declarations a Statement needs: what it reads while it
-// runs, and each Constant a body written in it reads. A body sees only the
-// Constants written above it.
-function needsOf(simulation: Simulation, index: number): Set<number> {
+// What a Statement needs written before it. `statements` are the Declarations
+// it reads while it runs, and each Constant a body written in it reads. A body
+// sees only the Constants written before it. `reads` and `assigns` name the
+// top-level Variables and Constants it reads and assigns while it runs.
+type Needs = {
+	statements: Set<number>
+	reads: Set<string>
+	assigns: Set<string>
+}
+
+function needsOf(simulation: Simulation, index: number): Needs {
 	let known = simulation.needs.get(index)
 
 	if (known !== undefined) {
@@ -842,18 +950,29 @@ function needsOf(simulation: Simulation, index: number): Set<number> {
 	}
 
 	let { order, units } = simulation
-	let needs = new Set<number>()
+	let needs: Needs = {
+		statements: new Set(),
+		reads: new Set(),
+		assigns: new Set(),
+	}
 	let need = (dependency: Dependency): void => {
 		let needed = Math.floor(availableFrom(dependency, order) / STEPS)
 
 		if (dependency.kind !== "cycle" && needed >= 0 && needed !== index) {
-			needs.add(needed)
+			needs.statements.add(needed)
 		}
 	}
 	let seen = new Set(units.roots[index])
 
 	for (let unit of seen) {
 		unit.dependencies.forEach(need)
+		unit.assigns.forEach((name) => needs.assigns.add(name))
+
+		for (let dependency of unit.dependencies) {
+			if (dependency.kind === "constant") {
+				needs.reads.add(dependency.name)
+			}
+		}
 
 		for (let id of [
 			...unit.runs.map((run) => run.target),

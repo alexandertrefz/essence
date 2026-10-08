@@ -38,6 +38,8 @@ export type Unit = {
 	tails: Array<{ id: string; position: common.Position }>
 	// The first call here that runs a Function value nothing names.
 	unknownCall: common.Position | null
+	// The top-level Variables given a new value here.
+	assigns: Array<string>
 }
 
 // A Function's or a Method's body. A completing body runs only when started,
@@ -268,6 +270,7 @@ function newUnit(id: string, name: string): Unit {
 		escapes: [],
 		tails: [],
 		unknownCall: null,
+		assigns: [],
 	}
 }
 
@@ -519,6 +522,21 @@ function visitStatement(
 		case "TypeAliasStatement":
 		case "ChoiceDeclarationStatement":
 			return
+		case "VariableAssignmentStatement": {
+			let binding = resolve(walk.scope, node.name.content)
+
+			if (binding?.kind === "value" && binding.declared !== undefined) {
+				walk.unit.assigns.push(node.name.content)
+			}
+
+			visitExpression(
+				node as TypedNode as common.typed.ExpressionNode,
+				walk,
+				"value",
+			)
+
+			return
+		}
 		default:
 			visitExpression(
 				node as TypedNode as common.typed.ExpressionNode,

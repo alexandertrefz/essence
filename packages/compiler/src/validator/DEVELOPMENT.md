@@ -147,14 +147,17 @@ notes the use, so `untypedReads.ts` leaves a read of an untyped static Property 
 counts the walk for a spec that holds it linear.
 
 The Help for a Namespace used too early, or a Constant reached too early, offers only the moves after which nothing runs
-before what it needs. `moveHelp` moves the Declaration above the Statement, together with every Declaration written
-between the two that it needs, or the Statement below the Declaration, where nothing written between needs what the
-Statement declares. `needsOf` answers what a Statement needs: what it reads while it runs, through every body it runs or
-lets escape, and every Constant read by a body written in it, since a body sees only the Constants written above it.
-Both are the reads `collectUnits` resolved through Scope, so a Property, a Parameter or a Record member that shares a
-Constant's name needs nothing. `Units.declared` holds the bodies each Statement's text holds. A Declaration that needs
-what the Statement declares can not come first, so the Help names what it needs that leads there, to change before the
-move. The Help's `data` says which moves it offers, and the Quick Fix makes only those.
+before what it needs, and no assignment passes a Statement that reads or assigns its Variable. `moveHelp` moves the
+Declaration above the Statement, together with every Statement written between the two that it needs, or the Statement
+below the Declaration, where nothing written between needs what the Statement declares. `needsOf` answers what a
+Statement needs: what it reads while it runs, through every body it runs or lets escape, and every Constant read by a
+body written in it, since a body sees only the Constants written above it. Both are the reads `collectUnits` resolved
+through Scope, so a Property, a Parameter or a Record member that shares a Constant's name needs nothing.
+`Units.declared` holds the bodies each Statement's text holds. `needsOf` also names the top-level Variables a Statement
+reads and assigns while it runs, as `Unit.assigns` records them. Two Statements that clash, one assigning a Variable the
+other reads or assigns, keep their order. A Declaration tied to the Statement, or to a Statement that declares nothing,
+such as an assignment, can not come first, so the Help names what it needs or clashes over, to change before the move.
+The Help's `data` says which moves it offers, and the Quick Fix makes only those.
 
 What remains conservative: an escaped value is taken to run at the first call through any value nothing names,
 whatever that call is handed. A `variable` holding a Function is a value nothing names. A Future's part after its

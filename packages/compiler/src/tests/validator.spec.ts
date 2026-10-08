@@ -3587,6 +3587,60 @@ describe("Validator", () => {
 						],
 					],
 				),
+				// An assignment stays on its side of every Statement that reads
+				// or assigns its Variable, so the output does not change.
+				[
+					"an assignment whose Variable a Statement between reads",
+					[
+						"variable v = 1",
+						"v = useIt()",
+						"Terminal.print(v)",
+						sizes("4"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[
+						"variable v = 1",
+						sizes("4"),
+						"v = useIt()",
+						"Terminal.print(v)",
+					],
+				],
+				[
+					"a body that assigns a Variable a Statement between reads",
+					[
+						"variable v = 1",
+						"function bump() -> Integer {\n\t\t\t\t\t\tv = useIt()\n\n\t\t\t\t\t\t<- v\n\t\t\t\t\t}",
+						"Terminal.print(bump())",
+						"Terminal.print(v)",
+						sizes("4"),
+					],
+					"Move the Declaration of 'Sizes' above this Statement.",
+					[
+						"variable v = 1",
+						"function bump() -> Integer {\n\t\t\t\t\t\tv = useIt()\n\n\t\t\t\t\t\t<- v\n\t\t\t\t\t}",
+						sizes("4"),
+						"Terminal.print(bump())",
+						"Terminal.print(v)",
+					],
+				],
+				[
+					"an assignment between to a Variable the Namespace reads",
+					[
+						"variable v = 1",
+						"constant a = useIt()",
+						"Terminal.print(a)",
+						"v = 5",
+						sizes("v"),
+					],
+					"Change 'Sizes' so it does not need 'v', then move its Declaration above this Statement.",
+					[
+						"variable v = 1",
+						sizes("4"),
+						"constant a = useIt()",
+						"Terminal.print(a)",
+						"v = 5",
+					],
+				],
 				// Only a read through the Scope needs the Constant, so neither a
 				// Property, a Parameter nor a Record member of its name does.
 				...[

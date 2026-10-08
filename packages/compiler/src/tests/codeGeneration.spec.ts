@@ -128,6 +128,54 @@ function hasCode(
 }
 
 describe("Code Generation", () => {
+	// A Help that moves Statements keeps what the Program prints. The move it
+	// refuses, the assignment after `Sizes`, prints the Variable's first value.
+	describe("a use-before-declaration Help", () => {
+		const program = (statements: Array<string>) => `implementation {
+			function useIt() -> Integer {
+				<- Sizes.base
+			}
+
+			${statements.join("\n\n")}
+		}`
+		const sizes = `namespace Sizes {
+				static base: Integer = 4
+			}`
+
+		it("moves no assignment past a read of its Variable", async () => {
+			expect(
+				diagnosticsOf(
+					program([
+						"variable v = 1",
+						"v = useIt()",
+						"Terminal.inspect(v)",
+						sizes,
+					]),
+				).flatMap((diagnostic) => diagnostic.helps),
+			).toEqual(["Move the Declaration of 'Sizes' above this Statement."])
+			expect(
+				await run(
+					program([
+						"variable v = 1",
+						sizes,
+						"v = useIt()",
+						"Terminal.inspect(v)",
+					]),
+				),
+			).toEqual(["4"])
+			expect(
+				await run(
+					program([
+						"variable v = 1",
+						"Terminal.inspect(v)",
+						sizes,
+						"v = useIt()",
+					]),
+				),
+			).toEqual(["1"])
+		})
+	})
+
 	// A static Property emits a `PropertyDefinition`, which upstream
 	// `escodegen` cannot print. The vendored copy in `packages/escodegen`
 	// patches it in (see its `PATCHES.md`), and these specs fail if a re-vendor
