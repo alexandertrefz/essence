@@ -98,6 +98,21 @@ describe("A Module described", () => {
 		})
 	})
 
+	// A generic Namespace's witness takes nothing a host would have to hand
+	// over. One whose conformance has `where` conditions does.
+	it("lists a generic Namespace's provided Methods unless conditions hold them", () => {
+		let shown = "<Item>(_ { item: Item }) -> String"
+
+		expect(namespaceSignatures("Provided.es", "Boxes")).toEqual({
+			label: shown,
+			Red: shown,
+			shout: shown,
+		})
+		expect(namespaceSignatures("Provided.es", "Taggeds")).toEqual({
+			label: "<Item is Printable>(_ { tag: Item }) -> String",
+		})
+	})
+
 	// A declared Case wins, since its constructor stands under that name.
 	it("leaves out a provided Method named like a Case of its Choice", () => {
 		expect(namespaceSignatures("Provided.es", "Colour")).toEqual({

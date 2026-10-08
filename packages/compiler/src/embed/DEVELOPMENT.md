@@ -135,10 +135,14 @@ The linker asks once every Module of a group is enriched, before it builds the g
 cycle that forwards the Namespace then hands on what the declaring Module found.
 
 The `embed` facet of the compile mode gates all of it, so a build that is not for a host emits none, and its
-bundle carries no provided body it never calls. A generic Namespace offers none, since a host can not hand over
-the witnesses its Type Parameters need. Neither does a name two Protocols provide without one extending the
-other, since a call has to pick one. Nor does the name of a Case of the Choice the Namespace shares its name
-with: the host finds that Case's constructor on the Namespace under that name, and a declared Case wins.
+bundle carries no provided body it never calls. Some provided Methods are left out:
+
+- One whose conformance has `where` conditions. Its witness takes the witnesses of the conditions, which only a
+  call that knows the Type Arguments can build. A generic Namespace without conditions offers its provided
+  Methods as it offers its own, and the boundary refuses a Parameter that names a Type Parameter in both alike.
+- A name two Protocols provide without one extending the other, since a call has to pick one.
+- A name of a Case of the Choice the Namespace shares its name with. The host finds that Case's constructor on
+  the Namespace under that name, and a declared Case wins.
 
 `describeTypes` lists declared Types and Protocols in export order, kept beside the `ModuleDescriptor` because
 nothing at run time reads a Type Alias. `carriesDictionary` and `carriesFuture` ask both, since a Dictionary in an

@@ -12,7 +12,7 @@ export function exposedMethods(
 	scope: enricher.Scope,
 	position: common.Position,
 ): Array<common.ExposedMethod> {
-	if (namespace.generics.length > 0 || namespace.targetType === null) {
+	if (namespace.targetType === null) {
 		return []
 	}
 
@@ -42,6 +42,8 @@ export function exposedMethods(
 			namespace.name,
 		)
 
+		// A conformance with `where` conditions does not solve here, since its
+		// witness takes theirs and the Type Parameters are open.
 		if (!solved.ok) {
 			continue
 		}

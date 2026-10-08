@@ -1,6 +1,7 @@
 § Namespaces whose Protocol provides Methods. A host calls a provided Method
 § on the Namespace as Essence does, and one the Namespace writes is its own. A
-§ Case of the Choice a Namespace shares its name with keeps that name.
+§ Case of the Choice a Namespace shares its name with keeps that name, and a
+§ conformance with `where` conditions offers nothing a host could call.
 
 implementation {
 	protocol Measurable {
@@ -60,9 +61,29 @@ implementation {
 			}
 		}
 	}
+
+	type Box<Item> = { item: Item }
+
+	namespace Boxes<infer Item> for Box<Item> is Labelled {
+		label() -> String {
+			<- "box"
+		}
+	}
+
+	type Tagged<Item> = { tag: Item }
+
+	namespace Taggeds<infer Item> for Tagged<Item>
+		is Labelled where Item is Printable
+	{
+		label() -> String {
+			<- "{@.tag}"
+		}
+	}
 }
 
 export {
+	Box
+	Boxes
 	Colour
 	Labelled
 	Measurable
@@ -70,4 +91,6 @@ export {
 	Rectangles
 	Square
 	Squares
+	Tagged
+	Taggeds
 }
