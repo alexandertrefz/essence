@@ -98,6 +98,19 @@ describe("A Module described", () => {
 		})
 	})
 
+	// A declared Case wins, since its constructor stands under that name.
+	it("leaves out a provided Method named like a Case of its Choice", () => {
+		expect(namespaceSignatures("Provided.es", "Colour")).toEqual({
+			label: "(_ Colour) -> String",
+			shout: "(_ Colour) -> String",
+		})
+		expect(
+			moduleDescriptor("Provided.es", true).exports.Colour,
+		).toMatchObject({
+			cases: [{ name: "Red" }, { name: "Blue" }],
+		})
+	})
+
 	it("shows a bound by its Protocol's name and never its path", () => {
 		let measure = moduleDescriptor("Bounded.es").exports.measure
 

@@ -399,6 +399,17 @@ export declare const Rectangle: {
 }`)
 	})
 
+	it("declares a Case over a provided Method of its name", async () => {
+		let text = await declarationsOf(clientFixture("Provided.es"))
+
+		expect(text).toContain(`export declare const Colour: {
+	readonly Red: "Red"
+	readonly Blue: "Blue"
+	label(p0: Colour): string
+	shout(p0: Colour): string
+}`)
+	})
+
 	it("declares the provided Methods of a Namespace a cycle forwards", async () => {
 		expect(
 			await declarationsOf(

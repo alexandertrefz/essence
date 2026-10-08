@@ -1,5 +1,6 @@
 import type { common, enricher } from "@essence-lang/interfaces"
 
+import { flattenUnionMembers } from "../helpers/types"
 import { providedNamespaceAnswers } from "./providedBodies"
 import { knownProtocol, solveConformance } from "./resolvers"
 
@@ -73,6 +74,7 @@ function providedNames(
 	scope: enricher.Scope,
 ): Array<string> {
 	let writers = new Map<string, Set<string>>()
+	let cases = caseNames(namespace, scope)
 
 	for (let identity of namespace.conformsTo ?? []) {
 		let provided = knownProtocol(identity, scope)?.providedMethods ?? {}
@@ -80,7 +82,8 @@ function providedNames(
 		for (let [name, writer] of Object.entries(provided)) {
 			if (
 				!Object.hasOwn(namespace.methods, name) &&
-				!Object.hasOwn(namespace.properties, name)
+				!Object.hasOwn(namespace.properties, name) &&
+				!cases.has(name)
 			) {
 				writers.set(name, (writers.get(name) ?? new Set()).add(writer))
 			}
@@ -103,4 +106,26 @@ function providedNames(
 			return answering.length === 1
 		})
 		.map(([name]) => name)
+}
+
+// The Cases of the Choice the Namespace shares its name with. A host finds each
+// Case's constructor on the Namespace under the Case's name, and a declared
+// Case wins over a provided Method.
+function caseNames(
+	namespace: common.NamespaceType,
+	scope: enricher.Scope,
+): Set<string> {
+	let choice = scope.types[namespace.name]
+	let members =
+		choice === undefined
+			? []
+			: choice.type === "UnionType"
+				? flattenUnionMembers(choice)
+				: [choice]
+
+	return new Set(
+		members.flatMap((member) =>
+			member.type === "Case" ? [member.name] : [],
+		),
+	)
 }

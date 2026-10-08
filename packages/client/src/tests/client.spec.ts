@@ -201,6 +201,19 @@ describe("Loading a Module", () => {
 		expect(squares.scaled!({ side: 3n }, 2n)).toBe(18n)
 	})
 
+	// The Choice's Case keeps its name, and the Protocol's other Methods join it.
+	it("keeps a Case over a provided Method of its name", async () => {
+		let provided = await loadModule(clientFixture("Provided.es"), {
+			cacheDirectory,
+		})
+		let colour = provided.exports.Colour as Record<string, unknown>
+
+		expect(colour.Red).toBe("Red")
+		expect((colour.shout as (value: string) => string)("Blue")).toBe(
+			"blue!",
+		)
+	})
+
 	// The re-exporting Module of a cycle hands on what the declaring one found.
 	it("binds the provided Methods of a Namespace a cycle forwards", async () => {
 		let walking = await loadModule(
