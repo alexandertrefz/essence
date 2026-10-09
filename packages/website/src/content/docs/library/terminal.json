@@ -147,7 +147,9 @@
 								}
 							],
 							"returns": "the structural rendering.",
-							"examples": []
+							"examples": [
+								"expect Terminal.describe(\"Ada\")::is(\"\\\"Ada\\\"\")\nexpect Terminal.describe(Stream#Error)::is(\"Stream#Error\")\nexpect Terminal.describe([1, 2])::is(\"[ 1, 2 ]\")"
+							]
 						}
 					]
 				}

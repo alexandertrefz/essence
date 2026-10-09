@@ -15,6 +15,23 @@ declarations {
 		§§
 		§§ The Function runs on the Program's own thread, from beginning to end, with nothing else in between. It is the way to describe a computation as work rather than to carry one out somewhere else.
 		§§
+		§§ @example
+		§§   variable starts = 0
+		§§
+		§§   constant counted = Async.deferred(() {
+		§§   	starts = starts::add(1)
+		§§
+		§§   	<- starts
+		§§   })
+		§§
+		§§   expect starts::is(0)
+		§§
+		§§   constant first = complete counted
+		§§   constant second = complete counted
+		§§
+		§§   expect first::is(1)
+		§§   expect second::is(2)
+		§§
 		§§ @param _ — the computation to run when the Future is started
 		§§ @returns — a Future answering what the computation answers.
 		static deferred<infer Value>(_ compute: () -> Value) -> Future<Value>

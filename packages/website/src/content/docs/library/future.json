@@ -45,7 +45,9 @@
 								}
 							],
 							"returns": "a Future answering what the computation answers.",
-							"examples": []
+							"examples": [
+								"variable starts = 0\n\nconstant counted = Async.deferred(() {\n\tstarts = starts::add(1)\n\n\t<- starts\n})\n\nexpect starts::is(0)\n\nconstant first = complete counted\nconstant second = complete counted\n\nexpect first::is(1)\nexpect second::is(2)"
+							]
 						}
 					]
 				},
@@ -111,7 +113,9 @@
 								}
 							],
 							"returns": "a Future answering what the transform answers.",
-							"examples": []
+							"examples": [
+								"constant price = Async.deferred(() { <- 40 })\nconstant total = complete price::map((amount) { <- amount::add(2) })\n\nexpect total::is(42)"
+							]
 						}
 					]
 				},
@@ -141,7 +145,9 @@
 								}
 							],
 							"returns": "a Future answering what the next work answers.",
-							"examples": []
+							"examples": [
+								"constant userId = Async.deferred(() { <- 7 })\nconstant greeting = complete userId::andThen((id) {\n\t<- Async.deferred(() { <- \"Hello, user {id}\" })\n})\n\nexpect greeting::is(\"Hello, user 7\")"
+							]
 						},
 						{
 							"signature": "andThen<infer Other>(_ next: Future<Other>) -> Future<Other>",
@@ -156,7 +162,9 @@
 								}
 							],
 							"returns": "a Future answering what the given work answers.",
-							"examples": []
+							"examples": [
+								"constant save = Async.deferred(() { <- \"saved\" })\nconstant notify = Async.deferred(() { <- \"notified\" })\nconstant answer = complete save::andThen(notify)\n\nexpect answer::is(\"notified\")"
+							]
 						}
 					]
 				},
@@ -186,7 +194,9 @@
 								}
 							],
 							"returns": "the value, or nothing where the deadline passed first.",
-							"examples": []
+							"examples": [
+								"constant quick = Async.deferred(() { <- \"ready\" })\nconstant answer = complete quick::within(milliseconds 1000)\n\nexpect answer::is(\"ready\")"
+							]
 						}
 					]
 				},
@@ -216,7 +226,9 @@
 								}
 							],
 							"returns": "a Future answering the first value, or the last reason.",
-							"examples": []
+							"examples": [
+								"variable calls = 0\n\nconstant flaky = Async.deferred(() -> Result<Integer, String> {\n\tcalls = calls::add(1)\n\n\tif calls::isLessThan(3) {\n\t\t<- #Failure(\"busy on call {calls}\")\n\t}\n\n\t<- #Value(calls)\n})\n\nconstant gaveUp = complete flaky::attempt(times 2)\nconstant answered = complete flaky::attempt(times 5)\n\nexpect gaveUp::is(#Failure(\"busy on call 2\"))\nexpect answered::is(3)"
+							]
 						},
 						{
 							"signature": "attempt(\n\ttimes count: Integer,\n\tpausingMilliseconds pause: Integer,\n) -> Future<Result<Value, Failure>>",
@@ -238,7 +250,9 @@
 								}
 							],
 							"returns": "a Future answering the first value, or the last reason.",
-							"examples": []
+							"examples": [
+								"constant ready = Async.deferred(() -> Result<String, String> {\n\t<- #Value(\"saved\")\n})\n\nconstant answer = complete ready::attempt(\n\ttimes 3,\n\tpausingMilliseconds 200,\n)\n\nexpect answer::is(\"saved\")"
+							]
 						}
 					]
 				}
@@ -266,7 +280,9 @@
 							"summary": "Answers a Future running every one of them in order, each started once the one before it has answered.\n\nThe answer holds one value per item, in the receiver's order. The empty List answers the empty List.\n\nThis is the entry for work that is not independent. A host can refuse a second request at once, and a walk can have an order that is what the answer means.",
 							"parameters": [],
 							"returns": "a Future answering the List of values.",
-							"examples": []
+							"examples": [
+								"constant steps = [\n\tAsync.deferred(() { <- \"fetch\" }),\n\tAsync.deferred(() { <- \"parse\" }),\n]\nconstant none: List<Future<String>> = []\n\nconstant done = complete steps::inSequence()\nconstant nothing = complete none::inSequence()\n\nexpect done::is([\"fetch\", \"parse\"])\nexpect nothing::isEmpty()"
+							]
 						}
 					]
 				},
@@ -288,7 +304,9 @@
 							"summary": "Answers a Future starting every one of them at once, and answering their values in the receiver's order.\n\nThe order of the answer is the receiver's, whatever order the runs finish in. The empty List answers the empty List.\n\nEverything runs on the Program's own thread, so what this saves is the waiting rather than the computing.",
 							"parameters": [],
 							"returns": "a Future answering the List of values.",
-							"examples": []
+							"examples": [
+								"constant lookups = [\n\tAsync.deferred(() { <- \"Ada\" }),\n\tAsync.deferred(() { <- \"Grace\" }),\n]\nconstant names = complete lookups::all()\n\nexpect names::is([\"Ada\", \"Grace\"])"
+							]
 						},
 						{
 							"signature": "all(atMost count: Integer) -> Future<List<Value>>",
@@ -303,7 +321,9 @@
 								}
 							],
 							"returns": "a Future answering the List of values.",
-							"examples": []
+							"examples": [
+								"constant pages = [\n\tAsync.deferred(() { <- 1 }),\n\tAsync.deferred(() { <- 2 }),\n\tAsync.deferred(() { <- 3 }),\n]\nconstant numbers = complete pages::all(atMost 2)\n\nexpect numbers::is([1, 2, 3])"
+							]
 						}
 					]
 				},
@@ -325,7 +345,9 @@
 							"summary": "Answers a Future starting every one of them at once, and answering with the first value any of them answers.\n\nEvery other run is stopped as soon as one has answered. What a stopped run would have answered is never read.",
 							"parameters": [],
 							"returns": "a Future answering the first value.",
-							"examples": []
+							"examples": [
+								"constant quick = Async.deferred(() { <- \"quick\" })\nconstant slow = Async.sleep(milliseconds 60000)::map((_) {\n\t<- \"slow\"\n})\n\nconstant first = complete [slow, quick]::race()\n\nexpect first::is(\"quick\")"
+							]
 						}
 					]
 				},
@@ -347,7 +369,9 @@
 							"summary": "Answers a Future starting every one of them at once, and answering with the value of the first that answers one.\n\nA run that fails is not an answer, and the waiting goes on. Every other run is stopped as soon as one has answered a value.\n\nA List whose every run failed answers nothing, and so does the empty List. The name is `OptionalList::firstValue`'s, for the same question one level along.",
 							"parameters": [],
 							"returns": "the first value, or nothing where every run failed.",
-							"examples": []
+							"examples": [
+								"constant down: Result<String, String> = #Failure(\"down\")\nconstant up: Result<String, String> = #Value(\"mirror\")\n\nconstant mirrors = [\n\tAsync.deferred(() { <- down }),\n\tAsync.deferred(() { <- up }),\n]\nconstant failing = [Async.deferred(() { <- down })]\n\nconstant found = complete mirrors::firstValue()\nconstant missing = complete failing::firstValue()\n\nexpect found::is(\"mirror\")\nexpect missing::isEmpty()"
+							]
 						}
 					]
 				}
@@ -383,7 +407,9 @@
 								}
 							],
 							"returns": "the run, answering what the transform answers.",
-							"examples": []
+							"examples": [
+								"constant run = start Async.deferred(() { <- 20 })\nconstant doubled = complete run::map((n) { <- n::multiply(with 2) })\n\nexpect doubled::is(40)"
+							]
 						}
 					]
 				},
@@ -413,7 +439,9 @@
 								}
 							],
 							"returns": "the value, or nothing where the deadline passed first.",
-							"examples": []
+							"examples": [
+								"constant run = start Async.deferred(() { <- \"ready\" })\nconstant answer = complete run::within(milliseconds 1000)\n\nexpect answer::is(\"ready\")"
+							]
 						}
 					]
 				}

@@ -90,6 +90,11 @@ declarations {
 		§§
 		§§ The reason is quoted, as a String payload is quoted inside any structure. The `#` sigil is left out, as `Result` prints `Failure` and `Ordering` prints `Less`.
 		§§
+		§§ @example
+		§§   constant failure = HttpFailure#Unreachable("refused")
+		§§
+		§§   expect failure::toString()::is("Unreachable(\"refused\")")
+		§§
 		§§ @returns — the rendering of the Case and its reason.
 		toString() -> String
 	}

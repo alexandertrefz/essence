@@ -36,6 +36,12 @@ declarations {
 		§§
 		§§ Nothing runs while the answer is being built. Each start of the answer starts the receiver again, so two starts run the work twice and call the transform twice.
 		§§
+		§§ @example
+		§§   constant price = Async.deferred(() { <- 40 })
+		§§   constant total = complete price::map((amount) { <- amount::add(2) })
+		§§
+		§§   expect total::is(42)
+		§§
 		§§ @param _ — the transform the value is handed to
 		§§ @returns — a Future answering what the transform answers.
 		map<infer Other>(_ transform: (_: Value) -> Other) -> Future<Other> {
@@ -50,6 +56,14 @@ declarations {
 			§§
 			§§ The Function is called once the receiver has answered, so what it builds can read that value. Nothing runs while the answer is being built.
 			§§
+			§§ @example
+			§§   constant userId = Async.deferred(() { <- 7 })
+			§§   constant greeting = complete userId::andThen((id) {
+			§§   	<- Async.deferred(() { <- "Hello, user {id}" })
+			§§   })
+			§§
+			§§   expect greeting::is("Hello, user 7")
+			§§
 			§§ @param _ — the Function building the work to run next
 			§§ @returns — a Future answering what the next work answers.
 			<infer Other>(
@@ -61,6 +75,13 @@ declarations {
 			§§ Answers a Future that runs this one, and then the given one.
 			§§
 			§§ The value the receiver answers with is dropped. This is the entry for work run for its effect, where what comes next does not read it.
+			§§
+			§§ @example
+			§§   constant save = Async.deferred(() { <- "saved" })
+			§§   constant notify = Async.deferred(() { <- "notified" })
+			§§   constant answer = complete save::andThen(notify)
+			§§
+			§§   expect answer::is("notified")
 			§§
 			§§ @param _ — the work to run once the receiver has answered
 			§§ @returns — a Future answering what the given work answers.
@@ -76,6 +97,12 @@ declarations {
 		§§ The run is stopped at the deadline. It was started by this Method and nothing else can be waiting for it, so what it would have answered is never read.
 		§§
 		§§ The answer is an Optional rather than a failure, because a deadline is a question the caller asked rather than something that went wrong.
+		§§
+		§§ @example
+		§§   constant quick = Async.deferred(() { <- "ready" })
+		§§   constant answer = complete quick::within(milliseconds 1000)
+		§§
+		§§   expect answer::is("ready")
 		§§
 		§§ @param milliseconds — how long the run has
 		§§ @returns — the value, or nothing where the deadline passed first.
@@ -102,6 +129,25 @@ declarations {
 			§§ The first attempt is one of the count, so `attempt(times 3)` runs the work three times at worst. A count below two is one attempt.
 			§§
 			§§ The answer is the first value, or the last reason where every attempt failed.
+			§§
+			§§ @example
+			§§   variable calls = 0
+			§§
+			§§   constant flaky = Async.deferred(() -> Result<Integer, String> {
+			§§   	calls = calls::add(1)
+			§§
+			§§   	if calls::isLessThan(3) {
+			§§   		<- #Failure("busy on call {calls}")
+			§§   	}
+			§§
+			§§   	<- #Value(calls)
+			§§   })
+			§§
+			§§   constant gaveUp = complete flaky::attempt(times 2)
+			§§   constant answered = complete flaky::attempt(times 5)
+			§§
+			§§   expect gaveUp::is(#Failure("busy on call 2"))
+			§§   expect answered::is(3)
 			§§
 			§§ @param times — how many attempts to make in all
 			§§ @returns — a Future answering the first value, or the last reason.
@@ -134,6 +180,18 @@ declarations {
 			§§ Answers the same, waiting the given number of milliseconds between two attempts.
 			§§
 			§§ The wait is between attempts, and never before the first or after the last.
+			§§
+			§§ @example
+			§§   constant ready = Async.deferred(() -> Result<String, String> {
+			§§   	<- #Value("saved")
+			§§   })
+			§§
+			§§   constant answer = complete ready::attempt(
+			§§   	times 3,
+			§§   	pausingMilliseconds 200,
+			§§   )
+			§§
+			§§   expect answer::is("saved")
 			§§
 			§§ @param times — how many attempts to make in all
 			§§ @param pausingMilliseconds — how long to wait between two attempts
@@ -188,6 +246,19 @@ declarations {
 		§§
 		§§ This is the entry for work that is not independent. A host can refuse a second request at once, and a walk can have an order that is what the answer means.
 		§§
+		§§ @example
+		§§   constant steps = [
+		§§   	Async.deferred(() { <- "fetch" }),
+		§§   	Async.deferred(() { <- "parse" }),
+		§§   ]
+		§§   constant none: List<Future<String>> = []
+		§§
+		§§   constant done = complete steps::inSequence()
+		§§   constant nothing = complete none::inSequence()
+		§§
+		§§   expect done::is(["fetch", "parse"])
+		§§   expect nothing::isEmpty()
+		§§
 		§§ @returns — a Future answering the List of values.
 		inSequence() -> Future<List<Value>>
 
@@ -201,12 +272,31 @@ declarations {
 			§§
 			§§ Everything runs on the Program's own thread, so what this saves is the waiting rather than the computing.
 			§§
+			§§ @example
+			§§   constant lookups = [
+			§§   	Async.deferred(() { <- "Ada" }),
+			§§   	Async.deferred(() { <- "Grace" }),
+			§§   ]
+			§§   constant names = complete lookups::all()
+			§§
+			§§   expect names::is(["Ada", "Grace"])
+			§§
 			§§ @returns — a Future answering the List of values.
 			() -> Future<List<Value>>
 
 			§§ Answers the same, with at most the given number of runs in flight at once.
 			§§
 			§§ A count below one runs them one at a time, and a count above the length runs them all at once.
+			§§
+			§§ @example
+			§§   constant pages = [
+			§§   	Async.deferred(() { <- 1 }),
+			§§   	Async.deferred(() { <- 2 }),
+			§§   	Async.deferred(() { <- 3 }),
+			§§   ]
+			§§   constant numbers = complete pages::all(atMost 2)
+			§§
+			§§   expect numbers::is([1, 2, 3])
 			§§
 			§§ @param atMost — how many runs to have in flight at once
 			§§ @returns — a Future answering the List of values.
@@ -221,6 +311,16 @@ declarations {
 		§§ Answers a Future starting every one of them at once, and answering with the first value any of them answers.
 		§§
 		§§ Every other run is stopped as soon as one has answered. What a stopped run would have answered is never read.
+		§§
+		§§ @example
+		§§   constant quick = Async.deferred(() { <- "quick" })
+		§§   constant slow = Async.sleep(milliseconds 60000)::map((_) {
+		§§   	<- "slow"
+		§§   })
+		§§
+		§§   constant first = complete [slow, quick]::race()
+		§§
+		§§   expect first::is("quick")
 		§§
 		§§ @returns — a Future answering the first value.
 		race() -> Future<Value>
@@ -238,6 +338,22 @@ declarations {
 		§§
 		§§ A List whose every run failed answers nothing, and so does the empty List. The name is `OptionalList::firstValue`'s, for the same question one level along.
 		§§
+		§§ @example
+		§§   constant down: Result<String, String> = #Failure("down")
+		§§   constant up: Result<String, String> = #Value("mirror")
+		§§
+		§§   constant mirrors = [
+		§§   	Async.deferred(() { <- down }),
+		§§   	Async.deferred(() { <- up }),
+		§§   ]
+		§§   constant failing = [Async.deferred(() { <- down })]
+		§§
+		§§   constant found = complete mirrors::firstValue()
+		§§   constant missing = complete failing::firstValue()
+		§§
+		§§   expect found::is("mirror")
+		§§   expect missing::isEmpty()
+		§§
 		§§ @returns — the first value, or nothing where every run failed.
 		firstValue() -> Future<Optional<Value>>
 	}
@@ -250,6 +366,12 @@ declarations {
 		§§
 		§§ The work is in flight already and nothing here starts it again, so the transform runs once however often the answer is completed.
 		§§
+		§§ @example
+		§§   constant run = start Async.deferred(() { <- 20 })
+		§§   constant doubled = complete run::map((n) { <- n::multiply(with 2) })
+		§§
+		§§   expect doubled::is(40)
+		§§
 		§§ @param _ — the transform the value is handed to
 		§§ @returns — the run, answering what the transform answers.
 		map<infer Other>(_ transform: (_: Value) -> Other) -> Started<Other>
@@ -261,6 +383,12 @@ declarations {
 		§§ A host with an event loop stays open until that work is over. Giving up on an answer is not giving up on the run, so a Program can not exit ahead of it.
 		§§
 		§§ The time is counted from here, because the run is in flight already.
+		§§
+		§§ @example
+		§§   constant run = start Async.deferred(() { <- "ready" })
+		§§   constant answer = complete run::within(milliseconds 1000)
+		§§
+		§§   expect answer::is("ready")
 		§§
 		§§ @param milliseconds — how long to wait for it
 		§§ @returns — the value, or nothing where the deadline passed first.

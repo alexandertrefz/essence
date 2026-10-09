@@ -83,6 +83,11 @@ declarations {
 		§§
 		§§ This is the rendering `inspect` writes. Strings are quoted, Cases print as their tags, and Records and Lists are laid out. The value needs no conformance.
 		§§
+		§§ @example
+		§§   expect Terminal.describe("Ada")::is("\"Ada\"")
+		§§   expect Terminal.describe(Stream#Error)::is("Stream#Error")
+		§§   expect Terminal.describe([1, 2])::is("[ 1, 2 ]")
+		§§
 		§§ @param _ — the value to describe
 		§§ @returns — the structural rendering.
 		static describe<infer Value>(_ value: Value) -> String
