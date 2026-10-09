@@ -1130,7 +1130,9 @@ describe("CLI on a standard library source", () => {
 		)
 
 		// Written out, since a compile that emits nothing never rewrites.
-		let directory = mkdtempSync(path.join(tmpdir(), "essence-stdlib-tests-"))
+		let directory = mkdtempSync(
+			path.join(tmpdir(), "essence-stdlib-tests-"),
+		)
 
 		try {
 			for (let fileName of fileNames) {
