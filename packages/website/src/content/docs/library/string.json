@@ -111,7 +111,9 @@
 								}
 							],
 							"returns": "`true` when the Strings are equal.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::is(\"Ada\")\nexpect \"Ada\"::is(\"ada\")::negate()"
+							]
 						},
 						{
 							"signature": "is(\n\t_ other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
@@ -133,7 +135,9 @@
 								}
 							],
 							"returns": "`true` when the Strings are equal under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::is(\"ADA\", comparing #Insensitive)\nexpect \"Ada\"::is(\"ADA\", comparing #Sensitive)::negate()"
+							]
 						}
 					]
 				},
@@ -163,7 +167,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect \"ant\"::compare(to \"bee\")::is(#Less)\nexpect \"Zoo\"::compare(to \"ant\")::is(#Less)"
+							]
 						},
 						{
 							"signature": "compare(\n\tto other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Ordering",
@@ -185,7 +191,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect \"Zoo\"::compare(to \"ant\", comparing #Insensitive)::is(#Greater)\nexpect \"ANT\"::compare(to \"ant\", comparing #Insensitive)::is(#Equal)"
+							]
 						}
 					]
 				},
@@ -207,7 +215,9 @@
 							"summary": "Answers the String itself.",
 							"parameters": [],
 							"returns": "the String, unchanged.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::toString()::is(\"Ada\")"
+							]
 						}
 					]
 				},
@@ -391,7 +401,9 @@
 							"summary": "Answers whether the String has no characters.",
 							"parameters": [],
 							"returns": "`true` for the empty String, and `false` otherwise.",
-							"examples": []
+							"examples": [
+								"expect \"\"::isEmpty()\nexpect \" \"::isEmpty()::negate()"
+							]
 						}
 					]
 				},
@@ -413,7 +425,9 @@
 							"summary": "Answers whether the String has at least one character.",
 							"parameters": [],
 							"returns": "`true` when the String is not empty.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::hasCharacters()\nexpect \"\"::hasCharacters()::negate()"
+							]
 						}
 					]
 				},
@@ -623,7 +637,9 @@
 								}
 							],
 							"returns": "`true` when it does not occur.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotContain(\"Tiger\")\nexpect \"Lions\"::doesNotContain(\"ion\")::negate()"
+							]
 						},
 						{
 							"signature": "doesNotContain(\n\t_ other: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
@@ -645,7 +661,9 @@
 								}
 							],
 							"returns": "`true` when it does not occur under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotContain(\"ION\", comparing #Sensitive)\nexpect \"Lions\"::doesNotContain(\"ION\", comparing #Insensitive)::negate()"
+							]
 						}
 					]
 				},
@@ -729,7 +747,9 @@
 								}
 							],
 							"returns": "`true` when the String does not begin with it.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotStart(with \"Ti\")\nexpect \"Lions\"::doesNotStart(with \"Li\")::negate()"
+							]
 						},
 						{
 							"signature": "doesNotStart(\n\twith prefix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
@@ -751,7 +771,9 @@
 								}
 							],
 							"returns": "`true` when the String does not begin with it under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotStart(with \"li\", comparing #Sensitive)\nexpect \"Lions\"::doesNotStart(with \"li\", comparing #Insensitive)::negate()"
+							]
 						}
 					]
 				},
@@ -781,7 +803,9 @@
 								}
 							],
 							"returns": "`true` when the String ends with it.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::ends(with \"ns\")\nexpect \"Lions\"::ends(with \"Li\")::negate()"
+							]
 						},
 						{
 							"signature": "ends(\n\twith suffix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
@@ -803,7 +827,9 @@
 								}
 							],
 							"returns": "`true` when the String ends with it under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::ends(with \"NS\", comparing #Insensitive)\nexpect \"Lions\"::ends(with \"NS\", comparing #Sensitive)::negate()"
+							]
 						}
 					]
 				},
@@ -833,7 +859,9 @@
 								}
 							],
 							"returns": "`true` when the String does not end with it.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotEnd(with \"Li\")\nexpect \"Lions\"::doesNotEnd(with \"ns\")::negate()"
+							]
 						},
 						{
 							"signature": "doesNotEnd(\n\twith suffix: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Boolean",
@@ -855,7 +883,9 @@
 								}
 							],
 							"returns": "`true` when the String does not end with it under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::doesNotEnd(with \"NS\", comparing #Sensitive)\nexpect \"Lions\"::doesNotEnd(with \"NS\", comparing #Insensitive)::negate()"
+							]
 						}
 					]
 				},
@@ -885,7 +915,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when it does not occur.",
-							"examples": []
+							"examples": [
+								"expect \"banana\"::firstIndex(of \"an\")::is(1)\nexpect \"banana\"::firstIndex(of \"\")::is(0)\nexpect \"banana\"::firstIndex(of \"x\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstIndex(of part: String, defaultingTo fallback: Integer) -> Integer",
@@ -907,7 +939,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"expect \"banana\"::firstIndex(of \"n\", defaultingTo -1)::is(2)\nexpect \"banana\"::firstIndex(of \"x\", defaultingTo -1)::is(-1)"
+							]
 						},
 						{
 							"signature": "firstIndex(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Optional<Integer>",
@@ -929,7 +963,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Anna\"::firstIndex(of \"a\", comparing #Insensitive)::is(0)\nexpect \"Anna\"::firstIndex(of \"a\", comparing #Sensitive)::is(3)"
+							]
 						}
 					]
 				},
@@ -959,7 +995,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when it does not occur.",
-							"examples": []
+							"examples": [
+								"expect \"banana\"::lastIndex(of \"an\")::is(3)\nexpect \"aaa\"::lastIndex(of \"aa\")::is(1)\nexpect \"banana\"::lastIndex(of \"x\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastIndex(of part: String, defaultingTo fallback: Integer) -> Integer",
@@ -981,7 +1019,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"expect \"banana\"::lastIndex(of \"n\", defaultingTo -1)::is(4)\nexpect \"banana\"::lastIndex(of \"x\", defaultingTo -1)::is(-1)"
+							]
 						},
 						{
 							"signature": "lastIndex(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> Optional<Integer>",
@@ -1003,7 +1043,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"expect \"Anna\"::lastIndex(of \"A\", comparing #Insensitive)::is(3)\nexpect \"Anna\"::lastIndex(of \"A\", comparing #Sensitive)::is(0)"
+							]
 						}
 					]
 				},
@@ -1065,7 +1107,9 @@
 								}
 							],
 							"returns": "the number of occurrences, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect \"banana\"::count(of \"a\")::is(3)\nexpect \"aaa\"::count(of \"aa\")::is(1)\nexpect \"banana\"::count(of \"\")::is(0)"
+							]
 						},
 						{
 							"signature": "count(\n\tof part: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> NonNegativeInteger",
@@ -1087,7 +1131,9 @@
 								}
 							],
 							"returns": "the number of occurrences under the given `CaseSensitivity`, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect \"Anna\"::count(of \"a\", comparing #Insensitive)::is(2)\nexpect \"Anna\"::count(of \"a\", comparing #Sensitive)::is(1)"
+							]
 						}
 					]
 				}
@@ -1115,7 +1161,9 @@
 							"summary": "Answers the lines of the String, split at every line break.\n\nA line break is `\\n`, `\\r` or `\\r\\n`. A trailing break leaves a final empty line. The empty String is one empty line.",
 							"parameters": [],
 							"returns": "the List of lines, without the line breaks. The List always has a line in it.",
-							"examples": []
+							"examples": [
+								"expect \"one\\ntwo\"::lines()::is([\"one\", \"two\"])\nexpect \"one\\r\\ntwo\\n\"::lines()::is([\"one\", \"two\", \"\"])\nexpect \"\"::lines()::is([\"\"])"
+							]
 						}
 					]
 				},
@@ -1137,7 +1185,9 @@
 							"summary": "Answers the words of the String.\n\nA word is a run of characters that are not whitespace. The whitespace between the words is dropped.",
 							"parameters": [],
 							"returns": "the List of words, empty when the String is only whitespace.",
-							"examples": []
+							"examples": [
+								"expect \" the  quick fox \"::words()::is([\"the\", \"quick\", \"fox\"])\nexpect \"   \"::words()::isEmpty()"
+							]
 						}
 					]
 				},
@@ -1159,7 +1209,9 @@
 							"summary": "Answers how many characters the String has.",
 							"parameters": [],
 							"returns": "the number of characters, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect \"Grüße\"::length()::is(5)\nexpect \"\"::length()::is(0)"
+							]
 						}
 					]
 				},
@@ -1181,7 +1233,9 @@
 							"summary": "Answers how many characters the String has, which is at least one.",
 							"parameters": [],
 							"returns": "the number of characters, which is above zero.",
-							"examples": []
+							"examples": [
+								"constant size: PositiveInteger = \"Ada\"::length()\n\nexpect size::is(3)"
+							]
 						}
 					]
 				},
@@ -1203,7 +1257,9 @@
 							"summary": "Answers the characters of the String, each as its own String.",
 							"parameters": [],
 							"returns": "the List of characters.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::characters()::is([\"A\", \"d\", \"a\"])\nexpect \"\"::characters()::isEmpty()"
+							]
 						}
 					]
 				},
@@ -1225,7 +1281,9 @@
 							"summary": "Answers the characters of the String, each as its own String.",
 							"parameters": [],
 							"returns": "the List of characters, which always holds at least one.",
-							"examples": []
+							"examples": [
+								"constant letters: NonEmptyList<Character> = \"Ada\"::characters()\n\nexpect letters::is([\"A\", \"d\", \"a\"])"
+							]
 						}
 					]
 				},
@@ -1255,7 +1313,9 @@
 								}
 							],
 							"returns": "the character, or nothing when the position is outside the String.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::character(at 0)::is(\"A\")\nexpect \"Ada\"::character(at -1)::is(\"a\")\nexpect \"Ada\"::character(at 3)::isEmpty()"
+							]
 						},
 						{
 							"signature": "character(at index: Integer, defaultingTo fallback: Character) -> Character",
@@ -1277,7 +1337,9 @@
 								}
 							],
 							"returns": "the character, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::character(at 1, defaultingTo \"?\")::is(\"d\")\nexpect \"Ada\"::character(at 3, defaultingTo \"?\")::is(\"?\")"
+							]
 						}
 					]
 				},
@@ -1299,7 +1361,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the first character, or nothing when the String is empty.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::firstCharacter()::is(\"A\")\nexpect \"\"::firstCharacter()::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstCharacter(defaultingTo fallback: Character) -> Character",
@@ -1314,7 +1378,9 @@
 								}
 							],
 							"returns": "the first character, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"constant name: String = \"Ada\"\n\nexpect name::firstCharacter(defaultingTo \"?\")::is(\"A\")\nexpect \"\"::firstCharacter(defaultingTo \"?\")::is(\"?\")"
+							]
 						}
 					]
 				},
@@ -1336,7 +1402,9 @@
 							"summary": "Answers the first character of the String.\n\nThe String has a character in it, so there is a first one to answer.",
 							"parameters": [],
 							"returns": "the first character.",
-							"examples": []
+							"examples": [
+								"constant initial: Character = \"Ada\"::firstCharacter()\n\nexpect initial::is(\"A\")"
+							]
 						}
 					]
 				},
@@ -1358,7 +1426,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the last character, or nothing when the String is empty.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::lastCharacter()::is(\"a\")\nexpect \"\"::lastCharacter()::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastCharacter(defaultingTo fallback: Character) -> Character",
@@ -1373,7 +1443,9 @@
 								}
 							],
 							"returns": "the last character, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"constant name: String = \"Ada\"\n\nexpect name::lastCharacter(defaultingTo \"?\")::is(\"a\")\nexpect \"\"::lastCharacter(defaultingTo \"?\")::is(\"?\")"
+							]
 						}
 					]
 				},
@@ -1395,7 +1467,9 @@
 							"summary": "Answers the last character of the String.\n\nThe String has a character in it, so there is a last one to answer.",
 							"parameters": [],
 							"returns": "the last character.",
-							"examples": []
+							"examples": [
+								"constant final: Character = \"Ada\"::lastCharacter()\n\nexpect final::is(\"a\")"
+							]
 						}
 					]
 				},
@@ -1455,7 +1529,9 @@
 								}
 							],
 							"returns": "the two Strings joined together.",
-							"examples": []
+							"examples": [
+								"expect \"world\"::prepend(\"hello \")::is(\"hello world\")"
+							]
 						}
 					]
 				},
@@ -1485,7 +1561,9 @@
 								}
 							],
 							"returns": "the two Strings joined together.",
-							"examples": []
+							"examples": [
+								"expect \"hello\"::append(\" world\")::is(\"hello world\")"
+							]
 						}
 					]
 				},
@@ -1515,7 +1593,9 @@
 								}
 							],
 							"returns": "the repeated String. A count below one answers the empty String.",
-							"examples": []
+							"examples": [
+								"expect \"ha\"::repeat(times 3)::is(\"hahaha\")\nexpect \"ha\"::repeat(times 0)::isEmpty()"
+							]
 						}
 					]
 				},
@@ -1545,7 +1625,9 @@
 								}
 							],
 							"returns": "the repeated String, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant laugh: NonEmptyString = \"ha\"::repeat(times 3)\n\nexpect laugh::is(\"hahaha\")"
+							]
 						}
 					]
 				},
@@ -1589,7 +1671,9 @@
 								}
 							],
 							"returns": "the padded String; unchanged when it is already that long.",
-							"examples": []
+							"examples": [
+								"expect \"7\"::pad(to 3, with \"0\")::is(\"007\")\nexpect \"Ada\"::pad(to 7, with \"*\", at #BothEnds)::is(\"**Ada**\")\nexpect \"Grace\"::pad(to 3)::is(\"Grace\")"
+							]
 						}
 					]
 				},
@@ -1710,7 +1794,9 @@
 								}
 							],
 							"returns": "the List of pieces, without the separator.",
-							"examples": []
+							"examples": [
+								"expect \"a,b,c\"::split(on \",\")::is([\"a\", \"b\", \"c\"])\nexpect \"a,,b\"::split(on \",\")::join(with \",\")::is(\"a,,b\")"
+							]
 						},
 						{
 							"signature": "split(on separator: NonEmptyString) -> NonEmptyList<String>",
@@ -1725,7 +1811,9 @@
 								}
 							],
 							"returns": "the List of pieces, which always holds at least one.",
-							"examples": []
+							"examples": [
+								"expect \"a,b\"::split(on \",\")::is([\"a\", \"b\"])\nexpect \"\"::split(on \",\")::is([\"\"])"
+							]
 						},
 						{
 							"signature": "split(\n\tonFirst separator: String,\n) -> Optional<{ leading: String, trailing: String }>",
@@ -1757,7 +1845,9 @@
 								}
 							],
 							"returns": "the text before and after the separator, or nothing when it does not occur.",
-							"examples": []
+							"examples": [
+								"constant parts = \"archive.tar.gz\"::split(onLast \".\")\n\nexpect parts::is({ leading = \"archive.tar\", trailing = \"gz\" })\nexpect \"README\"::split(onLast \".\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "split(\n\ton separator: NonEmptyString,\n\tatMost count: PositiveInteger,\n) -> NonEmptyList<String>",
@@ -1811,7 +1901,9 @@
 								}
 							],
 							"returns": "the trimmed String.",
-							"examples": []
+							"examples": [
+								"expect \"  Ada  \"::trim()::is(\"Ada\")\nexpect \"  Ada  \"::trim(at #End)::is(\"  Ada\")"
+							]
 						}
 					]
 				},
@@ -1848,7 +1940,9 @@
 								}
 							],
 							"returns": "the String of that range of characters.",
-							"examples": []
+							"examples": [
+								"expect \"Lions\"::slice(from 1, to 3)::is(\"io\")\nexpect \"Lions\"::slice(to -1)::is(\"Lion\")\nexpect \"Lions\"::slice(from 3, to 1)::isEmpty()"
+							]
 						}
 					]
 				},
@@ -1962,7 +2056,9 @@
 							"summary": "Answers the String with every character in upper case.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect \"Ada Lovelace\"::uppercase()::is(\"ADA LOVELACE\")"
+							]
 						}
 					]
 				},
@@ -1984,7 +2080,9 @@
 							"summary": "Answers the String with every character in upper case.\n\nCase mapping answers a character for every character it is given, so the answer has one too.",
 							"parameters": [],
 							"returns": "the upper-cased String, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant loud: NonEmptyString = \"Ada\"::uppercase()\n\nexpect loud::is(\"ADA\")"
+							]
 						}
 					]
 				},
@@ -2006,7 +2104,9 @@
 							"summary": "Answers the String with every character in lower case.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect \"Ada Lovelace\"::lowercase()::is(\"ada lovelace\")"
+							]
 						}
 					]
 				},
@@ -2028,7 +2128,9 @@
 							"summary": "Answers the String with every character in lower case.\n\nCase mapping answers a character for every character it is given, so the answer has one too.",
 							"parameters": [],
 							"returns": "the lower-cased String, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant quiet: NonEmptyString = \"ADA\"::lowercase()\n\nexpect quiet::is(\"ada\")"
+							]
 						}
 					]
 				},
@@ -2058,7 +2160,9 @@
 								}
 							],
 							"returns": "the normalized String.",
-							"examples": []
+							"examples": [
+								"expect \"x²\"::normalize(as #ComposedCompatibility)::is(\"x2\")\nexpect \"é\"::normalize(as #DecomposedCanonical)::length()::is(1)"
+							]
 						}
 					]
 				},
@@ -2095,7 +2199,9 @@
 								}
 							],
 							"returns": "the String with the replacements made.",
-							"examples": []
+							"examples": [
+								"expect \"2026-10-09\"::replaceEvery(\"-\", with \"/\")::is(\"2026/10/09\")\nexpect \"2026-10-09\"::replaceEvery(\"\", with \"/\")::is(\"2026-10-09\")"
+							]
 						},
 						{
 							"signature": "replaceEvery(\n\t_ part: String,\n\twith replacement: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> String",
@@ -2124,7 +2230,9 @@
 								}
 							],
 							"returns": "the String with the replacements made under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"constant laugh = \"Ho ho HO\"::replaceEvery(\n\t\"ho\",\n\twith \"ha\",\n\tcomparing #Insensitive,\n)\n\nexpect laugh::is(\"ha ha ha\")"
+							]
 						}
 					]
 				},
@@ -2161,7 +2269,9 @@
 								}
 							],
 							"returns": "the String with the first replacement made.",
-							"examples": []
+							"examples": [
+								"expect \"2026-10-09\"::replaceFirst(\"-\", with \"/\")::is(\"2026/10-09\")\nexpect \"2026\"::replaceFirst(\"-\", with \"/\")::is(\"2026\")"
+							]
 						},
 						{
 							"signature": "replaceFirst(\n\t_ part: String,\n\twith replacement: String,\n\tcomparing sensitivity: CaseSensitivity,\n) -> String",
@@ -2190,7 +2300,9 @@
 								}
 							],
 							"returns": "the String with the first replacement made under the given `CaseSensitivity`.",
-							"examples": []
+							"examples": [
+								"constant laugh = \"Ho ho HO\"::replaceFirst(\n\t\"ho\",\n\twith \"ha\",\n\tcomparing #Insensitive,\n)\n\nexpect laugh::is(\"ha ho HO\")"
+							]
 						}
 					]
 				},
@@ -2212,7 +2324,9 @@
 							"summary": "Answers the String with its characters in the opposite order.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect \"stressed\"::reverse()::is(\"desserts\")"
+							]
 						}
 					]
 				},
@@ -2234,7 +2348,9 @@
 							"summary": "Answers the String with its characters in the opposite order.\n\nReversing keeps every character, so the answer has one too.",
 							"parameters": [],
 							"returns": "the reversed String, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant word: NonEmptyString = \"drawer\"::reverse()\n\nexpect word::is(\"reward\")"
+							]
 						}
 					]
 				},

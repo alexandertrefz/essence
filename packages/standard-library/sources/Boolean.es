@@ -19,6 +19,10 @@ declarations {
 	namespace Boolean for Boolean is Equatable, is Printable, is Comparable {
 		§§ Answers whether the Boolean has the same truth value as another.
 		§§
+		§§ @example
+		§§   expect true::is(true)
+		§§   expect true::is(false)::negate()
+		§§
 		§§ @param _ — the Boolean to compare against
 		§§ @returns — `true` when both are equal.
 		is(_ other: Boolean) -> Boolean
@@ -30,6 +34,10 @@ declarations {
 		§ Essence body is a const of its own.
 
 		§§ Orders the Boolean against another one, with `false` before `true`.
+		§§
+		§§ @example
+		§§   expect false::compare(to true)::is(#Less)
+		§§   expect true::compare(to true)::is(#Equal)
 		§§
 		§§ @param to — the Boolean to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -49,6 +57,10 @@ declarations {
 		}
 
 		§§ Answers the opposite truth value: `false` for `true`, and `true` for `false`.
+		§§
+		§§ @example
+		§§   expect true::negate()::is(false)
+		§§   expect false::negate()
 		negate() -> Boolean
 
 		§§ Answers the logical conjunction: `true` only when both Booleans are `true`.
@@ -70,10 +82,18 @@ declarations {
 		§§
 		§§ Both sides are evaluated, as they are for `and`. Where the other side is expensive, write `define { as true if flag as other otherwise }`.
 		§§
+		§§ @example
+		§§   expect false::or(true)
+		§§   expect false::or(false)::negate()
+		§§
 		§§ @param _ — the other Boolean
 		or(_ other: Boolean) -> Boolean
 
 		§§ Answers the exclusive disjunction: `true` when exactly one Boolean is `true`.
+		§§
+		§§ @example
+		§§   expect true::exclusiveOr(false)
+		§§   expect true::exclusiveOr(true)::negate()
 		§§
 		§§ @param _ — the other Boolean
 		exclusiveOr(_ other: Boolean) -> Boolean {

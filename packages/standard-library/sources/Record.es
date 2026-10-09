@@ -55,6 +55,12 @@ declarations {
 		§§
 		§§ A Record Type whose declared members are not all `Equatable` is not `Equatable` either, exactly as a `List` of such a Type is not.
 		§§
+		§§ @example
+		§§   constant ada = { name = "Ada", born = 1815 }
+		§§
+		§§   expect ada::is({ born = 1815, name = "Ada" })
+		§§   expect ada::is({ name = "Ada", born = 1816 })::negate()
+		§§
 		§§ @param _ — the Record to compare against
 		§§ @returns — `true` when the Records are equal.
 		is(_ other: Record) -> Boolean
@@ -65,6 +71,11 @@ declarations {
 		§§
 		§§ A Record Type whose declared members are not all `Printable` is not `Printable` either. `Terminal.inspect` renders any value and asks for no conformance. That is what to reach for then.
 		§§
+		§§ @example
+		§§   constant ada = { name = "Ada", born = 1815 }
+		§§
+		§§   expect ada::toString()::is("\{ name = \"Ada\", born = 1815 \}")
+		§§
 		§§ @returns — the String representation of the Record.
 		toString() -> String
 
@@ -74,6 +85,11 @@ declarations {
 		§§ Answers the names of the Record's members.
 		§§
 		§§ The names are one third of a reflective trio. The other two, `entries` and `values`, answer a value of any Type, and there is no Type to write that with. So a Program can read the names and not what they name.
+		§§
+		§§ @example
+		§§   constant ada = { name = "Ada", born = 1815 }
+		§§
+		§§   expect ada::keys()::is(["name", "born"])
 		§§
 		§§ @returns — the member names, as a List of Strings.
 		keys() -> List<String>

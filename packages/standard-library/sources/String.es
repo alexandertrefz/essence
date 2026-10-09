@@ -123,12 +123,20 @@ declarations {
 		§§
 		§§ The comparison is case-sensitive unless a `CaseSensitivity` says otherwise.
 		overload is {
+			§§ @example
+			§§   expect "Ada"::is("Ada")
+			§§   expect "Ada"::is("ada")::negate()
+			§§
 			§§ @param _ — the String to compare against
 			§§ @returns — `true` when the Strings are equal.
 			(_ other: String) -> Boolean {
 				<- @::compare(to other)::is(#Equal)
 			}
 
+			§§ @example
+			§§   expect "Ada"::is("ADA", comparing #Insensitive)
+			§§   expect "Ada"::is("ADA", comparing #Sensitive)::negate()
+			§§
 			§§ @param _ — the String to compare against
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when the Strings are equal under the given `CaseSensitivity`.
@@ -147,6 +155,10 @@ declarations {
 			§ Native. It orders by code point, and an Essence body over
 			§ `codePoints()` would build a List of every point of both sides.
 
+			§§ @example
+			§§   expect "ant"::compare(to "bee")::is(#Less)
+			§§   expect "Zoo"::compare(to "ant")::is(#Less)
+			§§
 			§§ @param to — the String to order against
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 			(to other: String) -> Ordering
@@ -154,6 +166,10 @@ declarations {
 			§ Case is folded by lower-casing both sides, which approximates
 			§ full Unicode case folding. The ordering above then decides.
 
+			§§ @example
+			§§   expect "Zoo"::compare(to "ant", comparing #Insensitive)::is(#Greater)
+			§§   expect "ANT"::compare(to "ant", comparing #Insensitive)::is(#Equal)
+			§§
 			§§ @param to — the String to order against
 			§§ @param comparing — whether case is significant
 			§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -175,6 +191,9 @@ declarations {
 
 		§§ Answers the String itself.
 		§§
+		§§ @example
+		§§   expect "Ada"::toString()::is("Ada")
+		§§
 		§§ @returns — the String, unchanged.
 		toString() -> String {
 			<- @
@@ -182,12 +201,20 @@ declarations {
 
 		§§ Answers whether the String has no characters.
 		§§
+		§§ @example
+		§§   expect ""::isEmpty()
+		§§   expect " "::isEmpty()::negate()
+		§§
 		§§ @returns — `true` for the empty String, and `false` otherwise.
 		isEmpty() -> Boolean {
 			<- @::length()::is(0)
 		}
 
 		§§ Answers whether the String has at least one character.
+		§§
+		§§ @example
+		§§   expect "Ada"::hasCharacters()
+		§§   expect ""::hasCharacters()::negate()
 		§§
 		§§ @returns — `true` when the String is not empty.
 		hasCharacters() -> Boolean {
@@ -256,6 +283,10 @@ declarations {
 
 		§§ Answers whether the given String occurs nowhere in this one.
 		overload doesNotContain {
+			§§ @example
+			§§   expect "Lions"::doesNotContain("Tiger")
+			§§   expect "Lions"::doesNotContain("ion")::negate()
+			§§
 			§§ @param _ — the String to look for
 			§§ @returns — `true` when it does not occur.
 			(_ other: String) -> Boolean {
@@ -269,6 +300,10 @@ declarations {
 				<- @::contains(other)::negate()
 			}
 
+			§§ @example
+			§§   expect "Lions"::doesNotContain("ION", comparing #Sensitive)
+			§§   expect "Lions"::doesNotContain("ION", comparing #Insensitive)::negate()
+			§§
 			§§ @param _ — the String to look for
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when it does not occur under the given `CaseSensitivity`.
@@ -311,12 +346,20 @@ declarations {
 
 		§§ Answers whether the String does not begin with the given one.
 		overload doesNotStart {
+			§§ @example
+			§§   expect "Lions"::doesNotStart(with "Ti")
+			§§   expect "Lions"::doesNotStart(with "Li")::negate()
+			§§
 			§§ @param with — the String to look for at the front
 			§§ @returns — `true` when the String does not begin with it.
 			(with prefix: String) -> Boolean {
 				<- @::starts(with prefix)::negate()
 			}
 
+			§§ @example
+			§§   expect "Lions"::doesNotStart(with "li", comparing #Sensitive)
+			§§   expect "Lions"::doesNotStart(with "li", comparing #Insensitive)::negate()
+			§§
 			§§ @param with — the String to look for at the front
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when the String does not begin with it under the given `CaseSensitivity`.
@@ -335,10 +378,18 @@ declarations {
 
 		§§ Answers whether the String ends with the given one.
 		overload ends {
+			§§ @example
+			§§   expect "Lions"::ends(with "ns")
+			§§   expect "Lions"::ends(with "Li")::negate()
+			§§
 			§§ @param with — the String to look for at the end
 			§§ @returns — `true` when the String ends with it.
 			(with suffix: String) -> Boolean
 
+			§§ @example
+			§§   expect "Lions"::ends(with "NS", comparing #Insensitive)
+			§§   expect "Lions"::ends(with "NS", comparing #Sensitive)::negate()
+			§§
 			§§ @param with — the String to look for at the end
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when the String ends with it under the given `CaseSensitivity`.
@@ -350,12 +401,20 @@ declarations {
 
 		§§ Answers whether the String does not end with the given one.
 		overload doesNotEnd {
+			§§ @example
+			§§   expect "Lions"::doesNotEnd(with "Li")
+			§§   expect "Lions"::doesNotEnd(with "ns")::negate()
+			§§
 			§§ @param with — the String to look for at the end
 			§§ @returns — `true` when the String does not end with it.
 			(with suffix: String) -> Boolean {
 				<- @::ends(with suffix)::negate()
 			}
 
+			§§ @example
+			§§   expect "Lions"::doesNotEnd(with "NS", comparing #Sensitive)
+			§§   expect "Lions"::doesNotEnd(with "NS", comparing #Insensitive)::negate()
+			§§
 			§§ @param with — the String to look for at the end
 			§§ @param comparing — whether case is significant
 			§§ @returns — `true` when the String does not end with it under the given `CaseSensitivity`.
@@ -443,6 +502,11 @@ declarations {
 		§§
 		§§ A line break is `\n`, `\r` or `\r\n`. A trailing break leaves a final empty line. The empty String is one empty line.
 		§§
+		§§ @example
+		§§   expect "one\ntwo"::lines()::is(["one", "two"])
+		§§   expect "one\r\ntwo\n"::lines()::is(["one", "two", ""])
+		§§   expect ""::lines()::is([""])
+		§§
 		§§ @returns — the List of lines, without the line breaks. The List always has a line in it.
 		lines() -> NonEmptyList<String> {
 			§ No single `split(on:)` separator expresses all three breaks, so
@@ -460,10 +524,18 @@ declarations {
 		§§
 		§§ A word is a run of characters that are not whitespace. The whitespace between the words is dropped.
 		§§
+		§§ @example
+		§§   expect " the  quick fox "::words()::is(["the", "quick", "fox"])
+		§§   expect "   "::words()::isEmpty()
+		§§
 		§§ @returns — the List of words, empty when the String is only whitespace.
 		words() -> List<String>
 
 		§§ Answers how many characters the String has.
+		§§
+		§§ @example
+		§§   expect "Grüße"::length()::is(5)
+		§§   expect ""::length()::is(0)
 		§§
 		§§ @returns — the number of characters, which is never negative.
 		length() -> NonNegativeInteger
@@ -476,6 +548,10 @@ declarations {
 
 		§§ Answers the characters of the String, each as its own String.
 		§§
+		§§ @example
+		§§   expect "Ada"::characters()::is(["A", "d", "a"])
+		§§   expect ""::characters()::isEmpty()
+		§§
 		§§ @returns — the List of characters.
 		characters() -> List<Character>
 
@@ -487,10 +563,19 @@ declarations {
 		§§
 		§§ A negative position counts back from the end: -1 is the last character. A position outside the String answers nothing, and the `defaultingTo:` entry answers the given character instead.
 		overload character {
+			§§ @example
+			§§   expect "Ada"::character(at 0)::is("A")
+			§§   expect "Ada"::character(at -1)::is("a")
+			§§   expect "Ada"::character(at 3)::isEmpty()
+			§§
 			§§ @param at — the position to read
 			§§ @returns — the character, or nothing when the position is outside the String.
 			(at index: Integer) -> Optional<Character>
 
+			§§ @example
+			§§   expect "Ada"::character(at 1, defaultingTo "?")::is("d")
+			§§   expect "Ada"::character(at 3, defaultingTo "?")::is("?")
+			§§
 			§§ @param at — the position to read
 			§§ @param defaultingTo — the character to answer with when the position is outside the String
 			§§ @returns — the character, or the given one in its place.
@@ -505,10 +590,19 @@ declarations {
 		§§
 		§§ The empty String occurs at position 0. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload firstIndex {
+			§§ @example
+			§§   expect "banana"::firstIndex(of "an")::is(1)
+			§§   expect "banana"::firstIndex(of "")::is(0)
+			§§   expect "banana"::firstIndex(of "x")::isEmpty()
+			§§
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
 			(of part: String) -> Optional<Integer>
 
+			§§ @example
+			§§   expect "banana"::firstIndex(of "n", defaultingTo -1)::is(2)
+			§§   expect "banana"::firstIndex(of "x", defaultingTo -1)::is(-1)
+			§§
 			§§ @param of — the String to look for
 			§§ @param defaultingTo — the position to answer with when the String does not occur
 			§§ @returns — the zero-based position, or the given one in its place.
@@ -519,6 +613,10 @@ declarations {
 			§ Native, and the same walk with both sides folded; see the note
 			§ above `contains`.
 
+			§§ @example
+			§§   expect "Anna"::firstIndex(of "a", comparing #Insensitive)::is(0)
+			§§   expect "Anna"::firstIndex(of "a", comparing #Sensitive)::is(3)
+			§§
 			§§ @param of — the String to look for
 			§§ @param comparing — whether case is significant
 			§§ @returns — the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.
@@ -538,10 +636,19 @@ declarations {
 		§§
 		§§ The occurrence can overlap an earlier one: `"aaa"::lastIndex(of "aa")` is 1. The empty String occurs at the length. A String that does not occur answers nothing, and the `defaultingTo:` entry answers the given position instead.
 		overload lastIndex {
+			§§ @example
+			§§   expect "banana"::lastIndex(of "an")::is(3)
+			§§   expect "aaa"::lastIndex(of "aa")::is(1)
+			§§   expect "banana"::lastIndex(of "x")::isEmpty()
+			§§
 			§§ @param of — the String to look for
 			§§ @returns — the zero-based position, or nothing when it does not occur.
 			(of part: String) -> Optional<Integer>
 
+			§§ @example
+			§§   expect "banana"::lastIndex(of "n", defaultingTo -1)::is(4)
+			§§   expect "banana"::lastIndex(of "x", defaultingTo -1)::is(-1)
+			§§
 			§§ @param of — the String to look for
 			§§ @param defaultingTo — the position to answer with when the String does not occur
 			§§ @returns — the zero-based position, or the given one in its place.
@@ -549,6 +656,10 @@ declarations {
 				<- @::lastIndex(of part)::value(defaultingTo fallback)
 			}
 
+			§§ @example
+			§§   expect "Anna"::lastIndex(of "A", comparing #Insensitive)::is(3)
+			§§   expect "Anna"::lastIndex(of "A", comparing #Sensitive)::is(0)
+			§§
 			§§ @param of — the String to look for
 			§§ @param comparing — whether case is significant
 			§§ @returns — the zero-based position, or nothing when it does not occur under the given `CaseSensitivity`.
@@ -566,11 +677,21 @@ declarations {
 		§§
 		§§ The empty String has no first character and answers nothing. The `defaultingTo:` entry answers the given character instead.
 		overload firstCharacter {
+			§§ @example
+			§§   expect "Ada"::firstCharacter()::is("A")
+			§§   expect ""::firstCharacter()::isEmpty()
+			§§
 			§§ @returns — the first character, or nothing when the String is empty.
 			() -> Optional<Character> {
 				<- @::character(at 0)
 			}
 
+			§§ @example
+			§§   constant name: String = "Ada"
+			§§
+			§§   expect name::firstCharacter(defaultingTo "?")::is("A")
+			§§   expect ""::firstCharacter(defaultingTo "?")::is("?")
+			§§
 			§§ @param defaultingTo — the character to answer with when the String is empty
 			§§ @returns — the first character, or the given one in its place.
 			(defaultingTo fallback: Character) -> Character {
@@ -582,11 +703,21 @@ declarations {
 		§§
 		§§ The empty String has no last character and answers nothing. The `defaultingTo:` entry answers the given character instead.
 		overload lastCharacter {
+			§§ @example
+			§§   expect "Ada"::lastCharacter()::is("a")
+			§§   expect ""::lastCharacter()::isEmpty()
+			§§
 			§§ @returns — the last character, or nothing when the String is empty.
 			() -> Optional<Character> {
 				<- @::character(at -1)
 			}
 
+			§§ @example
+			§§   constant name: String = "Ada"
+			§§
+			§§   expect name::lastCharacter(defaultingTo "?")::is("a")
+			§§   expect ""::lastCharacter(defaultingTo "?")::is("?")
+			§§
 			§§ @param defaultingTo — the character to answer with when the String is empty
 			§§ @returns — the last character, or the given one in its place.
 			(defaultingTo fallback: Character) -> Character {
@@ -627,6 +758,9 @@ declarations {
 
 		§§ Joins another String onto the front of this one.
 		§§
+		§§ @example
+		§§   expect "world"::prepend("hello ")::is("hello world")
+		§§
 		§§ @param _ — the String to add to the front
 		§§ @returns — the two Strings joined together.
 		prepend(_ other: String) -> String {
@@ -634,6 +768,9 @@ declarations {
 		}
 
 		§§ Joins another String onto the end of this one.
+		§§
+		§§ @example
+		§§   expect "hello"::append(" world")::is("hello world")
 		§§
 		§§ @param _ — the String to add to the end
 		§§ @returns — the two Strings joined together.
@@ -643,6 +780,10 @@ declarations {
 		§§
 		§§ `join(with:)` on the answer rebuilds the String. A separator with a character in it always leaves at least one piece, and the entry taking a proven separator answers that.
 		overload split {
+			§§ @example
+			§§   expect "a,b,c"::split(on ",")::is(["a", "b", "c"])
+			§§   expect "a,,b"::split(on ",")::join(with ",")::is("a,,b")
+			§§
 			§§ @param on — the separator to split at
 			§§ @returns — the List of pieces, without the separator.
 			(on separator: String) -> List<String>
@@ -655,6 +796,10 @@ declarations {
 			§§ Splits the String at every occurrence of a separator proven to have a character.
 			§§
 			§§ Such a separator cuts between the pieces, and the piece before the first cut is always there. So the answer is never empty.
+			§§
+			§§ @example
+			§§   expect "a,b"::split(on ",")::is(["a", "b"])
+			§§   expect ""::split(on ",")::is([""])
 			§§
 			§§ @param on — the separator to split at, proven to have a character
 			§§ @returns — the List of pieces, which always holds at least one.
@@ -695,6 +840,12 @@ declarations {
 			§§ Splits the String at the last occurrence of the given separator.
 			§§
 			§§ The two pieces are the text before the separator and all the text after it. A separator that does not occur answers nothing. The empty separator occurs at the end, so it answers the whole receiver and the empty String.
+			§§
+			§§ @example
+			§§   constant parts = "archive.tar.gz"::split(onLast ".")
+			§§
+			§§   expect parts::is({ leading = "archive.tar", trailing = "gz" })
+			§§   expect "README"::split(onLast ".")::isEmpty()
 			§§
 			§§ @param onLast — the separator to cut at
 			§§ @returns — the text before and after the separator, or nothing when it does not occur.
@@ -744,10 +895,19 @@ declarations {
 		§§
 		§§ The occurrences do not overlap: `"aaa"::count(of "aa")` is 1. The empty String occurs 0 times.
 		overload count {
+			§§ @example
+			§§   expect "banana"::count(of "a")::is(3)
+			§§   expect "aaa"::count(of "aa")::is(1)
+			§§   expect "banana"::count(of "")::is(0)
+			§§
 			§§ @param of — the String to count
 			§§ @returns — the number of occurrences, which is never negative.
 			(of part: String) -> NonNegativeInteger
 
+			§§ @example
+			§§   expect "Anna"::count(of "a", comparing #Insensitive)::is(2)
+			§§   expect "Anna"::count(of "a", comparing #Sensitive)::is(1)
+			§§
 			§§ @param of — the String to count
 			§§ @param comparing — whether case is significant
 			§§ @returns — the number of occurrences under the given `CaseSensitivity`, which is never negative.
@@ -758,9 +918,15 @@ declarations {
 		}
 
 		§§ Answers the String with every character in upper case.
+		§§
+		§§ @example
+		§§   expect "Ada Lovelace"::uppercase()::is("ADA LOVELACE")
 		uppercase() -> String
 
 		§§ Answers the String with every character in lower case.
+		§§
+		§§ @example
+		§§   expect "Ada Lovelace"::lowercase()::is("ada lovelace")
 		lowercase() -> String
 
 		§§ Answers the String in the given Unicode normalization form.
@@ -769,6 +935,10 @@ declarations {
 		§§
 		§§ The two canonical forms are one text to every other Method here. They differ in the bytes `Terminal.write` emits, so `normalize(as #DecomposedCanonical)::length()` answers what `length()` answered before. The two compatibility forms do change the text.
 		§§
+		§§ @example
+		§§   expect "x²"::normalize(as #ComposedCompatibility)::is("x2")
+		§§   expect "é"::normalize(as #DecomposedCanonical)::length()::is(1)
+		§§
 		§§ @param as — the normalization form to produce; `#ComposedCanonical` when it is left out.
 		§§ @returns — the normalized String.
 		normalize(as form: NormalizationForm = #ComposedCanonical) -> String
@@ -776,6 +946,10 @@ declarations {
 		§§ Answers the String without the whitespace around it.
 		§§
 		§§ The whitespace goes from both ends when no end is named.
+		§§
+		§§ @example
+		§§   expect "  Ada  "::trim()::is("Ada")
+		§§   expect "  Ada  "::trim(at #End)::is("  Ada")
 		§§
 		§§ @param at — the end to trim; `#BothEnds` when it is left out.
 		§§ @returns — the trimmed String.
@@ -786,6 +960,10 @@ declarations {
 		§§ The occurrences do not overlap. The empty String matches nowhere, so the String comes back unchanged.
 		§§
 		overload replaceEvery {
+			§§ @example
+			§§   expect "2026-10-09"::replaceEvery("-", with "/")::is("2026/10/09")
+			§§   expect "2026-10-09"::replaceEvery("", with "/")::is("2026-10-09")
+			§§
 			§§ @param _ — the String to look for
 			§§ @param with — the String to put in its place
 			§§ @returns — the String with the replacements made.
@@ -804,6 +982,15 @@ declarations {
 			§ folded receiver is not the text to build the answer out of;
 			§ see the note above `contains`.
 
+			§§ @example
+			§§   constant laugh = "Ho ho HO"::replaceEvery(
+			§§   	"ho",
+			§§   	with "ha",
+			§§   	comparing #Insensitive,
+			§§   )
+			§§
+			§§   expect laugh::is("ha ha ha")
+			§§
 			§§ @param _ — the String to look for
 			§§ @param with — the String to put in its place
 			§§ @param comparing — whether case is significant
@@ -828,6 +1015,10 @@ declarations {
 		§§ The empty String matches nowhere, so it and a part that does not occur leave the String unchanged.
 		§§
 		overload replaceFirst {
+			§§ @example
+			§§   expect "2026-10-09"::replaceFirst("-", with "/")::is("2026/10-09")
+			§§   expect "2026"::replaceFirst("-", with "/")::is("2026")
+			§§
 			§§ @param _ — the String to look for
 			§§ @param with — the String to put in its place
 			§§ @returns — the String with the first replacement made.
@@ -855,6 +1046,15 @@ declarations {
 
 			§ Native, for the reason `replaceEvery`'s folding entry is.
 
+			§§ @example
+			§§   constant laugh = "Ho ho HO"::replaceFirst(
+			§§   	"ho",
+			§§   	with "ha",
+			§§   	comparing #Insensitive,
+			§§   )
+			§§
+			§§   expect laugh::is("ha ho HO")
+			§§
 			§§ @param _ — the String to look for
 			§§ @param with — the String to put in its place
 			§§ @param comparing — whether case is significant
@@ -871,6 +1071,10 @@ declarations {
 
 		§§ Answers the String joined to itself the given number of times.
 		§§
+		§§ @example
+		§§   expect "ha"::repeat(times 3)::is("hahaha")
+		§§   expect "ha"::repeat(times 0)::isEmpty()
+		§§
 		§§ @param times — how many copies to join
 		§§ @returns — the repeated String. A count below one answers the empty String.
 		repeat(times count: Integer) -> String
@@ -881,6 +1085,9 @@ declarations {
 		§ What to weigh before writing the next one.
 
 		§§ Answers the String with its characters in the opposite order.
+		§§
+		§§ @example
+		§§   expect "stressed"::reverse()::is("desserts")
 		reverse() -> String
 
 		§ Native. The Essence body, `characters()::slice(…)::join(with "")`,
@@ -891,6 +1098,11 @@ declarations {
 		§§
 		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last character. An empty or inverted range answers the empty String.
 		§§
+		§§ @example
+		§§   expect "Lions"::slice(from 1, to 3)::is("io")
+		§§   expect "Lions"::slice(to -1)::is("Lion")
+		§§   expect "Lions"::slice(from 3, to 1)::isEmpty()
+		§§
 		§§ @param from — the first position to include; zero when it is left out.
 		§§ @param to — the position to stop before; the length when it is left out.
 		§§ @returns — the String of that range of characters.
@@ -899,6 +1111,11 @@ declarations {
 		§§ Answers the String padded with the given String up to the given length.
 		§§
 		§§ The padding goes at the front when no end is named. `#BothEnds` centres the String.
+		§§
+		§§ @example
+		§§   expect "7"::pad(to 3, with "0")::is("007")
+		§§   expect "Ada"::pad(to 7, with "*", at #BothEnds)::is("**Ada**")
+		§§   expect "Grace"::pad(to 3)::is("Grace")
 		§§
 		§§ @param to — the length to reach
 		§§ @param with — the String to pad with, repeated as needed; a space when it is left out.
@@ -1121,10 +1338,20 @@ declarations {
 	namespace NonEmptyString for NonEmptyString {
 		§§ Answers how many characters the String has, which is at least one.
 		§§
+		§§ @example
+		§§   constant size: PositiveInteger = "Ada"::length()
+		§§
+		§§   expect size::is(3)
+		§§
 		§§ @returns — the number of characters, which is above zero.
 		length() -> PositiveInteger
 
 		§§ Answers the characters of the String, each as its own String.
+		§§
+		§§ @example
+		§§   constant letters: NonEmptyList<Character> = "Ada"::characters()
+		§§
+		§§   expect letters::is(["A", "d", "a"])
 		§§
 		§§ @returns — the List of characters, which always holds at least one.
 		characters() -> NonEmptyList<Character>
@@ -1133,12 +1360,22 @@ declarations {
 		§§
 		§§ The String has a character in it, so there is a first one to answer.
 		§§
+		§§ @example
+		§§   constant initial: Character = "Ada"::firstCharacter()
+		§§
+		§§   expect initial::is("A")
+		§§
 		§§ @returns — the first character.
 		firstCharacter() -> Character
 
 		§§ Answers the last character of the String.
 		§§
 		§§ The String has a character in it, so there is a last one to answer.
+		§§
+		§§ @example
+		§§   constant final: Character = "Ada"::lastCharacter()
+		§§
+		§§   expect final::is("a")
 		§§
 		§§ @returns — the last character.
 		lastCharacter() -> Character
@@ -1147,12 +1384,22 @@ declarations {
 		§§
 		§§ Case mapping answers a character for every character it is given, so the answer has one too.
 		§§
+		§§ @example
+		§§   constant loud: NonEmptyString = "Ada"::uppercase()
+		§§
+		§§   expect loud::is("ADA")
+		§§
 		§§ @returns — the upper-cased String, which is never empty.
 		uppercase() -> NonEmptyString
 
 		§§ Answers the String with every character in lower case.
 		§§
 		§§ Case mapping answers a character for every character it is given, so the answer has one too.
+		§§
+		§§ @example
+		§§   constant quiet: NonEmptyString = "ADA"::lowercase()
+		§§
+		§§   expect quiet::is("ada")
 		§§
 		§§ @returns — the lower-cased String, which is never empty.
 		lowercase() -> NonEmptyString
@@ -1161,12 +1408,22 @@ declarations {
 		§§
 		§§ Reversing keeps every character, so the answer has one too.
 		§§
+		§§ @example
+		§§   constant word: NonEmptyString = "drawer"::reverse()
+		§§
+		§§   expect word::is("reward")
+		§§
 		§§ @returns — the reversed String, which is never empty.
 		reverse() -> NonEmptyString
 
 		§§ Answers the String joined to itself the given number of times.
 		§§
 		§§ The count is above zero, so the answer holds at least one copy of a String that has a character.
+		§§
+		§§ @example
+		§§   constant laugh: NonEmptyString = "ha"::repeat(times 3)
+		§§
+		§§   expect laugh::is("hahaha")
 		§§
 		§§ @param times — how many copies to join, proven to be above zero
 		§§ @returns — the repeated String, which is never empty.

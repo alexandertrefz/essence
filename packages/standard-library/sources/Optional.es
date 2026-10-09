@@ -53,6 +53,14 @@ declarations {
 		§§ Answers whether the Optional is the given one, or whether it holds the given bare value.
 		§§
 		§§ Two Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. An Optional holding an Optional reaches the first entry, so `#Value(#Empty)::is(#Empty)` asks about the receiver and answers `false`. The Method is available whenever the payload conforms to `Equatable`.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect found::is(#Value(3))
+		§§   expect found::is(3)
+		§§   expect missing::is(3)::negate()
 		overload is {
 			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when both are empty, or both hold equal values.
@@ -86,6 +94,14 @@ declarations {
 		§§ Answers whether the Optional differs from the given one, or whether it does not hold the given bare value.
 		§§
 		§§ An empty Optional holds no bare value, so it always differs from one. The Method is available whenever the payload conforms to `Equatable`.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect found::isNot(#Empty)
+		§§   expect found::isNot(4)
+		§§   expect missing::isNot(3)
 		overload isNot {
 			§§ @param _ — the Optional to compare against
 			§§ @returns — `true` when the two differ in Case or in value.
@@ -110,6 +126,13 @@ declarations {
 		§§
 		§§ The payload renders through its own `toString`, and a String payload is quoted: `#Value("a")` answers `Value("a")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.
 		§§
+		§§ @example
+		§§   constant found: Optional<String> = #Value("Ada")
+		§§   constant missing: Optional<String> = #Empty
+		§§
+		§§   expect found::toString()::is("Value(\"Ada\")")
+		§§   expect missing::toString()::is("Empty")
+		§§
 		§§ @returns — the text `Value(…)` around the payload, or `Empty`.
 		toString<ItemType is Printable>() -> String
 
@@ -130,6 +153,13 @@ declarations {
 		overload hasValue {
 			§§ Answers whether the Optional holds a value.
 			§§
+			§§ @example
+			§§   constant found: Optional<Integer> = #Value(3)
+			§§   constant missing: Optional<Integer> = #Empty
+			§§
+			§§   expect found::hasValue()
+			§§   expect missing::hasValue()::negate()
+			§§
 			§§ @returns — `true` when there is a value.
 			() -> Boolean {
 				<- match @ -> Boolean {
@@ -141,6 +171,13 @@ declarations {
 			§§ Answers whether the Optional holds a value the check accepts.
 			§§
 			§§ An empty Optional answers `false`, and the check does not run.
+			§§
+			§§ @example
+			§§   constant found: Optional<Integer> = #Value(3)
+			§§   constant missing: Optional<Integer> = #Empty
+			§§
+			§§   expect found::hasValue(where (count) { <- count::isOdd() })
+			§§   expect missing::hasValue(where (count) { <- count::isOdd() })::negate()
 			§§
 			§§ @param where — the question asked of the value
 			§§ @returns — `true` when there is a value and the check accepts it.
@@ -154,6 +191,13 @@ declarations {
 
 		§§ Answers whether the Optional holds no value, the opposite of `hasValue`.
 		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect missing::isEmpty()
+		§§   expect found::isEmpty()::negate()
+		§§
 		§§ @returns — `true` when there is no value.
 		isEmpty() -> Boolean {
 			<- @::hasValue()::negate()
@@ -162,6 +206,13 @@ declarations {
 		§§ Answers the value, or the given fallback when there is none.
 		§§
 		§§ The call collapses an Optional back to a bare value: `list::firstItem()::value(defaultingTo 0)`.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect found::value(defaultingTo 0)::is(3)
+		§§   expect missing::value(defaultingTo 0)::is(0)
 		§§
 		§§ @param defaultingTo — the value to answer with when there is none
 		§§ @returns — the value, or the fallback in its place.
@@ -175,6 +226,13 @@ declarations {
 		§§ Answers the value transformed, wrapped in an Optional.
 		§§
 		§§ An empty Optional answers empty, and the transform does not run. This is `List::map` for the at-most-one case.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect found::map((count) { <- count::add(1) })::is(4)
+		§§   expect missing::map((count) { <- count::add(1) })::isEmpty()
 		§§
 		§§ @param _ — the transform to run on the value
 		§§ @returns — the transformed value in an Optional, or an empty Optional.
@@ -191,6 +249,13 @@ declarations {
 		§§
 		§§ The two Optionals do not nest: the answer has one level. An empty Optional answers empty, and the step does not run.
 		§§
+		§§ @example
+		§§   constant typed: Optional<String> = #Value("42")
+		§§   constant missing: Optional<String> = #Empty
+		§§
+		§§   expect typed::andThen((text) { <- Integer.parse(text) })::is(42)
+		§§   expect missing::andThen((text) { <- Integer.parse(text) })::isEmpty()
+		§§
 		§§ @param _ — the step to run on the value
 		§§ @returns — the Optional the step answers, or an empty Optional.
 		andThen<infer Other>(
@@ -205,6 +270,12 @@ declarations {
 		§§ Answers the Optional when its value passes the check, and empty otherwise.
 		§§
 		§§ An empty Optional answers empty, and the check does not run. This is `List::everyItem(where:)` for the at-most-one case.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§
+		§§   expect found::keep(where (count) { <- count::isOdd() })::is(3)
+		§§   expect found::keep(where (count) { <- count::isEven() })::isEmpty()
 		§§
 		§§ @param where — the question asked of the value
 		§§ @returns — the Optional unchanged when the value passes, an empty Optional otherwise.
@@ -261,6 +332,14 @@ declarations {
 		§§
 		§§ This is `List::pair(with:)` for the at-most-one case. Both values are needed, so one empty Optional answers empty.
 		§§
+		§§ @example
+		§§   constant age: Optional<Integer> = #Value(36)
+		§§   constant name: Optional<String> = #Value("Ada")
+		§§   constant missing: Optional<String> = #Empty
+		§§
+		§§   expect age::pair(with name)::is({ first = 36, second = "Ada" })
+		§§   expect age::pair(with missing)::isEmpty()
+		§§
 		§§ @param with — the Optional to pair the value with
 		§§ @returns — a Record holding this value under `first` and the other under `second`, or an empty Optional.
 		pair<infer Other>(
@@ -289,6 +368,13 @@ declarations {
 		§§ Answers a List holding the value, and the empty List when there is none.
 		§§
 		§§ The answer holds one item at most. It is the bridge to the Methods a List answers, and `OptionalList::values()` is the bridge back.
+		§§
+		§§ @example
+		§§   constant found: Optional<Integer> = #Value(3)
+		§§   constant missing: Optional<Integer> = #Empty
+		§§
+		§§   expect found::toList()::is([3])
+		§§   expect missing::toList()::isEmpty()
 		§§
 		§§ @returns — the List of the value, or the empty List.
 		toList() -> List<ItemType> {
@@ -341,6 +427,13 @@ declarations {
 		§§ Answers the inner Optional, one level down.
 		§§
 		§§ An empty outer Optional answers empty.
+		§§
+		§§ @example
+		§§   constant nested: Optional<Optional<Integer>> = #Value(#Value(3))
+		§§   constant missing: Optional<Optional<Integer>> = #Empty
+		§§
+		§§   expect nested::flatten()::is(3)
+		§§   expect missing::flatten()::isEmpty()
 		§§
 		§§ @returns — the flattened Optional.
 		flatten() -> Optional<ItemType> {

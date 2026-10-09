@@ -31,7 +31,9 @@
 					"condition": null,
 					"summary": "Answers whether the Optional is the given one, or whether it holds the given bare value.\n\nTwo Optionals are equal when they are the same Case and hold equal values. An empty Optional is never equal to a bare value. An Optional holding an Optional reaches the first entry, so `#Value(#Empty)::is(#Empty)` asks about the receiver and answers `false`. The Method is available whenever the payload conforms to `Equatable`.",
 					"returns": null,
-					"examples": [],
+					"examples": [
+						"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::is(#Value(3))\nexpect found::is(3)\nexpect missing::is(3)::negate()"
+					],
 					"entries": [
 						{
 							"signature": "is<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean",
@@ -76,7 +78,9 @@
 					"condition": null,
 					"summary": "Answers whether the Optional differs from the given one, or whether it does not hold the given bare value.\n\nAn empty Optional holds no bare value, so it always differs from one. The Method is available whenever the payload conforms to `Equatable`.",
 					"returns": null,
-					"examples": [],
+					"examples": [
+						"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::isNot(#Empty)\nexpect found::isNot(4)\nexpect missing::isNot(3)"
+					],
 					"entries": [
 						{
 							"signature": "isNot<ItemType is Equatable>(_ other: Optional<ItemType>) -> Boolean",
@@ -128,7 +132,9 @@
 							"summary": "Answers the Optional as a String, written `Value(…)` or `Empty`.\n\nThe payload renders through its own `toString`, and a String payload is quoted: `#Value(\"a\")` answers `Value(\"a\")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever the payload conforms to `Printable`.",
 							"parameters": [],
 							"returns": "the text `Value(…)` around the payload, or `Empty`.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<String> = #Value(\"Ada\")\nconstant missing: Optional<String> = #Empty\n\nexpect found::toString()::is(\"Value(\\\"Ada\\\")\")\nexpect missing::toString()::is(\"Empty\")"
+							]
 						}
 					]
 				}
@@ -156,7 +162,9 @@
 							"summary": "Answers whether the Optional holds a value.",
 							"parameters": [],
 							"returns": "`true` when there is a value.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::hasValue()\nexpect missing::hasValue()::negate()"
+							]
 						},
 						{
 							"signature": "hasValue(where check: (_: ItemType) -> Boolean) -> Boolean",
@@ -171,7 +179,9 @@
 								}
 							],
 							"returns": "`true` when there is a value and the check accepts it.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::hasValue(where (count) { <- count::isOdd() })\nexpect missing::hasValue(where (count) { <- count::isOdd() })::negate()"
+							]
 						}
 					]
 				},
@@ -193,7 +203,9 @@
 							"summary": "Answers whether the Optional holds no value, the opposite of `hasValue`.",
 							"parameters": [],
 							"returns": "`true` when there is no value.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect missing::isEmpty()\nexpect found::isEmpty()::negate()"
+							]
 						}
 					]
 				}
@@ -229,7 +241,9 @@
 								}
 							],
 							"returns": "the value, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::value(defaultingTo 0)::is(3)\nexpect missing::value(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				}
@@ -265,7 +279,9 @@
 								}
 							],
 							"returns": "the transformed value in an Optional, or an empty Optional.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::map((count) { <- count::add(1) })::is(4)\nexpect missing::map((count) { <- count::add(1) })::isEmpty()"
+							]
 						}
 					]
 				},
@@ -295,7 +311,9 @@
 								}
 							],
 							"returns": "the Optional the step answers, or an empty Optional.",
-							"examples": []
+							"examples": [
+								"constant typed: Optional<String> = #Value(\"42\")\nconstant missing: Optional<String> = #Empty\n\nexpect typed::andThen((text) { <- Integer.parse(text) })::is(42)\nexpect missing::andThen((text) { <- Integer.parse(text) })::isEmpty()"
+							]
 						}
 					]
 				},
@@ -325,7 +343,9 @@
 								}
 							],
 							"returns": "the Optional unchanged when the value passes, an empty Optional otherwise.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\n\nexpect found::keep(where (count) { <- count::isOdd() })::is(3)\nexpect found::keep(where (count) { <- count::isEven() })::isEmpty()"
+							]
 						}
 					]
 				}
@@ -399,7 +419,9 @@
 								}
 							],
 							"returns": "a Record holding this value under `first` and the other under `second`, or an empty Optional.",
-							"examples": []
+							"examples": [
+								"constant age: Optional<Integer> = #Value(36)\nconstant name: Optional<String> = #Value(\"Ada\")\nconstant missing: Optional<String> = #Empty\n\nexpect age::pair(with name)::is({ first = 36, second = \"Ada\" })\nexpect age::pair(with missing)::isEmpty()"
+							]
 						}
 					]
 				},
@@ -421,7 +443,9 @@
 							"summary": "Answers a List holding the value, and the empty List when there is none.\n\nThe answer holds one item at most. It is the bridge to the Methods a List answers, and `OptionalList::values()` is the bridge back.",
 							"parameters": [],
 							"returns": "the List of the value, or the empty List.",
-							"examples": []
+							"examples": [
+								"constant found: Optional<Integer> = #Value(3)\nconstant missing: Optional<Integer> = #Empty\n\nexpect found::toList()::is([3])\nexpect missing::toList()::isEmpty()"
+							]
 						}
 					]
 				},
@@ -481,7 +505,9 @@
 							"summary": "Answers the inner Optional, one level down.\n\nAn empty outer Optional answers empty.",
 							"parameters": [],
 							"returns": "the flattened Optional.",
-							"examples": []
+							"examples": [
+								"constant nested: Optional<Optional<Integer>> = #Value(#Value(3))\nconstant missing: Optional<Optional<Integer>> = #Empty\n\nexpect nested::flatten()::is(3)\nexpect missing::flatten()::isEmpty()"
+							]
 						}
 					]
 				}

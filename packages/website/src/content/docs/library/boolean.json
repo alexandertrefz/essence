@@ -50,7 +50,9 @@
 								}
 							],
 							"returns": "`true` when both are equal.",
-							"examples": []
+							"examples": [
+								"expect true::is(true)\nexpect true::is(false)::negate()"
+							]
 						}
 					]
 				},
@@ -80,7 +82,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect false::compare(to true)::is(#Less)\nexpect true::compare(to true)::is(#Equal)"
+							]
 						}
 					]
 				},
@@ -162,7 +166,9 @@
 							"summary": "Answers the opposite truth value: `false` for `true`, and `true` for `false`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect true::negate()::is(false)\nexpect false::negate()"
+							]
 						}
 					]
 				},
@@ -224,7 +230,9 @@
 								}
 							],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect false::or(true)\nexpect false::or(false)::negate()"
+							]
 						}
 					]
 				},
@@ -254,7 +262,9 @@
 								}
 							],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect true::exclusiveOr(false)\nexpect true::exclusiveOr(true)::negate()"
+							]
 						}
 					]
 				}

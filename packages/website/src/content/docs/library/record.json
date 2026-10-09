@@ -46,7 +46,9 @@
 								}
 							],
 							"returns": "`true` when the Records are equal.",
-							"examples": []
+							"examples": [
+								"constant ada = { name = \"Ada\", born = 1815 }\n\nexpect ada::is({ born = 1815, name = \"Ada\" })\nexpect ada::is({ name = \"Ada\", born = 1816 })::negate()"
+							]
 						}
 					]
 				},
@@ -68,7 +70,9 @@
 							"summary": "Answers the Record and its members as a String.\n\nEach member is written as `name = value`. Each member the Record's Type declares is written the way its own `Printable` conformance writes it. A `Money` member whose Namespace answers `EUR 1999` is written that way. A Case member is written as its Case name. A member the static Type can not see is written structurally. A whole Rational member prints its numerator alone. A String member keeps its quotation marks. A Record too long for one line is written over several lines.\n\nA Record Type whose declared members are not all `Printable` is not `Printable` either. `Terminal.inspect` renders any value and asks for no conformance. That is what to reach for then.",
 							"parameters": [],
 							"returns": "the String representation of the Record.",
-							"examples": []
+							"examples": [
+								"constant ada = { name = \"Ada\", born = 1815 }\n\nexpect ada::toString()::is(\"\\{ name = \\\"Ada\\\", born = 1815 \\}\")"
+							]
 						}
 					]
 				},
@@ -126,7 +130,9 @@
 							"summary": "Answers the names of the Record's members.\n\nThe names are one third of a reflective trio. The other two, `entries` and `values`, answer a value of any Type, and there is no Type to write that with. So a Program can read the names and not what they name.",
 							"parameters": [],
 							"returns": "the member names, as a List of Strings.",
-							"examples": []
+							"examples": [
+								"constant ada = { name = \"Ada\", born = 1815 }\n\nexpect ada::keys()::is([\"name\", \"born\"])"
+							]
 						}
 					]
 				}

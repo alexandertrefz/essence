@@ -53,6 +53,14 @@ declarations {
 		§§ Answers whether the Result is the given one, or whether it holds the given bare value.
 		§§
 		§§ Two Results are equal when they are the same Case and hold equal payloads. A failed Result is never equal to a bare value. A Result holding a Result reaches the first entry, so the question is about the receiver. The Method is available whenever both payloads conform to `Equatable`.
+		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect parsed::is(3)
+		§§   expect failed::is(#Failure("gone"))
+		§§   expect failed::is(3)::negate()
 		overload is {
 			§§ @param _ — the Result to compare against
 			§§ @returns — `true` when both are the same Case and hold equal payloads.
@@ -94,6 +102,14 @@ declarations {
 		§§ Answers whether the Result differs from the given one, or whether it does not hold the given bare value.
 		§§
 		§§ A failed Result holds no bare value, so it always differs from one. The Method is available whenever both payloads conform to `Equatable`.
+		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect parsed::isNot(4)
+		§§   expect parsed::isNot(#Failure("gone"))
+		§§   expect failed::isNot(3)
 		overload isNot {
 			§§ @param _ — the Result to compare against
 			§§ @returns — `true` when the two differ in Case or in payload.
@@ -119,6 +135,13 @@ declarations {
 		§§
 		§§ Each payload renders through its own `toString`, and a String payload is quoted: `#Failure("gone")` answers `Failure("gone")`. A String prints bare on its own and quoted inside a structure. The Method is available whenever both payloads conform to `Printable`.
 		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect parsed::toString()::is("Value(3)")
+		§§   expect failed::toString()::is("Failure(\"gone\")")
+		§§
 		§§ @returns — the text `Value(…)` or `Failure(…)` around the payload.
 		toString<ValueType is Printable, FailureType is Printable>() -> String
 
@@ -134,6 +157,13 @@ declarations {
 		overload hasValue {
 			§§ Answers whether the Result holds a value.
 			§§
+			§§ @example
+			§§   constant parsed: Result<Integer, String> = #Value(3)
+			§§   constant failed: Result<Integer, String> = #Failure("gone")
+			§§
+			§§   expect parsed::hasValue()
+			§§   expect failed::hasValue()::negate()
+			§§
 			§§ @returns — `true` when there is a value.
 			() -> Boolean {
 				<- match @ -> Boolean {
@@ -146,6 +176,13 @@ declarations {
 			§§
 			§§ A failed Result answers `false`, and the check does not run.
 			§§
+			§§ @example
+			§§   constant parsed: Result<Integer, String> = #Value(3)
+			§§   constant failed: Result<Integer, String> = #Failure("gone")
+			§§
+			§§   expect parsed::hasValue(where (count) { <- count::isOdd() })
+			§§   expect failed::hasValue(where (count) { <- count::isOdd() })::negate()
+			§§
 			§§ @param where — the question asked of the value
 			§§ @returns — `true` when there is a value and the check accepts it.
 			(where check: (_: ValueType) -> Boolean) -> Boolean {
@@ -157,6 +194,13 @@ declarations {
 		}
 
 		§§ Answers whether the Result failed, the opposite of `hasValue`.
+		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect failed::hasFailed()
+		§§   expect parsed::hasFailed()::negate()
 		§§
 		§§ @returns — `true` when there is a reason and no value.
 		hasFailed() -> Boolean {
@@ -180,6 +224,13 @@ declarations {
 			§§
 			§§ A failed Result answers an empty Optional, and the reason is dropped. `reason()` is the same reading of the other Case.
 			§§
+			§§ @example
+			§§   constant parsed: Result<Integer, String> = #Value(3)
+			§§   constant failed: Result<Integer, String> = #Failure("gone")
+			§§
+			§§   expect parsed::value()::is(3)
+			§§   expect failed::value()::isEmpty()
+			§§
 			§§ @returns — the value in an Optional, or an empty Optional.
 			() -> Optional<ValueType> {
 				<- match @ -> Optional<ValueType> {
@@ -191,6 +242,13 @@ declarations {
 			§§ Answers the value, or the given fallback where the Result failed.
 			§§
 			§§ The call collapses a Result back to a bare value: `parse(text)::value(defaultingTo 0)`.
+			§§
+			§§ @example
+			§§   constant parsed: Result<Integer, String> = #Value(3)
+			§§   constant failed: Result<Integer, String> = #Failure("gone")
+			§§
+			§§   expect parsed::value(defaultingTo 0)::is(3)
+			§§   expect failed::value(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the value to answer with where the Result failed
 			§§ @returns — the value, or the fallback in its place.
@@ -206,6 +264,13 @@ declarations {
 		§§
 		§§ A Result holding a value answers an empty Optional. Where a List of reasons is wanted, `ResultList::reasons()` answers it.
 		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect failed::reason()::is("gone")
+		§§   expect parsed::reason()::isEmpty()
+		§§
 		§§ @returns — the reason in an Optional, or an empty Optional.
 		reason() -> Optional<FailureType> {
 			<- match @ -> Optional<FailureType> {
@@ -217,6 +282,13 @@ declarations {
 		§§ Answers the value transformed, wrapped in a Result.
 		§§
 		§§ A failed Result answers the same failure, and the transform does not run. The reason is carried through unchanged.
+		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect parsed::map((count) { <- count::add(1) })::is(4)
+		§§   expect failed::map((count) { <- count::add(1) })::is(#Failure("gone"))
 		§§
 		§§ @param _ — the transform to run on the value
 		§§ @returns — the transformed value in a Result, or the failure unchanged.
@@ -232,6 +304,16 @@ declarations {
 		§§ Answers with the Result the step answers for the value.
 		§§
 		§§ The two Results do not nest: the answer has one level. A failed Result answers the same failure, and the step does not run. The step fails with the receiver's own failure Type.
+		§§
+		§§ @example
+		§§   constant typed: Result<String, String> = #Value("42")
+		§§   constant failed: Result<String, String> = #Failure("gone")
+		§§   constant parse = (_ text: String) -> Result<Integer, String> {
+		§§   	<- Integer.parse(text)::toResult(failingWith "not a number")
+		§§   }
+		§§
+		§§   expect typed::andThen(parse)::is(42)
+		§§   expect failed::andThen(parse)::is(#Failure("gone"))
 		§§
 		§§ @param _ — the step to run on the value
 		§§ @returns — the Result the step answers, or the failure unchanged.
@@ -253,6 +335,16 @@ declarations {
 		§§
 		§§ A Result holding a value answers the same value, and the transform does not run. This is `map` over the other Case.
 		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§   constant explain = (_ reason: String) -> String {
+		§§   	<- "lookup: {reason}"
+		§§   }
+		§§
+		§§   expect failed::mapFailure(explain)::is(#Failure("lookup: gone"))
+		§§   expect parsed::mapFailure(explain)::is(3)
+		§§
 		§§ @param _ — the transform to run on the reason
 		§§ @returns — the transformed reason in a Result, or the value unchanged.
 		mapFailure<infer Other>(
@@ -273,6 +365,13 @@ declarations {
 		§§
 		§§ A Result holding a value answers it, and the transform does not run. The answer is a bare value, so the failure is gone.
 		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect failed::recover(with (reason) { <- reason::length() })::is(4)
+		§§   expect parsed::recover(with (reason) { <- reason::length() })::is(3)
+		§§
 		§§ @param with — the transform that answers a value for a reason
 		§§ @returns — the value, or the transformed reason in its place.
 		recover(with transform: (_: FailureType) -> ValueType) -> ValueType {
@@ -291,6 +390,14 @@ declarations {
 		§§ Answers the Result when its value passes the check, and the given failure otherwise.
 		§§
 		§§ A failed Result answers the same failure, and the check does not run. This is `Optional::keep(where:)` with a reason for the values it drops. The reason is read whether or not the check refuses.
+		§§
+		§§ @example
+		§§   constant three: Result<Integer, String> = #Value(3)
+		§§   constant four: Result<Integer, String> = #Value(4)
+		§§   constant isOdd = (_ count: Integer) -> Boolean { <- count::isOdd() }
+		§§
+		§§   expect three::keep(where isOdd, failingWith "even")::is(3)
+		§§   expect four::keep(where isOdd, failingWith "even")::is(#Failure("even"))
 		§§
 		§§ @param where — the question asked of the value
 		§§ @param failingWith — the reason to fail with where the value does not pass
@@ -340,6 +447,13 @@ declarations {
 		§§
 		§§ The answer holds one item at most, and the reason is dropped. It is the bridge to the Methods a List answers, and `ResultList::values()` is the bridge back.
 		§§
+		§§ @example
+		§§   constant parsed: Result<Integer, String> = #Value(3)
+		§§   constant failed: Result<Integer, String> = #Failure("gone")
+		§§
+		§§   expect parsed::toList()::is([3])
+		§§   expect failed::toList()::isEmpty()
+		§§
 		§§ @returns — the List of the value, or the empty List.
 		toList() -> List<ValueType> {
 			<- match @ -> List<ValueType> {
@@ -359,6 +473,12 @@ declarations {
 		§§ Answers the inner Result, one level down.
 		§§
 		§§ A failed outer Result answers that failure. Where the two levels fail with different Types, the answer fails with both of them joined into one Type.
+		§§
+		§§ @example
+		§§   constant inner: Result<Integer, String> = #Value(3)
+		§§   constant outer: Result<Result<Integer, String>, String> = #Value(inner)
+		§§
+		§§   expect outer::flatten()::is(3)
 		§§
 		§§ @returns — the flattened Result.
 		flatten() -> Result<ValueType, FailureType> {
