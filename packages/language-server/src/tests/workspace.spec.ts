@@ -1800,6 +1800,87 @@ describe("Workspace", () => {
 				)
 			})
 
+			// Go to Definition reads the joined symbol's declaration.
+			it("should lead to the named Type's member from the importing Module", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": main,
+				})
+
+				let definitionAt = (cursor: common.Cursor) => {
+					let symbol = workspace.symbolAt(pathOf("Main.es"), cursor)
+
+					return symbol === null
+						? null
+						: {
+								file: path.basename(symbol.filePath ?? ""),
+								definition: symbol.definition,
+							}
+				}
+				let port = {
+					file: "Types.es",
+					definition: spanOf(types, 2, "port"),
+				}
+
+				// A read, a literal key, a path, and a read through the Alias.
+				expect(definitionAt(cursorAt(main, 16, "port"))).toEqual(port)
+				expect(definitionAt(cursorAt(main, 28, "port"))).toEqual(port)
+				expect(definitionAt(cursorPast(main, 31, "(."))).toEqual(port)
+				expect(definitionAt(cursorAt(main, 43, "port"))).toEqual(port)
+				expect(definitionAt(cursorAt(main, 37, "retries"))).toEqual({
+					file: "Types.es",
+					definition: spanOf(types, 7, "retries"),
+				})
+			})
+
+			it("should keep a member no named Type declares where it is first written", () => {
+				let shaped = [
+					"implementation {",
+					"\t§§ Answers the name.",
+					"\t§§",
+					"\t§§ @param _ — what to read.",
+					"\t§§ @returns — the name.",
+					"\tfunction describe(_ subject: { name: String }) -> String {",
+					"\t\t<- subject.name",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tdescribe",
+					"}",
+					"",
+				].join("\n")
+				let described = [
+					"import {",
+					'\tfrom "./Shaped.es" { describe }',
+					"}",
+					"",
+					"implementation {",
+					'\tconstant box = { name = "box" }',
+					"\tTerminal.print(describe(box)::append(box.name))",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({
+					"Shaped.es": shaped,
+					"Main.es": described,
+				})
+
+				let symbol = workspace.symbolAt(
+					pathOf("Main.es"),
+					cursorAt(described, 7, "name"),
+				)
+
+				expect(symbol?.filePath).toBe(pathOf("Main.es"))
+				expect(symbol?.definition).toEqual(spanOf(described, 6, "name"))
+				expect(
+					symbol?.occurrences.some(
+						(occurrence) =>
+							occurrence.filePath === pathOf("Shaped.es"),
+					),
+				).toBe(true)
+			})
+
 			it("should rename a Case payload member of an exported Choice", () => {
 				let { workspace, pathOf } = makeWorkspace({
 					"Types.es": types,

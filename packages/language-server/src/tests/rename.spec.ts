@@ -1246,6 +1246,41 @@ describe("findDefinition", () => {
 		})
 	})
 
+	// A member belongs to the Record Type a Type Alias names, wherever a
+	// literal writes it first.
+	it("should point a member at the named Type declaring it", () => {
+		let source = [
+			"implementation {",
+			'\tconstant first = { host = "a", port = 80 }',
+			"\ttype Server = { host: String, port: Integer }",
+			"\tconstant s: Server = first",
+			"\tTerminal.inspect(s.port)",
+			"}",
+		].join("\n")
+		let declared = {
+			start: { line: 3, column: 32 },
+			end: { line: 3, column: 36 },
+		}
+
+		expect(definitionOf(source, { line: 5, column: 21 })).toEqual(declared)
+		expect(definitionOf(source, { line: 2, column: 33 })).toEqual(declared)
+	})
+
+	it("should point a member no named Type declares at its first site", () => {
+		let source = [
+			"implementation {",
+			'\tconstant first = { host = "a", port = 80 }',
+			"\tconstant second: { host: String, port: Integer } = first",
+			"\tTerminal.inspect(second.port)",
+			"}",
+		].join("\n")
+
+		expect(definitionOf(source, { line: 4, column: 26 })).toEqual({
+			start: { line: 2, column: 33 },
+			end: { line: 2, column: 37 },
+		})
+	})
+
 	it("should point call site labels at the Parameter declaring them", () => {
 		let source = [
 			"implementation {",

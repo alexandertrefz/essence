@@ -1326,6 +1326,8 @@ type SiteData = {
 	filePath: string | null
 	definition: common.Position | null
 	answersBuiltin?: boolean
+	// As on a `Declaration`.
+	inNamedType?: true
 	occurrences: Array<WorkspaceOccurrence>
 }
 
@@ -1437,6 +1439,7 @@ function joinComponent(
 					labelled: declaration.labelled,
 					filePath,
 					definition: declaration.definition,
+					inNamedType: declaration.inNamedType,
 					occurrences: [],
 				}))
 			}
@@ -1833,7 +1836,10 @@ function joinComponent(
 		let own = sites.get(key)
 		// A declaration answers for itself even where it renames with
 		// others: a conformer's Method is still where a call bound to it leads.
+		// A Record member leads to a named Type declaring it, from any file.
 		let anchor =
+			(own?.inNamedType === true ? own : null) ??
+			members.find(([, site]) => site.inNamedType === true)?.[1] ??
 			(own !== undefined && isDeclaration(own) ? own : null) ??
 			declaringSite(sites, find, key) ??
 			own ??

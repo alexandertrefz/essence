@@ -231,6 +231,11 @@ as the Compiler does.
 `recordMembers`. The symbol join groups the shapes of every file of a component the same way, so a member declared in
 one Module joins its uses in the Modules importing it.
 
+A member's `definition` is where a named Record Type writes it, one that a Type Alias or a Case payload names, and the
+Declaration is then marked `inNamedType`. A group no named Type reaches keeps the first site that writes the member.
+The symbol join anchors a member on a site marked `inNamedType` before its own, so Go to Definition from any file
+reaches the named Type in the Module declaring it.
+
 ### Shorthand edits
 
 Renaming an ordinary occurrence writes the new name over its Identifier. A shorthand writes one name and means two
@@ -388,7 +393,8 @@ The join runs in an order each step depends on:
    another Module's Protocol. Each needs the entries joined first, to know which file declares it. A conformer's
    Method joins the Protocol member it answers here too, wherever each is written.
 
-A joined symbol reports where it is written as its declaration, not an import binding. A rename refuses a symbol
+A joined symbol reports where it is written as its declaration, not an import binding. A Record member reports a named
+Type's member, as "Record members" explains. A rename refuses a symbol
 written outside the workspace. With `localOnly`, the join covers one file, which is still a join: an unaliased entry
 and its declaration are one symbol. Document Highlight uses it, since it fires on every cursor move.
 

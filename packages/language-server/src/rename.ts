@@ -102,6 +102,9 @@ export type Declaration = {
 	// Protocol. No rename reaches that member, so renaming the Method alone
 	// would break the conformance.
 	answersBuiltin?: boolean
+	// Set on a Record member whose `definition` is written in a named Record
+	// Type, which Go to Definition prefers from any file.
+	inNamedType?: true
 }
 
 export type Scope = {
@@ -137,6 +140,8 @@ type RecordMemberSite = {
 	// A Pattern only names them, and its binder holds the same Position, which
 	// the workspace join would merge.
 	declares: boolean
+	// Set on the Record Type a Type Alias or a Case payload names.
+	named?: true
 	members: Array<{
 		name: string
 		position: common.Position
@@ -216,6 +221,8 @@ type WalkContext = {
 	patternSites: Map<string, RecordMemberSite>
 	// The shape each typed literal writes into, where `widenLiteral` knew it.
 	writtenShapes: Map<common.typed.RecordValueNode, Array<string>>
+	// The Record Types a Type Alias or a Case payload names.
+	namedRecordTypes: Set<parser.RecordTypeDeclarationNode>
 	// Every Scope with the Position it spans, for `scopeAt`.
 	scopes: Array<ScopeRange>
 }
@@ -454,6 +461,7 @@ export function indexProgram(
 		literalSites: new Map(),
 		patternSites: new Map(),
 		writtenShapes: new Map(),
+		namedRecordTypes: new Set(),
 		scopes: [],
 	}
 
@@ -1131,6 +1139,7 @@ function walkNode(node: ParserNode, walk: Walk) {
 			// hold references.
 			for (let choiceCase of node.cases) {
 				if (choiceCase.type !== null) {
+					context.namedRecordTypes.add(choiceCase.type)
 					walkTypeDeclaration(choiceCase.type, choiceWalk)
 				}
 			}
@@ -1339,7 +1348,12 @@ function walkNode(node: ParserNode, walk: Walk) {
 			walkFunctionDefinition(node.value, walk, node.position)
 			return
 		case "RecordTypeDeclaration":
-			registerRecordSite(Object.values(node.members), context)
+			registerRecordSite(
+				Object.values(node.members),
+				context,
+				null,
+				context.namedRecordTypes.has(node),
+			)
 			break
 	}
 
@@ -1966,6 +1980,10 @@ function walkTypeAlias(node: parser.TypeAliasStatementNode, walk: Walk) {
 
 	let aliasWalk = inScope(walk, scopeWithGenerics(node.generics, walk))
 
+	if (node.type.nodeType === "RecordTypeDeclaration") {
+		walk.context.namedRecordTypes.add(node.type)
+	}
+
 	walkTypeDeclaration(node.type, aliasWalk)
 
 	if (node.predicate !== null) {
@@ -1992,6 +2010,7 @@ function registerRecordSite(
 	context: WalkContext,
 	// A literal's braces, which the typed tree finds it by.
 	literal: common.Position | null = null,
+	named: boolean = false,
 ) {
 	if (members.length === 0) {
 		return
@@ -2000,6 +2019,7 @@ function registerRecordSite(
 	let site: RecordMemberSite = {
 		names: members.map((member) => member.name.content),
 		declares: true,
+		...(named ? { named: true as const } : {}),
 		members: members.map((member) => ({
 			name: member.name.content,
 			position: member.name.position,
@@ -2398,7 +2418,20 @@ function resolveRecordMembers(
 		return declaration
 	}
 
-	// Declaring sites first, so `definition` is one of them rather than a
+	// A named Type's member is the definition where the group holds one, so
+	// Go to Definition leads to the Type rather than a literal.
+	context.recordSites.forEach((site, siteIndex) => {
+		for (let member of site.named === true ? site.members : []) {
+			let declaration = declarationFor(siteIndex, member.name)
+
+			if (declaration.definition === null) {
+				declaration.definition = member.position
+				declaration.inNamedType = true
+			}
+		}
+	})
+
+	// Declaring sites next, so `definition` is one of them rather than a
 	// Lookup. A Pattern's site does not declare; see `registerPatternSite`.
 	context.recordSites.forEach((site, siteIndex) => {
 		for (let member of site.members) {
