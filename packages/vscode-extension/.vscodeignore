@@ -13,6 +13,7 @@ tsconfig.json
 node_modules/**
 extension.js
 launch.js
+renameAt.js
 testView.js
 testModel.ts
 

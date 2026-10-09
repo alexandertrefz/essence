@@ -351,7 +351,12 @@ bun run package
 
 This rebuilds the bundle and produces a `.vsix`. The bundle is included in the
 package even though it is git-ignored, so the published extension is
-self-contained. Publishing to the Marketplace is
+self-contained. A source the bundle holds is listed in `.vscodeignore`, so it
+does not ship a second time, loose. `tests/packageContents.spec.ts` pins every
+other file the package ships, so a new one is shipped on purpose or not at all.
+It leaves out `server/` and `dist/`, which only a build writes;
+`tests/serverBundle.spec.ts` checks what they hold.
+Publishing to the Marketplace is
 
 ```sh
 bun run publish
