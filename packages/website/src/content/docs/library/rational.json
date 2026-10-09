@@ -1578,7 +1578,9 @@
 								}
 							],
 							"returns": "`true` when the value is within the bounds.",
-							"examples": []
+							"examples": [
+								"expect 7::isBetween(1, and 10)\nexpect 7::isBetween(10, and 1)\nexpect 15::isBetween(10, and 1)::negate()"
+							]
 						}
 					]
 				},
@@ -1615,7 +1617,9 @@
 								}
 							],
 							"returns": "the clamped value.",
-							"examples": []
+							"examples": [
+								"expect 7::clamp(between 1, and 10)::is(7)\nexpect 15::clamp(between 1, and 10)::is(10)\nexpect -4::clamp(between 10, and 1)::is(1)"
+							]
 						}
 					]
 				}

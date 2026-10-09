@@ -8943,11 +8943,9 @@ describe("a bound through a Protocol with a body of the name", () => {
 // WARNING: every consumer reads one process-wide library, so the original is
 // put back afterwards, or later files would compile against this one.
 describe("a provided Method in the standard library", () => {
+	// The end of `Printable`, so its documentation can change freely.
+	const printableEnd = ["\t\ttoString() -> String", "\t}"].join("\n")
 	const printable = [
-		"\tprotocol Printable {",
-		"\t\t§§ Answers the value as a String.",
-		"\t\t§§",
-		"\t\t§§ @returns — the String representation of the value.",
 		"\t\ttoString() -> String",
 		"",
 		"\t\t§§ Answers the value as a String, for a reader.",
@@ -8967,17 +8965,7 @@ describe("a provided Method in the standard library", () => {
 				return parseStdlibSource(filePath, sourceText)
 			}
 
-			let replaced = sourceText.replace(
-				[
-					"\tprotocol Printable {",
-					"\t\t§§ Answers the value as a String.",
-					"\t\t§§",
-					"\t\t§§ @returns — the String representation of the value.",
-					"\t\ttoString() -> String",
-					"\t}",
-				].join("\n"),
-				printable,
-			)
+			let replaced = sourceText.replace(printableEnd, printable)
 
 			expect(replaced).not.toBe(sourceText)
 

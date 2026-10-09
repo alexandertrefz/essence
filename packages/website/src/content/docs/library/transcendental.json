@@ -189,7 +189,9 @@
 								}
 							],
 							"returns": "`true` when the values differ.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::isNot(\"Grace\")\nexpect 3::isNot(3)::negate()"
+							]
 						}
 					]
 				}

@@ -31,6 +31,11 @@ declarations {
 		§§
 		§§ The two bounds name the same range in either order: `7::isBetween(10, and 1)` is `true`, and `15::isBetween(10, and 1)` is `false`.
 		§§
+		§§ @example
+		§§   expect 7::isBetween(1, and 10)
+		§§   expect 7::isBetween(10, and 1)
+		§§   expect 15::isBetween(10, and 1)::negate()
+		§§
 		§§ @param _ — one bound of the range, included
 		§§ @param and — the other bound of the range, included
 		§§ @returns — `true` when the value is within the bounds.
@@ -51,6 +56,11 @@ declarations {
 		§§ Answers the value, pulled into the given bounds.
 		§§
 		§§ The answer is the lower bound when the value is below it. It is the upper bound when the value is above it, and the value itself otherwise. The two bounds name the same range in either order: `7::clamp(between 10, and 1)` is `7`, and `15::clamp(between 10, and 1)` is `10`.
+		§§
+		§§ @example
+		§§   expect 7::clamp(between 1, and 10)::is(7)
+		§§   expect 15::clamp(between 1, and 10)::is(10)
+		§§   expect -4::clamp(between 10, and 1)::is(1)
 		§§
 		§§ @param between — one bound of the range
 		§§ @param and — the other bound of the range

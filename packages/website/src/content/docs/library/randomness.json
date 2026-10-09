@@ -59,7 +59,9 @@
 								}
 							],
 							"returns": "a source that replays.",
-							"examples": []
+							"examples": [
+								"constant source = Randomness.seeded(\"league\")\nconstant replay = Randomness.seeded(\"league\")\n\nconstant drawn = source::drawInteger(between 1, and 100)\n\nexpect replay::drawInteger(between 1, and 100)::is(drawn)"
+							]
 						}
 					]
 				}
@@ -87,7 +89,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "`true` or `false`, with each equally likely.",
-							"examples": []
+							"examples": [
+								"constant coin = Randomness.seeded(\"coin\")\nconstant heads = List.of(integersFrom 1, through 100)\n\t::count(where (_) { <- coin::drawBoolean() })\n\nexpect heads::isBetween(30, and 70)"
+							]
 						},
 						{
 							"signature": "drawBoolean(withProbability chance: Rational) -> Boolean",
@@ -102,7 +106,9 @@
 								}
 							],
 							"returns": "`true` that often, and `false` the rest of the time.",
-							"examples": []
+							"examples": [
+								"constant coin = Randomness.seeded(\"coin\")\nconstant rare = List.of(integersFrom 1, through 100)\n\t::count(where (_) { <- coin::drawBoolean(withProbability 1/4) })\n\nexpect rare::isBetween(10, and 40)\nexpect coin::drawBoolean(withProbability 3/2)"
+							]
 						}
 					]
 				},
@@ -139,7 +145,9 @@
 								}
 							],
 							"returns": "a number from the range, with each one equally likely.",
-							"examples": []
+							"examples": [
+								"constant die = Randomness.seeded(\"dice\")\n\nexpect die::drawInteger(between 1, and 6)::isBetween(1, and 6)\nexpect die::drawInteger(between 6, and 1)::isBetween(1, and 6)\nexpect die::drawInteger(between 4, and 4)::is(4)"
+							]
 						},
 						{
 							"signature": "drawInteger(below bound: PositiveInteger) -> NonNegativeInteger",
@@ -154,7 +162,9 @@
 								}
 							],
 							"returns": "a number from zero up to the bound, with each one equally likely.",
-							"examples": []
+							"examples": [
+								"constant source = Randomness.seeded(\"index\")\n\nexpect source::drawInteger(below 10)::isBetween(0, and 9)\nexpect source::drawInteger(below 1)::is(0)"
+							]
 						}
 					]
 				},
@@ -220,7 +230,9 @@
 								}
 							],
 							"returns": "a fraction from the range, drawn over the given denominator and reduced.",
-							"examples": []
+							"examples": [
+								"constant source = Randomness.seeded(\"prices\")\nconstant quarter = source::drawRational(between 0/1, and 1/1, over 4)\n\nexpect [0/1, 1/4, 1/2, 3/4, 1/1]::contains(quarter)\nexpect source::drawRational(between 1/10, and 1/5, over 2)::is(1/10)"
+							]
 						}
 					]
 				},
@@ -250,7 +262,9 @@
 								}
 							],
 							"returns": "a String of that length or shorter.",
-							"examples": []
+							"examples": [
+								"constant source = Randomness.seeded(\"names\")\n\nexpect source::drawString(upTo 8)::length()::isLessThanOrEqualTo(8)\nexpect source::drawString(upTo 0)::isEmpty()"
+							]
 						}
 					]
 				}
@@ -286,7 +300,9 @@
 								}
 							],
 							"returns": "an item of the List, with each item equally likely.",
-							"examples": []
+							"examples": [
+								"constant colours: NonEmptyList<String> = [\"red\", \"green\", \"blue\"]\nconstant source = Randomness.seeded(\"colours\")\n\nexpect colours::contains(source::pick(from colours))"
+							]
 						},
 						{
 							"signature": "pick<infer ItemType>(\n\t_ count: PositiveInteger,\n\tfrom items: NonEmptyList<ItemType>,\n) -> NonEmptyList<ItemType>",
@@ -308,7 +324,9 @@
 								}
 							],
 							"returns": "the drawn items, which certainly holds one.",
-							"examples": []
+							"examples": [
+								"constant team: NonEmptyList<String> = [\"Ada\", \"Grace\", \"Alan\"]\nconstant source = Randomness.seeded(\"team\")\nconstant pair = source::pick(2, from team)\n\nexpect pair::length()::is(2)\nexpect pair::hasDuplicates()::negate()\nexpect source::pick(5, from team)::sort()::is([\"Ada\", \"Alan\", \"Grace\"])"
+							]
 						},
 						{
 							"signature": "pick<infer ItemType>(\n\tfrom items: NonEmptyList<ItemType>,\n\tweightedBy weight: (_: ItemType) -> Rational,\n) -> ItemType",
@@ -330,7 +348,9 @@
 								}
 							],
 							"returns": "an item of the List, as likely as its own weight.",
-							"examples": []
+							"examples": [
+								"constant source = Randomness.seeded(\"prizes\")\nconstant prize = source::pick(\n\tfrom [\n\t\t{ name = \"car\", weight = 0/1 },\n\t\t{ name = \"pen\", weight = 3/4 },\n\t],\n\tweightedBy .weight,\n)\n\nexpect prize.name::is(\"pen\")"
+							]
 						}
 					]
 				},
@@ -360,7 +380,9 @@
 								}
 							],
 							"returns": "the reordered List.",
-							"examples": []
+							"examples": [
+								"constant deck: List<Integer> = [1, 2, 3, 4]\nconstant source = Randomness.seeded(\"deck\")\nconstant shuffled = source::shuffle(deck)\n\nexpect shuffled::sort()::is([1, 2, 3, 4])"
+							]
 						},
 						{
 							"signature": "shuffle<infer ItemType>(\n\t_ items: NonEmptyList<ItemType>,\n) -> NonEmptyList<ItemType>",
@@ -375,7 +397,9 @@
 								}
 							],
 							"returns": "the reordered List, which certainly holds one.",
-							"examples": []
+							"examples": [
+								"constant names: NonEmptyList<String> = [\"Ada\", \"Grace\", \"Alan\"]\nconstant source = Randomness.seeded(\"names\")\nconstant shuffled = source::shuffle(names)\n\nexpect names::contains(shuffled::firstItem())\nexpect shuffled::length()::is(3)"
+							]
 						}
 					]
 				}

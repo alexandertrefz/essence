@@ -7,6 +7,10 @@ declarations {
 	protocol Equatable {
 		§§ Answers whether both values are equal.
 		§§
+		§§ @example
+		§§   expect "Ada"::is("Ada")
+		§§   expect [1, 2]::is([2, 1])::negate()
+		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values are equal.
 		is(_ other: Self) -> Boolean
@@ -25,6 +29,10 @@ declarations {
 
 		§§ Answers whether the values differ.
 		§§
+		§§ @example
+		§§   expect "Ada"::isNot("Grace")
+		§§   expect 3::isNot(3)::negate()
+		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the values differ.
 		isNot(_ other: Self) -> Boolean {
@@ -39,6 +47,10 @@ declarations {
 	§§ Anything that can represent itself as a String.
 	protocol Printable {
 		§§ Answers the value as a String.
+		§§
+		§§ @example
+		§§   expect 42::toString()::is("42")
+		§§   expect [1, 2]::toString()::is("[1, 2]")
 		§§
 		§§ @returns — the String representation of the value.
 		toString() -> String

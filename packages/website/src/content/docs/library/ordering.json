@@ -46,7 +46,9 @@
 								}
 							],
 							"returns": "`true` when the values are equal.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::is(\"Ada\")\nexpect [1, 2]::is([2, 1])::negate()"
+							]
 						}
 					]
 				},
@@ -68,7 +70,9 @@
 							"summary": "Answers the value as a String.",
 							"parameters": [],
 							"returns": "the String representation of the value.",
-							"examples": []
+							"examples": [
+								"expect 42::toString()::is(\"42\")\nexpect [1, 2]::toString()::is(\"[1, 2]\")"
+							]
 						}
 					]
 				},
@@ -120,7 +124,9 @@
 								}
 							],
 							"returns": "`true` when the values differ.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::isNot(\"Grace\")\nexpect 3::isNot(3)::negate()"
+							]
 						}
 					]
 				}

@@ -44,11 +44,19 @@ declarations {
 	protocol Comparable {
 		§§ Orders the value against another one of the same Type.
 		§§
+		§§ @example
+		§§   expect 3::compare(to 5)::is(#Less)
+		§§   expect "pear"::compare(to "apple")::is(#Greater)
+		§§
 		§§ @param to — the value to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Self) -> Ordering
 
 		§§ Answers whether the value is strictly below another.
+		§§
+		§§ @example
+		§§   expect 3::isLessThan(5)
+		§§   expect 5::isLessThan(5)::negate()
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the value is below the given one.
@@ -57,6 +65,10 @@ declarations {
 		}
 
 		§§ Answers whether the value is below another, or equal to it.
+		§§
+		§§ @example
+		§§   expect 3::isLessThanOrEqualTo(5)
+		§§   expect 5::isLessThanOrEqualTo(5)
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the value is below the given one or equal to it.
@@ -70,6 +82,10 @@ declarations {
 
 		§§ Answers whether the value is strictly above another.
 		§§
+		§§ @example
+		§§   expect "pear"::isGreaterThan("apple")
+		§§   expect "pear"::isGreaterThan("pear")::negate()
+		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the value is above the given one.
 		isGreaterThan(_ other: Self) -> Boolean {
@@ -77,6 +93,10 @@ declarations {
 		}
 
 		§§ Answers whether the value is above another, or equal to it.
+		§§
+		§§ @example
+		§§   expect 5::isGreaterThanOrEqualTo(3)
+		§§   expect 5::isGreaterThanOrEqualTo(5)
 		§§
 		§§ @param _ — the value to compare with
 		§§ @returns — `true` when the value is above the given one or equal to it.

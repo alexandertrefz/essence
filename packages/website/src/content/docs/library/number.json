@@ -1247,7 +1247,9 @@
 								}
 							],
 							"returns": "`true` when the values differ.",
-							"examples": []
+							"examples": [
+								"expect \"Ada\"::isNot(\"Grace\")\nexpect 3::isNot(3)::negate()"
+							]
 						}
 					]
 				}
@@ -1283,7 +1285,9 @@
 								}
 							],
 							"returns": "`true` when the value is below the given one.",
-							"examples": []
+							"examples": [
+								"expect 3::isLessThan(5)\nexpect 5::isLessThan(5)::negate()"
+							]
 						}
 					]
 				},
@@ -1313,7 +1317,9 @@
 								}
 							],
 							"returns": "`true` when the value is below the given one or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 3::isLessThanOrEqualTo(5)\nexpect 5::isLessThanOrEqualTo(5)"
+							]
 						}
 					]
 				},
@@ -1343,7 +1349,9 @@
 								}
 							],
 							"returns": "`true` when the value is above the given one.",
-							"examples": []
+							"examples": [
+								"expect \"pear\"::isGreaterThan(\"apple\")\nexpect \"pear\"::isGreaterThan(\"pear\")::negate()"
+							]
 						}
 					]
 				},
@@ -1373,7 +1381,9 @@
 								}
 							],
 							"returns": "`true` when the value is above the given one or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 5::isGreaterThanOrEqualTo(3)\nexpect 5::isGreaterThanOrEqualTo(5)"
+							]
 						}
 					]
 				},
@@ -1410,7 +1420,9 @@
 								}
 							],
 							"returns": "`true` when the value is within the bounds.",
-							"examples": []
+							"examples": [
+								"expect 7::isBetween(1, and 10)\nexpect 7::isBetween(10, and 1)\nexpect 15::isBetween(10, and 1)::negate()"
+							]
 						}
 					]
 				},
@@ -1447,7 +1459,9 @@
 								}
 							],
 							"returns": "the clamped value.",
-							"examples": []
+							"examples": [
+								"expect 7::clamp(between 1, and 10)::is(7)\nexpect 15::clamp(between 1, and 10)::is(10)\nexpect -4::clamp(between 10, and 1)::is(1)"
+							]
 						}
 					]
 				}

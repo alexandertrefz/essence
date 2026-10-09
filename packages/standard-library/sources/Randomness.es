@@ -42,6 +42,14 @@ declarations {
 		§§
 		§§ The same seed, drawn from by the same calls in the same order, answers the same values. The source carries words that every draw advances, so a caller that wants the sequence again builds a second source from the seed. Any text is a seed. A seed is hashed to 32 bits, so two different seeds almost always answer two different sequences.
 		§§
+		§§ @example
+		§§   constant source = Randomness.seeded("league")
+		§§   constant replay = Randomness.seeded("league")
+		§§
+		§§   constant drawn = source::drawInteger(between 1, and 100)
+		§§
+		§§   expect replay::drawInteger(between 1, and 100)::is(drawn)
+		§§
 		§§ @param _ — the text the sequence is built from
 		§§ @returns — a source that replays.
 		static seeded(_ seed: String) -> Randomness
@@ -50,9 +58,24 @@ declarations {
 		§§
 		§§ The entry taking no Argument answers each of the two half the time. A chance of `1/4` answers `true` once in four draws. A chance below zero answers `false` at every draw, and a chance above one answers `true` at every draw.
 		overload drawBoolean {
+			§§ @example
+			§§   constant coin = Randomness.seeded("coin")
+			§§   constant heads = List.of(integersFrom 1, through 100)
+			§§   	::count(where (_) { <- coin::drawBoolean() })
+			§§
+			§§   expect heads::isBetween(30, and 70)
+			§§
 			§§ @returns — `true` or `false`, with each equally likely.
 			() -> Boolean
 
+			§§ @example
+			§§   constant coin = Randomness.seeded("coin")
+			§§   constant rare = List.of(integersFrom 1, through 100)
+			§§   	::count(where (_) { <- coin::drawBoolean(withProbability 1/4) })
+			§§
+			§§   expect rare::isBetween(10, and 40)
+			§§   expect coin::drawBoolean(withProbability 3/2)
+			§§
 			§§ @param withProbability — how often the answer is `true`, as a part of one
 			§§ @returns — `true` that often, and `false` the rest of the time.
 			(withProbability chance: Rational) -> Boolean
@@ -62,11 +85,24 @@ declarations {
 		§§
 		§§ The two bounds name the same range in either order, and both of them are inside it. The `below:` entry counts from zero, and the bound it is given is outside the range.
 		overload drawInteger {
+			§§ @example
+			§§   constant die = Randomness.seeded("dice")
+			§§
+			§§   expect die::drawInteger(between 1, and 6)::isBetween(1, and 6)
+			§§   expect die::drawInteger(between 6, and 1)::isBetween(1, and 6)
+			§§   expect die::drawInteger(between 4, and 4)::is(4)
+			§§
 			§§ @param between — one bound of the range.
 			§§ @param and — the other bound of the range.
 			§§ @returns — a number from the range, with each one equally likely.
 			(between low: Integer, and high: Integer) -> Integer
 
+			§§ @example
+			§§   constant source = Randomness.seeded("index")
+			§§
+			§§   expect source::drawInteger(below 10)::isBetween(0, and 9)
+			§§   expect source::drawInteger(below 1)::is(0)
+			§§
 			§§ @param below — the number the range stops below, proven to be above zero
 			§§ @returns — a number from zero up to the bound, with each one equally likely.
 			(below bound: PositiveInteger) -> NonNegativeInteger
@@ -81,6 +117,13 @@ declarations {
 			§§ @returns — a fraction from the range, drawn over one of the twelve denominators and reduced.
 			(between low: Rational, and high: Rational) -> Rational
 
+			§§ @example
+			§§   constant source = Randomness.seeded("prices")
+			§§   constant quarter = source::drawRational(between 0/1, and 1/1, over 4)
+			§§
+			§§   expect [0/1, 1/4, 1/2, 3/4, 1/1]::contains(quarter)
+			§§   expect source::drawRational(between 1/10, and 1/5, over 2)::is(1/10)
+			§§
 			§§ @param between — one bound of the range.
 			§§ @param and — the other bound of the range.
 			§§ @param over — the denominator every answer is drawn over, proven to be above zero
@@ -96,6 +139,12 @@ declarations {
 		§§
 		§§ The characters are letters, digits and a space, with four characters that are outside ASCII among them. A bound of zero or less answers the empty String.
 		§§
+		§§ @example
+		§§   constant source = Randomness.seeded("names")
+		§§
+		§§   expect source::drawString(upTo 8)::length()::isLessThanOrEqualTo(8)
+		§§   expect source::drawString(upTo 0)::isEmpty()
+		§§
 		§§ @param upTo — the greatest number of characters the answer can have.
 		§§ @returns — a String of that length or shorter.
 		drawString(upTo length: Integer) -> String
@@ -104,10 +153,25 @@ declarations {
 		§§
 		§§ The counted entry draws without replacement, so it never answers one item twice, and a count above the length of the List answers every item. The drawn items stand in the order they were drawn. A weight of zero or less is drawn as zero, and weights that are all zero answer as the unweighted entry does.
 		overload pick {
+			§§ @example
+			§§   constant colours: NonEmptyList<String> = ["red", "green", "blue"]
+			§§   constant source = Randomness.seeded("colours")
+			§§
+			§§   expect colours::contains(source::pick(from colours))
+			§§
 			§§ @param from — the items to choose from, which certainly has one.
 			§§ @returns — an item of the List, with each item equally likely.
 			<infer ItemType>(from items: NonEmptyList<ItemType>) -> ItemType
 
+			§§ @example
+			§§   constant team: NonEmptyList<String> = ["Ada", "Grace", "Alan"]
+			§§   constant source = Randomness.seeded("team")
+			§§   constant pair = source::pick(2, from team)
+			§§
+			§§   expect pair::length()::is(2)
+			§§   expect pair::hasDuplicates()::negate()
+			§§   expect source::pick(5, from team)::sort()::is(["Ada", "Alan", "Grace"])
+			§§
 			§§ @param _ — how many items to answer, proven to be above zero
 			§§ @param from — the items to choose from, which certainly has one.
 			§§ @returns — the drawn items, which certainly holds one.
@@ -116,6 +180,18 @@ declarations {
 				from items: NonEmptyList<ItemType>,
 			) -> NonEmptyList<ItemType>
 
+			§§ @example
+			§§   constant source = Randomness.seeded("prizes")
+			§§   constant prize = source::pick(
+			§§   	from [
+			§§   		{ name = "car", weight = 0/1 },
+			§§   		{ name = "pen", weight = 3/4 },
+			§§   	],
+			§§   	weightedBy .weight,
+			§§   )
+			§§
+			§§   expect prize.name::is("pen")
+			§§
 			§§ @param from — the items to choose from, which certainly has one.
 			§§ @param weightedBy — how likely each item is, against the weights of the others
 			§§ @returns — an item of the List, as likely as its own weight.
@@ -133,10 +209,25 @@ declarations {
 		§§
 		§§ Every order of the items is equally likely. The List it is given is left as it was.
 		overload shuffle {
+			§§ @example
+			§§   constant deck: List<Integer> = [1, 2, 3, 4]
+			§§   constant source = Randomness.seeded("deck")
+			§§   constant shuffled = source::shuffle(deck)
+			§§
+			§§   expect shuffled::sort()::is([1, 2, 3, 4])
+			§§
 			§§ @param _ — the items to reorder
 			§§ @returns — the reordered List.
 			<infer ItemType>(_ items: List<ItemType>) -> List<ItemType>
 
+			§§ @example
+			§§   constant names: NonEmptyList<String> = ["Ada", "Grace", "Alan"]
+			§§   constant source = Randomness.seeded("names")
+			§§   constant shuffled = source::shuffle(names)
+			§§
+			§§   expect names::contains(shuffled::firstItem())
+			§§   expect shuffled::length()::is(3)
+			§§
 			§§ @param _ — the items to reorder, which certainly has one
 			§§ @returns — the reordered List, which certainly holds one.
 			<infer ItemType>(
