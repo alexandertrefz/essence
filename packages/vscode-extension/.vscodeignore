@@ -6,6 +6,7 @@ bun.lock
 bunfig.toml
 DEVELOPMENT.md
 buildServer.js
+buildExtension.js
 tsconfig.json
 
 # Bundled into dist/extension.js by `bun run build`.

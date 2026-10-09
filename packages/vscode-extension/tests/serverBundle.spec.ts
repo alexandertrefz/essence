@@ -1,9 +1,20 @@
 import { afterAll, describe, expect, it } from "bun:test"
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import {
+	accessSync,
+	constants,
+	existsSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
+import { buildExtension } from "../buildExtension.js"
 import { buildServer } from "../buildServer.js"
 
 // The extension forks the bundled server on the Node VS Code ships, so a
@@ -12,18 +23,24 @@ import { buildServer } from "../buildServer.js"
 // can say how the bundle runs there.
 const node = Bun.which("node")
 
-let directory = mkdtempSync(path.join(tmpdir(), "essence-server-bundle-"))
+// Laid out as an installed extension: `server/` and `dist/` side by side.
+let root = mkdtempSync(path.join(tmpdir(), "essence-server-bundle-"))
+let extension = path.join(root, "extension")
+let directory = path.join(extension, "server")
 let workspace = mkdtempSync(path.join(tmpdir(), "essence-server-workspace-"))
 let building: Promise<void> | null = null
 
 afterAll(() => {
-	rmSync(directory, { recursive: true, force: true })
+	rmSync(root, { recursive: true, force: true })
 	rmSync(workspace, { recursive: true, force: true })
 })
 
 // One build serves every test.
 function built(): Promise<void> {
-	building ??= buildServer(directory)
+	building ??= Promise.all([
+		buildServer(directory),
+		buildExtension(path.join(extension, "dist")),
+	]).then(() => {})
 
 	return building
 }
@@ -110,6 +127,13 @@ function answerTo(
 	)
 }
 
+// Every file under `directory`, at any depth.
+function filesUnder(directory: string): Array<string> {
+	return readdirSync(directory, { recursive: true, withFileTypes: true })
+		.filter((entry) => entry.isFile())
+		.map((entry) => path.join(entry.parentPath, entry.name))
+}
+
 // `start` and every directory above it, up to the root.
 function directoriesAbove(start: string): Array<string> {
 	let directories = [start]
@@ -187,7 +211,7 @@ describe("The bundled Language Server", () => {
 		async () => {
 			await built()
 
-			let reachable = [directory, workspace].flatMap((start) =>
+			let reachable = [extension, workspace].flatMap((start) =>
 				directoriesAbove(start)
 					.map((each) => path.join(each, "node_modules"))
 					.filter((each) => existsSync(each)),
@@ -297,4 +321,38 @@ describe("The bundled Language Server", () => {
 			})
 		},
 	)
+
+	// A bundled CommonJS module would spell out the path it was built from.
+	// That path names the building machine and its user, and exists on no other.
+	it("names no path of the machine that built it", async () => {
+		await built()
+
+		let checkout = path.resolve(import.meta.dirname, "..", "..", "..")
+		// Every path holds the root, so a home directory at the root is no clue.
+		let spellings = [
+			...new Set(
+				[checkout, homedir()].flatMap((each) => [
+					each,
+					realpathSync(each),
+				]),
+			),
+		].filter((each) => path.parse(each).root !== each)
+		let naming = filesUnder(extension).filter((file) => {
+			let contents = readFileSync(file)
+
+			return spellings.some((spelling) => contents.includes(spelling))
+		})
+
+		expect(naming.map((file) => path.relative(extension, file))).toEqual([])
+	})
+
+	// The language client stops a server that outlives `stop` by running this
+	// script, which it looks for beside its own bundled file.
+	it("ships the language client's terminate script beside it", async () => {
+		await built()
+
+		let script = path.join(extension, "dist", "terminateProcess.sh")
+
+		expect(() => accessSync(script, constants.X_OK)).not.toThrow()
+	})
 })

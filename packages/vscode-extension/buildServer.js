@@ -53,6 +53,17 @@ const esbuildWasmFiles = [
 // Where the bundles import the copy from, relative to themselves.
 const esbuildWasmEntry = "./esbuild-wasm/lib/main.js"
 
+// A bundled CommonJS module's `__dirname` and `__filename` would otherwise be
+// spelled out as the paths it was built from. Every bundle reads its own
+// location at run time instead.
+export const ownLocation = {
+	define: {
+		__dirname: "__bundleDirname",
+		__filename: "__bundleFilename",
+	},
+	banner: "const __bundleDirname = import.meta.dirname, __bundleFilename = import.meta.filename;",
+}
+
 // Packages whose `main` wraps itself in a universal module factory. The
 // factory takes `require` as a Parameter, which hides its files from the
 // bundler, and the bundle would look for them beside itself. Their `module`
@@ -149,6 +160,7 @@ export async function buildServer(directory) {
 			target: "node",
 			format: "esm",
 			plugins: [moduleEntries, wasmESBuild],
+			...ownLocation,
 			throw: false,
 		})
 

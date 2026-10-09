@@ -46,7 +46,7 @@
 	"scripts": {
 		"build": "bun run build:server && bun run build:extension",
 		"build:server": "bun buildServer.js",
-		"build:extension": "bun build extension.js --target=node --format=esm --external vscode --outfile=dist/extension.js",
+		"build:extension": "bun buildExtension.js",
 		"package": "bun run build && vsce package --no-dependencies",
 		"publish": "bun run build && vsce publish --no-dependencies"
 	},

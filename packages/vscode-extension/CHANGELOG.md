@@ -92,6 +92,11 @@
   ran. The extension ships esbuild's WebAssembly build beside the server, one
   package for every platform, and starts it on the Node the server runs on, so
   a `PATH` without `node` does not stop it either.
+- A Language Server that hangs rather than stopping is killed on every
+  machine. The language client kills it with a script it looks for beside its
+  own file, and the bundled extension looked for that script where it had been
+  built, so anywhere else a hung server outlived a restart. The script ships
+  beside the extension now, and the extension finds it there.
 
 ## [0.7.0]
 

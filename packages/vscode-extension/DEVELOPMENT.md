@@ -26,10 +26,20 @@ instead (`umdPackages`). `tests/serverBundle.spec.ts` builds the server, starts
 it under Node and runs a workspace's tests through it, since no other spec runs
 the bundle there.
 
+Every bundle reads its own location at run time. Bundled as they are, a
+CommonJS module's `__dirname` and `__filename` would be spelled out as the
+paths it was built from, which name the building machine and exist on no other.
+`ownLocation` in `buildServer.js` defines both to the bundle's `import.meta`
+instead, for the server, its Worker and the extension alike. The language
+client is one such module: it stops a server that outlives `stop` with the
+`terminateProcess.sh` beside its own file, so `buildExtension.js` copies that
+script beside `dist/extension.js`. The spec checks that no built file names the
+checkout.
+
 ```sh
 bun install        # links the workspace, or fetches the published packages
-bun run build      # server/server.js, server/testWorker.js, and what each of
-                   # them reads at run time
+bun run build      # server/server.js, server/testWorker.js, dist/extension.js,
+                   # and what each of them reads at run time
 ```
 
 Press `F5` ("Extension") to open an Extension Development Host.
