@@ -2732,7 +2732,8 @@ function bindLookupMember(node: common.typed.LookupNode, context: WalkContext) {
 				node.providedBy ?? bound,
 			)
 		}
-	} else if (baseType.type === "Record") {
+	} else if (baseType.type === "Record" || baseType.type === "Case") {
+		// A Case's payload members read like a Record's.
 		context.recordLookups.push({
 			names: Object.keys(baseType.members),
 			name: node.member.content,

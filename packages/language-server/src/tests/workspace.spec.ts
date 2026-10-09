@@ -1660,6 +1660,10 @@ describe("Workspace", () => {
 				"\t}",
 				"",
 				"\tTerminal.inspect(e.port::add(config.server.port))",
+				"\tconstant read = match f -> Integer {",
+				"\t\tcase #Get { <- @.retries }",
+				"\t\tcase #Stop { <- 0 }",
+				"\t}",
 				"}",
 				"",
 			].join("\n")
@@ -1813,7 +1817,8 @@ describe("Workspace", () => {
 					"Types.es": types.replace("retries:", "attempts:"),
 					"Main.es": main
 						.replace("retries = 1", "attempts = 1")
-						.replace("{ retries }", "{ attempts as retries }"),
+						.replace("{ retries }", "{ attempts as retries }")
+						.replace("@.retries", "@.attempts"),
 				})
 				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
 					"Types.es": [],

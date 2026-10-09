@@ -219,7 +219,7 @@ A Record member has no Type that declares it alone, since any Record of the same
 Pattern, the keys of an update and the base of a Lookup. Two shapes share a group when one holds every name of the
 other, since a value of the larger could flow into the smaller. The relation is closed transitively, and each name of a
 group is one Declaration. Shapes neither of which holds the other stay apart, so two Types sharing a member's name do
-not rename together.
+not rename together. A Case's payload members read like a Record's, so a Lookup on a Case value counts as a shape too.
 
 `groupRelatedShapes` in `src/recordShapes.ts` does the grouping, and the index keeps each group's shapes as
 `recordMembers`. The symbol join groups the shapes of every file of a component the same way, so a member declared in

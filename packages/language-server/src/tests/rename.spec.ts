@@ -964,6 +964,37 @@ describe("Rename of Methods and Record members", () => {
 			].join("\n"),
 		)
 	})
+
+	// A Case's members read like a Record's, so a Lookup on a Case value is
+	// one of its payload member's occurrences.
+	it("should rename a Case payload member read through a Lookup", () => {
+		let source = [
+			"implementation {",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, retries: Integer },",
+			"\t\tStop,",
+			"\t}",
+			"",
+			'\tconstant f: Fetch = #Get({ url = "a", retries = 1 })',
+			"\tconstant tries = match f -> Integer {",
+			"\t\tcase #Get { <- @.retries }",
+			"\t\tcase #Stop { <- 0 }",
+			"\t}",
+			"}",
+		].join("\n")
+
+		let renamed = source.replaceAll("retries", "attempts")
+
+		expect(rename(source, { line: 3, column: 22 }, "attempts")).toBe(
+			renamed,
+		)
+		expect(rename(source, { line: 7, column: 40 }, "attempts")).toBe(
+			renamed,
+		)
+		expect(rename(source, { line: 9, column: 20 }, "attempts")).toBe(
+			renamed,
+		)
+	})
 })
 
 describe("findDefinition", () => {
