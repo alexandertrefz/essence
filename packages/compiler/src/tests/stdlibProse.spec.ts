@@ -112,6 +112,10 @@ const tagPattern = /^@(?:param\s+\S+|returns)\s*(?:—\s*)?/
 // A fenced block holds example code, which is not prose.
 const fencePattern = /^\s*(?:```|~~~)/
 
+// An `@example` holds code too: its indented lines, and the blank lines
+// between them, up to the first line written flush again.
+const examplePattern = /^@example\s*$/
+
 // One paragraph of a block, kept as its lines so a finding can name the
 // line it starts at.
 type Paragraph = {
@@ -125,6 +129,7 @@ function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 	let paragraphs: Array<Paragraph> = []
 	let current: Paragraph | null = null
 	let fenced = false
+	let example = false
 
 	for (let [index, raw] of block.lines.entries()) {
 		let line = block.line + index
@@ -139,6 +144,19 @@ function paragraphsOf(block: ProseBlock): Array<Paragraph> {
 		if (fenced) {
 			continue
 		}
+
+		if (examplePattern.test(raw)) {
+			example = true
+			current = null
+
+			continue
+		}
+
+		if (example && (raw.trim() === "" || /^\s/.test(raw))) {
+			continue
+		}
+
+		example = false
 
 		let text = raw.replace(tagPattern, "").trim()
 
