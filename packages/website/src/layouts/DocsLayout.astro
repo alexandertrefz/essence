@@ -85,7 +85,7 @@ let hasAside =
 		data-variant={variant}
 		data-aside={hasAside ? "true" : "false"}
 	>
-		<div class="docs__rail">
+		<div class="docs__rail" data-docs-rail>
 			<SidebarNav sections={sections} activeId={activeId} />
 			{
 				/*
@@ -145,17 +145,31 @@ let hasAside =
 		z-index: 1;
 	}
 
+	/*
+	 * The rail scrolls on its own: the tree is longer than any screen, and
+	 * riding along with the page put the reader's place in it out of sight.
+	 * It holds the height of the viewport under the header, so its right
+	 * rule — the grid's only vertical one — still runs top to bottom however
+	 * short the tree.
+	 */
 	.docs__rail {
+		position: sticky;
+		top: var(--header-height-docs);
+		align-self: start;
 		display: flex;
 		flex-direction: column;
+		height: calc(100dvh - var(--header-height-docs));
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+		border-right: 1px solid var(--hairline-softest);
 	}
 
 	/*
 	 * The rail's footer, on every page. Set like the tree's own rows and
 	 * pulled up into the bottom padding the tree leaves (64px, of which the
 	 * row takes 40), so it reads as the last line of the rail rather than as
-	 * a thing beneath it. The tree's right rule still runs beside it, because
-	 * the row sits inside the tree's box.
+	 * a thing beneath it.
 	 */
 	.docs__from-js[data-variant="rail"] {
 		margin: -40px 24px 64px 0;
@@ -237,6 +251,49 @@ let hasAside =
 </style>
 
 <script>
+	/*
+	 * The rail keeps its place across pages. Every page is a fresh document,
+	 * so without this the tree would snap back to its top on each click and
+	 * hide the row just chosen. The stored offset is restored first; the
+	 * current row is then brought into view only if that offset leaves it
+	 * out — arriving from outside the docs, or from a far branch.
+	 */
+	let rail = document.querySelector<HTMLElement>("[data-docs-rail]")
+
+	if (rail !== null) {
+		let key = "essence:docs-rail-scroll"
+
+		try {
+			let stored = Number(sessionStorage.getItem(key))
+
+			if (Number.isFinite(stored)) {
+				rail.scrollTop = stored
+			}
+		} catch {}
+
+		let current = rail.querySelector<HTMLElement>('[aria-current="page"]')
+
+		if (current !== null) {
+			let railBox = rail.getBoundingClientRect()
+			let rowBox = current.getBoundingClientRect()
+
+			// By hand rather than `scrollIntoView`, which would scroll the
+			// page as well as the rail.
+			if (rowBox.top < railBox.top || rowBox.bottom > railBox.bottom) {
+				rail.scrollTop +=
+					rowBox.top - railBox.top - (railBox.height - rowBox.height) / 2
+			}
+		}
+
+		let scrolled = rail
+
+		window.addEventListener("pagehide", () => {
+			try {
+				sessionStorage.setItem(key, String(scrolled.scrollTop))
+			} catch {}
+		})
+	}
+
 	/*
 	 * The scroll spy behind both on-this-page lists.
 	 *

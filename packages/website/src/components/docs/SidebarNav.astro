@@ -86,12 +86,11 @@ let overviewActive = activeId === undefined
 		flex-direction: column;
 	}
 
-	/* The rail — 1f. Its own hairline is the grid's only vertical rule. */
+	/* The rail — 1f. The rail around it draws the grid's vertical rule. */
 
 	.tree[data-variant="rail"] {
 		gap: 26px;
 		padding: 32px 24px 64px 0;
-		border-right: 1px solid var(--hairline-softest);
 	}
 
 	.tree[data-variant="rail"] .overview {
