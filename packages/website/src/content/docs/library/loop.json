@@ -51,7 +51,9 @@
 								}
 							],
 							"returns": "the first State the condition rejects.",
-							"examples": []
+							"examples": [
+								"constant doubled = loop(\n\tstartingWith 1,\n\twhile (n) { <- n::isLessThan(100) },\n\t(n) { <- n::multiply(with 2) },\n)\n\nexpect doubled::is(128)\n\nconstant unchanged = loop(\n\tstartingWith 500,\n\twhile (n) { <- n::isLessThan(100) },\n\t(n) { <- n::multiply(with 2) },\n)\n\nexpect unchanged::is(500)"
+							]
 						}
 					]
 				},
@@ -95,7 +97,9 @@
 								}
 							],
 							"returns": "the first State the condition accepts.",
-							"examples": []
+							"examples": [
+								"constant tripled = loop(\n\tstartingWith 1,\n\tuntil (n) { <- n::isGreaterThan(100) },\n\t(n) { <- n::multiply(with 3) },\n)\n\nexpect tripled::is(243)"
+							]
 						}
 					]
 				}
@@ -152,7 +156,9 @@
 								}
 							],
 							"returns": "the State after the last step, or the seed when the body never runs.",
-							"examples": []
+							"examples": [
+								"constant total = loop(from 1, through 10, startingWith 0, (index, sum) {\n\t<- sum::add(index)\n})\n\nexpect total::is(55)\n\nconstant backwards = loop(from 3, through 1, startingWith \"none\", (index, text) {\n\t<- \"{text}{index}\"\n})\n\nexpect backwards::is(\"none\")"
+							]
 						}
 					]
 				},
@@ -203,7 +209,9 @@
 								}
 							],
 							"returns": "the State after the last step, or the seed when the body never runs.",
-							"examples": []
+							"examples": [
+								"constant digits = loop(from 1, upTo 4, startingWith \"\", (index, text) {\n\t<- \"{text}{index}\"\n})\n\nexpect digits::is(\"123\")"
+							]
 						}
 					]
 				},
@@ -254,7 +262,9 @@
 								}
 							],
 							"returns": "the State after the last step.",
-							"examples": []
+							"examples": [
+								"constant countdown = loop(from 3, downTo 1, startingWith \"\", (index, text) {\n\t<- \"{text}{index}\"\n})\n\nexpect countdown::is(\"321\")\n\nconstant once = loop(from 1, downTo 3, startingWith \"\", (index, text) {\n\t<- \"{text}{index}\"\n})\n\nexpect once::is(\"1\")"
+							]
 						}
 					]
 				}
@@ -297,7 +307,9 @@
 								}
 							],
 							"returns": "the value the first `#Done` carries.",
-							"examples": []
+							"examples": [
+								"constant answer = loop(startingWith 1, step (n) {\n\tif n::isGreaterThan(50) {\n\t\t<- #Done(\"the first power of two over 50 is {n}\")\n\t}\n\n\t<- #Continue(n::multiply(with 2))\n})\n\nexpect answer::is(\"the first power of two over 50 is 64\")"
+							]
 						}
 					]
 				},
@@ -348,7 +360,9 @@
 								}
 							],
 							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
-							"examples": []
+							"examples": [
+								"constant firstOverTen = loop(\n\tfrom 1,\n\tthrough 100,\n\tstartingWith 0,\n\tstep (index, total) {\n\t\tconstant next = total::add(index)\n\n\t\tif next::isGreaterThan(10) {\n\t\t\t<- #Done(next)\n\t\t}\n\n\t\t<- #Continue(next)\n\t},\n)\n\nexpect firstOverTen::is(15)"
+							]
 						}
 					]
 				},
@@ -399,7 +413,9 @@
 								}
 							],
 							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
-							"examples": []
+							"examples": [
+								"constant firstBigSquare = loop(\n\tfrom 0,\n\tupTo 10,\n\tstartingWith 0,\n\tstep (index, found) {\n\t\tif index::multiply(with index)::isGreaterThan(20) {\n\t\t\t<- #Done(index)\n\t\t}\n\n\t\t<- #Continue(found)\n\t},\n)\n\nexpect firstBigSquare::is(5)"
+							]
 						}
 					]
 				},
@@ -450,7 +466,9 @@
 								}
 							],
 							"returns": "the State the count ran out on, or the value the first `#Done` carries.",
-							"examples": []
+							"examples": [
+								"constant stopped = loop(\n\tfrom 5,\n\tdownTo 1,\n\tstartingWith \"\",\n\tstep (index, text) {\n\t\tif index::is(2) {\n\t\t\t<- #Done(\"{text}stop\")\n\t\t}\n\n\t\t<- #Continue(\"{text}{index} \")\n\t},\n)\n\nexpect stopped::is(\"5 4 3 stop\")"
+							]
 						}
 					]
 				}

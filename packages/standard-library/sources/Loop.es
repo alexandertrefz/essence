@@ -36,6 +36,23 @@ declarations {
 		§§
 		§§ The condition is checked before each step. A condition that is false on the seed answers the seed unchanged, and the loop runs zero times. This entry is one of the family's two natives.
 		§§
+		§§ @example
+		§§   constant doubled = loop(
+		§§   	startingWith 1,
+		§§   	while (n) { <- n::isLessThan(100) },
+		§§   	(n) { <- n::multiply(with 2) },
+		§§   )
+		§§
+		§§   expect doubled::is(128)
+		§§
+		§§   constant unchanged = loop(
+		§§   	startingWith 500,
+		§§   	while (n) { <- n::isLessThan(100) },
+		§§   	(n) { <- n::multiply(with 2) },
+		§§   )
+		§§
+		§§   expect unchanged::is(500)
+		§§
 		§§ @param startingWith — the State the loop begins from.
 		§§ @param while — the condition, checked against the State before each step; the loop continues while it is `true`.
 		§§ @param _ — the body, handed the running State and answering with the next.
@@ -49,6 +66,15 @@ declarations {
 		§§ Answers the first State the condition accepts.
 		§§
 		§§ The condition is checked before each step. A condition already `true` on the seed answers the seed unchanged, and the loop runs zero times.
+		§§
+		§§ @example
+		§§   constant tripled = loop(
+		§§   	startingWith 1,
+		§§   	until (n) { <- n::isGreaterThan(100) },
+		§§   	(n) { <- n::multiply(with 3) },
+		§§   )
+		§§
+		§§   expect tripled::is(243)
 		§§
 		§§ @param startingWith — the State the loop begins from.
 		§§ @param until — the condition, checked against the State before each step; the loop continues while it is `false`.
@@ -71,6 +97,19 @@ declarations {
 		§§ Runs the body once for each Integer from `from` up through `through`, and answers the State after the last step.
 		§§
 		§§ Both endpoints are included and the count only runs up. An end below the start runs the body zero times and answers the seed untouched. That mirrors `List.of(integersFrom:through:)`. To count down, use the `downTo:` entry. The entry always finishes, because the range is fixed before the first step.
+		§§
+		§§ @example
+		§§   constant total = loop(from 1, through 10, startingWith 0, (index, sum) {
+		§§   	<- sum::add(index)
+		§§   })
+		§§
+		§§   expect total::is(55)
+		§§
+		§§   constant backwards = loop(from 3, through 1, startingWith "none", (index, text) {
+		§§   	<- "{text}{index}"
+		§§   })
+		§§
+		§§   expect backwards::is("none")
 		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param through — the last Integer the body sees, included.
@@ -104,6 +143,17 @@ declarations {
 		§§
 		§§ Each step answers with a `Step`. A `#Continue` carries the next State, and the loop goes again. A `#Done` carries the answer, and the loop finishes with it. This entry ends on a decision the State makes, rather than on a count or a fixed predicate. It is the family's other native.
 		§§
+		§§ @example
+		§§   constant answer = loop(startingWith 1, step (n) {
+		§§   	if n::isGreaterThan(50) {
+		§§   		<- #Done("the first power of two over 50 is {n}")
+		§§   	}
+		§§
+		§§   	<- #Continue(n::multiply(with 2))
+		§§   })
+		§§
+		§§   expect answer::is("the first power of two over 50 is 64")
+		§§
 		§§ @param startingWith — the State the loop begins from.
 		§§ @param step — the body, handed the running State and answering with a `Step`: `#Continue` to go again, `#Done` to stop.
 		§§ @returns — the value the first `#Done` carries.
@@ -115,6 +165,13 @@ declarations {
 		§§ Runs the body once for each Integer from `from` up to, but not including, `upTo`, and answers the State after the last step.
 		§§
 		§§ The count only runs up. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched. That mirrors `List.of(integersFrom:upTo:)`, so a count written from a length is empty rather than inverted.
+		§§
+		§§ @example
+		§§   constant digits = loop(from 1, upTo 4, startingWith "", (index, text) {
+		§§   	<- "{text}{index}"
+		§§   })
+		§§
+		§§   expect digits::is("123")
 		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param upTo — the Integer the count stops before.
@@ -141,6 +198,19 @@ declarations {
 		§§ Runs the body once for each Integer from `from` down through `downTo`, and answers the State after the last step.
 		§§
 		§§ Both endpoints are included and the count only runs down. The first Integer is always seen, so an end above the start runs the body once. That mirrors `List.of(integersFrom:downTo:)`. The entry always finishes, because the range is fixed before the first step.
+		§§
+		§§ @example
+		§§   constant countdown = loop(from 3, downTo 1, startingWith "", (index, text) {
+		§§   	<- "{text}{index}"
+		§§   })
+		§§
+		§§   expect countdown::is("321")
+		§§
+		§§   constant once = loop(from 1, downTo 3, startingWith "", (index, text) {
+		§§   	<- "{text}{index}"
+		§§   })
+		§§
+		§§   expect once::is("1")
 		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param downTo — the last Integer the body sees, included.
@@ -177,6 +247,24 @@ declarations {
 		§§ Runs the body over the Integers from `from` up through `through`, and lets the body stop before the end.
 		§§
 		§§ Each step answers with a `Step`. A `#Continue` carries the next State, and the count goes on. A `#Done` carries the answer, and the loop finishes with it at once. The count running out answers the State the last step carried. An end below the start runs the body zero times and answers the seed.
+		§§
+		§§ @example
+		§§   constant firstOverTen = loop(
+		§§   	from 1,
+		§§   	through 100,
+		§§   	startingWith 0,
+		§§   	step (index, total) {
+		§§   		constant next = total::add(index)
+		§§
+		§§   		if next::isGreaterThan(10) {
+		§§   			<- #Done(next)
+		§§   		}
+		§§
+		§§   		<- #Continue(next)
+		§§   	},
+		§§   )
+		§§
+		§§   expect firstOverTen::is(15)
 		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param through — the last Integer the body sees, included.
@@ -220,6 +308,22 @@ declarations {
 		§§
 		§§ Each step answers with a `Step`, as the `through:` entry beside it reads. The body runs zero times when `upTo` is not above `from`, and the seed is answered untouched.
 		§§
+		§§ @example
+		§§   constant firstBigSquare = loop(
+		§§   	from 0,
+		§§   	upTo 10,
+		§§   	startingWith 0,
+		§§   	step (index, found) {
+		§§   		if index::multiply(with index)::isGreaterThan(20) {
+		§§   			<- #Done(index)
+		§§   		}
+		§§
+		§§   		<- #Continue(found)
+		§§   	},
+		§§   )
+		§§
+		§§   expect firstBigSquare::is(5)
+		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param upTo — the Integer the count stops before.
 		§§ @param startingWith — the State the first step builds on.
@@ -245,6 +349,22 @@ declarations {
 		§§ Runs the body over the Integers from `from` down through `downTo`, and lets the body stop before the end.
 		§§
 		§§ Each step answers with a `Step`, as the `through:` entry reads. The first Integer is always seen, so an end above the start runs the body once and answers what that step carried.
+		§§
+		§§ @example
+		§§   constant stopped = loop(
+		§§   	from 5,
+		§§   	downTo 1,
+		§§   	startingWith "",
+		§§   	step (index, text) {
+		§§   		if index::is(2) {
+		§§   			<- #Done("{text}stop")
+		§§   		}
+		§§
+		§§   		<- #Continue("{text}{index} ")
+		§§   	},
+		§§   )
+		§§
+		§§   expect stopped::is("5 4 3 stop")
 		§§
 		§§ @param from — the first Integer the body sees.
 		§§ @param downTo — the last Integer the body sees, included.
