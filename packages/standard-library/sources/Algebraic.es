@@ -30,6 +30,13 @@ declarations {
 		§§
 		§§ Normal forms decide the answer exactly. No approximation is consulted.
 		§§
+		§§ @example
+		§§   constant golden = Number.GoldenRatio
+		§§   constant rootFive = golden::multiply(with 2)::subtract(1)
+		§§
+		§§   expect rootFive::is(golden::subtract(1/2)::multiply(with 2))
+		§§   expect rootFive::is(golden)::negate()
+		§§
 		§§ @param _ — the Algebraic to compare with
 		§§ @returns — `true` when the numbers are equal.
 		is(_ other: Algebraic) -> Boolean {
@@ -39,6 +46,13 @@ declarations {
 		§§ Orders the Algebraic against another Algebraic.
 		§§
 		§§ The comparison is symbolic, so it is exact.
+		§§
+		§§ @example
+		§§   constant golden = Number.GoldenRatio
+		§§   constant rootFive = golden::multiply(with 2)::subtract(1)
+		§§
+		§§   expect golden::compare(to rootFive)::is(#Less)
+		§§   expect rootFive::compare(to golden::add(1/2))::is(#Greater)
 		§§
 		§§ @param to — the Algebraic to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -70,11 +84,23 @@ declarations {
 			§§ Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.
 			§§
 			§§ One radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.
+			§§
+			§§ @example
+			§§   expect 2::squareRoot()::toString()::is("√2")
+			§§   expect 18::squareRoot()::toString()::is("3·√2")
+			§§   expect Number.GoldenRatio::toString()::is("1/2 + 1/2·√5")
 			() -> String
 
 			§§ Answers the Algebraic as a decimal, or in the exact symbolic form, in the named format.
 			§§
 			§§ The `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes eighty digits after the point of the mantissa, and the power of ten after an `e`. The reading is taken at the eightieth digit of the mantissa, wherever the value falls. A value below one is read deeper than eighty places. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.
+			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§
+			§§   expect root::toString(as #Decimal)::starts(with "1.41421356237")
+			§§   expect root::toString(as #Decimal)::length()::is(82)
+			§§   expect root::toString(as #Fraction)::is("√2")
 			§§
 			§§ @param as — the form to represent the Algebraic in
 			§§ @returns — the String representation of the Algebraic.
@@ -111,6 +137,13 @@ declarations {
 			§§ Answers the Algebraic as a decimal with exactly that many places.
 			§§
 			§§ The digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point, at every magnitude. The value is read as many digits past the count as its own power of ten falls below zero. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.
+			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§
+			§§   expect root::toString(as #Decimal, toPlaces 3)::is("1.414")
+			§§   expect root::toString(as #Decimal, toPlaces 3, toward #Up)::is("1.415")
+			§§   expect root::toString(as #Percent, toPlaces 1)::is("141.4%")
 			§§
 			§§ @param as — the form to represent the Algebraic in
 			§§ @param toPlaces — how many digits to write after the point
@@ -176,6 +209,10 @@ declarations {
 			§§
 			§§ An Integer shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.
 			§§
+			§§ @example
+			§§   expect 2::squareRoot()::add(1)::toString()::is("1 + √2")
+			§§   expect 2::squareRoot()::add(-1)::toString()::is("-1 + √2")
+			§§
 			§§ @param _ — the Integer to add
 			§§ @returns — the exact sum.
 			(_ other: Integer) -> Algebraic
@@ -183,6 +220,9 @@ declarations {
 			§§ Answers the exact sum of the Algebraic and a Rational.
 			§§
 			§§ A Rational shifts the rational part and leaves the radical in place, so the sum is again an Algebraic.
+			§§
+			§§ @example
+			§§   expect 2::squareRoot()::add(1/2)::toString()::is("1/2 + √2")
 			§§
 			§§ @param _ — the Rational to add
 			§§ @returns — the exact sum.
@@ -192,6 +232,13 @@ declarations {
 			§§
 			§§ Over the same radical the sum stays in the slice, and can collapse to a Rational. Over different radicals the sum falls outside what an Algebraic holds, and the answer is empty.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant conjugate = golden::negate()::add(1)
+			§§
+			§§   expect golden::add(golden)::is(golden::multiply(with 2))
+			§§   expect golden::add(conjugate)::is(1/1)
+			§§
 			§§ @param _ — the Algebraic to add
 			§§ @returns — the sum, or nothing when the radicals differ.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic>
@@ -199,6 +246,11 @@ declarations {
 			§§ Answers the exact sum of the two Algebraics.
 			§§
 			§§ Over different radicals there is no sum, and the answer is the given value.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§
+			§§   expect golden::add(golden, defaultingTo 0/1)::toString()::is("1 + √5")
 			§§
 			§§ @param _ — the Algebraic to add
 			§§ @param defaultingTo — the value to answer with when there is no sum
@@ -219,6 +271,9 @@ declarations {
 			§§
 			§§ An Integer shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.
 			§§
+			§§ @example
+			§§   expect 2::squareRoot()::subtract(1)::toString()::is("-1 + √2")
+			§§
 			§§ @param _ — the Integer to subtract
 			§§ @returns — the exact difference.
 			(_ other: Integer) -> Algebraic {
@@ -228,6 +283,9 @@ declarations {
 			§§ Answers the exact difference of the Algebraic and a Rational.
 			§§
 			§§ A Rational shifts the rational part and leaves the radical in place, so the difference is again an Algebraic.
+			§§
+			§§ @example
+			§§   expect 2::squareRoot()::subtract(1/2)::toString()::is("-1/2 + √2")
 			§§
 			§§ @param _ — the Rational to subtract
 			§§ @returns — the exact difference.
@@ -239,6 +297,12 @@ declarations {
 			§§
 			§§ Over the same radical the difference stays in the slice, and can collapse to a Rational. Over different radicals there is no difference, and the answer is empty.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§
+			§§   expect golden::subtract(golden::multiply(with 2))::is(golden::negate())
+			§§   expect golden::subtract(golden::subtract(1))::is(1/1)
+			§§
 			§§ @param _ — the Algebraic to subtract
 			§§ @returns — the difference, or nothing when the radicals differ.
 			(_ other: Algebraic) -> Optional<Rational | Algebraic> {
@@ -248,6 +312,12 @@ declarations {
 			§§ Answers the exact difference of the two Algebraics.
 			§§
 			§§ Over different radicals there is no difference, and the answer is the given value.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant smaller = golden::subtract(1)
+			§§
+			§§   expect golden::subtract(smaller, defaultingTo 0/1)::is(1)
 			§§
 			§§ @param _ — the Algebraic to subtract
 			§§ @param defaultingTo — the value to answer with when there is no difference
@@ -268,6 +338,13 @@ declarations {
 			§§
 			§§ An Integer scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.
 			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§   constant copies = 3
+			§§
+			§§   expect root::multiply(with copies)::toString()::is("3·√2")
+			§§   expect root::multiply(with 0)::is(0)
+			§§
 			§§ @param with — the Integer to multiply with
 			§§ @returns — the exact product, an Algebraic or a Rational.
 			(with other: Integer) -> Algebraic | Rational
@@ -275,6 +352,13 @@ declarations {
 			§§ Answers the exact product of the Algebraic and a Rational.
 			§§
 			§§ A Rational scales both parts and leaves the radical in place. A zero factor collapses the product to the Rational zero.
+			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§   constant half = 1/2
+			§§
+			§§   expect root::multiply(with half)::toString()::is("1/2·√2")
+			§§   expect root::multiply(with 0/1)::is(0)
 			§§
 			§§ @param with — the Rational to multiply with
 			§§ @returns — the exact product, an Algebraic or a Rational.
@@ -284,6 +368,12 @@ declarations {
 			§§
 			§§ Over the same radical the product stays exact: `√2 · √2` is `2`. Two pure radicals combine across radicals: `√2 · √3` is `√6`. Anything else is empty.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§
+			§§   expect golden::multiply(with golden)::is(golden::add(1))
+			§§   expect golden::multiply(with golden::subtract(1))::is(1/1)
+			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @returns — the product, or nothing when there is none.
 			(with other: Algebraic) -> Optional<Rational | Algebraic>
@@ -291,6 +381,12 @@ declarations {
 			§§ Answers the exact product of the two Algebraics.
 			§§
 			§§ Where there is no product, the answer is the given value.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant squared = golden::multiply(with golden, defaultingTo 0/1)
+			§§
+			§§   expect squared::is(golden::add(1))
 			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @param defaultingTo — the value to answer with when there is no product
@@ -306,6 +402,10 @@ declarations {
 			§§
 			§§ A non-zero Integer scales both parts and leaves the radical in place. The answer is again an Algebraic rather than a Union.
 			§§
+			§§ @example
+			§§   expect 2::squareRoot()::multiply(with 3)::toString()::is("3·√2")
+			§§   expect Number.GoldenRatio::multiply(with 2)::toString()::is("1 + √5")
+			§§
 			§§ @param with — the factor, proven not to be zero
 			§§ @returns — the exact product.
 			(with other: NonZeroInteger) -> Algebraic
@@ -313,6 +413,9 @@ declarations {
 			§§ Answers the exact product of the Algebraic and a Rational factor proven not to be zero.
 			§§
 			§§ A Rational that is not zero scales both parts and leaves the radical in place. The answer is again an Algebraic rather than a Union.
+			§§
+			§§ @example
+			§§   expect 2::squareRoot()::multiply(with 1/2)::toString()::is("1/2·√2")
 			§§
 			§§ @param with — the factor, proven not to be zero
 			§§ @returns — the exact product.
@@ -327,6 +430,13 @@ declarations {
 			§§
 			§§ A divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant divisor = 2
+			§§
+			§§   expect golden::divide(by divisor)::is(golden::multiply(with 1/2))
+			§§   expect golden::divide(by 0)::isEmpty()
+			§§
 			§§ @param by — the divisor
 			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Algebraic>
@@ -334,6 +444,13 @@ declarations {
 			§§ Answers the exact quotient of the Algebraic and a Rational.
 			§§
 			§§ A divisor that is not zero scales both parts and leaves the radical in place. A zero divisor answers empty.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant half = 1/2
+			§§
+			§§   expect golden::divide(by half)::is(golden::multiply(with 2))
+			§§   expect golden::divide(by 0/1)::isEmpty()
 			§§
 			§§ @param by — the divisor
 			§§ @returns — the exact quotient, or nothing when the divisor is zero.
@@ -343,6 +460,12 @@ declarations {
 			§§
 			§§ The divisor's conjugate gives its reciprocal, and the quotient is that product. It is empty wherever the matching product is empty.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§
+			§§   expect golden::divide(by golden)::is(1/1)
+			§§   expect golden::divide(by golden::subtract(1))::is(golden::add(1))
+			§§
 			§§ @param by — the divisor
 			§§ @returns — the quotient, or nothing when there is none.
 			(by other: Algebraic) -> Optional<Rational | Algebraic>
@@ -350,6 +473,14 @@ declarations {
 			§§ Answers the exact quotient of the Algebraic and an Integer.
 			§§
 			§§ A zero divisor answers the given value.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant halved = golden::multiply(with 1/2)
+			§§   constant divisor = 2
+			§§
+			§§   expect golden::divide(by divisor, defaultingTo golden)::is(halved)
+			§§   expect golden::divide(by 0, defaultingTo golden)::is(golden)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -361,6 +492,14 @@ declarations {
 			§§ Answers the exact quotient of the Algebraic and a Rational.
 			§§
 			§§ A zero divisor answers the given value.
+			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§   constant doubled = golden::multiply(with 2)
+			§§   constant half = 1/2
+			§§
+			§§   expect golden::divide(by half, defaultingTo golden)::is(doubled)
+			§§   expect golden::divide(by 0/1, defaultingTo golden)::is(golden)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -376,6 +515,11 @@ declarations {
 			§§
 			§§ Where there is no quotient, the answer is the given value.
 			§§
+			§§ @example
+			§§   constant golden = Number.GoldenRatio
+			§§
+			§§   expect golden::divide(by golden, defaultingTo 0/1)::is(1)
+			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
 			§§ @returns — the quotient, or the given value in its place.
@@ -390,6 +534,9 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 2::squareRoot()::divide(by 2)::toString()::is("1/2·√2")
+			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
 			(by other: NonZeroInteger) -> Algebraic
@@ -397,6 +544,9 @@ declarations {
 			§§ Answers the exact quotient of the Algebraic and a Rational divisor proven not to be zero.
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @example
+			§§   expect 2::squareRoot()::divide(by 1/2)::toString()::is("2·√2")
 			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
@@ -413,6 +563,13 @@ declarations {
 		§§ Answers the Algebraic raised to the given power, exactly.
 		§§
 		§§ The slice is closed under Integer powers, so every power is exact. A power can cancel the radical, so `2::squareRoot()` squared is the Rational `2`. A negative exponent answers the power of the reciprocal, which always exists, since an Algebraic is never zero. A zero exponent answers `1`.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::raise(to 2)::is(2)
+		§§   expect root::raise(to 3)::toString()::is("2·√2")
+		§§   expect root::raise(to -2)::is(1/2)
 		§§
 		§§ @param to — the exponent
 		§§ @returns — the exact power, an Algebraic or a Rational.
@@ -433,6 +590,12 @@ declarations {
 		§§ Answers whether the Algebraic is above zero.
 		§§
 		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::subtract(1.4142)::isPositive()
+		§§   expect root::subtract(1.4143)::isPositive()::negate()
 		isPositive() -> Boolean {
 			<- @::compare(to @::negate())::is(#Greater)
 		}
@@ -440,6 +603,12 @@ declarations {
 		§§ Answers whether the Algebraic is below zero.
 		§§
 		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::subtract(1.4143)::isNegative()
+		§§   expect root::isNegative()::negate()
 		isNegative() -> Boolean {
 			<- @::compare(to @::negate())::is(#Less)
 		}
@@ -447,6 +616,9 @@ declarations {
 		§§ Answers whether the Algebraic is exactly zero.
 		§§
 		§§ An Algebraic carries a radical with a coefficient that is not zero, so the answer is always `false`.
+		§§
+		§§ @example
+		§§   expect 2::squareRoot()::isZero()::negate()
 		isZero() -> Boolean {
 			<- false
 		}
@@ -454,6 +626,9 @@ declarations {
 		§§ Answers whether the Algebraic is a whole number.
 		§§
 		§§ An Algebraic is irrational, so it is never whole and the answer is always `false`.
+		§§
+		§§ @example
+		§§   expect 2::squareRoot()::isWholeNumber()::negate()
 		isWholeNumber() -> Boolean {
 			<- false
 		}
@@ -461,6 +636,12 @@ declarations {
 		§§ Answers the Algebraic without its sign, which is its distance from zero.
 		§§
 		§§ The sign of `a + b·√d` is exactly decidable. No approximation is consulted.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::negate()::absolute()::is(root)
+		§§   expect root::subtract(2)::absolute()::is(root::negate()::add(2))
 		absolute() -> Algebraic {
 			if @::isNegative() {
 				<- @::negate()
@@ -472,6 +653,12 @@ declarations {
 		§§ Answers the Algebraic with its sign flipped.
 		§§
 		§§ Negating an irrational leaves it irrational, so the answer is again an Algebraic.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::negate()::toString()::is("-√2")
+		§§   expect root::negate()::negate()::is(root)
 		negate() -> Algebraic
 
 		§ The two Methods that hand an Algebraic to a reader as digits. Both
@@ -485,6 +672,13 @@ declarations {
 		§§ Answers the Algebraic as a Rational on a decimal grid of the given width.
 		§§
 		§§ Five places answer the value rounded to hundred-thousandths, so `2::squareRoot()` over five places answers `141421/100000`. This Method is where a Program asks for digits in place of the exact value. The answer is exact all the same: it is the step of that grid the value rounds to. A width of no places answers a whole number, as a Rational.
+		§§
+		§§ @example
+		§§   constant root = 2::squareRoot()
+		§§
+		§§   expect root::approximate(toPlaces 5)::is(1.41421)
+		§§   expect root::approximate(toPlaces 2, toward #Up)::is(1.42)
+		§§   expect root::approximate(toPlaces 0)::is(1/1)
 		§§
 		§§ @param toPlaces — how many decimal places the grid keeps
 		§§ @param toward — the direction to round in, `#Nearest` when it is left out
@@ -500,6 +694,12 @@ declarations {
 		overload round {
 			§§ Answers the Algebraic as an Integer, rounded in the named direction.
 			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§
+			§§   expect root::round()::is(1)
+			§§   expect root::round(toward #Up)::is(2)
+			§§
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
 			§§ @returns — the rounded Integer.
 			(toward direction: Rounding = #Nearest) -> Integer
@@ -507,6 +707,13 @@ declarations {
 			§§ Answers the Algebraic rounded to a decimal grid of the given width.
 			§§
 			§§ Two places round to hundredths. The answer is what `approximate(toPlaces:toward:)` answers, and a count below one rounds to a whole number. The entry stands here so that a Number receiver reaches `round` at every width, whichever kind it holds.
+			§§
+			§§ @example
+			§§   constant root = 2::squareRoot()
+			§§
+			§§   expect root::round(toPlaces 2)::is(1.41)
+			§§   expect root::round(toPlaces 2, toward #Up)::is(1.42)
+			§§   expect root::round(toPlaces 0)::is(1/1)
 			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
@@ -534,6 +741,13 @@ declarations {
 		§§ Answers the power of ten at or below the Algebraic's distance from zero.
 		§§
 		§§ This is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. That always happens: an Algebraic is irrational, so it is never a power of ten itself.
+		§§
+		§§ @example
+		§§   constant golden = Number.GoldenRatio
+		§§
+		§§   expect golden::decimalExponent()::is(0)
+		§§   expect golden::subtract(1)::decimalExponent()::is(-1)
+		§§   expect golden::multiply(with 10)::decimalExponent()::is(1)
 		§§
 		§§ @returns — the exponent of the power of ten the value falls on.
 		decimalExponent() -> Integer

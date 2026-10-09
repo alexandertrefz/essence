@@ -80,7 +80,9 @@
 								}
 							],
 							"returns": "the Integer, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"expect Integer.parse(\"42\", defaultingTo 0)::is(42)\nexpect Integer.parse(\"forty-two\", defaultingTo 0)::is(0)"
+							]
 						},
 						{
 							"signature": "static parse(_ text: String, inBase base: Integer) -> Optional<Integer>",
@@ -102,7 +104,9 @@
 								}
 							],
 							"returns": "the Integer, or nothing when the text has any other shape.",
-							"examples": []
+							"examples": [
+								"expect Integer.parse(\"ff\", inBase 16)::is(255)\nexpect Integer.parse(\"-1010\", inBase 2)::is(-10)\nexpect Integer.parse(\"12\", inBase 2)::isEmpty()"
+							]
 						},
 						{
 							"signature": "static parse(\n\t_ text: String,\n\tinBase base: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -131,7 +135,9 @@
 								}
 							],
 							"returns": "the Integer, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"expect Integer.parse(\"FF\", inBase 16, defaultingTo 0)::is(255)\nexpect Integer.parse(\"0x1F\", inBase 16, defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				}
@@ -167,7 +173,9 @@
 								}
 							],
 							"returns": "`true` when both are equal.",
-							"examples": []
+							"examples": [
+								"expect 3::is(3)\nexpect 3::is(-3)::negate()"
+							]
 						},
 						{
 							"signature": "is(_ other: Rational) -> Boolean",
@@ -182,7 +190,9 @@
 								}
 							],
 							"returns": "`true` when both are equal.",
-							"examples": []
+							"examples": [
+								"expect 2::is(4/2)\nexpect 2::is(5/2)::negate()"
+							]
 						}
 					]
 				},
@@ -212,7 +222,9 @@
 								}
 							],
 							"returns": "`true` when the two differ.",
-							"examples": []
+							"examples": [
+								"expect 3::isNot(4)\nexpect 3::isNot(3)::negate()"
+							]
 						},
 						{
 							"signature": "isNot(_ other: Rational) -> Boolean",
@@ -227,7 +239,9 @@
 								}
 							],
 							"returns": "`true` when the two differ.",
-							"examples": []
+							"examples": [
+								"expect 2::isNot(5/2)\nexpect 2::isNot(4/2)::negate()"
+							]
 						}
 					]
 				},
@@ -257,7 +271,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect 1::compare(to 2)::is(#Less)\nexpect 2::compare(to 2)::is(#Equal)\nexpect 3::compare(to 2)::is(#Greater)"
+							]
 						}
 					]
 				},
@@ -279,7 +295,9 @@
 							"summary": "Answers the Integer as a String, in decimal digits.",
 							"parameters": [],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"expect 42::toString()::is(\"42\")\nexpect -7::toString()::is(\"-7\")"
+							]
 						},
 						{
 							"signature": "toString(as format: NumberFormat) -> String",
@@ -294,7 +312,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"expect 42::toString(as #Fraction)::is(\"42\")\nexpect 3::toString(as #Percent)::is(\"300%\")\nexpect 1500::toString(as #Scientific)::is(\"1.5e3\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -323,7 +343,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"expect 5::toString(as #Decimal, toPlaces 2)::is(\"5.00\")\nexpect 5::toString(as #Fraction, toPlaces 2)::is(\"5\")\nexpect 1234::toString(as #Scientific, toPlaces 1)::is(\"1.2e3\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\tgroupingWith separator: String,\n) -> String",
@@ -345,7 +367,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"constant written = 1234567::toString(as #Decimal, groupingWith \",\")\n\nexpect written::is(\"1,234,567\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\tgroupingWith separator: String,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -381,7 +405,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"constant total = 1234567::toString(\n\tas #Decimal,\n\ttoPlaces 2,\n\tgroupingWith \",\",\n)\n\nexpect total::is(\"1,234,567.00\")"
+							]
 						},
 						{
 							"signature": "toString(scaledBy places: NonNegativeInteger) -> String",
@@ -396,7 +422,9 @@
 								}
 							],
 							"returns": "the String representation of the scaled Integer.",
-							"examples": []
+							"examples": [
+								"expect 1234::toString(scaledBy 2)::is(\"12.34\")\nexpect -1234::toString(scaledBy 2)::is(\"-12.34\")\nexpect 1234::toString(scaledBy 0)::is(\"1234\")"
+							]
 						},
 						{
 							"signature": "toString(showingSign style: SignStyle) -> String",
@@ -411,7 +439,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"expect 3::toString(showingSign #Always)::is(\"+3\")\nexpect 0::toString(showingSign #Always)::is(\"+0\")\nexpect -3::toString(showingSign #Always)::is(\"-3\")"
+							]
 						},
 						{
 							"signature": "toString(inBase base: Integer) -> String",
@@ -426,7 +456,9 @@
 								}
 							],
 							"returns": "the String representation of the Integer.",
-							"examples": []
+							"examples": [
+								"expect 255::toString(inBase 16)::is(\"ff\")\nexpect -5::toString(inBase 2)::is(\"-101\")"
+							]
 						}
 					]
 				}
@@ -462,7 +494,9 @@
 								}
 							],
 							"returns": "the sum.",
-							"examples": []
+							"examples": [
+								"expect 2::add(3)::is(5)\nexpect 2::add(-5)::is(-3)"
+							]
 						},
 						{
 							"signature": "add(_ other: Rational) -> Rational",
@@ -477,7 +511,7 @@
 								}
 							],
 							"returns": "the sum.",
-							"examples": []
+							"examples": ["expect 1::add(1/2)::is(3/2)"]
 						},
 						{
 							"signature": "add(_ other: Algebraic) -> Algebraic",
@@ -492,7 +526,9 @@
 								}
 							],
 							"returns": "the exact sum.",
-							"examples": []
+							"examples": [
+								"match 2::squareRoot() -> {} {\n\tcase Algebraic { expect 1::add(@)::toString()::is(\"1 + √2\") }\n\tcase Integer { expect false }\n}"
+							]
 						},
 						{
 							"signature": "add(_ other: Transcendental) -> Transcendental",
@@ -537,7 +573,7 @@
 								}
 							],
 							"returns": "the sum, which is above zero.",
-							"examples": []
+							"examples": ["expect 0::add(5)::is(5)"]
 						},
 						{
 							"signature": "add(_ other: NonNegativeInteger) -> NonNegativeInteger",
@@ -552,7 +588,9 @@
 								}
 							],
 							"returns": "the sum, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant finished: NonNegativeInteger = 3\nconstant remaining: NonNegativeInteger = 4\n\nexpect finished::add(remaining)::is(7)"
+							]
 						}
 					]
 				},
@@ -582,7 +620,9 @@
 								}
 							],
 							"returns": "the sum, which is above zero.",
-							"examples": []
+							"examples": [
+								"expect 2::add(3)::is(5)\nexpect 2::add(0)::is(2)"
+							]
 						}
 					]
 				},
@@ -612,7 +652,7 @@
 								}
 							],
 							"returns": "the difference.",
-							"examples": []
+							"examples": ["expect 5::subtract(8)::is(-3)"]
 						},
 						{
 							"signature": "subtract(_ other: Rational) -> Rational",
@@ -627,7 +667,7 @@
 								}
 							],
 							"returns": "the difference.",
-							"examples": []
+							"examples": ["expect 1::subtract(1/4)::is(3/4)"]
 						},
 						{
 							"signature": "subtract(_ other: Algebraic) -> Algebraic",
@@ -642,7 +682,9 @@
 								}
 							],
 							"returns": "the exact difference.",
-							"examples": []
+							"examples": [
+								"match 2::squareRoot() -> {} {\n\tcase Algebraic { expect 3::subtract(@)::toString()::is(\"3 − √2\") }\n\tcase Integer { expect false }\n}"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Transcendental) -> Transcendental",
@@ -687,7 +729,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"expect 6::multiply(with 7)::is(42)\nexpect 6::multiply(with -7)::is(-42)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Rational) -> Rational",
@@ -702,7 +746,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"expect 3::multiply(with 1/2)::is(3/2)\nexpect 4::multiply(with 1/2)::is(2)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Algebraic) -> Algebraic | Rational",
@@ -717,7 +763,9 @@
 								}
 							],
 							"returns": "the exact product, an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"match 2::squareRoot() -> {} {\n\tcase Algebraic {\n\t\texpect 3::multiply(with @)::toString()::is(\"3·√2\")\n\t\texpect 0::multiply(with @)::toString()::is(\"0\")\n\t}\n\n\tcase Integer { expect false }\n}"
+							]
 						},
 						{
 							"signature": "multiply(with other: Transcendental) -> Transcendental | Rational",
@@ -762,7 +810,7 @@
 								}
 							],
 							"returns": "the product, which is not zero.",
-							"examples": []
+							"examples": ["expect -3::multiply(with 4)::is(-12)"]
 						},
 						{
 							"signature": "multiply(with other: Algebraic) -> Algebraic",
@@ -777,7 +825,9 @@
 								}
 							],
 							"returns": "the exact product.",
-							"examples": []
+							"examples": [
+								"match 2::squareRoot() -> {} {\n\tcase Algebraic {\n\t\texpect 3::multiply(with @)::toString()::is(\"3·√2\")\n\t}\n\n\tcase Integer { expect false }\n}"
+							]
 						},
 						{
 							"signature": "multiply(with other: Transcendental) -> Transcendental",
@@ -822,7 +872,9 @@
 								}
 							],
 							"returns": "the product, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant rows: NonNegativeInteger = 3\n\nexpect rows::multiply(with 4)::is(12)"
+							]
 						}
 					]
 				},
@@ -852,7 +904,7 @@
 								}
 							],
 							"returns": "the product, which is above zero.",
-							"examples": []
+							"examples": ["expect 6::multiply(with 7)::is(42)"]
 						}
 					]
 				},
@@ -882,7 +934,9 @@
 								}
 							],
 							"returns": "the exact quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect 10::divide(by guests)::is(5/2)\nexpect 10::divide(by 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Rational) -> Optional<Rational>",
@@ -897,7 +951,9 @@
 								}
 							],
 							"returns": "the exact quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant share: Rational = 2/3\n\nexpect 1::divide(by share)::is(3/2)\nexpect 1::divide(by 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Algebraic) -> Algebraic | Rational",
@@ -912,7 +968,9 @@
 								}
 							],
 							"returns": "the exact quotient, an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"match 2::squareRoot() -> {} {\n\tcase Algebraic {\n\t\texpect 2::divide(by @)::toString()::is(\"√2\")\n\t\texpect 0::divide(by @)::toString()::is(\"0\")\n\t}\n\n\tcase Integer { expect false }\n}"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroInteger) -> Rational",
@@ -927,7 +985,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect 7::divide(by 2)::is(7/2)\nexpect 6::divide(by -3)::is(-2)"
+							]
 						},
 						{
 							"signature": "divide(by other: Integer, defaultingTo fallback: Rational) -> Rational",
@@ -949,7 +1009,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect 10::divide(by guests, defaultingTo 0/1)::is(5/2)\nexpect 10::divide(by 0, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: Rational, defaultingTo fallback: Rational) -> Rational",
@@ -971,7 +1033,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant share: Rational = 2/3\n\nexpect 1::divide(by share, defaultingTo 0/1)::is(3/2)\nexpect 1::divide(by 0/1, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroRational) -> Rational",
@@ -986,7 +1050,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect 3::divide(by 3/4)::is(4)\nexpect 1::divide(by 2/3)::is(3/2)"
+							]
 						}
 					]
 				},
@@ -1016,7 +1082,9 @@
 								}
 							],
 							"returns": "the exact quotient, which is not zero.",
-							"examples": []
+							"examples": [
+								"expect 6::divide(by 4)::is(3/2)\nexpect 6::divide(by 4)::reciprocal()::is(2/3)"
+							]
 						}
 					]
 				},
@@ -1046,7 +1114,9 @@
 								}
 							],
 							"returns": "the remainder, or nothing when dividing by zero.",
-							"examples": []
+							"examples": [
+								"constant teamSize: Integer = 3\n\nexpect 7::remainder(dividingBy teamSize)::is(1)\nexpect 7::remainder(dividingBy 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "remainder(dividingBy divisor: NonZeroInteger) -> Integer",
@@ -1061,7 +1131,9 @@
 								}
 							],
 							"returns": "the remainder.",
-							"examples": []
+							"examples": [
+								"expect 7::remainder(dividingBy 3)::is(1)\nexpect -7::remainder(dividingBy 3)::is(2)"
+							]
 						},
 						{
 							"signature": "remainder(\n\tdividingBy divisor: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1083,7 +1155,9 @@
 								}
 							],
 							"returns": "the remainder, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant teamSize: Integer = 3\n\nexpect 7::remainder(dividingBy teamSize, defaultingTo 0)::is(1)\nexpect 7::remainder(dividingBy 0, defaultingTo 0)::is(0)"
+							]
 						},
 						{
 							"signature": "remainder(dividingBy divisor: NonZeroInteger, as kind: Division) -> Integer",
@@ -1105,7 +1179,9 @@
 								}
 							],
 							"returns": "the remainder.",
-							"examples": []
+							"examples": [
+								"expect -7::remainder(dividingBy 3, as #Truncating)::is(-1)\nexpect -7::remainder(dividingBy 3, as #Euclidean)::is(2)"
+							]
 						}
 					]
 				},
@@ -1135,7 +1211,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when dividing by zero.",
-							"examples": []
+							"examples": [
+								"constant teamSize: Integer = 3\n\nexpect 7::quotient(dividingBy teamSize)::is(2)\nexpect 7::quotient(dividingBy 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "quotient(dividingBy divisor: NonZeroInteger) -> Integer",
@@ -1150,7 +1228,9 @@
 								}
 							],
 							"returns": "the quotient.",
-							"examples": []
+							"examples": [
+								"expect 7::quotient(dividingBy 3)::is(2)\nexpect -7::quotient(dividingBy 3)::is(-3)"
+							]
 						},
 						{
 							"signature": "quotient(\n\tdividingBy divisor: Integer,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1172,7 +1252,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant teamSize: Integer = 3\n\nexpect 7::quotient(dividingBy teamSize, defaultingTo 0)::is(2)\nexpect 7::quotient(dividingBy 0, defaultingTo 0)::is(0)"
+							]
 						},
 						{
 							"signature": "quotient(\n\tdividingBy divisor: NonZeroInteger,\n\ttoward direction: Rounding,\n) -> Integer",
@@ -1194,7 +1276,9 @@
 								}
 							],
 							"returns": "the quotient.",
-							"examples": []
+							"examples": [
+								"expect 7::quotient(dividingBy 2, toward #Up)::is(4)\nexpect -7::quotient(dividingBy 2, toward #TowardZero)::is(-3)"
+							]
 						}
 					]
 				},
@@ -1224,7 +1308,9 @@
 								}
 							],
 							"returns": "the power, or nothing when raising zero to a negative power.",
-							"examples": []
+							"examples": [
+								"constant base: Integer = 10\n\nexpect base::raise(to 3)::is(1000)\nexpect base::raise(to -2)::is(1/100)\nexpect 0::raise(to -1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "raise(\n\tto exponent: Integer,\n\tdefaultingTo fallback: Integer | Rational,\n) -> Integer | Rational",
@@ -1246,7 +1332,9 @@
 								}
 							],
 							"returns": "the power, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant base: Integer = 10\n\nexpect base::raise(to -1, defaultingTo 0)::is(1/10)\nexpect 0::raise(to -1, defaultingTo 0)::is(0)"
+							]
 						},
 						{
 							"signature": "raise(to exponent: NonNegativeInteger) -> Integer",
@@ -1261,7 +1349,9 @@
 								}
 							],
 							"returns": "the power.",
-							"examples": []
+							"examples": [
+								"expect 3::raise(to 4)::is(81)\nexpect 0::raise(to 0)::is(1)"
+							]
 						}
 					]
 				},
@@ -1291,7 +1381,9 @@
 								}
 							],
 							"returns": "the power.",
-							"examples": []
+							"examples": [
+								"expect 2::raise(to -2)::is(1/4)\nexpect -2::raise(to -1)::is(-1/2)"
+							]
 						},
 						{
 							"signature": "raise(to exponent: NonNegativeInteger) -> Integer",
@@ -1306,7 +1398,9 @@
 								}
 							],
 							"returns": "the power.",
-							"examples": []
+							"examples": [
+								"expect -2::raise(to 3)::is(-8)\nexpect -2::raise(to 0)::is(1)"
+							]
 						}
 					]
 				},
@@ -1336,7 +1430,9 @@
 								}
 							],
 							"returns": "the power, which is above zero.",
-							"examples": []
+							"examples": [
+								"expect 2::raise(to 10)::is(1024)\nexpect 5::raise(to 0)::is(1)"
+							]
 						}
 					]
 				},
@@ -1358,7 +1454,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the root, or nothing for a negative Integer.",
-							"examples": []
+							"examples": [
+								"constant area: Integer = 9\n\nexpect area::squareRoot()::is(3)\nexpect -4::squareRoot()::isEmpty()"
+							]
 						},
 						{
 							"signature": "squareRoot(\n\tdefaultingTo fallback: Integer | Algebraic,\n) -> Integer | Algebraic",
@@ -1373,7 +1471,9 @@
 								}
 							],
 							"returns": "the root, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant area: Integer = 9\n\nexpect area::squareRoot(defaultingTo 0)::is(3)\nexpect -4::squareRoot(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1395,7 +1495,9 @@
 							"summary": "Answers the exact square root of this NonNegativeInteger.\n\nA negative Integer is the only one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A perfect square answers an Integer, and every other value answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the root.",
-							"examples": []
+							"examples": [
+								"constant area: NonNegativeInteger = 49\n\nexpect area::squareRoot()::is(7)\nexpect 0::squareRoot()::is(0)"
+							]
 						}
 					]
 				},
@@ -1417,7 +1519,9 @@
 							"summary": "Answers the exact square root of this PositiveInteger.\n\nA perfect square above zero has a root above zero, and every other value answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the root.",
-							"examples": []
+							"examples": [
+								"expect 49::squareRoot()::is(7)\nexpect 2::squareRoot()::toString()::is(\"√2\")"
+							]
 						}
 					]
 				}
@@ -1453,7 +1557,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is below the other.",
-							"examples": []
+							"examples": [
+								"expect 1::isLessThan(2)\nexpect 2::isLessThan(2)::negate()"
+							]
 						},
 						{
 							"signature": "isLessThan(_ other: Rational) -> Boolean",
@@ -1468,7 +1574,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is below the Rational.",
-							"examples": []
+							"examples": [
+								"expect 1::isLessThan(3/2)\nexpect 2::isLessThan(3/2)::negate()"
+							]
 						}
 					]
 				},
@@ -1498,7 +1606,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is not above the other.",
-							"examples": []
+							"examples": [
+								"expect 2::isLessThanOrEqualTo(2)\nexpect 3::isLessThanOrEqualTo(2)::negate()"
+							]
 						},
 						{
 							"signature": "isLessThanOrEqualTo(_ other: Rational) -> Boolean",
@@ -1513,7 +1623,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is not above the Rational.",
-							"examples": []
+							"examples": [
+								"expect 2::isLessThanOrEqualTo(4/2)\nexpect 2::isLessThanOrEqualTo(3/2)::negate()"
+							]
 						}
 					]
 				},
@@ -1543,7 +1655,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is above the other.",
-							"examples": []
+							"examples": [
+								"expect 3::isGreaterThan(2)\nexpect 2::isGreaterThan(2)::negate()"
+							]
 						},
 						{
 							"signature": "isGreaterThan(_ other: Rational) -> Boolean",
@@ -1558,7 +1672,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is above the Rational.",
-							"examples": []
+							"examples": [
+								"expect 2::isGreaterThan(3/2)\nexpect 1::isGreaterThan(3/2)::negate()"
+							]
 						}
 					]
 				},
@@ -1588,7 +1704,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is not below the other.",
-							"examples": []
+							"examples": [
+								"expect 2::isGreaterThanOrEqualTo(2)\nexpect 1::isGreaterThanOrEqualTo(2)::negate()"
+							]
 						},
 						{
 							"signature": "isGreaterThanOrEqualTo(_ other: Rational) -> Boolean",
@@ -1603,7 +1721,9 @@
 								}
 							],
 							"returns": "`true` when this Integer is not below the Rational.",
-							"examples": []
+							"examples": [
+								"expect 2::isGreaterThanOrEqualTo(4/2)\nexpect 1::isGreaterThanOrEqualTo(3/2)::negate()"
+							]
 						}
 					]
 				},
@@ -1705,7 +1825,9 @@
 							"summary": "Answers whether the Integer is divisible by two.\n\nZero is even.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 4::isEven()\nexpect 0::isEven()\nexpect 7::isEven()::negate()"
+							]
 						}
 					]
 				},
@@ -1727,7 +1849,9 @@
 							"summary": "Answers whether the Integer is not divisible by two.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 7::isOdd()\nexpect -3::isOdd()\nexpect 4::isOdd()::negate()"
+							]
 						}
 					]
 				},
@@ -1749,7 +1873,9 @@
 							"summary": "Answers whether the Integer is above zero.\n\nZero is neither positive nor negative.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 5::isPositive()\nexpect 0::isPositive()::negate()"
+							]
 						}
 					]
 				},
@@ -1771,7 +1897,9 @@
 							"summary": "Answers whether the Integer is below zero.\n\nZero is neither positive nor negative.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect -5::isNegative()\nexpect 0::isNegative()::negate()"
+							]
 						}
 					]
 				},
@@ -1793,7 +1921,9 @@
 							"summary": "Answers whether the Integer is exactly zero.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 0::isZero()\nexpect 3::isZero()::negate()"
+							]
 						}
 					]
 				},
@@ -1815,7 +1945,7 @@
 							"summary": "Answers whether the Integer is a whole number.\n\nEvery Integer is whole, so the answer is always `true`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": ["expect 7::isWholeNumber()"]
 						}
 					]
 				},
@@ -1845,7 +1975,9 @@
 								}
 							],
 							"returns": "`true` when the division leaves no remainder.",
-							"examples": []
+							"examples": [
+								"expect 12::isMultiple(of 4)\nexpect 0::isMultiple(of 7)\nexpect 12::isMultiple(of 0)::negate()"
+							]
 						}
 					]
 				},
@@ -1867,7 +1999,9 @@
 							"summary": "Answers whether the Integer has exactly two whole divisors above zero.\n\nTwo is the lowest prime. Zero, one and every negative Integer are not prime. The test is a Miller-Rabin test over the first twelve primes as witnesses. It decides every Integer below 3317044064679887385961981 exactly. A larger Integer it accepts is a strong probable prime to those twelve witnesses.",
 							"parameters": [],
 							"returns": "`true` when the Integer is prime.",
-							"examples": []
+							"examples": [
+								"expect 97::isPrime()\nexpect 2::isPrime()\nexpect 1::isPrime()::negate()"
+							]
 						}
 					]
 				}
@@ -1895,7 +2029,9 @@
 							"summary": "Answers the Integer without its sign, which is its distance from zero.",
 							"parameters": [],
 							"returns": "the distance, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect -7::absolute()::is(7)\nexpect 0::absolute()::is(0)"
+							]
 						}
 					]
 				},
@@ -1917,7 +2053,7 @@
 							"summary": "Answers this NonZeroInteger without its sign, which is its distance from zero.\n\nThe receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveInteger.",
 							"parameters": [],
 							"returns": "the distance, which is above zero.",
-							"examples": []
+							"examples": ["expect -7::absolute()::is(7)"]
 						}
 					]
 				},
@@ -1939,7 +2075,9 @@
 							"summary": "Answers the Integer with its sign flipped.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 7::negate()::is(-7)\nexpect -7::negate()::is(7)"
+							]
 						}
 					]
 				},
@@ -1961,7 +2099,9 @@
 							"summary": "Answers this NonZeroInteger with its sign flipped.\n\nNegation keeps a value away from zero, so the answer is a NonZeroInteger too.",
 							"parameters": [],
 							"returns": "the negation, which is not zero.",
-							"examples": []
+							"examples": [
+								"expect 7::negate()::is(-7)\nexpect -7::negate()::is(7)"
+							]
 						}
 					]
 				},
@@ -1991,7 +2131,9 @@
 								}
 							],
 							"returns": "the Integer itself.",
-							"examples": []
+							"examples": [
+								"expect 7::round()::is(7)\nexpect 7::round(toward #Up)::is(7)"
+							]
 						},
 						{
 							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Integer",
@@ -2013,7 +2155,9 @@
 								}
 							],
 							"returns": "the Integer itself.",
-							"examples": []
+							"examples": [
+								"expect 1234::round(toPlaces 2)::is(1234)"
+							]
 						}
 					]
 				},
@@ -2050,7 +2194,9 @@
 								}
 							],
 							"returns": "the Integer itself, as a Rational.",
-							"examples": []
+							"examples": [
+								"expect 3::approximate(toPlaces 2)::is(3)"
+							]
 						}
 					]
 				}
@@ -2086,7 +2232,9 @@
 								}
 							],
 							"returns": "the greatest common divisor, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect 12::greatestCommonDivisor(with 18)::is(6)\nexpect -4::greatestCommonDivisor(with 6)::is(2)\nexpect 0::greatestCommonDivisor(with -5)::is(5)"
+							]
 						}
 					]
 				},
@@ -2116,7 +2264,9 @@
 								}
 							],
 							"returns": "the least common multiple, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect 4::leastCommonMultiple(with 6)::is(12)\nexpect -4::leastCommonMultiple(with 6)::is(12)\nexpect 0::leastCommonMultiple(with 6)::is(0)"
+							]
 						}
 					]
 				},
@@ -2138,7 +2288,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the factorial, or nothing for a negative Integer.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect guests::factorial()::is(24)\nexpect -1::factorial()::isEmpty()"
+							]
 						},
 						{
 							"signature": "factorial(defaultingTo fallback: Integer) -> Integer",
@@ -2153,7 +2305,9 @@
 								}
 							],
 							"returns": "the factorial, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect guests::factorial(defaultingTo 0)::is(24)\nexpect -1::factorial(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -2175,7 +2329,9 @@
 							"summary": "Answers the product of every Integer from one up to this NonNegativeInteger.\n\nA negative Integer is the one receiver with no factorial, and the receiver is proven not to be one. So the answer is the factorial itself rather than an Optional. The factorial of zero is one.",
 							"parameters": [],
 							"returns": "the factorial, which is above zero.",
-							"examples": []
+							"examples": [
+								"expect 5::factorial()::is(120)\nexpect 0::factorial()::is(1)"
+							]
 						}
 					]
 				}
@@ -2203,7 +2359,9 @@
 							"summary": "Answers the Integer as a Rational.\n\nEvery Integer is a Rational over one, so the crossing never fails. The Rational is whole, and prints as the digits alone.",
 							"parameters": [],
 							"returns": "the Rational holding this value.",
-							"examples": []
+							"examples": [
+								"expect 3::toRational()::is(3/1)\nexpect 3::toRational()::toString()::is(\"3\")"
+							]
 						}
 					]
 				}

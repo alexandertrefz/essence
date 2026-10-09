@@ -50,7 +50,9 @@
 								}
 							],
 							"returns": "`true` when the numbers are equal.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant rootFive = golden::multiply(with 2)::subtract(1)\n\nexpect rootFive::is(golden::subtract(1/2)::multiply(with 2))\nexpect rootFive::is(golden)::negate()"
+							]
 						}
 					]
 				},
@@ -80,7 +82,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant rootFive = golden::multiply(with 2)::subtract(1)\n\nexpect golden::compare(to rootFive)::is(#Less)\nexpect rootFive::compare(to golden::add(1/2))::is(#Greater)"
+							]
 						}
 					]
 				},
@@ -102,7 +106,9 @@
 							"summary": "Answers the Algebraic as a String, in the exact symbolic form: `√2`, `3·√2` or `1 + √2`.\n\nOne radical has one printed form, with one exception. Normalisation divides out square factors up to 65536, so a radicand `p²·q` with both primes above that is printed as written. The equal `p·√q` prints in the normalised form.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::toString()::is(\"√2\")\nexpect 18::squareRoot()::toString()::is(\"3·√2\")\nexpect Number.GoldenRatio::toString()::is(\"1/2 + 1/2·√5\")"
+							]
 						},
 						{
 							"signature": "toString(as format: NumberFormat) -> String",
@@ -117,7 +123,9 @@
 								}
 							],
 							"returns": "the String representation of the Algebraic.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::toString(as #Decimal)::starts(with \"1.41421356237\")\nexpect root::toString(as #Decimal)::length()::is(82)\nexpect root::toString(as #Fraction)::is(\"√2\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -146,7 +154,9 @@
 								}
 							],
 							"returns": "the String representation of the Algebraic.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::toString(as #Decimal, toPlaces 3)::is(\"1.414\")\nexpect root::toString(as #Decimal, toPlaces 3, toward #Up)::is(\"1.415\")\nexpect root::toString(as #Percent, toPlaces 1)::is(\"141.4%\")"
+							]
 						}
 					]
 				},
@@ -212,7 +222,9 @@
 								}
 							],
 							"returns": "the exact sum.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::add(1)::toString()::is(\"1 + √2\")\nexpect 2::squareRoot()::add(-1)::toString()::is(\"-1 + √2\")"
+							]
 						},
 						{
 							"signature": "add(_ other: Rational) -> Algebraic",
@@ -227,7 +239,9 @@
 								}
 							],
 							"returns": "the exact sum.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::add(1/2)::toString()::is(\"1/2 + √2\")"
+							]
 						},
 						{
 							"signature": "add(_ other: Algebraic) -> Optional<Rational | Algebraic>",
@@ -242,7 +256,9 @@
 								}
 							],
 							"returns": "the sum, or nothing when the radicals differ.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant conjugate = golden::negate()::add(1)\n\nexpect golden::add(golden)::is(golden::multiply(with 2))\nexpect golden::add(conjugate)::is(1/1)"
+							]
 						},
 						{
 							"signature": "add(\n\t_ other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -264,7 +280,9 @@
 								}
 							],
 							"returns": "the sum, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::add(golden, defaultingTo 0/1)::toString()::is(\"1 + √5\")"
+							]
 						}
 					]
 				},
@@ -294,7 +312,9 @@
 								}
 							],
 							"returns": "the exact difference.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::subtract(1)::toString()::is(\"-1 + √2\")"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Rational) -> Algebraic",
@@ -309,7 +329,9 @@
 								}
 							],
 							"returns": "the exact difference.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::subtract(1/2)::toString()::is(\"-1/2 + √2\")"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Algebraic) -> Optional<Rational | Algebraic>",
@@ -324,7 +346,9 @@
 								}
 							],
 							"returns": "the difference, or nothing when the radicals differ.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::subtract(golden::multiply(with 2))::is(golden::negate())\nexpect golden::subtract(golden::subtract(1))::is(1/1)"
+							]
 						},
 						{
 							"signature": "subtract(\n\t_ other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -346,7 +370,9 @@
 								}
 							],
 							"returns": "the difference, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant smaller = golden::subtract(1)\n\nexpect golden::subtract(smaller, defaultingTo 0/1)::is(1)"
+							]
 						}
 					]
 				},
@@ -376,7 +402,9 @@
 								}
 							],
 							"returns": "the exact product, an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\nconstant copies = 3\n\nexpect root::multiply(with copies)::toString()::is(\"3·√2\")\nexpect root::multiply(with 0)::is(0)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Rational) -> Algebraic | Rational",
@@ -391,7 +419,9 @@
 								}
 							],
 							"returns": "the exact product, an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\nconstant half = 1/2\n\nexpect root::multiply(with half)::toString()::is(\"1/2·√2\")\nexpect root::multiply(with 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Algebraic) -> Optional<Rational | Algebraic>",
@@ -406,7 +436,9 @@
 								}
 							],
 							"returns": "the product, or nothing when there is none.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::multiply(with golden)::is(golden::add(1))\nexpect golden::multiply(with golden::subtract(1))::is(1/1)"
+							]
 						},
 						{
 							"signature": "multiply(\n\twith other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -428,7 +460,9 @@
 								}
 							],
 							"returns": "the product, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant squared = golden::multiply(with golden, defaultingTo 0/1)\n\nexpect squared::is(golden::add(1))"
+							]
 						},
 						{
 							"signature": "multiply(with other: NonZeroInteger) -> Algebraic",
@@ -443,7 +477,9 @@
 								}
 							],
 							"returns": "the exact product.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::multiply(with 3)::toString()::is(\"3·√2\")\nexpect Number.GoldenRatio::multiply(with 2)::toString()::is(\"1 + √5\")"
+							]
 						},
 						{
 							"signature": "multiply(with other: NonZeroRational) -> Algebraic",
@@ -458,7 +494,9 @@
 								}
 							],
 							"returns": "the exact product.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::multiply(with 1/2)::toString()::is(\"1/2·√2\")"
+							]
 						}
 					]
 				},
@@ -488,7 +526,9 @@
 								}
 							],
 							"returns": "the exact quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant divisor = 2\n\nexpect golden::divide(by divisor)::is(golden::multiply(with 1/2))\nexpect golden::divide(by 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Rational) -> Optional<Algebraic>",
@@ -503,7 +543,9 @@
 								}
 							],
 							"returns": "the exact quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant half = 1/2\n\nexpect golden::divide(by half)::is(golden::multiply(with 2))\nexpect golden::divide(by 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Algebraic) -> Optional<Rational | Algebraic>",
@@ -518,7 +560,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when there is none.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::divide(by golden)::is(1/1)\nexpect golden::divide(by golden::subtract(1))::is(golden::add(1))"
+							]
 						},
 						{
 							"signature": "divide(by other: Integer, defaultingTo fallback: Algebraic) -> Algebraic",
@@ -540,7 +584,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant halved = golden::multiply(with 1/2)\nconstant divisor = 2\n\nexpect golden::divide(by divisor, defaultingTo golden)::is(halved)\nexpect golden::divide(by 0, defaultingTo golden)::is(golden)"
+							]
 						},
 						{
 							"signature": "divide(\n\tby other: Rational,\n\tdefaultingTo fallback: Algebraic,\n) -> Algebraic",
@@ -562,7 +608,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\nconstant doubled = golden::multiply(with 2)\nconstant half = 1/2\n\nexpect golden::divide(by half, defaultingTo golden)::is(doubled)\nexpect golden::divide(by 0/1, defaultingTo golden)::is(golden)"
+							]
 						},
 						{
 							"signature": "divide(\n\tby other: Algebraic,\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -584,7 +632,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::divide(by golden, defaultingTo 0/1)::is(1)"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroInteger) -> Algebraic",
@@ -599,7 +649,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::divide(by 2)::toString()::is(\"1/2·√2\")"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroRational) -> Algebraic",
@@ -614,7 +666,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::divide(by 1/2)::toString()::is(\"2·√2\")"
+							]
 						}
 					]
 				},
@@ -644,7 +698,9 @@
 								}
 							],
 							"returns": "the exact power, an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::raise(to 2)::is(2)\nexpect root::raise(to 3)::toString()::is(\"2·√2\")\nexpect root::raise(to -2)::is(1/2)"
+							]
 						}
 					]
 				}
@@ -872,7 +928,9 @@
 							"summary": "Answers whether the Algebraic is above zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::subtract(1.4142)::isPositive()\nexpect root::subtract(1.4143)::isPositive()::negate()"
+							]
 						}
 					]
 				},
@@ -894,7 +952,9 @@
 							"summary": "Answers whether the Algebraic is below zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::subtract(1.4143)::isNegative()\nexpect root::isNegative()::negate()"
+							]
 						}
 					]
 				},
@@ -916,7 +976,9 @@
 							"summary": "Answers whether the Algebraic is exactly zero.\n\nAn Algebraic carries a radical with a coefficient that is not zero, so the answer is always `false`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::isZero()::negate()"
+							]
 						}
 					]
 				},
@@ -938,7 +1000,9 @@
 							"summary": "Answers whether the Algebraic is a whole number.\n\nAn Algebraic is irrational, so it is never whole and the answer is always `false`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 2::squareRoot()::isWholeNumber()::negate()"
+							]
 						}
 					]
 				}
@@ -966,7 +1030,9 @@
 							"summary": "Answers the Algebraic without its sign, which is its distance from zero.\n\nThe sign of `a + b·√d` is exactly decidable. No approximation is consulted.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::negate()::absolute()::is(root)\nexpect root::subtract(2)::absolute()::is(root::negate()::add(2))"
+							]
 						}
 					]
 				},
@@ -988,7 +1054,9 @@
 							"summary": "Answers the Algebraic with its sign flipped.\n\nNegating an irrational leaves it irrational, so the answer is again an Algebraic.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::negate()::toString()::is(\"-√2\")\nexpect root::negate()::negate()::is(root)"
+							]
 						}
 					]
 				},
@@ -1025,7 +1093,9 @@
 								}
 							],
 							"returns": "the value on the grid the width names.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::approximate(toPlaces 5)::is(1.41421)\nexpect root::approximate(toPlaces 2, toward #Up)::is(1.42)\nexpect root::approximate(toPlaces 0)::is(1/1)"
+							]
 						}
 					]
 				},
@@ -1055,7 +1125,9 @@
 								}
 							],
 							"returns": "the rounded Integer.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::round()::is(1)\nexpect root::round(toward #Up)::is(2)"
+							]
 						},
 						{
 							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
@@ -1077,7 +1149,9 @@
 								}
 							],
 							"returns": "the rounded Rational.",
-							"examples": []
+							"examples": [
+								"constant root = 2::squareRoot()\n\nexpect root::round(toPlaces 2)::is(1.41)\nexpect root::round(toPlaces 2, toward #Up)::is(1.42)\nexpect root::round(toPlaces 0)::is(1/1)"
+							]
 						}
 					]
 				},
@@ -1099,7 +1173,9 @@
 							"summary": "Answers the power of ten at or below the Algebraic's distance from zero.\n\nThis is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. That always happens: an Algebraic is irrational, so it is never a power of ten itself.",
 							"parameters": [],
 							"returns": "the exponent of the power of ten the value falls on.",
-							"examples": []
+							"examples": [
+								"constant golden = Number.GoldenRatio\n\nexpect golden::decimalExponent()::is(0)\nexpect golden::subtract(1)::decimalExponent()::is(-1)\nexpect golden::multiply(with 10)::decimalExponent()::is(1)"
+							]
 						}
 					]
 				}

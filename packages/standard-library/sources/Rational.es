@@ -123,6 +123,12 @@ declarations {
 		overload static of {
 			§§ Builds the Rational from two Integers, with nothing known about either.
 			§§
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect Rational.of(3, over guests)::is(3/4)
+			§§   expect Rational.of(3, over 0)::isEmpty()
+			§§
 			§§ @param _ — the numerator
 			§§ @param over — the denominator
 			§§ @returns — the Rational, or nothing when the denominator is zero.
@@ -135,12 +141,21 @@ declarations {
 			§§
 			§§ There is no failure to report, so the Rational itself is the answer.
 			§§
+			§§ @example
+			§§   expect Rational.of(6, over 8)::is(3/4)
+			§§
 			§§ @param _ — the numerator
 			§§ @param over — the denominator, proven not to be zero
 			§§ @returns — the Rational.
 			(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational
 
 			§§ Builds the Rational from two Integers, with a value to answer when the denominator is zero.
+			§§
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect Rational.of(3, over guests, defaultingTo 0/1)::is(3/4)
+			§§   expect Rational.of(3, over 0, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param _ — the numerator
 			§§ @param over — the denominator
@@ -317,6 +332,10 @@ declarations {
 		overload is {
 			§§ Answers whether the Rational has the same value as another Rational.
 			§§
+			§§ @example
+			§§   expect 1/2::is(2/4)
+			§§   expect 1/2::is(1/3)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when both are equal.
 			(_ other: Rational) -> Boolean {
@@ -324,6 +343,10 @@ declarations {
 			}
 
 			§§ Answers whether the Rational has the same value as an Integer.
+			§§
+			§§ @example
+			§§   expect 6/3::is(2)
+			§§   expect 5/2::is(2)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is whole and its numerator is that Integer.
@@ -343,6 +366,10 @@ declarations {
 		overload isNot {
 			§§ Answers whether the Rational differs from another Rational.
 			§§
+			§§ @example
+			§§   expect 1/2::isNot(1/3)
+			§§   expect 1/2::isNot(2/4)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Rational) -> Boolean {
@@ -350,6 +377,10 @@ declarations {
 			}
 
 			§§ Answers whether the Rational differs from an Integer.
+			§§
+			§§ @example
+			§§   expect 5/2::isNot(2)
+			§§   expect 6/3::isNot(2)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the two differ.
@@ -359,6 +390,10 @@ declarations {
 		}
 
 		§§ Orders the Rational against another Rational.
+		§§
+		§§ @example
+		§§   expect 1/2::compare(to 2/3)::is(#Less)
+		§§   expect 2/4::compare(to 1/2)::is(#Equal)
 		§§
 		§§ @param to — the Rational to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -373,6 +408,10 @@ declarations {
 			§§ Answers the Rational as a fraction, in lowest terms.
 			§§
 			§§ The form is `3/4`. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1`.
+			§§
+			§§ @example
+			§§   expect 3/4::toString()::is("3/4")
+			§§   expect 1/2::add(1/2)::toString()::is("1")
 			§§
 			§§ @returns — the String representation of the Rational.
 			() -> String {
@@ -397,6 +436,11 @@ declarations {
 			§§
 			§§ The `#Decimal` format writes the expansion, to at most 80 digits, and the `#Fraction` format writes `3/4`. A whole Rational prints its numerator alone in either. The `#Percent` format writes that same expansion of one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point and the power of ten as an exponent, so `1234` is `1.234e3` and zero is `0e0`.
 			§§
+			§§ @example
+			§§   expect 3/4::toString(as #Decimal)::is("0.75")
+			§§   expect 3/4::toString(as #Percent)::is("75%")
+			§§   expect 1234/1::toString(as #Scientific)::is("1.234e3")
+			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @returns — the String representation of the Rational.
 			(as format: NumberFormat) -> String
@@ -415,6 +459,11 @@ declarations {
 			§§ Answers the Rational in the named format, with exactly that many places.
 			§§
 			§§ The digits are padded with zeroes where the expansion is shorter, so `1/2` over two places is `0.50`. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given, so `1/8` is `0.13`. A count below one rounds to a whole number, and no point is written. The count has no ceiling. The `#Percent` and `#Scientific` formats take the count the same way, so `1/8` over one place is `12.5%` and `1234` over two is `1.23e3`. The `#Fraction` format ignores both the count and the direction.
+			§§
+			§§ @example
+			§§   expect 1/2::toString(as #Decimal, toPlaces 2)::is("0.50")
+			§§   expect 1/8::toString(as #Decimal, toPlaces 2)::is("0.13")
+			§§   expect 1/8::toString(as #Decimal, toPlaces 2, toward #Down)::is("0.12")
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param toPlaces — how many digits to write after the point
@@ -438,6 +487,12 @@ declarations {
 			§§
 			§§ The separator goes between every three digits before the point, counted from the right, so `1234567` is `1,234,567` under a comma. The scientific form writes one digit before the point and takes no separator. The fraction form groups the numerator and the denominator alike.
 			§§
+			§§ @example
+			§§   constant price = 12345/2
+			§§
+			§§   expect price::toString(as #Decimal, groupingWith ",")::is("6,172.5")
+			§§   expect price::toString(as #Fraction, groupingWith ",")::is("12,345/2")
+			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param groupingWith — the text to write between the digit groups
 			§§ @returns — the String representation of the Rational.
@@ -446,6 +501,15 @@ declarations {
 			§§ Answers the Rational in the named format, with that many places and a separator between the digit groups.
 			§§
 			§§ The count and the direction reach the format exactly as they do without a separator, so `1234567/1` over two places is `1,234,567.00` under a comma. Only the digits before the point are grouped.
+			§§
+			§§ @example
+			§§   constant label = 12345/2::toString(
+			§§   	as #Decimal,
+			§§   	toPlaces 2,
+			§§   	groupingWith ",",
+			§§   )
+			§§
+			§§   expect label::is("6,172.50")
 			§§
 			§§ @param as — the form to represent the Rational in
 			§§ @param toPlaces — how many digits to write after the point
@@ -467,6 +531,11 @@ declarations {
 			§§ Answers the Rational as a fraction, with its sign written in the named style.
 			§§
 			§§ The `#Always` Case writes a `+` in front of a value that is not negative, so `3/4` is `+3/4` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.
+			§§
+			§§ @example
+			§§   expect 3/4::toString(showingSign #Always)::is("+3/4")
+			§§   expect 0/1::toString(showingSign #Always)::is("+0")
+			§§   expect 3/4::toString(showingSign #Negative)::is("3/4")
 			§§
 			§§ @param showingSign — whether to write a sign in front of a value that is not negative
 			§§ @returns — the String representation of the Rational.
@@ -503,6 +572,9 @@ declarations {
 
 		§§ Adds a number to the Rational, and stays exact for every member of the numeric tower.
 		overload add {
+			§§ @example
+			§§   expect 1/2::add(-1/3)::is(1/6)
+			§§
 			§§ @param _ — the Rational to add
 			§§ @returns — the sum.
 			(_ other: Rational) -> Rational
@@ -510,6 +582,9 @@ declarations {
 			§§ Adds an Integer to the Rational.
 			§§
 			§§ The sum is a Rational, since a whole number added to a fraction need not be whole.
+			§§
+			§§ @example
+			§§   expect 1/2::add(1)::is(3/2)
 			§§
 			§§ @param _ — the Integer to add
 			§§ @returns — the sum, as a Rational.
@@ -524,6 +599,9 @@ declarations {
 			§§
 			§§ The sum is an Algebraic, since adding a Rational leaves the radical part in place.
 			§§
+			§§ @example
+			§§   expect 1/2::add(Number.GoldenRatio)::toString()::is("1 + 1/2·√5")
+			§§
 			§§ @param _ — the Algebraic to add
 			§§ @returns — the sum, as an Algebraic.
 			(_ other: Algebraic) -> Algebraic {
@@ -534,6 +612,9 @@ declarations {
 			§§
 			§§ The sum is a Transcendental, since adding a Rational leaves every base term in place.
 			§§
+			§§ @example
+			§§   expect 1/2::add(Number.Pi)::toString()::is("1/2 + π")
+			§§
 			§§ @param _ — the Transcendental to add
 			§§ @returns — the sum, as a Transcendental.
 			(_ other: Transcendental) -> Transcendental {
@@ -543,6 +624,9 @@ declarations {
 
 		§§ Subtracts a number from the Rational, and stays exact for every member of the numeric tower.
 		overload subtract {
+			§§ @example
+			§§   expect 3/4::subtract(1/4)::is(1/2)
+			§§
 			§§ @param _ — the Rational to subtract
 			§§ @returns — the difference.
 			(_ other: Rational) -> Rational
@@ -550,6 +634,9 @@ declarations {
 			§§ Subtracts an Integer from the Rational.
 			§§
 			§§ The difference is a Rational, since a whole number taken from a fraction need not be whole.
+			§§
+			§§ @example
+			§§   expect 5/2::subtract(1)::is(3/2)
 			§§
 			§§ @param _ — the Integer to subtract
 			§§ @returns — the difference, as a Rational.
@@ -561,6 +648,9 @@ declarations {
 			§§
 			§§ The difference is an Algebraic, since the radical part stays and only its sign flips.
 			§§
+			§§ @example
+			§§   expect 1/2::subtract(Number.GoldenRatio)::toString()::is("-1/2·√5")
+			§§
 			§§ @param _ — the Algebraic to subtract
 			§§ @returns — the difference, as an Algebraic.
 			(_ other: Algebraic) -> Algebraic {
@@ -571,6 +661,9 @@ declarations {
 			§§
 			§§ The difference is a Transcendental, since every base term stays with its sign flipped.
 			§§
+			§§ @example
+			§§   expect 1/2::subtract(Number.Pi)::toString()::is("1/2 − π")
+			§§
 			§§ @param _ — the Transcendental to subtract
 			§§ @returns — the difference, as a Transcendental.
 			(_ other: Transcendental) -> Transcendental {
@@ -580,6 +673,11 @@ declarations {
 
 		§§ Multiplies the Rational with a number, and stays exact for every member of the numeric tower.
 		overload multiply {
+			§§ @example
+			§§   constant rate: Rational = 3/4
+			§§
+			§§   expect rate::multiply(with 2/3)::is(1/2)
+			§§
 			§§ @param with — the Rational to multiply with
 			§§ @returns — the product.
 			(with other: Rational) -> Rational
@@ -587,6 +685,9 @@ declarations {
 			§§ Multiplies the Rational with an Integer.
 			§§
 			§§ The product is a Rational, since scaling a fraction by a whole number need not leave a whole number.
+			§§
+			§§ @example
+			§§   expect 3/4::multiply(with 2)::is(3/2)
 			§§
 			§§ @param with — the Integer to multiply with
 			§§ @returns — the product, as a Rational.
@@ -601,6 +702,10 @@ declarations {
 			§§
 			§§ The product is an Algebraic, since scaling keeps the radical part. A zero receiver answers zero, which is a Rational.
 			§§
+			§§ @example
+			§§   expect 2/1::multiply(with Number.GoldenRatio)::toString()::is("1 + √5")
+			§§   expect 0/1::multiply(with Number.GoldenRatio)::is(0)
+			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @returns — the product, as an Algebraic or a Rational.
 			(with other: Algebraic) -> Algebraic | Rational {
@@ -610,6 +715,10 @@ declarations {
 			§§ Multiplies the Rational with a Transcendental.
 			§§
 			§§ The product is a Transcendental, since scaling keeps every base term. A zero receiver answers zero, which is a Rational.
+			§§
+			§§ @example
+			§§   expect 1/2::multiply(with Number.Tau)::toString()::is("π")
+			§§   expect 0/1::multiply(with Number.Pi)::is(0)
 			§§
 			§§ @param with — the Transcendental to multiply with
 			§§ @returns — the product, as a Transcendental or a Rational.
@@ -622,6 +731,12 @@ declarations {
 		§§
 		§§ Dividing by an Integer or a Rational answers empty for a zero divisor. With `defaultingTo`, the given value stands in place of empty. Dividing by an Algebraic always answers, because an Algebraic is irrational and so never zero. Dividing by an Integer proven not to be zero always answers too. A Rational proven not to be zero answers as well.
 		overload divide {
+			§§ @example
+			§§   constant share: Rational = 3/4
+			§§
+			§§   expect 1/2::divide(by share)::is(2/3)
+			§§   expect 1/2::divide(by 0/1)::isEmpty()
+			§§
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
 			(by other: Rational) -> Optional<Rational>
@@ -629,6 +744,12 @@ declarations {
 			§§ Divides the Rational by an Integer.
 			§§
 			§§ The quotient is a Rational. A zero divisor answers empty, and the `defaultingTo:` entry answers the given Rational instead.
+			§§
+			§§ @example
+			§§   constant people: Integer = 3
+			§§
+			§§   expect 3/4::divide(by people)::is(1/4)
+			§§   expect 3/4::divide(by 0)::isEmpty()
 			§§
 			§§ @param by — the Integer to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
@@ -643,11 +764,23 @@ declarations {
 			§§
 			§§ An Algebraic is irrational and so never zero, which is why the quotient itself is the answer. The quotient is an Algebraic, and a zero receiver answers zero, which is a Rational.
 			§§
+			§§ @example
+			§§   constant phi = Number.GoldenRatio
+			§§
+			§§   expect 1/1::divide(by phi)::is(phi::subtract(1))
+			§§   expect 0/1::divide(by phi)::is(0)
+			§§
 			§§ @param by — the Algebraic to divide by
 			§§ @returns — the quotient, as an Algebraic or a Rational.
 			(by other: Algebraic) -> Algebraic | Rational
 
 			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant share: Rational = 3/4
+			§§
+			§§   expect 1/2::divide(by share, defaultingTo 0/1)::is(2/3)
+			§§   expect 1/2::divide(by 0/1, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -657,6 +790,12 @@ declarations {
 			}
 
 			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant people: Integer = 3
+			§§
+			§§   expect 3/4::divide(by people, defaultingTo 0/1)::is(1/4)
+			§§   expect 3/4::divide(by 0, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -668,6 +807,9 @@ declarations {
 			§§ Divides by an Integer proven not to be zero.
 			§§
 			§§ There is no failure to report, so the quotient itself is the answer.
+			§§
+			§§ @example
+			§§   expect 3/4::divide(by 3)::is(1/4)
 			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the quotient.
@@ -683,6 +825,9 @@ declarations {
 			§§ Divides by a Rational proven not to be zero.
 			§§
 			§§ There is no failure to report, so the quotient itself is the answer.
+			§§
+			§§ @example
+			§§   expect 1/2::divide(by 3/4)::is(2/3)
 			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the quotient.
@@ -706,6 +851,12 @@ declarations {
 		overload remainder {
 			§§ Answers the remainder over a divisor nothing is known about.
 			§§
+			§§ @example
+			§§   constant step: Rational = 1/3
+			§§
+			§§   expect 7/2::remainder(dividingBy step)::is(1/6)
+			§§   expect 7/2::remainder(dividingBy 0/1)::isEmpty()
+			§§
 			§§ @param dividingBy — the divisor
 			§§ @returns — the remainder, or nothing when dividing by zero.
 			(dividingBy divisor: Rational) -> Optional<Rational> {
@@ -723,6 +874,10 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the remainder itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 7/2::remainder(dividingBy 1/3)::is(1/6)
+			§§   expect -7/2::remainder(dividingBy 1/3)::is(1/6)
+			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the remainder.
 			(dividingBy divisor: NonZeroRational) -> Rational {
@@ -732,6 +887,12 @@ declarations {
 			}
 
 			§§ Answers the remainder, with a value to answer when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant step: Rational = 1/3
+			§§
+			§§   expect 7/2::remainder(dividingBy step, defaultingTo 0/1)::is(1/6)
+			§§   expect 7/2::remainder(dividingBy 0/1, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param dividingBy — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no remainder
@@ -751,6 +912,12 @@ declarations {
 		overload quotient {
 			§§ Answers the quotient over a divisor nothing is known about.
 			§§
+			§§ @example
+			§§   constant step: Rational = 1/3
+			§§
+			§§   expect 7/2::quotient(dividingBy step)::is(10)
+			§§   expect 7/2::quotient(dividingBy 0/1)::isEmpty()
+			§§
 			§§ @param dividingBy — the divisor
 			§§ @returns — the quotient, or nothing when dividing by zero.
 			(dividingBy divisor: Rational) -> Optional<Integer> {
@@ -765,6 +932,10 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 7/2::quotient(dividingBy 1/3)::is(10)
+			§§   expect -7/2::quotient(dividingBy 1/3)::is(-11)
+			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the quotient.
 			(dividingBy divisor: NonZeroRational) -> Integer {
@@ -778,6 +949,12 @@ declarations {
 			}
 
 			§§ Answers the quotient, with a value to answer when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant step: Rational = 1/3
+			§§
+			§§   expect 7/2::quotient(dividingBy step, defaultingTo 0)::is(10)
+			§§   expect 7/2::quotient(dividingBy 0/1, defaultingTo 0)::is(0)
 			§§
 			§§ @param dividingBy — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -794,11 +971,19 @@ declarations {
 		§§
 		§§ A negative exponent answers the exact reciprocal power. Zero raised to the power of zero is one. Raising this Rational to an exponent proven not to be negative can not fail. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given Rational instead.
 		overload raise {
+			§§ @example
+			§§   expect 2/3::raise(to -2)::is(9/4)
+			§§   expect 0/1::raise(to -1)::isEmpty()
+			§§
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
 			(to exponent: Integer) -> Optional<Rational>
 
 			§§ Raises the Rational to the given power, and answers the given value when there is no power.
+			§§
+			§§ @example
+			§§   expect 2/3::raise(to -2, defaultingTo 0/1)::is(9/4)
+			§§   expect 0/1::raise(to -1, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param to — the exponent
 			§§ @param defaultingTo — the value to answer with when there is no power
@@ -814,6 +999,10 @@ declarations {
 			§§
 			§§ Every Rational has such a power, the reciprocal is never taken, and no denominator can reach zero. So the answer is the power itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 2/3::raise(to 2)::is(4/9)
+			§§   expect 0/1::raise(to 0)::is(1)
+			§§
 			§§ @param to — the exponent, proven not to be negative
 			§§ @returns — the power.
 			(to exponent: NonNegativeInteger) -> Rational
@@ -823,10 +1012,22 @@ declarations {
 		§§
 		§§ A perfect square answers a Rational. Any other value that is not negative answers an exact Algebraic. A negative Rational answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload squareRoot {
+			§§ @example
+			§§   constant area: Rational = 9/4
+			§§
+			§§   expect area::squareRoot()::is(3/2)
+			§§   expect -1/4::squareRoot()::isEmpty()
+			§§
 			§§ @returns — the root, or nothing for a negative Rational.
 			() -> Optional<Rational | Algebraic>
 
 			§§ Answers the exact square root, with a value to answer for a negative Rational.
+			§§
+			§§ @example
+			§§   constant area: Rational = 9/4
+			§§
+			§§   expect area::squareRoot(defaultingTo 0/1)::is(3/2)
+			§§   expect -1/4::squareRoot(defaultingTo 0/1)::is(0)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no root
 			§§ @returns — the root, or the given value in its place.
@@ -862,6 +1063,10 @@ declarations {
 			§§
 			§§ The comparison is in lowest terms, so `1/2` is not below `2/4`.
 			§§
+			§§ @example
+			§§   expect 1/2::isLessThan(2/3)
+			§§   expect 1/2::isLessThan(2/4)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the receiver is below the other Rational.
 			(_ other: Rational) -> Boolean {
@@ -871,6 +1076,10 @@ declarations {
 			§§ Answers whether the Rational is strictly below an Integer.
 			§§
 			§§ The Integer is read as `n/1`, so `1/2` is below `1`.
+			§§
+			§§ @example
+			§§   expect 1/2::isLessThan(1)
+			§§   expect 3/2::isLessThan(1)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is below the Integer.
@@ -887,6 +1096,10 @@ declarations {
 			§§ Equal Rationals answer `true`.
 			§§ The comparison is in lowest terms, so `1/2` answers `true` against `2/4`.
 			§§
+			§§ @example
+			§§   expect 1/2::isLessThanOrEqualTo(2/4)
+			§§   expect 2/3::isLessThanOrEqualTo(1/2)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the receiver is below the other Rational or equal to it.
 			(_ other: Rational) -> Boolean {
@@ -896,6 +1109,10 @@ declarations {
 			§§ Answers whether the Rational is below an Integer, or equal to it.
 			§§
 			§§ The Integer is read as `n/1`, so `2/2` answers `true` against `1`.
+			§§
+			§§ @example
+			§§   expect 2/2::isLessThanOrEqualTo(1)
+			§§   expect 3/2::isLessThanOrEqualTo(1)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is below the Integer or equal to it.
@@ -910,6 +1127,10 @@ declarations {
 			§§
 			§§ The comparison is in lowest terms, so `2/4` is not above `1/2`.
 			§§
+			§§ @example
+			§§   expect 2/3::isGreaterThan(1/2)
+			§§   expect 2/4::isGreaterThan(1/2)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the receiver is above the other Rational.
 			(_ other: Rational) -> Boolean {
@@ -919,6 +1140,10 @@ declarations {
 			§§ Answers whether the Rational is strictly above an Integer.
 			§§
 			§§ The Integer is read as `n/1`, so `3/2` is above `1`.
+			§§
+			§§ @example
+			§§   expect 3/2::isGreaterThan(1)
+			§§   expect 1/2::isGreaterThan(1)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is above the Integer.
@@ -935,6 +1160,10 @@ declarations {
 			§§ Equal Rationals answer `true`.
 			§§ The comparison is in lowest terms, so `2/4` answers `true` against `1/2`.
 			§§
+			§§ @example
+			§§   expect 2/4::isGreaterThanOrEqualTo(1/2)
+			§§   expect 1/2::isGreaterThanOrEqualTo(2/3)::negate()
+			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the receiver is above the other Rational or equal to it.
 			(_ other: Rational) -> Boolean {
@@ -944,6 +1173,10 @@ declarations {
 			§§ Answers whether the Rational is above an Integer, or equal to it.
 			§§
 			§§ The Integer is read as `n/1`, so `2/2` answers `true` against `1`.
+			§§
+			§§ @example
+			§§   expect 2/2::isGreaterThanOrEqualTo(1)
+			§§   expect 1/2::isGreaterThanOrEqualTo(1)::negate()
 			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the Rational is above the Integer or equal to it.
@@ -955,6 +1188,10 @@ declarations {
 		§§ Answers whether the Rational is a whole number.
 		§§
 		§§ A whole number has the denominator one in lowest terms.
+		§§
+		§§ @example
+		§§   expect 4/2::isWholeNumber()
+		§§   expect 3/4::isWholeNumber()::negate()
 		isWholeNumber() -> Boolean {
 			<- @::denominator()::is(1)
 		}
@@ -971,6 +1208,10 @@ declarations {
 		§§ Answers whether the Rational is above zero.
 		§§
 		§§ Zero is neither positive nor negative.
+		§§
+		§§ @example
+		§§   expect 3/4::isPositive()
+		§§   expect 0/1::isPositive()::negate()
 		isPositive() -> Boolean {
 			<- @::isGreaterThan(0/1)
 		}
@@ -978,11 +1219,19 @@ declarations {
 		§§ Answers whether the Rational is below zero.
 		§§
 		§§ Zero is neither positive nor negative.
+		§§
+		§§ @example
+		§§   expect -3/4::isNegative()
+		§§   expect 0/1::isNegative()::negate()
 		isNegative() -> Boolean {
 			<- @::isLessThan(0/1)
 		}
 
 		§§ Answers whether the Rational is exactly zero.
+		§§
+		§§ @example
+		§§   expect 0/1::isZero()
+		§§   expect 3/4::isZero()::negate()
 		isZero() -> Boolean {
 			<- @::is(0/1)
 		}
@@ -990,11 +1239,20 @@ declarations {
 		§§ Answers the numerator of the Rational in lowest terms.
 		§§
 		§§ The numerator carries the sign, because the denominator is always positive.
+		§§
+		§§ @example
+		§§   constant ratio: Rational = -6/8
+		§§
+		§§   expect ratio::numerator()::is(-3)
 		numerator() -> Integer
 
 		§§ Answers the denominator of the Rational in lowest terms.
 		§§
 		§§ The denominator is always positive, and never zero. So the answer is a PositiveInteger, which fits every position that asks for a NonZeroInteger or a NonNegativeInteger.
+		§§
+		§§ @example
+		§§   expect 6/8::denominator()::is(4)
+		§§   expect -1/2::denominator()::is(2)
 		denominator() -> PositiveInteger
 
 		§ `absolute` is native for the reason `Integer::absolute` is, and it is
@@ -1006,10 +1264,20 @@ declarations {
 
 		§§ Answers the Rational without its sign, which is its distance from zero.
 		§§
+		§§ @example
+		§§   constant change: Rational = -3/4
+		§§
+		§§   expect change::absolute()::is(3/4)
+		§§
 		§§ @returns — the distance, which is never negative.
 		absolute() -> NonNegativeRational
 
 		§§ Answers the Rational with its sign flipped.
+		§§
+		§§ @example
+		§§   constant change: Rational = 3/4
+		§§
+		§§   expect change::negate()::is(-3/4)
 		negate() -> Rational {
 			<- Rational.of(@::numerator()::negate(), over @::denominator())
 		}
@@ -1018,12 +1286,24 @@ declarations {
 		§§
 		§§ The reciprocal exchanges the numerator and the denominator. Zero has no reciprocal, and the `defaultingTo:` entry answers the given Rational instead. A receiver proven not to be zero answers the reciprocal itself.
 		overload reciprocal {
+			§§ @example
+			§§   constant ratio: Rational = 3/4
+			§§
+			§§   expect ratio::reciprocal()::is(4/3)
+			§§   expect 0/1::reciprocal()::isEmpty()
+			§§
 			§§ @returns — the reciprocal, or nothing for zero.
 			() -> Optional<Rational> {
 				<- Rational.of(@::denominator(), over @::numerator())
 			}
 
 			§§ Answers the reciprocal, with a value to answer for zero.
+			§§
+			§§ @example
+			§§   constant ratio: Rational = 3/4
+			§§
+			§§   expect ratio::reciprocal(defaultingTo 0/1)::is(4/3)
+			§§   expect 0/1::reciprocal(defaultingTo 0/1)::is(0)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no reciprocal
 			§§ @returns — the reciprocal, or the given value in its place.
@@ -1037,6 +1317,11 @@ declarations {
 		§§ The direction is `#Nearest` when a call names none. A value exactly halfway between two steps rounds away from zero, so `1/2` answers `1` and `-1/2` answers `-1`. Under `#NearestEven` a value exactly halfway between two steps reaches the even one, so `1/2` answers `0` and `3/2` answers `2`. The other directions answer the floor for `#Down`, the ceiling for `#Up`, and the value towards zero for `#TowardZero`. Naming a count of places rounds to a decimal grid of that width instead, and answers a Rational.
 		overload round {
 			§§ Answers the Rational as an Integer, rounded in the named direction.
+			§§
+			§§ @example
+			§§   expect 5/2::round()::is(3)
+			§§   expect 5/2::round(toward #NearestEven)::is(2)
+			§§   expect -5/2::round(toward #Down)::is(-3)
 			§§
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
 			§§ @returns — the rounded Integer.
@@ -1116,6 +1401,10 @@ declarations {
 			§§
 			§§ Two places round to hundredths, so `5/3` answers `167/100`. The answer is exact, and it is a Rational rather than text: `toString(as #Decimal, toPlaces 2)` is what writes `1.67`. A count below one rounds to a whole number, answered as a Rational. The count has no ceiling, as it has none on `toString`.
 			§§
+			§§ @example
+			§§   expect 5/3::round(toPlaces 2)::is(167/100)
+			§§   expect 5/3::round(toPlaces 0)::is(2)
+			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
 			§§ @returns — the rounded Rational.
@@ -1152,6 +1441,9 @@ declarations {
 		§§
 		§§ A Rational is exact, so the answer is the same one `round(toPlaces:toward:)` gives: two places answer hundredths, and `5/3` answers `167/100`. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.
 		§§
+		§§ @example
+		§§   expect 5/3::approximate(toPlaces 2)::is(167/100)
+		§§
 		§§ @param toPlaces — how many decimal places to keep
 		§§ @param toward — the direction to round in, `#Nearest` when it is left out
 		§§ @returns — the Rational on that grid.
@@ -1171,6 +1463,9 @@ declarations {
 		§§ Answers the Rational as a Rational.
 		§§
 		§§ A Rational is one already, so the answer is the receiver itself. The entry is what lets a `Scalar` receiver reach the crossing that an Integer receiver reaches.
+		§§
+		§§ @example
+		§§   expect 3/4::toRational()::is(3/4)
 		§§
 		§§ @returns — the receiver itself.
 		toRational() -> Rational {
@@ -1199,6 +1494,9 @@ declarations {
 		§§
 		§§ The product is never zero, so the answer is a NonZeroRational too.
 		§§
+		§§ @example
+		§§   expect -1/2::multiply(with 2/3)::is(-1/3)
+		§§
 		§§ @param with — the NonZeroRational to multiply with
 		§§ @returns — the product, which is not zero.
 		multiply(with other: NonZeroRational) -> NonZeroRational
@@ -1207,12 +1505,18 @@ declarations {
 		§§
 		§§ A Rational is zero exactly when its numerator is, and the receiver is proven not to be zero. So the answer is a NonZeroInteger.
 		§§
+		§§ @example
+		§§   expect -6/8::numerator()::is(-3)
+		§§
 		§§ @returns — the numerator, which is not zero.
 		numerator() -> NonZeroInteger
 
 		§§ Answers this NonZeroRational without its sign, which is its distance from zero.
 		§§
 		§§ The receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveRational.
+		§§
+		§§ @example
+		§§   expect -3/4::absolute()::is(3/4)
 		§§
 		§§ @returns — the distance, which is above zero.
 		absolute() -> PositiveRational
@@ -1221,12 +1525,19 @@ declarations {
 		§§
 		§§ Zero is the one Rational with no reciprocal, and the receiver is proven not to be one. So the answer is the reciprocal itself rather than an Optional. Exchanging the two parts of a value that is not zero leaves a value that is not zero, so the answer is proven as well.
 		§§
+		§§ @example
+		§§   expect 3/4::reciprocal()::is(4/3)
+		§§   expect -1/2::reciprocal()::is(-2)
+		§§
 		§§ @returns — the reciprocal, which is not zero.
 		reciprocal() -> NonZeroRational
 
 		§§ Answers this NonZeroRational with its sign flipped.
 		§§
 		§§ Negation keeps a value away from zero, so the answer is a NonZeroRational too.
+		§§
+		§§ @example
+		§§   expect 3/4::negate()::is(-3/4)
 		§§
 		§§ @returns — the negation, which is not zero.
 		negate() -> NonZeroRational
@@ -1259,6 +1570,11 @@ declarations {
 			§§
 			§§ The receiver is not negative and the other summand is above zero, so the sum is above zero.
 			§§
+			§§ @example
+			§§   constant tip: NonNegativeRational = 1/10
+			§§
+			§§   expect tip::add(1/5)::is(3/10)
+			§§
 			§§ @param _ — the PositiveRational to add
 			§§ @returns — the sum, which is above zero.
 			(_ other: PositiveRational) -> PositiveRational
@@ -1266,6 +1582,12 @@ declarations {
 			§§ Adds a Rational proven not to be negative.
 			§§
 			§§ Neither summand is negative, so the sum is not negative either.
+			§§
+			§§ @example
+			§§   constant tip: NonNegativeRational = 1/10
+			§§   constant tax: NonNegativeRational = 1/5
+			§§
+			§§   expect tip::add(tax)::is(3/10)
 			§§
 			§§ @param _ — the NonNegativeRational to add
 			§§ @returns — the sum, which is never negative.
@@ -1276,6 +1598,12 @@ declarations {
 		§§
 		§§ Neither factor is negative, so the product is not negative either.
 		§§
+		§§ @example
+		§§   constant tip: NonNegativeRational = 1/10
+		§§   constant share: NonNegativeRational = 1/2
+		§§
+		§§   expect tip::multiply(with share)::is(1/20)
+		§§
 		§§ @param with — the NonNegativeRational to multiply with
 		§§ @returns — the product, which is never negative.
 		multiply(with other: NonNegativeRational) -> NonNegativeRational
@@ -1283,6 +1611,13 @@ declarations {
 		§§ Answers the exact square root of this NonNegativeRational.
 		§§
 		§§ A negative Rational is the one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A ratio of two perfect squares answers a Rational, and every other value answers an exact Algebraic.
+		§§
+		§§ @example
+		§§   constant area: NonNegativeRational = 9/4
+		§§   constant half: NonNegativeRational = 1/2
+		§§
+		§§   expect area::squareRoot()::is(3/2)
+		§§   expect half::squareRoot()::toString()::is("1/2·√2")
 		§§
 		§§ @returns — the root.
 		squareRoot() -> Rational | Algebraic
@@ -1303,6 +1638,10 @@ declarations {
 		§§
 		§§ The receiver is above zero and the other summand is not below it, so the sum is above zero.
 		§§
+		§§ @example
+		§§   expect 1/2::add(1/3)::is(5/6)
+		§§   expect 1/2::add(0/1)::is(1/2)
+		§§
 		§§ @param _ — the NonNegativeRational to add
 		§§ @returns — the sum, which is above zero.
 		add(_ other: NonNegativeRational) -> PositiveRational
@@ -1311,6 +1650,9 @@ declarations {
 		§§
 		§§ Both factors are above zero, so the product is above zero.
 		§§
+		§§ @example
+		§§   expect 1/2::multiply(with 3/4)::is(3/8)
+		§§
 		§§ @param with — the PositiveRational to multiply with
 		§§ @returns — the product, which is above zero.
 		multiply(with other: PositiveRational) -> PositiveRational
@@ -1318,6 +1660,10 @@ declarations {
 		§§ Answers the exact square root of this PositiveRational.
 		§§
 		§§ A ratio of two perfect squares above zero has a root above zero, and every other value answers an exact Algebraic.
+		§§
+		§§ @example
+		§§   expect 9/4::squareRoot()::is(3/2)
+		§§   expect 1/2::squareRoot()::toString()::is("1/2·√2")
 		§§
 		§§ @returns — the root.
 		squareRoot() -> PositiveRational | Algebraic

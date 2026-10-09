@@ -160,6 +160,10 @@ declarations {
 
 			§§ Reads an Integer from its text form, with a value to answer when the text has another shape.
 			§§
+			§§ @example
+			§§   expect Integer.parse("42", defaultingTo 0)::is(42)
+			§§   expect Integer.parse("forty-two", defaultingTo 0)::is(0)
+			§§
 			§§ @param _ — the text to read
 			§§ @param defaultingTo — the value to answer with when the text is no Integer
 			§§ @returns — the Integer, or the given value in its place.
@@ -184,12 +188,21 @@ declarations {
 			§§
 			§§ The text form is the one the entries above read, in digits of that base: a leading sign, and an optional underscore between two digits. A digit above nine is a letter, and a capital letter reads as its lowercase. Text of any other shape answers empty. A base below two is read as two, and a base above thirty-six as thirty-six.
 			§§
+			§§ @example
+			§§   expect Integer.parse("ff", inBase 16)::is(255)
+			§§   expect Integer.parse("-1010", inBase 2)::is(-10)
+			§§   expect Integer.parse("12", inBase 2)::isEmpty()
+			§§
 			§§ @param _ — the text to read
 			§§ @param inBase — the base the digits are written in
 			§§ @returns — the Integer, or nothing when the text has any other shape.
 			(_ text: String, inBase base: Integer) -> Optional<Integer>
 
 			§§ Reads an Integer from its text form in the given base, with a value to answer when the text has another shape.
+			§§
+			§§ @example
+			§§   expect Integer.parse("FF", inBase 16, defaultingTo 0)::is(255)
+			§§   expect Integer.parse("0x1F", inBase 16, defaultingTo 0)::is(0)
 			§§
 			§§ @param _ — the text to read
 			§§ @param inBase — the base the digits are written in
@@ -218,6 +231,10 @@ declarations {
 		overload is {
 			§§ Answers whether this Integer has the same value as another Integer.
 			§§
+			§§ @example
+			§§   expect 3::is(3)
+			§§   expect 3::is(-3)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when both are equal.
 			(_ other: Integer) -> Boolean {
@@ -225,6 +242,10 @@ declarations {
 			}
 
 			§§ Answers whether this Integer has the same value as a Rational.
+			§§
+			§§ @example
+			§§   expect 2::is(4/2)
+			§§   expect 2::is(5/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when both are equal.
@@ -244,6 +265,10 @@ declarations {
 		overload isNot {
 			§§ Answers whether this Integer differs from another Integer.
 			§§
+			§§ @example
+			§§   expect 3::isNot(4)
+			§§   expect 3::isNot(3)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when the two differ.
 			(_ other: Integer) -> Boolean {
@@ -251,6 +276,10 @@ declarations {
 			}
 
 			§§ Answers whether this Integer differs from a Rational.
+			§§
+			§§ @example
+			§§   expect 2::isNot(5/2)
+			§§   expect 2::isNot(4/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when the two differ.
@@ -260,6 +289,11 @@ declarations {
 		}
 
 		§§ Orders the Integer against another Integer.
+		§§
+		§§ @example
+		§§   expect 1::compare(to 2)::is(#Less)
+		§§   expect 2::compare(to 2)::is(#Equal)
+		§§   expect 3::compare(to 2)::is(#Greater)
 		§§
 		§§ @param to — the Integer to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
@@ -276,12 +310,21 @@ declarations {
 		overload toString {
 			§§ Answers the Integer as a String, in decimal digits.
 			§§
+			§§ @example
+			§§   expect 42::toString()::is("42")
+			§§   expect -7::toString()::is("-7")
+			§§
 			§§ @returns — the String representation of the Integer.
 			() -> String
 
 			§§ Answers the Integer in the named format.
 			§§
 			§§ The `#Decimal` and `#Fraction` formats both write the digits alone, since an Integer is whole. The `#Percent` format writes one hundred times the value, with a `%` after it. The `#Scientific` format writes one digit before the point, and the power of ten after an `e`.
+			§§
+			§§ @example
+			§§   expect 42::toString(as #Fraction)::is("42")
+			§§   expect 3::toString(as #Percent)::is("300%")
+			§§   expect 1500::toString(as #Scientific)::is("1.5e3")
 			§§
 			§§ @param as — the form to represent the Integer in
 			§§ @returns — the String representation of the Integer.
@@ -292,6 +335,11 @@ declarations {
 			§§ Answers the Integer in the named format, with exactly that many places.
 			§§
 			§§ The places are written as zeroes for the `#Decimal` format, so `5` over two places is `5.00`. The `#Fraction` format ignores both the count and the direction. The count and the direction reach the other two formats as they reach `Rational`.
+			§§
+			§§ @example
+			§§   expect 5::toString(as #Decimal, toPlaces 2)::is("5.00")
+			§§   expect 5::toString(as #Fraction, toPlaces 2)::is("5")
+			§§   expect 1234::toString(as #Scientific, toPlaces 1)::is("1.2e3")
 			§§
 			§§ @param as — the form to represent the Integer in
 			§§ @param toPlaces — how many digits to write after the point
@@ -310,6 +358,11 @@ declarations {
 			§§
 			§§ The separator goes between every three digits, counted from the right, so `1234567` is `1,234,567` under a comma.
 			§§
+			§§ @example
+			§§   constant written = 1234567::toString(as #Decimal, groupingWith ",")
+			§§
+			§§   expect written::is("1,234,567")
+			§§
 			§§ @param as — the form to represent the Integer in
 			§§ @param groupingWith — the text to write between the digit groups
 			§§ @returns — the String representation of the Integer.
@@ -324,6 +377,15 @@ declarations {
 			§§ Answers the Integer in the named format, with that many places and a separator between the digit groups.
 			§§
 			§§ Only the digits before the point are grouped, so `1234567` over two places is `1,234,567.00` under a comma.
+			§§
+			§§ @example
+			§§   constant total = 1234567::toString(
+			§§   	as #Decimal,
+			§§   	toPlaces 2,
+			§§   	groupingWith ",",
+			§§   )
+			§§
+			§§   expect total::is("1,234,567.00")
 			§§
 			§§ @param as — the form to represent the Integer in
 			§§ @param toPlaces — how many digits to write after the point
@@ -355,6 +417,11 @@ declarations {
 			§§
 			§§ The receiver is read as a count of the last place, so `1234` scaled by two places is `12.34`. A count of zero writes the digits alone. The sign is written in front, so `-1234` scaled by two places is `-12.34`.
 			§§
+			§§ @example
+			§§   expect 1234::toString(scaledBy 2)::is("12.34")
+			§§   expect -1234::toString(scaledBy 2)::is("-12.34")
+			§§   expect 1234::toString(scaledBy 0)::is("1234")
+			§§
 			§§ @param scaledBy — how many decimal places to scale the Integer down by
 			§§ @returns — the String representation of the scaled Integer.
 			(scaledBy places: NonNegativeInteger) -> String {
@@ -370,6 +437,11 @@ declarations {
 			§§ Answers the Integer with its sign written in the named style.
 			§§
 			§§ The `#Always` Case writes a `+` in front of a value that is not negative, so `3` is `+3` and zero is `+0`. The `#Negative` Case writes what the plain `toString()` writes.
+			§§
+			§§ @example
+			§§   expect 3::toString(showingSign #Always)::is("+3")
+			§§   expect 0::toString(showingSign #Always)::is("+0")
+			§§   expect -3::toString(showingSign #Always)::is("-3")
 			§§
 			§§ @param showingSign — whether to write a sign in front of a value that is not negative
 			§§ @returns — the String representation of the Integer.
@@ -396,6 +468,10 @@ declarations {
 			§§
 			§§ A digit above nine is written as a lowercase letter, so `255` in base sixteen is `ff`. The sign is written in front. A base below two is read as two, and a base above thirty-six as thirty-six. `Integer.parse(_ , inBase:)` reads back what this writes.
 			§§
+			§§ @example
+			§§   expect 255::toString(inBase 16)::is("ff")
+			§§   expect -5::toString(inBase 2)::is("-101")
+			§§
 			§§ @param inBase — the base to write the digits in
 			§§ @returns — the String representation of the Integer.
 			(inBase base: Integer) -> String
@@ -411,6 +487,10 @@ declarations {
 			§§
 			§§ The sum is an Integer.
 			§§
+			§§ @example
+			§§   expect 2::add(3)::is(5)
+			§§   expect 2::add(-5)::is(-3)
+			§§
 			§§ @param _ — the Integer to add
 			§§ @returns — the sum.
 			(_ other: Integer) -> Integer
@@ -418,6 +498,9 @@ declarations {
 			§§ Adds a Rational to this Integer.
 			§§
 			§§ The sum is a Rational, since it need not be whole.
+			§§
+			§§ @example
+			§§   expect 1::add(1/2)::is(3/2)
 			§§
 			§§ @param _ — the Rational to add
 			§§ @returns — the sum.
@@ -428,6 +511,12 @@ declarations {
 			§§ Adds an Algebraic to this Integer.
 			§§
 			§§ The sum stays exact. Shifting the rational part of `a + b·√d` leaves the radical untouched.
+			§§
+			§§ @example
+			§§   match 2::squareRoot() -> {} {
+			§§   	case Algebraic { expect 1::add(@)::toString()::is("1 + √2") }
+			§§   	case Integer { expect false }
+			§§   }
 			§§
 			§§ @param _ — the Algebraic to add
 			§§ @returns — the exact sum.
@@ -452,6 +541,9 @@ declarations {
 			§§
 			§§ The difference is an Integer.
 			§§
+			§§ @example
+			§§   expect 5::subtract(8)::is(-3)
+			§§
 			§§ @param _ — the Integer to subtract
 			§§ @returns — the difference.
 			(_ other: Integer) -> Integer {
@@ -462,6 +554,9 @@ declarations {
 			§§
 			§§ The difference is a Rational, since it need not be whole.
 			§§
+			§§ @example
+			§§   expect 1::subtract(1/4)::is(3/4)
+			§§
 			§§ @param _ — the Rational to subtract
 			§§ @returns — the difference.
 			(_ other: Rational) -> Rational {
@@ -471,6 +566,12 @@ declarations {
 			§§ Subtracts an Algebraic from this Integer.
 			§§
 			§§ The difference stays exact. Negating `a + b·√d` flips both parts and leaves the radical itself in place.
+			§§
+			§§ @example
+			§§   match 2::squareRoot() -> {} {
+			§§   	case Algebraic { expect 3::subtract(@)::toString()::is("3 − √2") }
+			§§   	case Integer { expect false }
+			§§   }
 			§§
 			§§ @param _ — the Algebraic to subtract
 			§§ @returns — the exact difference.
@@ -495,6 +596,10 @@ declarations {
 			§§
 			§§ The product is an Integer.
 			§§
+			§§ @example
+			§§   expect 6::multiply(with 7)::is(42)
+			§§   expect 6::multiply(with -7)::is(-42)
+			§§
 			§§ @param with — the Integer to multiply with
 			§§ @returns — the product.
 			(with other: Integer) -> Integer
@@ -502,6 +607,10 @@ declarations {
 			§§ Multiplies this Integer with a Rational.
 			§§
 			§§ The product is a Rational, since it need not be whole.
+			§§
+			§§ @example
+			§§   expect 3::multiply(with 1/2)::is(3/2)
+			§§   expect 4::multiply(with 1/2)::is(2)
 			§§
 			§§ @param with — the Rational to multiply with
 			§§ @returns — the product.
@@ -512,6 +621,16 @@ declarations {
 			§§ Multiplies this Integer with an Algebraic.
 			§§
 			§§ The product stays exact. A zero factor collapses it to the Rational zero, so the answer is a Union of both kinds.
+			§§
+			§§ @example
+			§§   match 2::squareRoot() -> {} {
+			§§   	case Algebraic {
+			§§   		expect 3::multiply(with @)::toString()::is("3·√2")
+			§§   		expect 0::multiply(with @)::toString()::is("0")
+			§§   	}
+			§§
+			§§   	case Integer { expect false }
+			§§   }
 			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @returns — the exact product, an Algebraic or a Rational.
@@ -538,6 +657,12 @@ declarations {
 			§§
 			§§ The quotient is a Rational, since it need not be whole. A zero divisor answers empty.
 			§§
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect 10::divide(by guests)::is(5/2)
+			§§   expect 10::divide(by 0)::isEmpty()
+			§§
 			§§ @param by — the divisor
 			§§ @returns — the exact quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Rational> {
@@ -547,6 +672,12 @@ declarations {
 			§§ Divides this Integer by a Rational.
 			§§
 			§§ The quotient is a Rational, since it need not be whole. A zero divisor answers empty.
+			§§
+			§§ @example
+			§§   constant share: Rational = 2/3
+			§§
+			§§   expect 1::divide(by share)::is(3/2)
+			§§   expect 1::divide(by 0/1)::isEmpty()
 			§§
 			§§ @param by — the divisor
 			§§ @returns — the exact quotient, or nothing when the divisor is zero.
@@ -564,6 +695,16 @@ declarations {
 			§§
 			§§ An Algebraic is irrational, so it is never zero and the division can not fail. A zero receiver answers the Rational zero.
 			§§
+			§§ @example
+			§§   match 2::squareRoot() -> {} {
+			§§   	case Algebraic {
+			§§   		expect 2::divide(by @)::toString()::is("√2")
+			§§   		expect 0::divide(by @)::toString()::is("0")
+			§§   	}
+			§§
+			§§   	case Integer { expect false }
+			§§   }
+			§§
 			§§ @param by — the divisor
 			§§ @returns — the exact quotient, an Algebraic or a Rational.
 			(by other: Algebraic) -> Algebraic | Rational
@@ -572,11 +713,21 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 7::divide(by 2)::is(7/2)
+			§§   expect 6::divide(by -3)::is(-2)
+			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
 			(by other: NonZeroInteger) -> Rational
 
 			§§ Divides by an Integer, and answers the given value when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect 10::divide(by guests, defaultingTo 0/1)::is(5/2)
+			§§   expect 10::divide(by 0, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -586,6 +737,12 @@ declarations {
 			}
 
 			§§ Divides by a Rational, and answers the given value when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant share: Rational = 2/3
+			§§
+			§§   expect 1::divide(by share, defaultingTo 0/1)::is(3/2)
+			§§   expect 1::divide(by 0/1, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -597,6 +754,10 @@ declarations {
 			§§ Divides this Integer by a Rational proven not to be zero.
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @example
+			§§   expect 3::divide(by 3/4)::is(4)
+			§§   expect 1::divide(by 2/3)::is(3/2)
 			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
@@ -613,6 +774,12 @@ declarations {
 		overload remainder {
 			§§ Answers the remainder over a divisor nothing is known about.
 			§§
+			§§ @example
+			§§   constant teamSize: Integer = 3
+			§§
+			§§   expect 7::remainder(dividingBy teamSize)::is(1)
+			§§   expect 7::remainder(dividingBy 0)::isEmpty()
+			§§
 			§§ @param dividingBy — the divisor
 			§§ @returns — the remainder, or nothing when dividing by zero.
 			(dividingBy divisor: Integer) -> Optional<Integer>
@@ -621,11 +788,21 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the remainder itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 7::remainder(dividingBy 3)::is(1)
+			§§   expect -7::remainder(dividingBy 3)::is(2)
+			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the remainder.
 			(dividingBy divisor: NonZeroInteger) -> Integer
 
 			§§ Answers the remainder, with a value to answer when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant teamSize: Integer = 3
+			§§
+			§§   expect 7::remainder(dividingBy teamSize, defaultingTo 0)::is(1)
+			§§   expect 7::remainder(dividingBy 0, defaultingTo 0)::is(0)
 			§§
 			§§ @param dividingBy — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no remainder
@@ -641,6 +818,10 @@ declarations {
 			§§ Answers what is left over, paired with the quotient in the named way.
 			§§
 			§§ The entries above answer the `#Euclidean` pairing, which is why this one names no default. The `#Truncating` Case answers a remainder carrying the sign of the dividend, so `-7::remainder(dividingBy 3, as #Truncating)` is `-1` rather than `2`. The two agree wherever the dividend is not negative.
+			§§
+			§§ @example
+			§§   expect -7::remainder(dividingBy 3, as #Truncating)::is(-1)
+			§§   expect -7::remainder(dividingBy 3, as #Euclidean)::is(2)
 			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @param as — the pairing to read the remainder under
@@ -675,6 +856,12 @@ declarations {
 		overload quotient {
 			§§ Answers the quotient over a divisor nothing is known about.
 			§§
+			§§ @example
+			§§   constant teamSize: Integer = 3
+			§§
+			§§   expect 7::quotient(dividingBy teamSize)::is(2)
+			§§   expect 7::quotient(dividingBy 0)::isEmpty()
+			§§
 			§§ @param dividingBy — the divisor
 			§§ @returns — the quotient, or nothing when dividing by zero.
 			(dividingBy divisor: Integer) -> Optional<Integer>
@@ -683,11 +870,21 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect 7::quotient(dividingBy 3)::is(2)
+			§§   expect -7::quotient(dividingBy 3)::is(-3)
+			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @returns — the quotient.
 			(dividingBy divisor: NonZeroInteger) -> Integer
 
 			§§ Answers the quotient, with a value to answer when the divisor is zero.
+			§§
+			§§ @example
+			§§   constant teamSize: Integer = 3
+			§§
+			§§   expect 7::quotient(dividingBy teamSize, defaultingTo 0)::is(2)
+			§§   expect 7::quotient(dividingBy 0, defaultingTo 0)::is(0)
 			§§
 			§§ @param dividingBy — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -714,6 +911,10 @@ declarations {
 			§§
 			§§ The answer is the exact quotient rounded in that direction, so `7::quotient(dividingBy 2, toward #Up)` is `4`. The entries above pair their quotient with a remainder that is never negative. That pairing is the floor for a positive divisor and the ceiling for a negative one. So `#Down` answers what they answer for every divisor above zero.
 			§§
+			§§ @example
+			§§   expect 7::quotient(dividingBy 2, toward #Up)::is(4)
+			§§   expect -7::quotient(dividingBy 2, toward #TowardZero)::is(-3)
+			§§
 			§§ @param dividingBy — the divisor, proven not to be zero
 			§§ @param toward — the direction to round the quotient in
 			§§ @returns — the quotient.
@@ -729,11 +930,24 @@ declarations {
 		§§
 		§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational. Zero to the power of zero is one. Raising this Integer to an exponent proven not to be negative can not fail. A receiver proven not to be zero can not fail either, and answers through `NonZeroInteger`. Zero raised to a negative power answers empty, and the `defaultingTo:` entry answers the given value instead.
 		overload raise {
+			§§ @example
+			§§   constant base: Integer = 10
+			§§
+			§§   expect base::raise(to 3)::is(1000)
+			§§   expect base::raise(to -2)::is(1/100)
+			§§   expect 0::raise(to -1)::isEmpty()
+			§§
 			§§ @param to — the exponent
 			§§ @returns — the power, or nothing when raising zero to a negative power.
 			(to exponent: Integer) -> Optional<Integer | Rational>
 
 			§§ Raises the Integer to the given power, and answers the given value when there is no power.
+			§§
+			§§ @example
+			§§   constant base: Integer = 10
+			§§
+			§§   expect base::raise(to -1, defaultingTo 0)::is(1/10)
+			§§   expect 0::raise(to -1, defaultingTo 0)::is(0)
 			§§
 			§§ @param to — the exponent
 			§§ @param defaultingTo — the value to answer with when there is no power
@@ -749,6 +963,10 @@ declarations {
 			§§
 			§§ Every Integer has such a power and every one of them is whole. So the answer is the power itself rather than an Optional, and it is an Integer rather than a Rational.
 			§§
+			§§ @example
+			§§   expect 3::raise(to 4)::is(81)
+			§§   expect 0::raise(to 0)::is(1)
+			§§
 			§§ @param to — the exponent, proven not to be negative
 			§§ @returns — the power.
 			(to exponent: NonNegativeInteger) -> Integer
@@ -758,10 +976,22 @@ declarations {
 		§§
 		§§ A perfect square answers an Integer, and any other non-negative Integer answers an exact Algebraic. A negative Integer answers empty, and the `defaultingTo:` entry answers the given value instead. A receiver proven not to be negative answers the root itself, through `NonNegativeInteger`.
 		overload squareRoot {
+			§§ @example
+			§§   constant area: Integer = 9
+			§§
+			§§   expect area::squareRoot()::is(3)
+			§§   expect -4::squareRoot()::isEmpty()
+			§§
 			§§ @returns — the root, or nothing for a negative Integer.
 			() -> Optional<Integer | Algebraic>
 
 			§§ Answers the exact square root, with a value to answer for a negative Integer.
+			§§
+			§§ @example
+			§§   constant area: Integer = 9
+			§§
+			§§   expect area::squareRoot(defaultingTo 0)::is(3)
+			§§   expect -4::squareRoot(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no root
 			§§ @returns — the root, or the given value in its place.
@@ -802,6 +1032,10 @@ declarations {
 		overload isLessThan {
 			§§ Answers whether this Integer is strictly below another Integer.
 			§§
+			§§ @example
+			§§   expect 1::isLessThan(2)
+			§§   expect 2::isLessThan(2)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when this Integer is below the other.
 			(_ other: Integer) -> Boolean {
@@ -809,6 +1043,10 @@ declarations {
 			}
 
 			§§ Answers whether this Integer is strictly below a Rational.
+			§§
+			§§ @example
+			§§   expect 1::isLessThan(3/2)
+			§§   expect 2::isLessThan(3/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when this Integer is below the Rational.
@@ -821,6 +1059,10 @@ declarations {
 		overload isLessThanOrEqualTo {
 			§§ Answers whether this Integer is below another Integer, or equal to it.
 			§§
+			§§ @example
+			§§   expect 2::isLessThanOrEqualTo(2)
+			§§   expect 3::isLessThanOrEqualTo(2)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when this Integer is not above the other.
 			(_ other: Integer) -> Boolean {
@@ -830,6 +1072,10 @@ declarations {
 			§§ Answers whether this Integer is below a Rational, or equal to it.
 			§§
 			§§ An Integer equals a Rational only when that Rational is whole.
+			§§
+			§§ @example
+			§§   expect 2::isLessThanOrEqualTo(4/2)
+			§§   expect 2::isLessThanOrEqualTo(3/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when this Integer is not above the Rational.
@@ -842,6 +1088,10 @@ declarations {
 		overload isGreaterThan {
 			§§ Answers whether this Integer is strictly above another Integer.
 			§§
+			§§ @example
+			§§   expect 3::isGreaterThan(2)
+			§§   expect 2::isGreaterThan(2)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when this Integer is above the other.
 			(_ other: Integer) -> Boolean {
@@ -849,6 +1099,10 @@ declarations {
 			}
 
 			§§ Answers whether this Integer is strictly above a Rational.
+			§§
+			§§ @example
+			§§   expect 2::isGreaterThan(3/2)
+			§§   expect 1::isGreaterThan(3/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when this Integer is above the Rational.
@@ -861,6 +1115,10 @@ declarations {
 		overload isGreaterThanOrEqualTo {
 			§§ Answers whether this Integer is above another Integer, or equal to it.
 			§§
+			§§ @example
+			§§   expect 2::isGreaterThanOrEqualTo(2)
+			§§   expect 1::isGreaterThanOrEqualTo(2)::negate()
+			§§
 			§§ @param _ — the Integer to compare against
 			§§ @returns — `true` when this Integer is not below the other.
 			(_ other: Integer) -> Boolean {
@@ -870,6 +1128,10 @@ declarations {
 			§§ Answers whether this Integer is above a Rational, or equal to it.
 			§§
 			§§ An Integer equals a Rational only when that Rational is whole.
+			§§
+			§§ @example
+			§§   expect 2::isGreaterThanOrEqualTo(4/2)
+			§§   expect 1::isGreaterThanOrEqualTo(3/2)::negate()
 			§§
 			§§ @param _ — the Rational to compare against
 			§§ @returns — `true` when this Integer is not below the Rational.
@@ -881,6 +1143,11 @@ declarations {
 		§§ Answers whether the Integer is divisible by two.
 		§§
 		§§ Zero is even.
+		§§
+		§§ @example
+		§§   expect 4::isEven()
+		§§   expect 0::isEven()
+		§§   expect 7::isEven()::negate()
 		isEven() -> Boolean {
 			§ `2` is a literal, so it is a NonZeroInteger and `remainder`
 			§ answers a bare Integer.
@@ -888,6 +1155,11 @@ declarations {
 		}
 
 		§§ Answers whether the Integer is not divisible by two.
+		§§
+		§§ @example
+		§§   expect 7::isOdd()
+		§§   expect -3::isOdd()
+		§§   expect 4::isOdd()::negate()
 		isOdd() -> Boolean {
 			<- @::isEven()::negate()
 		}
@@ -895,6 +1167,10 @@ declarations {
 		§§ Answers whether the Integer is above zero.
 		§§
 		§§ Zero is neither positive nor negative.
+		§§
+		§§ @example
+		§§   expect 5::isPositive()
+		§§   expect 0::isPositive()::negate()
 		isPositive() -> Boolean {
 			<- @::isGreaterThan(0)
 		}
@@ -902,11 +1178,19 @@ declarations {
 		§§ Answers whether the Integer is below zero.
 		§§
 		§§ Zero is neither positive nor negative.
+		§§
+		§§ @example
+		§§   expect -5::isNegative()
+		§§   expect 0::isNegative()::negate()
 		isNegative() -> Boolean {
 			<- @::isLessThan(0)
 		}
 
 		§§ Answers whether the Integer is exactly zero.
+		§§
+		§§ @example
+		§§   expect 0::isZero()
+		§§   expect 3::isZero()::negate()
 		isZero() -> Boolean {
 			§ This body is read as well as run. A predicate written as one
 			§ call on `@` is that call, so the `else` of an `if` asking
@@ -924,6 +1208,9 @@ declarations {
 		§§ Answers whether the Integer is a whole number.
 		§§
 		§§ Every Integer is whole, so the answer is always `true`.
+		§§
+		§§ @example
+		§§   expect 7::isWholeNumber()
 		isWholeNumber() -> Boolean {
 			<- true
 		}
@@ -931,6 +1218,11 @@ declarations {
 		§§ Answers whether the Integer is a whole multiple of the given divisor.
 		§§
 		§§ Zero is a multiple of every Integer. A zero divisor answers `false`: there is no remainder to read, and an empty answer is not zero.
+		§§
+		§§ @example
+		§§   expect 12::isMultiple(of 4)
+		§§   expect 0::isMultiple(of 7)
+		§§   expect 12::isMultiple(of 0)::negate()
 		§§
 		§§ @param of — the divisor
 		§§ @returns — `true` when the division leaves no remainder.
@@ -953,6 +1245,11 @@ declarations {
 		§§
 		§§ Two is the lowest prime. Zero, one and every negative Integer are not prime. The test is a Miller-Rabin test over the first twelve primes as witnesses. It decides every Integer below 3317044064679887385961981 exactly. A larger Integer it accepts is a strong probable prime to those twelve witnesses.
 		§§
+		§§ @example
+		§§   expect 97::isPrime()
+		§§   expect 2::isPrime()
+		§§   expect 1::isPrime()::negate()
+		§§
 		§§ @returns — `true` when the Integer is prime.
 		isPrime() -> Boolean
 
@@ -964,10 +1261,18 @@ declarations {
 
 		§§ Answers the Integer without its sign, which is its distance from zero.
 		§§
+		§§ @example
+		§§   expect -7::absolute()::is(7)
+		§§   expect 0::absolute()::is(0)
+		§§
 		§§ @returns — the distance, which is never negative.
 		absolute() -> NonNegativeInteger
 
 		§§ Answers the Integer with its sign flipped.
+		§§
+		§§ @example
+		§§   expect 7::negate()::is(-7)
+		§§   expect -7::negate()::is(7)
 		negate() -> Integer
 
 		§§ Answers the Integer, rounded in the named direction.
@@ -975,6 +1280,10 @@ declarations {
 		§§ An Integer is already whole and is on every decimal grid, so every entry here answers the receiver itself. The direction is `#Nearest` when a call names none.
 		overload round {
 			§§ Answers the Integer, rounded in the named direction.
+			§§
+			§§ @example
+			§§   expect 7::round()::is(7)
+			§§   expect 7::round(toward #Up)::is(7)
 			§§
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
 			§§ @returns — the Integer itself.
@@ -992,6 +1301,9 @@ declarations {
 			§ saves 491.
 
 			§§ Answers the Integer, rounded to a decimal grid of the given width.
+			§§
+			§§ @example
+			§§   expect 1234::round(toPlaces 2)::is(1234)
 			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
@@ -1012,6 +1324,9 @@ declarations {
 		§§ Answers the Integer read off a decimal grid of the given width.
 		§§
 		§§ An Integer is on every decimal grid, so the answer is the receiver itself as a Rational. The entries of this name on `Algebraic` and on `Transcendental` are what make an irrational readable as a number. This one is what lets a `Number` receiver reach the family.
+		§§
+		§§ @example
+		§§   expect 3::approximate(toPlaces 2)::is(3)
 		§§
 		§§ @param toPlaces — how many decimal places to keep
 		§§ @param toward — the direction to round in, `#Nearest` when it is left out
@@ -1034,6 +1349,11 @@ declarations {
 		§§
 		§§ The sign of either Integer is ignored, so the answer is never negative. Zero is divided by every Integer, so the divisor of zero and an Integer is that Integer without its sign. The divisor of two zeroes is zero.
 		§§
+		§§ @example
+		§§   expect 12::greatestCommonDivisor(with 18)::is(6)
+		§§   expect -4::greatestCommonDivisor(with 6)::is(2)
+		§§   expect 0::greatestCommonDivisor(with -5)::is(5)
+		§§
 		§§ @param with — the Integer to share a divisor with
 		§§ @returns — the greatest common divisor, which is never negative.
 		greatestCommonDivisor(with other: Integer) -> NonNegativeInteger
@@ -1041,6 +1361,11 @@ declarations {
 		§§ Answers the smallest Integer above zero that both this Integer and the given one divide.
 		§§
 		§§ The sign of either Integer is ignored, so the answer is never negative. Zero has no multiple above zero, so a zero operand answers zero. The product of the two answers holds for every pair: `leastCommonMultiple · greatestCommonDivisor` is the product of the two Integers without its sign.
+		§§
+		§§ @example
+		§§   expect 4::leastCommonMultiple(with 6)::is(12)
+		§§   expect -4::leastCommonMultiple(with 6)::is(12)
+		§§   expect 0::leastCommonMultiple(with 6)::is(0)
 		§§
 		§§ @param with — the Integer to share a multiple with
 		§§ @returns — the least common multiple, which is never negative.
@@ -1050,10 +1375,22 @@ declarations {
 		§§
 		§§ The factorial of zero is one. A negative Integer has no factorial, and the `defaultingTo:` entry answers the given Integer instead. A receiver proven not to be negative answers the factorial itself, through `NonNegativeInteger`.
 		overload factorial {
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect guests::factorial()::is(24)
+			§§   expect -1::factorial()::isEmpty()
+			§§
 			§§ @returns — the factorial, or nothing for a negative Integer.
 			() -> Optional<PositiveInteger>
 
 			§§ Answers the factorial, with a value to answer for a negative Integer.
+			§§
+			§§ @example
+			§§   constant guests: Integer = 4
+			§§
+			§§   expect guests::factorial(defaultingTo 0)::is(24)
+			§§   expect -1::factorial(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is no factorial
 			§§ @returns — the factorial, or the given value in its place.
@@ -1077,6 +1414,10 @@ declarations {
 		§§ Answers the Integer as a Rational.
 		§§
 		§§ Every Integer is a Rational over one, so the crossing never fails. The Rational is whole, and prints as the digits alone.
+		§§
+		§§ @example
+		§§   expect 3::toRational()::is(3/1)
+		§§   expect 3::toRational()::toString()::is("3")
 		§§
 		§§ @returns — the Rational holding this value.
 		toRational() -> Rational {
@@ -1121,6 +1462,9 @@ declarations {
 			§§
 			§§ The product is never zero, so the answer is a NonZeroInteger too.
 			§§
+			§§ @example
+			§§   expect -3::multiply(with 4)::is(-12)
+			§§
 			§§ @param with — the NonZeroInteger to multiply with
 			§§ @returns — the product, which is not zero.
 			(with other: NonZeroInteger) -> NonZeroInteger
@@ -1128,6 +1472,15 @@ declarations {
 			§§ Multiplies this NonZeroInteger with an Algebraic.
 			§§
 			§§ The factor is proven, so the radical survives and the answer is an Algebraic rather than a Union.
+			§§
+			§§ @example
+			§§   match 2::squareRoot() -> {} {
+			§§   	case Algebraic {
+			§§   		expect 3::multiply(with @)::toString()::is("3·√2")
+			§§   	}
+			§§
+			§§   	case Integer { expect false }
+			§§   }
 			§§
 			§§ @param with — the Algebraic to multiply with
 			§§ @returns — the exact product.
@@ -1150,6 +1503,10 @@ declarations {
 		§§
 		§§ Neither operand is zero, so the quotient is not zero either. So the answer is a NonZeroRational, and it reaches `reciprocal` without an Optional in between.
 		§§
+		§§ @example
+		§§   expect 6::divide(by 4)::is(3/2)
+		§§   expect 6::divide(by 4)::reciprocal()::is(2/3)
+		§§
 		§§ @param by — the divisor, proven not to be zero
 		§§ @returns — the exact quotient, which is not zero.
 		divide(by other: NonZeroInteger) -> NonZeroRational
@@ -1162,6 +1519,10 @@ declarations {
 			§§
 			§§ A non-negative exponent answers an Integer, and a negative one answers the exact reciprocal as a Rational.
 			§§
+			§§ @example
+			§§   expect 2::raise(to -2)::is(1/4)
+			§§   expect -2::raise(to -1)::is(-1/2)
+			§§
 			§§ @param to — the exponent
 			§§ @returns — the power.
 			(to exponent: Integer) -> Integer | Rational
@@ -1169,6 +1530,10 @@ declarations {
 			§§ Raises this NonZeroInteger to an exponent proven not to be negative.
 			§§
 			§§ Every such power is whole, so the answer is an Integer rather than a Union. The entry is `Integer`'s own, declared here as well, because a receiver carrying more proof must not answer wider than one carrying none.
+			§§
+			§§ @example
+			§§   expect -2::raise(to 3)::is(-8)
+			§§   expect -2::raise(to 0)::is(1)
 			§§
 			§§ @param to — the exponent, proven not to be negative
 			§§ @returns — the power.
@@ -1179,12 +1544,19 @@ declarations {
 		§§
 		§§ The receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveInteger.
 		§§
+		§§ @example
+		§§   expect -7::absolute()::is(7)
+		§§
 		§§ @returns — the distance, which is above zero.
 		absolute() -> PositiveInteger
 
 		§§ Answers this NonZeroInteger with its sign flipped.
 		§§
 		§§ Negation keeps a value away from zero, so the answer is a NonZeroInteger too.
+		§§
+		§§ @example
+		§§   expect 7::negate()::is(-7)
+		§§   expect -7::negate()::is(7)
 		§§
 		§§ @returns — the negation, which is not zero.
 		negate() -> NonZeroInteger
@@ -1209,6 +1581,9 @@ declarations {
 			§§
 			§§ The receiver is not negative and the other summand is above zero, so the sum is above zero.
 			§§
+			§§ @example
+			§§   expect 0::add(5)::is(5)
+			§§
 			§§ @param _ — the PositiveInteger to add
 			§§ @returns — the sum, which is above zero.
 			(_ other: PositiveInteger) -> PositiveInteger
@@ -1216,6 +1591,12 @@ declarations {
 			§§ Adds an Integer proven not to be negative.
 			§§
 			§§ Neither summand is negative, so the sum is not negative either.
+			§§
+			§§ @example
+			§§   constant finished: NonNegativeInteger = 3
+			§§   constant remaining: NonNegativeInteger = 4
+			§§
+			§§   expect finished::add(remaining)::is(7)
 			§§
 			§§ @param _ — the NonNegativeInteger to add
 			§§ @returns — the sum, which is never negative.
@@ -1226,6 +1607,11 @@ declarations {
 		§§
 		§§ Neither factor is negative, so the product is not negative either.
 		§§
+		§§ @example
+		§§   constant rows: NonNegativeInteger = 3
+		§§
+		§§   expect rows::multiply(with 4)::is(12)
+		§§
 		§§ @param with — the NonNegativeInteger to multiply with
 		§§ @returns — the product, which is never negative.
 		multiply(with other: NonNegativeInteger) -> NonNegativeInteger
@@ -1234,12 +1620,22 @@ declarations {
 		§§
 		§§ A negative Integer is the only one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A perfect square answers an Integer, and every other value answers an exact Algebraic.
 		§§
+		§§ @example
+		§§   constant area: NonNegativeInteger = 49
+		§§
+		§§   expect area::squareRoot()::is(7)
+		§§   expect 0::squareRoot()::is(0)
+		§§
 		§§ @returns — the root.
 		squareRoot() -> Integer | Algebraic
 
 		§§ Answers the product of every Integer from one up to this NonNegativeInteger.
 		§§
 		§§ A negative Integer is the one receiver with no factorial, and the receiver is proven not to be one. So the answer is the factorial itself rather than an Optional. The factorial of zero is one.
+		§§
+		§§ @example
+		§§   expect 5::factorial()::is(120)
+		§§   expect 0::factorial()::is(1)
 		§§
 		§§ @returns — the factorial, which is above zero.
 		factorial() -> PositiveInteger
@@ -1267,6 +1663,10 @@ declarations {
 		§§
 		§§ The receiver is above zero and the other summand is not below it, so the sum is above zero.
 		§§
+		§§ @example
+		§§   expect 2::add(3)::is(5)
+		§§   expect 2::add(0)::is(2)
+		§§
 		§§ @param _ — the NonNegativeInteger to add
 		§§ @returns — the sum, which is above zero.
 		add(_ other: NonNegativeInteger) -> PositiveInteger
@@ -1274,6 +1674,9 @@ declarations {
 		§§ Multiplies this PositiveInteger with another.
 		§§
 		§§ Both factors are above zero, so the product is above zero.
+		§§
+		§§ @example
+		§§   expect 6::multiply(with 7)::is(42)
 		§§
 		§§ @param with — the PositiveInteger to multiply with
 		§§ @returns — the product, which is above zero.
@@ -1283,6 +1686,10 @@ declarations {
 		§§
 		§§ Every such power is whole and above zero. Zero as an exponent answers one.
 		§§
+		§§ @example
+		§§   expect 2::raise(to 10)::is(1024)
+		§§   expect 5::raise(to 0)::is(1)
+		§§
 		§§ @param to — the exponent, proven not to be negative
 		§§ @returns — the power, which is above zero.
 		raise(to exponent: NonNegativeInteger) -> PositiveInteger
@@ -1290,6 +1697,10 @@ declarations {
 		§§ Answers the exact square root of this PositiveInteger.
 		§§
 		§§ A perfect square above zero has a root above zero, and every other value answers an exact Algebraic.
+		§§
+		§§ @example
+		§§   expect 49::squareRoot()::is(7)
+		§§   expect 2::squareRoot()::toString()::is("√2")
 		§§
 		§§ @returns — the root.
 		squareRoot() -> PositiveInteger | Algebraic

@@ -65,7 +65,9 @@
 								}
 							],
 							"returns": "the Rational, or nothing when the denominator is zero.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect Rational.of(3, over guests)::is(3/4)\nexpect Rational.of(3, over 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "static of(_ numerator: Integer, over denominator: NonZeroInteger) -> Rational",
@@ -87,7 +89,9 @@
 								}
 							],
 							"returns": "the Rational.",
-							"examples": []
+							"examples": [
+								"expect Rational.of(6, over 8)::is(3/4)"
+							]
 						},
 						{
 							"signature": "static of(\n\t_ numerator: Integer,\n\tover denominator: Integer,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -116,7 +120,9 @@
 								}
 							],
 							"returns": "the Rational, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant guests: Integer = 4\n\nexpect Rational.of(3, over guests, defaultingTo 0/1)::is(3/4)\nexpect Rational.of(3, over 0, defaultingTo 0/1)::is(0)"
+							]
 						}
 					]
 				},
@@ -206,7 +212,9 @@
 								}
 							],
 							"returns": "`true` when both are equal.",
-							"examples": []
+							"examples": [
+								"expect 1/2::is(2/4)\nexpect 1/2::is(1/3)::negate()"
+							]
 						},
 						{
 							"signature": "is(_ other: Integer) -> Boolean",
@@ -221,7 +229,9 @@
 								}
 							],
 							"returns": "`true` when the Rational is whole and its numerator is that Integer.",
-							"examples": []
+							"examples": [
+								"expect 6/3::is(2)\nexpect 5/2::is(2)::negate()"
+							]
 						}
 					]
 				},
@@ -251,7 +261,9 @@
 								}
 							],
 							"returns": "`true` when the two differ.",
-							"examples": []
+							"examples": [
+								"expect 1/2::isNot(1/3)\nexpect 1/2::isNot(2/4)::negate()"
+							]
 						},
 						{
 							"signature": "isNot(_ other: Integer) -> Boolean",
@@ -266,7 +278,9 @@
 								}
 							],
 							"returns": "`true` when the two differ.",
-							"examples": []
+							"examples": [
+								"expect 5/2::isNot(2)\nexpect 6/3::isNot(2)::negate()"
+							]
 						}
 					]
 				},
@@ -296,7 +310,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect 1/2::compare(to 2/3)::is(#Less)\nexpect 2/4::compare(to 1/2)::is(#Equal)"
+							]
 						}
 					]
 				},
@@ -318,7 +334,9 @@
 							"summary": "Answers the Rational as a fraction, in lowest terms.\n\nThe form is `3/4`. A whole Rational prints its numerator alone, so `1/2::add(1/2)` prints `1`.",
 							"parameters": [],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"expect 3/4::toString()::is(\"3/4\")\nexpect 1/2::add(1/2)::toString()::is(\"1\")"
+							]
 						},
 						{
 							"signature": "toString(as format: NumberFormat) -> String",
@@ -333,7 +351,9 @@
 								}
 							],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"expect 3/4::toString(as #Decimal)::is(\"0.75\")\nexpect 3/4::toString(as #Percent)::is(\"75%\")\nexpect 1234/1::toString(as #Scientific)::is(\"1.234e3\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -362,7 +382,9 @@
 								}
 							],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"expect 1/2::toString(as #Decimal, toPlaces 2)::is(\"0.50\")\nexpect 1/8::toString(as #Decimal, toPlaces 2)::is(\"0.13\")\nexpect 1/8::toString(as #Decimal, toPlaces 2, toward #Down)::is(\"0.12\")"
+							]
 						},
 						{
 							"signature": "toString(as format: NumberFormat, groupingWith separator: String) -> String",
@@ -384,7 +406,9 @@
 								}
 							],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"constant price = 12345/2\n\nexpect price::toString(as #Decimal, groupingWith \",\")::is(\"6,172.5\")\nexpect price::toString(as #Fraction, groupingWith \",\")::is(\"12,345/2\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\tgroupingWith separator: String,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -420,7 +444,9 @@
 								}
 							],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"constant label = 12345/2::toString(\n\tas #Decimal,\n\ttoPlaces 2,\n\tgroupingWith \",\",\n)\n\nexpect label::is(\"6,172.50\")"
+							]
 						},
 						{
 							"signature": "toString(showingSign style: SignStyle) -> String",
@@ -435,7 +461,9 @@
 								}
 							],
 							"returns": "the String representation of the Rational.",
-							"examples": []
+							"examples": [
+								"expect 3/4::toString(showingSign #Always)::is(\"+3/4\")\nexpect 0/1::toString(showingSign #Always)::is(\"+0\")\nexpect 3/4::toString(showingSign #Negative)::is(\"3/4\")"
+							]
 						}
 					]
 				}
@@ -471,7 +499,7 @@
 								}
 							],
 							"returns": "the sum.",
-							"examples": []
+							"examples": ["expect 1/2::add(-1/3)::is(1/6)"]
 						},
 						{
 							"signature": "add(_ other: Integer) -> Rational",
@@ -486,7 +514,7 @@
 								}
 							],
 							"returns": "the sum, as a Rational.",
-							"examples": []
+							"examples": ["expect 1/2::add(1)::is(3/2)"]
 						},
 						{
 							"signature": "add(_ other: Algebraic) -> Algebraic",
@@ -501,7 +529,9 @@
 								}
 							],
 							"returns": "the sum, as an Algebraic.",
-							"examples": []
+							"examples": [
+								"expect 1/2::add(Number.GoldenRatio)::toString()::is(\"1 + 1/2·√5\")"
+							]
 						},
 						{
 							"signature": "add(_ other: Transcendental) -> Transcendental",
@@ -516,7 +546,9 @@
 								}
 							],
 							"returns": "the sum, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect 1/2::add(Number.Pi)::toString()::is(\"1/2 + π\")"
+							]
 						}
 					]
 				},
@@ -546,7 +578,9 @@
 								}
 							],
 							"returns": "the sum, which is above zero.",
-							"examples": []
+							"examples": [
+								"constant tip: NonNegativeRational = 1/10\n\nexpect tip::add(1/5)::is(3/10)"
+							]
 						},
 						{
 							"signature": "add(_ other: NonNegativeRational) -> NonNegativeRational",
@@ -561,7 +595,9 @@
 								}
 							],
 							"returns": "the sum, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant tip: NonNegativeRational = 1/10\nconstant tax: NonNegativeRational = 1/5\n\nexpect tip::add(tax)::is(3/10)"
+							]
 						}
 					]
 				},
@@ -591,7 +627,9 @@
 								}
 							],
 							"returns": "the sum, which is above zero.",
-							"examples": []
+							"examples": [
+								"expect 1/2::add(1/3)::is(5/6)\nexpect 1/2::add(0/1)::is(1/2)"
+							]
 						}
 					]
 				},
@@ -621,7 +659,7 @@
 								}
 							],
 							"returns": "the difference.",
-							"examples": []
+							"examples": ["expect 3/4::subtract(1/4)::is(1/2)"]
 						},
 						{
 							"signature": "subtract(_ other: Integer) -> Rational",
@@ -636,7 +674,7 @@
 								}
 							],
 							"returns": "the difference, as a Rational.",
-							"examples": []
+							"examples": ["expect 5/2::subtract(1)::is(3/2)"]
 						},
 						{
 							"signature": "subtract(_ other: Algebraic) -> Algebraic",
@@ -651,7 +689,9 @@
 								}
 							],
 							"returns": "the difference, as an Algebraic.",
-							"examples": []
+							"examples": [
+								"expect 1/2::subtract(Number.GoldenRatio)::toString()::is(\"-1/2·√5\")"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Transcendental) -> Transcendental",
@@ -666,7 +706,9 @@
 								}
 							],
 							"returns": "the difference, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect 1/2::subtract(Number.Pi)::toString()::is(\"1/2 − π\")"
+							]
 						}
 					]
 				},
@@ -696,7 +738,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant rate: Rational = 3/4\n\nexpect rate::multiply(with 2/3)::is(1/2)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Integer) -> Rational",
@@ -711,7 +755,9 @@
 								}
 							],
 							"returns": "the product, as a Rational.",
-							"examples": []
+							"examples": [
+								"expect 3/4::multiply(with 2)::is(3/2)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Algebraic) -> Algebraic | Rational",
@@ -726,7 +772,9 @@
 								}
 							],
 							"returns": "the product, as an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"expect 2/1::multiply(with Number.GoldenRatio)::toString()::is(\"1 + √5\")\nexpect 0/1::multiply(with Number.GoldenRatio)::is(0)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Transcendental) -> Transcendental | Rational",
@@ -741,7 +789,9 @@
 								}
 							],
 							"returns": "the product, as a Transcendental or a Rational.",
-							"examples": []
+							"examples": [
+								"expect 1/2::multiply(with Number.Tau)::toString()::is(\"π\")\nexpect 0/1::multiply(with Number.Pi)::is(0)"
+							]
 						}
 					]
 				},
@@ -771,7 +821,9 @@
 								}
 							],
 							"returns": "the product, which is not zero.",
-							"examples": []
+							"examples": [
+								"expect -1/2::multiply(with 2/3)::is(-1/3)"
+							]
 						}
 					]
 				},
@@ -801,7 +853,9 @@
 								}
 							],
 							"returns": "the product, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant tip: NonNegativeRational = 1/10\nconstant share: NonNegativeRational = 1/2\n\nexpect tip::multiply(with share)::is(1/20)"
+							]
 						}
 					]
 				},
@@ -831,7 +885,9 @@
 								}
 							],
 							"returns": "the product, which is above zero.",
-							"examples": []
+							"examples": [
+								"expect 1/2::multiply(with 3/4)::is(3/8)"
+							]
 						}
 					]
 				},
@@ -861,7 +917,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant share: Rational = 3/4\n\nexpect 1/2::divide(by share)::is(2/3)\nexpect 1/2::divide(by 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Integer) -> Optional<Rational>",
@@ -876,7 +934,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant people: Integer = 3\n\nexpect 3/4::divide(by people)::is(1/4)\nexpect 3/4::divide(by 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Algebraic) -> Algebraic | Rational",
@@ -891,7 +951,9 @@
 								}
 							],
 							"returns": "the quotient, as an Algebraic or a Rational.",
-							"examples": []
+							"examples": [
+								"constant phi = Number.GoldenRatio\n\nexpect 1/1::divide(by phi)::is(phi::subtract(1))\nexpect 0/1::divide(by phi)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: Rational, defaultingTo fallback: Rational) -> Rational",
@@ -913,7 +975,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant share: Rational = 3/4\n\nexpect 1/2::divide(by share, defaultingTo 0/1)::is(2/3)\nexpect 1/2::divide(by 0/1, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: Integer, defaultingTo fallback: Rational) -> Rational",
@@ -935,7 +999,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant people: Integer = 3\n\nexpect 3/4::divide(by people, defaultingTo 0/1)::is(1/4)\nexpect 3/4::divide(by 0, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroInteger) -> Rational",
@@ -950,7 +1016,7 @@
 								}
 							],
 							"returns": "the quotient.",
-							"examples": []
+							"examples": ["expect 3/4::divide(by 3)::is(1/4)"]
 						},
 						{
 							"signature": "divide(by other: NonZeroRational) -> Rational",
@@ -965,7 +1031,7 @@
 								}
 							],
 							"returns": "the quotient.",
-							"examples": []
+							"examples": ["expect 1/2::divide(by 3/4)::is(2/3)"]
 						}
 					]
 				},
@@ -995,7 +1061,9 @@
 								}
 							],
 							"returns": "the remainder, or nothing when dividing by zero.",
-							"examples": []
+							"examples": [
+								"constant step: Rational = 1/3\n\nexpect 7/2::remainder(dividingBy step)::is(1/6)\nexpect 7/2::remainder(dividingBy 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "remainder(dividingBy divisor: NonZeroRational) -> Rational",
@@ -1010,7 +1078,9 @@
 								}
 							],
 							"returns": "the remainder.",
-							"examples": []
+							"examples": [
+								"expect 7/2::remainder(dividingBy 1/3)::is(1/6)\nexpect -7/2::remainder(dividingBy 1/3)::is(1/6)"
+							]
 						},
 						{
 							"signature": "remainder(\n\tdividingBy divisor: Rational,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -1032,7 +1102,9 @@
 								}
 							],
 							"returns": "the remainder, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant step: Rational = 1/3\n\nexpect 7/2::remainder(dividingBy step, defaultingTo 0/1)::is(1/6)\nexpect 7/2::remainder(dividingBy 0/1, defaultingTo 0/1)::is(0)"
+							]
 						}
 					]
 				},
@@ -1062,7 +1134,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when dividing by zero.",
-							"examples": []
+							"examples": [
+								"constant step: Rational = 1/3\n\nexpect 7/2::quotient(dividingBy step)::is(10)\nexpect 7/2::quotient(dividingBy 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "quotient(dividingBy divisor: NonZeroRational) -> Integer",
@@ -1077,7 +1151,9 @@
 								}
 							],
 							"returns": "the quotient.",
-							"examples": []
+							"examples": [
+								"expect 7/2::quotient(dividingBy 1/3)::is(10)\nexpect -7/2::quotient(dividingBy 1/3)::is(-11)"
+							]
 						},
 						{
 							"signature": "quotient(\n\tdividingBy divisor: Rational,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1099,7 +1175,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant step: Rational = 1/3\n\nexpect 7/2::quotient(dividingBy step, defaultingTo 0)::is(10)\nexpect 7/2::quotient(dividingBy 0/1, defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1129,7 +1207,9 @@
 								}
 							],
 							"returns": "the power, or nothing when raising zero to a negative power.",
-							"examples": []
+							"examples": [
+								"expect 2/3::raise(to -2)::is(9/4)\nexpect 0/1::raise(to -1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "raise(\n\tto exponent: Integer,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -1151,7 +1231,9 @@
 								}
 							],
 							"returns": "the power, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"expect 2/3::raise(to -2, defaultingTo 0/1)::is(9/4)\nexpect 0/1::raise(to -1, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "raise(to exponent: NonNegativeInteger) -> Rational",
@@ -1166,7 +1248,9 @@
 								}
 							],
 							"returns": "the power.",
-							"examples": []
+							"examples": [
+								"expect 2/3::raise(to 2)::is(4/9)\nexpect 0/1::raise(to 0)::is(1)"
+							]
 						}
 					]
 				},
@@ -1188,7 +1272,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the root, or nothing for a negative Rational.",
-							"examples": []
+							"examples": [
+								"constant area: Rational = 9/4\n\nexpect area::squareRoot()::is(3/2)\nexpect -1/4::squareRoot()::isEmpty()"
+							]
 						},
 						{
 							"signature": "squareRoot(\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -1203,7 +1289,9 @@
 								}
 							],
 							"returns": "the root, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant area: Rational = 9/4\n\nexpect area::squareRoot(defaultingTo 0/1)::is(3/2)\nexpect -1/4::squareRoot(defaultingTo 0/1)::is(0)"
+							]
 						}
 					]
 				},
@@ -1225,7 +1313,9 @@
 							"summary": "Answers the exact square root of this NonNegativeRational.\n\nA negative Rational is the one with no real root, and the receiver is proven not to be one. So the answer is the root itself rather than an Optional. A ratio of two perfect squares answers a Rational, and every other value answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the root.",
-							"examples": []
+							"examples": [
+								"constant area: NonNegativeRational = 9/4\nconstant half: NonNegativeRational = 1/2\n\nexpect area::squareRoot()::is(3/2)\nexpect half::squareRoot()::toString()::is(\"1/2·√2\")"
+							]
 						}
 					]
 				},
@@ -1247,7 +1337,9 @@
 							"summary": "Answers the exact square root of this PositiveRational.\n\nA ratio of two perfect squares above zero has a root above zero, and every other value answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the root.",
-							"examples": []
+							"examples": [
+								"expect 9/4::squareRoot()::is(3/2)\nexpect 1/2::squareRoot()::toString()::is(\"1/2·√2\")"
+							]
 						}
 					]
 				}
@@ -1283,7 +1375,9 @@
 								}
 							],
 							"returns": "`true` when the receiver is below the other Rational.",
-							"examples": []
+							"examples": [
+								"expect 1/2::isLessThan(2/3)\nexpect 1/2::isLessThan(2/4)::negate()"
+							]
 						},
 						{
 							"signature": "isLessThan(_ other: Integer) -> Boolean",
@@ -1298,7 +1392,9 @@
 								}
 							],
 							"returns": "`true` when the Rational is below the Integer.",
-							"examples": []
+							"examples": [
+								"expect 1/2::isLessThan(1)\nexpect 3/2::isLessThan(1)::negate()"
+							]
 						}
 					]
 				},
@@ -1328,7 +1424,9 @@
 								}
 							],
 							"returns": "`true` when the receiver is below the other Rational or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 1/2::isLessThanOrEqualTo(2/4)\nexpect 2/3::isLessThanOrEqualTo(1/2)::negate()"
+							]
 						},
 						{
 							"signature": "isLessThanOrEqualTo(_ other: Integer) -> Boolean",
@@ -1343,7 +1441,9 @@
 								}
 							],
 							"returns": "`true` when the Rational is below the Integer or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 2/2::isLessThanOrEqualTo(1)\nexpect 3/2::isLessThanOrEqualTo(1)::negate()"
+							]
 						}
 					]
 				},
@@ -1373,7 +1473,9 @@
 								}
 							],
 							"returns": "`true` when the receiver is above the other Rational.",
-							"examples": []
+							"examples": [
+								"expect 2/3::isGreaterThan(1/2)\nexpect 2/4::isGreaterThan(1/2)::negate()"
+							]
 						},
 						{
 							"signature": "isGreaterThan(_ other: Integer) -> Boolean",
@@ -1388,7 +1490,9 @@
 								}
 							],
 							"returns": "`true` when the Rational is above the Integer.",
-							"examples": []
+							"examples": [
+								"expect 3/2::isGreaterThan(1)\nexpect 1/2::isGreaterThan(1)::negate()"
+							]
 						}
 					]
 				},
@@ -1418,7 +1522,9 @@
 								}
 							],
 							"returns": "`true` when the receiver is above the other Rational or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 2/4::isGreaterThanOrEqualTo(1/2)\nexpect 1/2::isGreaterThanOrEqualTo(2/3)::negate()"
+							]
 						},
 						{
 							"signature": "isGreaterThanOrEqualTo(_ other: Integer) -> Boolean",
@@ -1433,7 +1539,9 @@
 								}
 							],
 							"returns": "`true` when the Rational is above the Integer or equal to it.",
-							"examples": []
+							"examples": [
+								"expect 2/2::isGreaterThanOrEqualTo(1)\nexpect 1/2::isGreaterThanOrEqualTo(1)::negate()"
+							]
 						}
 					]
 				},
@@ -1535,7 +1643,9 @@
 							"summary": "Answers whether the Rational is a whole number.\n\nA whole number has the denominator one in lowest terms.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 4/2::isWholeNumber()\nexpect 3/4::isWholeNumber()::negate()"
+							]
 						}
 					]
 				},
@@ -1557,7 +1667,9 @@
 							"summary": "Answers whether the Rational is above zero.\n\nZero is neither positive nor negative.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 3/4::isPositive()\nexpect 0/1::isPositive()::negate()"
+							]
 						}
 					]
 				},
@@ -1579,7 +1691,9 @@
 							"summary": "Answers whether the Rational is below zero.\n\nZero is neither positive nor negative.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect -3/4::isNegative()\nexpect 0/1::isNegative()::negate()"
+							]
 						}
 					]
 				},
@@ -1601,7 +1715,9 @@
 							"summary": "Answers whether the Rational is exactly zero.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 0/1::isZero()\nexpect 3/4::isZero()::negate()"
+							]
 						}
 					]
 				}
@@ -1629,7 +1745,9 @@
 							"summary": "Answers the numerator of the Rational in lowest terms.\n\nThe numerator carries the sign, because the denominator is always positive.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant ratio: Rational = -6/8\n\nexpect ratio::numerator()::is(-3)"
+							]
 						}
 					]
 				},
@@ -1651,7 +1769,7 @@
 							"summary": "Answers the numerator of this NonZeroRational in lowest terms.\n\nA Rational is zero exactly when its numerator is, and the receiver is proven not to be zero. So the answer is a NonZeroInteger.",
 							"parameters": [],
 							"returns": "the numerator, which is not zero.",
-							"examples": []
+							"examples": ["expect -6/8::numerator()::is(-3)"]
 						}
 					]
 				},
@@ -1673,7 +1791,9 @@
 							"summary": "Answers the denominator of the Rational in lowest terms.\n\nThe denominator is always positive, and never zero. So the answer is a PositiveInteger, which fits every position that asks for a NonZeroInteger or a NonNegativeInteger.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect 6/8::denominator()::is(4)\nexpect -1/2::denominator()::is(2)"
+							]
 						}
 					]
 				},
@@ -1695,7 +1815,9 @@
 							"summary": "Answers the Rational without its sign, which is its distance from zero.",
 							"parameters": [],
 							"returns": "the distance, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant change: Rational = -3/4\n\nexpect change::absolute()::is(3/4)"
+							]
 						}
 					]
 				},
@@ -1717,7 +1839,7 @@
 							"summary": "Answers this NonZeroRational without its sign, which is its distance from zero.\n\nThe receiver is not zero, so its distance from zero is above zero. So the answer is a PositiveRational.",
 							"parameters": [],
 							"returns": "the distance, which is above zero.",
-							"examples": []
+							"examples": ["expect -3/4::absolute()::is(3/4)"]
 						}
 					]
 				}
@@ -1745,7 +1867,9 @@
 							"summary": "Answers the Rational with its sign flipped.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant change: Rational = 3/4\n\nexpect change::negate()::is(-3/4)"
+							]
 						}
 					]
 				},
@@ -1767,7 +1891,7 @@
 							"summary": "Answers this NonZeroRational with its sign flipped.\n\nNegation keeps a value away from zero, so the answer is a NonZeroRational too.",
 							"parameters": [],
 							"returns": "the negation, which is not zero.",
-							"examples": []
+							"examples": ["expect 3/4::negate()::is(-3/4)"]
 						}
 					]
 				},
@@ -1789,7 +1913,9 @@
 							"summary": "",
 							"parameters": [],
 							"returns": "the reciprocal, or nothing for zero.",
-							"examples": []
+							"examples": [
+								"constant ratio: Rational = 3/4\n\nexpect ratio::reciprocal()::is(4/3)\nexpect 0/1::reciprocal()::isEmpty()"
+							]
 						},
 						{
 							"signature": "reciprocal(defaultingTo fallback: Rational) -> Rational",
@@ -1804,7 +1930,9 @@
 								}
 							],
 							"returns": "the reciprocal, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant ratio: Rational = 3/4\n\nexpect ratio::reciprocal(defaultingTo 0/1)::is(4/3)\nexpect 0/1::reciprocal(defaultingTo 0/1)::is(0)"
+							]
 						}
 					]
 				},
@@ -1826,7 +1954,9 @@
 							"summary": "Answers the reciprocal of this NonZeroRational.\n\nZero is the one Rational with no reciprocal, and the receiver is proven not to be one. So the answer is the reciprocal itself rather than an Optional. Exchanging the two parts of a value that is not zero leaves a value that is not zero, so the answer is proven as well.",
 							"parameters": [],
 							"returns": "the reciprocal, which is not zero.",
-							"examples": []
+							"examples": [
+								"expect 3/4::reciprocal()::is(4/3)\nexpect -1/2::reciprocal()::is(-2)"
+							]
 						}
 					]
 				},
@@ -1856,7 +1986,9 @@
 								}
 							],
 							"returns": "the rounded Integer.",
-							"examples": []
+							"examples": [
+								"expect 5/2::round()::is(3)\nexpect 5/2::round(toward #NearestEven)::is(2)\nexpect -5/2::round(toward #Down)::is(-3)"
+							]
 						},
 						{
 							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
@@ -1878,7 +2010,9 @@
 								}
 							],
 							"returns": "the rounded Rational.",
-							"examples": []
+							"examples": [
+								"expect 5/3::round(toPlaces 2)::is(167/100)\nexpect 5/3::round(toPlaces 0)::is(2)"
+							]
 						}
 					]
 				},
@@ -1915,7 +2049,9 @@
 								}
 							],
 							"returns": "the Rational on that grid.",
-							"examples": []
+							"examples": [
+								"expect 5/3::approximate(toPlaces 2)::is(167/100)"
+							]
 						}
 					]
 				}
@@ -1943,7 +2079,7 @@
 							"summary": "Answers the Rational as a Rational.\n\nA Rational is one already, so the answer is the receiver itself. The entry is what lets a `Scalar` receiver reach the crossing that an Integer receiver reaches.",
 							"parameters": [],
 							"returns": "the receiver itself.",
-							"examples": []
+							"examples": ["expect 3/4::toRational()::is(3/4)"]
 						}
 					]
 				}

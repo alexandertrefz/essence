@@ -72,6 +72,13 @@ declarations {
 		§§
 		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
 		§§
+		§§ @example
+		§§   constant price: Scalar = 3
+		§§   constant tip: Scalar = 1/2
+		§§
+		§§   expect price::add(tip)::is(7/2)
+		§§   expect price::add(price)::is(6)
+		§§
 		§§ @param _ — the Scalar to add
 		§§ @returns — the exact sum.
 		add(_ other: Scalar) -> Scalar {
@@ -101,6 +108,13 @@ declarations {
 		§§ Multiplies two Scalars.
 		§§
 		§§ The answer is an Integer for two Integers, and a Rational for every other pair.
+		§§
+		§§ @example
+		§§   constant price: Scalar = 4
+		§§   constant share: Scalar = 3/4
+		§§
+		§§   expect price::multiply(with share)::is(3)
+		§§   expect price::multiply(with price)::is(16)
 		§§
 		§§ @param with — the Scalar to multiply with
 		§§ @returns — the exact product.
@@ -139,15 +153,33 @@ declarations {
 	§ `isLessThan` family reads that same order.
 	namespace Number for Number is Equatable, is Printable, is Orderable {
 		§§ The ratio of a circle's circumference to its diameter, exactly.
+		§§
+		§§ @example
+		§§   expect Number.Pi::toString()::is("π")
+		§§   expect Number.Pi::toString(as #Decimal, toPlaces 5)::is("3.14159")
 		static Pi: Transcendental
 
 		§§ Twice `Pi`, which is the ratio of a circle's circumference to its radius.
+		§§
+		§§ @example
+		§§   expect Number.Tau::is(Number.Pi::multiply(with 2))
+		§§   expect Number.Tau::toString()::is("2·π")
 		static Tau: Transcendental
 
 		§§ Euler's number, the base of the natural logarithm, exactly.
+		§§
+		§§ @example
+		§§   expect Number.E::toString()::is("e")
+		§§   expect Number.E::toString(as #Decimal, toPlaces 5)::is("2.71828")
 		static E: Transcendental
 
 		§§ The golden ratio `(1 + √5) / 2`, the positive solution of `x² = x + 1`, exactly.
+		§§
+		§§ @example
+		§§   constant golden = Number.GoldenRatio
+		§§
+		§§   expect golden::toString()::is("1/2 + 1/2·√5")
+		§§   expect golden::raise(to 2)::is(golden::add(1))
 		static GoldenRatio: Algebraic
 
 		§ Each aggregate is a fold over the members' own arithmetic. A mixed
@@ -163,6 +195,12 @@ declarations {
 			§§
 			§§ The sum is an Integer, since whole numbers add to a whole number. The empty List sums to zero.
 			§§
+			§§ @example
+			§§   constant noGoals: List<Integer> = []
+			§§
+			§§   expect Number.sum([3, 4, 5])::is(12)
+			§§   expect Number.sum(noGoals)::is(0)
+			§§
 			§§ @param _ — the Integers to add up
 			§§ @returns — the total.
 			(_ integers: List<Integer>) -> Integer {
@@ -175,6 +213,10 @@ declarations {
 			§§
 			§§ The sum is a Rational, since it need not be whole. A whole total stays a Rational here, so `[1/2, 1/2]::sum()` answers `1/1`. The mixed entry below collapses one to an Integer. The empty List sums to zero.
 			§§
+			§§ @example
+			§§   expect Number.sum([1/2, 1/4])::is(3/4)
+			§§   expect Number.sum([1/2, 1/2])::is(1/1)
+			§§
 			§§ @param _ — the Rationals to add up
 			§§ @returns — the total.
 			(_ rationals: List<Rational>) -> Rational {
@@ -186,6 +228,10 @@ declarations {
 			§§ Adds up a List holding both Integers and Rationals.
 			§§
 			§§ The sum is an Integer when the total is whole, and a Rational otherwise. The empty List sums to zero.
+			§§
+			§§ @example
+			§§   expect Number.sum([1, 1/2, 1/2])::is(2)
+			§§   expect Number.sum([1, 1/4])::is(5/4)
 			§§
 			§§ @param _ — the Numbers to add up
 			§§ @returns — the total.
@@ -221,6 +267,12 @@ declarations {
 			§§
 			§§ The product is an Integer, since whole numbers multiply to a whole number. The empty List multiplies to one.
 			§§
+			§§ @example
+			§§   constant noFactors: List<Integer> = []
+			§§
+			§§   expect Number.product([2, 3, 4])::is(24)
+			§§   expect Number.product(noFactors)::is(1)
+			§§
 			§§ @param _ — the Integers to multiply
 			§§ @returns — the product.
 			(_ integers: List<Integer>) -> Integer {
@@ -233,6 +285,10 @@ declarations {
 			§§
 			§§ The product is a Rational, since it need not be whole. A whole product stays a Rational here, as a whole sum does. The mixed entry below collapses one to an Integer. The empty List multiplies to one.
 			§§
+			§§ @example
+			§§   expect Number.product([1/2, 2/3])::is(1/3)
+			§§   expect Number.product([3/2, 2/3])::is(1/1)
+			§§
 			§§ @param _ — the Rationals to multiply
 			§§ @returns — the product.
 			(_ rationals: List<Rational>) -> Rational {
@@ -244,6 +300,10 @@ declarations {
 			§§ Multiplies a List holding both Integers and Rationals together.
 			§§
 			§§ The product is an Integer when it is whole, and a Rational otherwise. The empty List multiplies to one.
+			§§
+			§§ @example
+			§§   expect Number.product([4, 3/2])::is(6)
+			§§   expect Number.product([3, 1/2])::is(3/2)
 			§§
 			§§ @param _ — the Numbers to multiply
 			§§ @returns — the product.
@@ -284,6 +344,13 @@ declarations {
 			§§
 			§§ The mean is a Rational, since it need not be whole. The empty List has no mean.
 			§§
+			§§ @example
+			§§   constant scores = [1, 2, 3, 4]
+			§§   constant noScores: List<Integer> = []
+			§§
+			§§   expect Number.average(scores)::is(5/2)
+			§§   expect Number.average(noScores)::isEmpty()
+			§§
 			§§ @param _ — the Integers to average
 			§§ @returns — the mean, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Rational> {
@@ -294,6 +361,13 @@ declarations {
 			§§
 			§§ The mean is a Rational. The empty List has no mean.
 			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/4]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.average(shares)::is(3/8)
+			§§   expect Number.average(noShares)::isEmpty()
+			§§
 			§§ @param _ — the Rationals to average
 			§§ @returns — the mean, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
@@ -303,6 +377,13 @@ declarations {
 			§§ The arithmetic mean of a List holding both Integers and Rationals.
 			§§
 			§§ The mean is a Rational, since it need not be whole. The empty List has no mean.
+			§§
+			§§ @example
+			§§   constant readings = [1, 1/2, 3]
+			§§   constant noReadings: List<Scalar> = []
+			§§
+			§§   expect Number.average(readings)::is(3/2)
+			§§   expect Number.average(noReadings)::isEmpty()
 			§§
 			§§ @param _ — the Numbers to average
 			§§ @returns — the mean, or nothing for the empty List.
@@ -318,6 +399,13 @@ declarations {
 
 			§§ The arithmetic mean of the Integers, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant scores = [1, 2, 3, 4]
+			§§   constant noScores: List<Integer> = []
+			§§
+			§§   expect Number.average(scores, defaultingTo 0/1)::is(5/2)
+			§§   expect Number.average(noScores, defaultingTo 0/1)::is(0/1)
+			§§
 			§§ @param _ — the Integers to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
@@ -330,6 +418,13 @@ declarations {
 
 			§§ The arithmetic mean of the Rationals, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/4]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.average(shares, defaultingTo 0/1)::is(3/8)
+			§§   expect Number.average(noShares, defaultingTo 0/1)::is(0/1)
+			§§
 			§§ @param _ — the Rationals to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
 			§§ @returns — the mean, or the given value in its place.
@@ -341,6 +436,13 @@ declarations {
 			}
 
 			§§ The arithmetic mean of the Numbers, with a value to answer for the empty List.
+			§§
+			§§ @example
+			§§   constant readings = [1, 1/2, 3]
+			§§   constant noReadings: List<Scalar> = []
+			§§
+			§§   expect Number.average(readings, defaultingTo 0/1)::is(3/2)
+			§§   expect Number.average(noReadings, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param _ — the Numbers to average
 			§§ @param defaultingTo — the value to answer with when there is no mean
@@ -361,6 +463,10 @@ declarations {
 			§§
 			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect Number.average([1, 2, 3, 4])::is(5/2)
+			§§   expect Number.average([7])::is(7)
+			§§
 			§§ @param _ — the Integers to average
 			§§ @returns — the mean.
 			(_ integers: NonEmptyList<Integer>) -> Rational {
@@ -371,6 +477,9 @@ declarations {
 			§§
 			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect Number.average([1/2, 1/4])::is(3/8)
+			§§
 			§§ @param _ — the Rationals to average
 			§§ @returns — the mean.
 			(_ rationals: NonEmptyList<Rational>) -> Rational {
@@ -380,6 +489,9 @@ declarations {
 			§§ The arithmetic mean of the Numbers in a List proven to have an item.
 			§§
 			§§ The count is above zero, so the answer is the mean itself rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.average([1, 1/2, 3])::is(3/2)
 			§§
 			§§ @param _ — the Numbers to average
 			§§ @returns — the mean.
@@ -402,6 +514,10 @@ declarations {
 			§§
 			§§ The answer is an Integer. Two equal Integers answer the first of them.
 			§§
+			§§ @example
+			§§   expect Number.lowest(3, 7)::is(3)
+			§§   expect Number.lowest(-2, 5)::is(-2)
+			§§
 			§§ @param _ — the first Integer to compare
 			§§ @param _ — the second Integer to compare
 			§§ @returns — the lower Integer.
@@ -416,6 +532,9 @@ declarations {
 			§§ The lower of two Rationals.
 			§§
 			§§ The answer is a Rational. Two equal Rationals answer the first of them.
+			§§
+			§§ @example
+			§§   expect Number.lowest(1/2, 1/3)::is(1/3)
 			§§
 			§§ @param _ — the first Rational to compare
 			§§ @param _ — the second Rational to compare
@@ -432,6 +551,10 @@ declarations {
 			§§
 			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.
 			§§
+			§§ @example
+			§§   expect Number.lowest(1, 3/2)::is(1)
+			§§   expect Number.lowest(2, 3/2)::is(3/2)
+			§§
 			§§ @param _ — the Integer to compare
 			§§ @param _ — the Rational to compare
 			§§ @returns — the lower Number.
@@ -446,6 +569,10 @@ declarations {
 			§§ The lower of a Rational and an Integer.
 			§§
 			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.
+			§§
+			§§ @example
+			§§   expect Number.lowest(5/2, 3)::is(5/2)
+			§§   expect Number.lowest(7/2, 3)::is(3)
 			§§
 			§§ @param _ — the Rational to compare
 			§§ @param _ — the Integer to compare
@@ -466,6 +593,13 @@ declarations {
 			§§
 			§§ The answer is the earliest of the lowest items. The empty List has none.
 			§§
+			§§ @example
+			§§   constant temperatures = [12, -3, 7]
+			§§   constant noReadings: List<Integer> = []
+			§§
+			§§   expect Number.lowest(temperatures)::is(-3)
+			§§   expect Number.lowest(noReadings)::isEmpty()
+			§§
 			§§ @param _ — the Integers to compare
 			§§ @returns — the lowest Integer, or nothing for the empty List.
 			(_ integers: List<Integer>) -> Optional<Integer> {
@@ -485,6 +619,13 @@ declarations {
 			§§ The lowest of the Rationals in the List.
 			§§
 			§§ The answer is the earliest of the lowest items. The empty List has none.
+			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/3, 3/4]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.lowest(shares)::is(1/3)
+			§§   expect Number.lowest(noShares)::isEmpty()
 			§§
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the lowest Rational, or nothing for the empty List.
@@ -509,6 +650,13 @@ declarations {
 			§§
 			§§ The answer keeps the kind of the item it picks, and is the earliest of the lowest items. The empty List has none.
 			§§
+			§§ @example
+			§§   constant prices = [3, 5/2, 4]
+			§§   constant noPrices: List<Scalar> = []
+			§§
+			§§   expect Number.lowest(prices)::is(5/2)
+			§§   expect Number.lowest(noPrices)::isEmpty()
+			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the lowest Number, or nothing for the empty List.
 			(_ numbers: List<Scalar>) -> Optional<Scalar> {
@@ -531,6 +679,13 @@ declarations {
 
 			§§ The lowest of the Integers, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant temperatures = [12, -3, 7]
+			§§   constant noReadings: List<Integer> = []
+			§§
+			§§   expect Number.lowest(temperatures, defaultingTo 0)::is(-3)
+			§§   expect Number.lowest(noReadings, defaultingTo 0)::is(0)
+			§§
 			§§ @param _ — the Integers to compare
 			§§ @param defaultingTo — the value to answer with when there is no lowest
 			§§ @returns — the lowest Integer, or the given value in its place.
@@ -543,6 +698,13 @@ declarations {
 
 			§§ The lowest of the Rationals, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/3]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.lowest(shares, defaultingTo 0/1)::is(1/3)
+			§§   expect Number.lowest(noShares, defaultingTo 0/1)::is(0/1)
+			§§
 			§§ @param _ — the Rationals to compare
 			§§ @param defaultingTo — the value to answer with when there is no lowest
 			§§ @returns — the lowest Rational, or the given value in its place.
@@ -554,6 +716,13 @@ declarations {
 			}
 
 			§§ The lowest of the Numbers, with a value to answer for the empty List.
+			§§
+			§§ @example
+			§§   constant prices = [3, 5/2, 4]
+			§§   constant noPrices: List<Scalar> = []
+			§§
+			§§   expect Number.lowest(prices, defaultingTo 0)::is(5/2)
+			§§   expect Number.lowest(noPrices, defaultingTo 0)::is(0)
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @param defaultingTo — the value to answer with when there is no lowest
@@ -570,6 +739,9 @@ declarations {
 			§§
 			§§ The List has a lowest item, so the answer is that item rather than an Optional.
 			§§
+			§§ @example
+			§§   expect Number.lowest([12, -3, 7])::is(-3)
+			§§
 			§§ @param _ — the Integers to compare
 			§§ @returns — the lowest Integer.
 			(_ integers: NonEmptyList<Integer>) -> Integer {
@@ -583,6 +755,9 @@ declarations {
 			§§
 			§§ The List has a lowest item, so the answer is that item rather than an Optional.
 			§§
+			§§ @example
+			§§   expect Number.lowest([1/2, 1/3, 3/4])::is(1/3)
+			§§
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the lowest Rational.
 			(_ rationals: NonEmptyList<Rational>) -> Rational {
@@ -595,6 +770,9 @@ declarations {
 			§§ The lowest of the Numbers in a List proven to have an item.
 			§§
 			§§ The List has a lowest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.lowest([3, 5/2, 4])::is(5/2)
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the lowest Number.
@@ -621,6 +799,10 @@ declarations {
 			§§
 			§§ The answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.
 			§§
+			§§ @example
+			§§   expect Number.lowest(Number.Pi, 22/7)::is(Number.Pi)
+			§§   expect Number.lowest(Number.E, Number.Pi)::is(Number.E)
+			§§
 			§§ @param _ — the first Number to compare
 			§§ @param _ — the second Number to compare
 			§§ @returns — the lower Number.
@@ -641,6 +823,10 @@ declarations {
 			§§
 			§§ The answer is an Integer. Two equal Integers answer the first of them.
 			§§
+			§§ @example
+			§§   expect Number.highest(3, 7)::is(7)
+			§§   expect Number.highest(-2, -5)::is(-2)
+			§§
 			§§ @param _ — the first Integer to compare
 			§§ @param _ — the second Integer to compare
 			§§ @returns — the higher Integer.
@@ -655,6 +841,9 @@ declarations {
 			§§ The higher of two Rationals.
 			§§
 			§§ The answer is a Rational. Two equal Rationals answer the first of them.
+			§§
+			§§ @example
+			§§   expect Number.highest(1/2, 1/3)::is(1/2)
 			§§
 			§§ @param _ — the first Rational to compare
 			§§ @param _ — the second Rational to compare
@@ -671,6 +860,10 @@ declarations {
 			§§
 			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Integer.
 			§§
+			§§ @example
+			§§   expect Number.highest(1, 3/2)::is(3/2)
+			§§   expect Number.highest(2, 3/2)::is(2)
+			§§
 			§§ @param _ — the Integer to compare
 			§§ @param _ — the Rational to compare
 			§§ @returns — the higher Number.
@@ -686,6 +879,10 @@ declarations {
 			§§
 			§§ The answer keeps the kind of the Number it picks, so it is an Integer or a Rational. Two equal Numbers answer the Rational.
 			§§
+			§§ @example
+			§§   expect Number.highest(5/2, 3)::is(3)
+			§§   expect Number.highest(7/2, 3)::is(7/2)
+			§§
 			§§ @param _ — the Rational to compare
 			§§ @param _ — the Integer to compare
 			§§ @returns — the higher Number.
@@ -700,6 +897,13 @@ declarations {
 			§§ The highest of the Integers in the List.
 			§§
 			§§ The answer is the earliest of the highest items. The empty List has none.
+			§§
+			§§ @example
+			§§   constant temperatures = [12, -3, 7]
+			§§   constant noReadings: List<Integer> = []
+			§§
+			§§   expect Number.highest(temperatures)::is(12)
+			§§   expect Number.highest(noReadings)::isEmpty()
 			§§
 			§§ @param _ — the Integers to compare
 			§§ @returns — the highest Integer, or nothing for the empty List.
@@ -721,6 +925,13 @@ declarations {
 			§§
 			§§ The answer is the earliest of the highest items. The empty List has none.
 			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/3, 3/4]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.highest(shares)::is(3/4)
+			§§   expect Number.highest(noShares)::isEmpty()
+			§§
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the highest Rational, or nothing for the empty List.
 			(_ rationals: List<Rational>) -> Optional<Rational> {
@@ -740,6 +951,13 @@ declarations {
 			§§ The highest Number in a List holding both Integers and Rationals.
 			§§
 			§§ The answer keeps the kind of the item it picks, and is the earliest of the highest items. The empty List has none.
+			§§
+			§§ @example
+			§§   constant prices = [3, 5/2, 4]
+			§§   constant noPrices: List<Scalar> = []
+			§§
+			§§   expect Number.highest(prices)::is(4)
+			§§   expect Number.highest(noPrices)::isEmpty()
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the highest Number, or nothing for the empty List.
@@ -763,6 +981,13 @@ declarations {
 
 			§§ The highest of the Integers, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant temperatures = [12, -3, 7]
+			§§   constant noReadings: List<Integer> = []
+			§§
+			§§   expect Number.highest(temperatures, defaultingTo 0)::is(12)
+			§§   expect Number.highest(noReadings, defaultingTo 0)::is(0)
+			§§
 			§§ @param _ — the Integers to compare
 			§§ @param defaultingTo — the value to answer with when there is no highest
 			§§ @returns — the highest Integer, or the given value in its place.
@@ -774,6 +999,13 @@ declarations {
 			}
 
 			§§ The highest of the Rationals, with a value to answer for the empty List.
+			§§
+			§§ @example
+			§§   constant shares = [1/2, 1/3]
+			§§   constant noShares: List<Rational> = []
+			§§
+			§§   expect Number.highest(shares, defaultingTo 0/1)::is(1/2)
+			§§   expect Number.highest(noShares, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param _ — the Rationals to compare
 			§§ @param defaultingTo — the value to answer with when there is no highest
@@ -787,6 +1019,13 @@ declarations {
 
 			§§ The highest of the Numbers, with a value to answer for the empty List.
 			§§
+			§§ @example
+			§§   constant prices = [3, 5/2, 4]
+			§§   constant noPrices: List<Scalar> = []
+			§§
+			§§   expect Number.highest(prices, defaultingTo 0)::is(4)
+			§§   expect Number.highest(noPrices, defaultingTo 0)::is(0)
+			§§
 			§§ @param _ — the Numbers to compare
 			§§ @param defaultingTo — the value to answer with when there is no highest
 			§§ @returns — the highest Number, or the given value in its place.
@@ -797,6 +1036,9 @@ declarations {
 			§§ The highest of the Integers in a List proven to have an item.
 			§§
 			§§ The List has a highest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.highest([12, -3, 7])::is(12)
 			§§
 			§§ @param _ — the Integers to compare
 			§§ @returns — the highest Integer.
@@ -810,6 +1052,9 @@ declarations {
 			§§ The highest of the Rationals in a List proven to have an item.
 			§§
 			§§ The List has a highest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.highest([1/2, 1/3, 3/4])::is(3/4)
 			§§
 			§§ @param _ — the Rationals to compare
 			§§ @returns — the highest Rational.
@@ -825,6 +1070,9 @@ declarations {
 			§§ The highest of the Numbers in a List proven to have an item.
 			§§
 			§§ The List has a highest item, so the answer is that item rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.highest([3, 5/2, 4])::is(4)
 			§§
 			§§ @param _ — the Numbers to compare
 			§§ @returns — the highest Number.
@@ -850,6 +1098,10 @@ declarations {
 			§§ The higher of two Numbers, of any kind the tower holds.
 			§§
 			§§ The answer is a Number, since the two can be of different kinds. Two equal Numbers answer the first of them.
+			§§
+			§§ @example
+			§§   expect Number.highest(Number.Pi, 22/7)::is(22/7)
+			§§   expect Number.highest(Number.E, Number.Pi)::is(Number.Pi)
 			§§
 			§§ @param _ — the first Number to compare
 			§§ @param _ — the second Number to compare
@@ -879,6 +1131,11 @@ declarations {
 		§§
 		§§ The text form is what `Integer.parse` reads, or what `Rational.parse` reads: a fraction like `3/4`, a decimal like `0.75`, or a whole number like `3`. A whole number answers an Integer, and every other shape a Rational. Text of another shape answers empty, and the `defaultingTo:` entry answers the given Number instead.
 		overload static parse {
+			§§ @example
+			§§   expect Number.parse("5")::is(5)
+			§§   expect Number.parse("0.75")::is(3/4)
+			§§   expect Number.parse("five")::isEmpty()
+			§§
 			§§ @param _ — the text to read
 			§§ @returns — the Number, or nothing when the text has any other shape.
 			(_ text: String) -> Optional<Scalar> {
@@ -901,6 +1158,10 @@ declarations {
 
 			§§ Reads a Number from its text form, with a value to answer when the text has another shape.
 			§§
+			§§ @example
+			§§   expect Number.parse("3/4", defaultingTo 0)::is(3/4)
+			§§   expect Number.parse("", defaultingTo 0)::is(0)
+			§§
 			§§ @param _ — the text to read
 			§§ @param defaultingTo — the value to answer with when the text is no Number
 			§§ @returns — the Number, or the given value in its place.
@@ -913,6 +1174,13 @@ declarations {
 		§§
 		§§ An Integer and a Rational are the same Number when their values are equal, so `1 is 1/1` holds. The answer is read off `compare`. So two Transcendentals that both carry π and e can stop the Program at the precision cutoff `compare` names.
 		§§
+		§§ @example
+		§§   constant whole: Number = 1
+		§§   constant angle: Number = Number.Tau
+		§§
+		§§   expect whole::is(1/1)
+		§§   expect angle::is(Number.Pi::multiply(with 2))
+		§§
 		§§ @param _ — the Number to compare against
 		§§ @returns — `true` when both Numbers have the same numeric value.
 		is(_ other: Number) -> Boolean {
@@ -923,11 +1191,24 @@ declarations {
 		§§
 		§§ Every pair is ordered exactly, with one exception. A Transcendental carrying both π and e is ordered against another Number by refining enclosures, and the refinement stops at 32768 decimal places. A pair that still agrees there stops the Program with an error, since deciding it exactly is an open problem. The bounded form is `Transcendental::compare(to:withPrecision:)`, which answers empty instead.
 		§§
+		§§ @example
+		§§   constant three: Number = 3
+		§§
+		§§   expect three::compare(to Number.Pi)::is(#Less)
+		§§   expect three::compare(to 3/1)::is(#Equal)
+		§§
 		§§ @param to — the Number to order against
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare(to other: Number) -> Ordering
 
 		§§ Answers the Number as a String, in the notation of the member Type it holds.
+		§§
+		§§ @example
+		§§   constant share: Number = 1/2
+		§§   constant angle: Number = Number.Tau
+		§§
+		§§   expect share::toString()::is("1/2")
+		§§   expect angle::toString()::is("2·π")
 		§§
 		§§ @returns — the String representation of the Number.
 		toString() -> String {

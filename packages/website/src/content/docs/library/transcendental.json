@@ -46,7 +46,9 @@
 								}
 							],
 							"returns": "`true` when the canonical forms agree.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::is(Number.Pi::multiply(with 2))\nexpect Number.Pi::is(Number.E)::negate()"
+							]
 						}
 					]
 				},
@@ -83,7 +85,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`, or nothing when the two are not told apart at that width.",
-							"examples": []
+							"examples": [
+								"constant nearPi = Number.E::add(0.42331)\n\nexpect Number.Pi::compare(to Number.E, withPrecision 2)::is(#Greater)\nexpect Number.Pi::compare(to nearPi, withPrecision 7)::is(#Greater)"
+							]
 						}
 					]
 				},
@@ -105,7 +109,9 @@
 							"summary": "Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect Number.Tau::toString()::is(\"2·π\")\nexpect Number.E::add(1)::toString()::is(\"1 + e\")"
+							]
 						},
 						{
 							"signature": "toString(as format: NumberFormat) -> String",
@@ -120,7 +126,9 @@
 								}
 							],
 							"returns": "the String representation of the Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::toString(as #Decimal)::starts(with \"3.14159265358\")\nexpect Number.Pi::toString(as #Fraction)::is(\"π\")"
+							]
 						},
 						{
 							"signature": "toString(\n\tas format: NumberFormat,\n\ttoPlaces count: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> String",
@@ -149,7 +157,9 @@
 								}
 							],
 							"returns": "the String representation of the Transcendental.",
-							"examples": []
+							"examples": [
+								"constant pi = Number.Pi\n\nexpect pi::toString(as #Decimal, toPlaces 2)::is(\"3.14\")\nexpect pi::toString(as #Decimal, toPlaces 2, toward #Up)::is(\"3.15\")\nexpect pi::toString(as #Percent, toPlaces 1)::is(\"314.2%\")"
+							]
 						}
 					]
 				},
@@ -215,7 +225,9 @@
 								}
 							],
 							"returns": "the sum, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::add(1)::toString()::is(\"1 + π\")"
+							]
 						},
 						{
 							"signature": "add(_ other: Rational) -> Transcendental",
@@ -230,7 +242,9 @@
 								}
 							],
 							"returns": "the sum, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::add(1/2)::toString()::is(\"1/2 + π\")"
+							]
 						},
 						{
 							"signature": "add(_ other: Transcendental) -> Rational | Transcendental",
@@ -245,7 +259,9 @@
 								}
 							],
 							"returns": "the exact sum, a Rational or a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::add(Number.E)::toString()::is(\"π + e\")\nexpect Number.Pi::add(Number.Pi::negate())::is(0)"
+							]
 						}
 					]
 				},
@@ -275,7 +291,9 @@
 								}
 							],
 							"returns": "the difference, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::subtract(3)::toString()::is(\"-3 + π\")"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Rational) -> Transcendental",
@@ -290,7 +308,9 @@
 								}
 							],
 							"returns": "the difference, as a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::subtract(1/2)::toString()::is(\"-1/2 + π\")"
+							]
 						},
 						{
 							"signature": "subtract(_ other: Transcendental) -> Rational | Transcendental",
@@ -305,7 +325,9 @@
 								}
 							],
 							"returns": "the difference, as a Rational or a Transcendental.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::subtract(Number.Pi)::is(Number.Pi)\nexpect Number.Pi::subtract(Number.Pi)::is(0)"
+							]
 						}
 					]
 				},
@@ -335,7 +357,9 @@
 								}
 							],
 							"returns": "the product, as a Transcendental or a Rational.",
-							"examples": []
+							"examples": [
+								"constant turns = 2\n\nexpect Number.Pi::multiply(with turns)::is(Number.Tau)\nexpect Number.Pi::multiply(with 0)::is(0)"
+							]
 						},
 						{
 							"signature": "multiply(with other: Rational) -> Transcendental | Rational",
@@ -350,7 +374,9 @@
 								}
 							],
 							"returns": "the product, as a Transcendental or a Rational.",
-							"examples": []
+							"examples": [
+								"constant half = 1/2\n\nexpect Number.Tau::multiply(with half)::is(Number.Pi)\nexpect Number.Pi::multiply(with 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "multiply(with other: NonZeroInteger) -> Transcendental",
@@ -365,7 +391,9 @@
 								}
 							],
 							"returns": "the exact product.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::multiply(with 2)::is(Number.Tau)\nexpect Number.E::multiply(with 3)::toString()::is(\"3·e\")"
+							]
 						},
 						{
 							"signature": "multiply(with other: NonZeroRational) -> Transcendental",
@@ -380,7 +408,9 @@
 								}
 							],
 							"returns": "the exact product.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::multiply(with 1/2)::is(Number.Pi)\nexpect Number.Pi::multiply(with 3/2)::toString()::is(\"3/2·π\")"
+							]
 						}
 					]
 				},
@@ -410,7 +440,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant divisor = 2\n\nexpect Number.Tau::divide(by divisor)::is(Number.Pi)\nexpect Number.Pi::divide(by 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Rational) -> Optional<Transcendental>",
@@ -425,7 +457,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when the divisor is zero.",
-							"examples": []
+							"examples": [
+								"constant half = 1/2\n\nexpect Number.Pi::divide(by half)::is(Number.Tau)\nexpect Number.Pi::divide(by 0/1)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(by other: Transcendental) -> Optional<Rational>",
@@ -440,7 +474,9 @@
 								}
 							],
 							"returns": "the quotient, or nothing when the two are not proportional.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::divide(by Number.Pi)::is(2/1)\nexpect Number.Pi::divide(by Number.E)::isEmpty()"
+							]
 						},
 						{
 							"signature": "divide(\n\tby other: Integer,\n\tdefaultingTo fallback: Transcendental,\n) -> Transcendental",
@@ -462,7 +498,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant tau = Number.Tau\nconstant divisor = 2\n\nexpect tau::divide(by divisor, defaultingTo tau)::is(Number.Pi)\nexpect tau::divide(by 0, defaultingTo tau)::is(tau)"
+							]
 						},
 						{
 							"signature": "divide(\n\tby other: Rational,\n\tdefaultingTo fallback: Transcendental,\n) -> Transcendental",
@@ -484,7 +522,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"constant pi = Number.Pi\nconstant half = 1/2\n\nexpect pi::divide(by half, defaultingTo pi)::is(Number.Tau)\nexpect pi::divide(by 0/1, defaultingTo pi)::is(pi)"
+							]
 						},
 						{
 							"signature": "divide(\n\tby other: Transcendental,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -506,7 +546,9 @@
 								}
 							],
 							"returns": "the quotient, or the given value in its place.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::divide(by Number.Pi, defaultingTo 0/1)::is(2)\nexpect Number.Pi::divide(by Number.E, defaultingTo 0/1)::is(0)"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroInteger) -> Transcendental",
@@ -521,7 +563,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect Number.Tau::divide(by 2)::is(Number.Pi)\nexpect Number.Pi::divide(by 2)::toString()::is(\"1/2·π\")"
+							]
 						},
 						{
 							"signature": "divide(by other: NonZeroRational) -> Transcendental",
@@ -536,7 +580,9 @@
 								}
 							],
 							"returns": "the exact quotient.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::divide(by 1/2)::is(Number.Tau)"
+							]
 						}
 					]
 				}
@@ -564,7 +610,9 @@
 							"summary": "Answers whether the Transcendental is above zero.\n\nA value over a single base has an exact sign. A value that mixes π and e decides its sign by refining an interval, down to the precision limit `absolute` names.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect Number.Pi::subtract(3)::isPositive()\nexpect Number.E::subtract(Number.Pi)::isPositive()::negate()"
+							]
 						}
 					]
 				},
@@ -586,7 +634,9 @@
 							"summary": "Answers whether the Transcendental is below zero.\n\nA Transcendental is never zero, so it is below zero exactly when it is not above it. The sign is decided the way `isPositive` decides it.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect Number.Pi::subtract(22/7)::isNegative()\nexpect Number.Pi::isNegative()::negate()"
+							]
 						}
 					]
 				},
@@ -608,7 +658,7 @@
 							"summary": "Answers whether the Transcendental is exactly zero.\n\nAt least one base term keeps a coefficient that is not zero, so the answer is always `false`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": ["expect Number.Pi::isZero()::negate()"]
 						}
 					]
 				},
@@ -630,7 +680,9 @@
 							"summary": "Answers whether the Transcendental is a whole number.\n\nA Transcendental is irrational, so it is never whole and the answer is always `false`.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect Number.Pi::isWholeNumber()::negate()"
+							]
 						}
 					]
 				}
@@ -658,7 +710,9 @@
 							"summary": "Answers the Transcendental without its sign, which is its distance from zero.\n\nA value on a single base can never equal a Rational, so its sign is exact. A value that mixes π and e decides its sign by refining an interval, down to a documented precision limit.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"constant pi = Number.Pi\n\nexpect pi::negate()::absolute()::is(pi)\nexpect pi::negate()::add(3)::absolute()::is(pi::subtract(3))"
+							]
 						}
 					]
 				},
@@ -680,7 +734,9 @@
 							"summary": "Answers the Transcendental with its sign flipped.\n\nAt least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.",
 							"parameters": [],
 							"returns": null,
-							"examples": []
+							"examples": [
+								"expect Number.Pi::negate()::toString()::is(\"-π\")\nexpect Number.Tau::negate()::toString()::is(\"-2·π\")"
+							]
 						}
 					]
 				},
@@ -717,7 +773,9 @@
 								}
 							],
 							"returns": "the value on the grid the width names.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::approximate(toPlaces 5)::is(3.14159)\nexpect Number.E::approximate(toPlaces 2, toward #Down)::is(2.71)\nexpect Number.Pi::approximate(toPlaces 0)::is(3/1)"
+							]
 						}
 					]
 				},
@@ -747,7 +805,9 @@
 								}
 							],
 							"returns": "the rounded Integer.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::round()::is(3)\nexpect Number.Pi::round(toward #Up)::is(4)"
+							]
 						},
 						{
 							"signature": "round(\n\ttoPlaces places: Integer,\n\ttoward direction: Rounding = #Nearest,\n) -> Rational",
@@ -769,7 +829,9 @@
 								}
 							],
 							"returns": "the rounded Rational.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::round(toPlaces 2)::is(3.14)\nexpect Number.Pi::round(toPlaces 2, toward #Up)::is(3.15)"
+							]
 						}
 					]
 				},
@@ -791,7 +853,9 @@
 							"summary": "Answers the power of ten at or below the Transcendental's distance from zero.\n\nThis is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. A value over a single base always falls inside one, since it is never a power of ten itself. A value carrying both π and e reaches the cutoff `Number::compare` names where it does not, and stops the Program there.",
 							"parameters": [],
 							"returns": "the exponent of the power of ten the value falls on.",
-							"examples": []
+							"examples": [
+								"expect Number.Pi::decimalExponent()::is(0)\nexpect Number.Pi::subtract(3)::decimalExponent()::is(-1)\nexpect Number.Pi::multiply(with 100)::decimalExponent()::is(2)"
+							]
 						}
 					]
 				}

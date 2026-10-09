@@ -43,6 +43,10 @@ declarations {
 		§§
 		§§ Every component is held reduced, so agreement is structural. On a single base that agreement is exactly numeric equality.
 		§§
+		§§ @example
+		§§   expect Number.Tau::is(Number.Pi::multiply(with 2))
+		§§   expect Number.Pi::is(Number.E)::negate()
+		§§
 		§§ @param _ — the Transcendental to compare with
 		§§ @returns — `true` when the canonical forms agree.
 		is(_ other: Transcendental) -> Boolean
@@ -50,6 +54,12 @@ declarations {
 		§§ Orders the Transcendental against another one, to a given number of decimal places.
 		§§
 		§§ The difference of the two is enclosed in an interval under one unit of the last decimal place wide. The answer is read off that interval. Two values one unit of that place or more apart are always told apart. The answer is empty only for two values closer than that. Two values whose π and e terms cancel differ by a Rational, and compare exactly at any width. No call here reaches the precision cutoff that `Number::compare` can, since nothing is refined past the width given.
+		§§
+		§§ @example
+		§§   constant nearPi = Number.E::add(0.42331)
+		§§
+		§§   expect Number.Pi::compare(to Number.E, withPrecision 2)::is(#Greater)
+		§§   expect Number.Pi::compare(to nearPi, withPrecision 7)::is(#Greater)
 		§§
 		§§ @param to — the Transcendental to order against
 		§§ @param withPrecision — the number of decimal places the two are told apart to
@@ -83,11 +93,19 @@ declarations {
 		§§ The form is `π`, `2·π`, `e` or `1 + π + e` when no format is named, and `#Fraction` names that same form. The `#Decimal` format writes the expansion, to at most 80 digits, which is the cap a Rational writes a non-terminating expansion at. A count of places writes exactly that many digits after the point.
 		overload toString {
 			§§ Answers the Transcendental as a String, in the exact symbolic form: `π`, `2·π`, `e` or `1 + π + e`.
+			§§
+			§§ @example
+			§§   expect Number.Tau::toString()::is("2·π")
+			§§   expect Number.E::add(1)::toString()::is("1 + e")
 			() -> String
 
 			§§ Answers the Transcendental as a decimal, or in the exact symbolic form, in the named format.
 			§§
 			§§ The `#Decimal` format rounds the expansion at the eightieth digit and writes it. An irrational expansion never ends, so the cap is always reached. Trailing zeros the rounding leaves are dropped, as they are for any Rational. The `#Percent` format writes one hundred times that same reading, taken two digits deeper so that eighty still stand after the point. The `#Scientific` format writes eighty digits after the point of the mantissa, and the power of ten after an `e`. The reading is taken at the eightieth digit of the mantissa, wherever the value falls. A value below one is read deeper than eighty places. The `#Fraction` format writes the symbolic form, since no ratio of two Integers is this number.
+			§§
+			§§ @example
+			§§   expect Number.Pi::toString(as #Decimal)::starts(with "3.14159265358")
+			§§   expect Number.Pi::toString(as #Fraction)::is("π")
 			§§
 			§§ @param as — the form to represent the Transcendental in
 			§§ @returns — the String representation of the Transcendental.
@@ -124,6 +142,13 @@ declarations {
 			§§ Answers the Transcendental as a decimal with exactly that many places.
 			§§
 			§§ The digits are padded with zeroes where the rounded value is shorter. The last digit kept is rounded in the named direction, and `#Nearest` is what a call that names none is given. A count below one rounds to a whole number, and no point is written. The `#Percent` format takes the count the same way, on one hundred times the value. The `#Scientific` format counts the digits of the mantissa after the point, at every magnitude. The value is read as many digits past the count as its own power of ten falls below zero. The `#Fraction` format ignores both the count and the direction, and writes the symbolic form.
+			§§
+			§§ @example
+			§§   constant pi = Number.Pi
+			§§
+			§§   expect pi::toString(as #Decimal, toPlaces 2)::is("3.14")
+			§§   expect pi::toString(as #Decimal, toPlaces 2, toward #Up)::is("3.15")
+			§§   expect pi::toString(as #Percent, toPlaces 1)::is("314.2%")
 			§§
 			§§ @param as — the form to represent the Transcendental in
 			§§ @param toPlaces — how many digits to write after the point
@@ -189,6 +214,9 @@ declarations {
 			§§
 			§§ The sum is a Transcendental, since an Integer changes the rational part alone.
 			§§
+			§§ @example
+			§§   expect Number.Pi::add(1)::toString()::is("1 + π")
+			§§
 			§§ @param _ — the Integer to add
 			§§ @returns — the sum, as a Transcendental.
 			(_ other: Integer) -> Transcendental
@@ -197,6 +225,9 @@ declarations {
 			§§
 			§§ The sum is a Transcendental, since a Rational changes the rational part alone.
 			§§
+			§§ @example
+			§§   expect Number.Pi::add(1/2)::toString()::is("1/2 + π")
+			§§
 			§§ @param _ — the Rational to add
 			§§ @returns — the sum, as a Transcendental.
 			(_ other: Rational) -> Transcendental
@@ -204,6 +235,10 @@ declarations {
 			§§ Answers the exact sum of the two Transcendentals.
 			§§
 			§§ The π and e parts can cancel, which leaves a Rational.
+			§§
+			§§ @example
+			§§   expect Number.Pi::add(Number.E)::toString()::is("π + e")
+			§§   expect Number.Pi::add(Number.Pi::negate())::is(0)
 			§§
 			§§ @param _ — the Transcendental to add
 			§§ @returns — the exact sum, a Rational or a Transcendental.
@@ -218,6 +253,9 @@ declarations {
 			§§
 			§§ The difference is a Transcendental, since an Integer changes the rational part alone.
 			§§
+			§§ @example
+			§§   expect Number.Pi::subtract(3)::toString()::is("-3 + π")
+			§§
 			§§ @param _ — the Integer to subtract
 			§§ @returns — the difference, as a Transcendental.
 			(_ other: Integer) -> Transcendental {
@@ -228,6 +266,9 @@ declarations {
 			§§
 			§§ The difference is a Transcendental, since a Rational changes the rational part alone.
 			§§
+			§§ @example
+			§§   expect Number.Pi::subtract(1/2)::toString()::is("-1/2 + π")
+			§§
 			§§ @param _ — the Rational to subtract
 			§§ @returns — the difference, as a Transcendental.
 			(_ other: Rational) -> Transcendental {
@@ -237,6 +278,10 @@ declarations {
 			§§ Subtracts one Transcendental from another.
 			§§
 			§§ Equal π and e terms cancel, which leaves a Rational. Every other difference is a Transcendental.
+			§§
+			§§ @example
+			§§   expect Number.Tau::subtract(Number.Pi)::is(Number.Pi)
+			§§   expect Number.Pi::subtract(Number.Pi)::is(0)
 			§§
 			§§ @param _ — the Transcendental to subtract
 			§§ @returns — the difference, as a Rational or a Transcendental.
@@ -253,6 +298,12 @@ declarations {
 			§§
 			§§ The product is a Transcendental, since an Integer scales the rational part and every base term. A zero factor answers zero, which is a Rational.
 			§§
+			§§ @example
+			§§   constant turns = 2
+			§§
+			§§   expect Number.Pi::multiply(with turns)::is(Number.Tau)
+			§§   expect Number.Pi::multiply(with 0)::is(0)
+			§§
 			§§ @param with — the Integer to multiply with
 			§§ @returns — the product, as a Transcendental or a Rational.
 			(with other: Integer) -> Transcendental | Rational
@@ -260,6 +311,12 @@ declarations {
 			§§ Multiplies the Transcendental with a Rational.
 			§§
 			§§ The product is a Transcendental, since a Rational scales the rational part and every base term. A zero factor answers zero, which is a Rational.
+			§§
+			§§ @example
+			§§   constant half = 1/2
+			§§
+			§§   expect Number.Tau::multiply(with half)::is(Number.Pi)
+			§§   expect Number.Pi::multiply(with 0/1)::is(0)
 			§§
 			§§ @param with — the Rational to multiply with
 			§§ @returns — the product, as a Transcendental or a Rational.
@@ -269,6 +326,10 @@ declarations {
 			§§
 			§§ A non-zero Integer scales the rational part and every base term, and no coefficient reaches zero. The answer is again a Transcendental rather than a Union.
 			§§
+			§§ @example
+			§§   expect Number.Pi::multiply(with 2)::is(Number.Tau)
+			§§   expect Number.E::multiply(with 3)::toString()::is("3·e")
+			§§
 			§§ @param with — the factor, proven not to be zero
 			§§ @returns — the exact product.
 			(with other: NonZeroInteger) -> Transcendental
@@ -276,6 +337,10 @@ declarations {
 			§§ Answers the exact product of the Transcendental and a Rational factor proven not to be zero.
 			§§
 			§§ A Rational that is not zero scales the rational part and every base term, and no coefficient reaches zero. The answer is again a Transcendental rather than a Union.
+			§§
+			§§ @example
+			§§   expect Number.Tau::multiply(with 1/2)::is(Number.Pi)
+			§§   expect Number.Pi::multiply(with 3/2)::toString()::is("3/2·π")
 			§§
 			§§ @param with — the factor, proven not to be zero
 			§§ @returns — the exact product.
@@ -290,6 +355,12 @@ declarations {
 			§§
 			§§ The quotient is a Transcendental, since an Integer scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.
 			§§
+			§§ @example
+			§§   constant divisor = 2
+			§§
+			§§   expect Number.Tau::divide(by divisor)::is(Number.Pi)
+			§§   expect Number.Pi::divide(by 0)::isEmpty()
+			§§
 			§§ @param by — the Integer to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
 			(by other: Integer) -> Optional<Transcendental>
@@ -297,6 +368,12 @@ declarations {
 			§§ Divides the Transcendental by a Rational.
 			§§
 			§§ The quotient is a Transcendental, since a Rational scales the rational part and every base term. A zero divisor answers empty, and the `defaultingTo:` entry answers the given value instead.
+			§§
+			§§ @example
+			§§   constant half = 1/2
+			§§
+			§§   expect Number.Pi::divide(by half)::is(Number.Tau)
+			§§   expect Number.Pi::divide(by 0/1)::isEmpty()
 			§§
 			§§ @param by — the Rational to divide by
 			§§ @returns — the quotient, or nothing when the divisor is zero.
@@ -306,6 +383,10 @@ declarations {
 			§§
 			§§ Proportional values answer a Rational: `Tau::divide(by Pi)` is `2`. Anything else is empty, including π divided by e.
 			§§
+			§§ @example
+			§§   expect Number.Tau::divide(by Number.Pi)::is(2/1)
+			§§   expect Number.Pi::divide(by Number.E)::isEmpty()
+			§§
 			§§ @param by — the Transcendental to divide by
 			§§ @returns — the quotient, or nothing when the two are not proportional.
 			(by other: Transcendental) -> Optional<Rational>
@@ -313,6 +394,13 @@ declarations {
 			§§ Answers the exact quotient of the Transcendental and an Integer.
 			§§
 			§§ A zero divisor answers the given value.
+			§§
+			§§ @example
+			§§   constant tau = Number.Tau
+			§§   constant divisor = 2
+			§§
+			§§   expect tau::divide(by divisor, defaultingTo tau)::is(Number.Pi)
+			§§   expect tau::divide(by 0, defaultingTo tau)::is(tau)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -328,6 +416,13 @@ declarations {
 			§§
 			§§ A zero divisor answers the given value.
 			§§
+			§§ @example
+			§§   constant pi = Number.Pi
+			§§   constant half = 1/2
+			§§
+			§§   expect pi::divide(by half, defaultingTo pi)::is(Number.Tau)
+			§§   expect pi::divide(by 0/1, defaultingTo pi)::is(pi)
+			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
 			§§ @returns — the quotient, or the given value in its place.
@@ -341,6 +436,10 @@ declarations {
 			§§ Answers the exact quotient of the two Transcendentals.
 			§§
 			§§ Where the two are not proportional, the answer is the given value.
+			§§
+			§§ @example
+			§§   expect Number.Tau::divide(by Number.Pi, defaultingTo 0/1)::is(2)
+			§§   expect Number.Pi::divide(by Number.E, defaultingTo 0/1)::is(0)
 			§§
 			§§ @param by — the divisor
 			§§ @param defaultingTo — the value to answer with when there is no quotient
@@ -356,6 +455,10 @@ declarations {
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
 			§§
+			§§ @example
+			§§   expect Number.Tau::divide(by 2)::is(Number.Pi)
+			§§   expect Number.Pi::divide(by 2)::toString()::is("1/2·π")
+			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
 			(by other: NonZeroInteger) -> Transcendental
@@ -363,6 +466,9 @@ declarations {
 			§§ Answers the exact quotient of the Transcendental and a Rational divisor proven not to be zero.
 			§§
 			§§ The division can not fail, so the answer is the quotient itself rather than an Optional.
+			§§
+			§§ @example
+			§§   expect Number.Pi::divide(by 1/2)::is(Number.Tau)
 			§§
 			§§ @param by — the divisor, proven not to be zero
 			§§ @returns — the exact quotient.
@@ -394,11 +500,19 @@ declarations {
 		§§ Answers whether the Transcendental is above zero.
 		§§
 		§§ A value over a single base has an exact sign. A value that mixes π and e decides its sign by refining an interval, down to the precision limit `absolute` names.
+		§§
+		§§ @example
+		§§   expect Number.Pi::subtract(3)::isPositive()
+		§§   expect Number.E::subtract(Number.Pi)::isPositive()::negate()
 		isPositive() -> Boolean
 
 		§§ Answers whether the Transcendental is below zero.
 		§§
 		§§ A Transcendental is never zero, so it is below zero exactly when it is not above it. The sign is decided the way `isPositive` decides it.
+		§§
+		§§ @example
+		§§   expect Number.Pi::subtract(22/7)::isNegative()
+		§§   expect Number.Pi::isNegative()::negate()
 		isNegative() -> Boolean {
 			<- @::isPositive()::negate()
 		}
@@ -406,6 +520,9 @@ declarations {
 		§§ Answers whether the Transcendental is exactly zero.
 		§§
 		§§ At least one base term keeps a coefficient that is not zero, so the answer is always `false`.
+		§§
+		§§ @example
+		§§   expect Number.Pi::isZero()::negate()
 		isZero() -> Boolean {
 			<- false
 		}
@@ -413,6 +530,9 @@ declarations {
 		§§ Answers whether the Transcendental is a whole number.
 		§§
 		§§ A Transcendental is irrational, so it is never whole and the answer is always `false`.
+		§§
+		§§ @example
+		§§   expect Number.Pi::isWholeNumber()::negate()
 		isWholeNumber() -> Boolean {
 			<- false
 		}
@@ -420,11 +540,21 @@ declarations {
 		§§ Answers the Transcendental without its sign, which is its distance from zero.
 		§§
 		§§ A value on a single base can never equal a Rational, so its sign is exact. A value that mixes π and e decides its sign by refining an interval, down to a documented precision limit.
+		§§
+		§§ @example
+		§§   constant pi = Number.Pi
+		§§
+		§§   expect pi::negate()::absolute()::is(pi)
+		§§   expect pi::negate()::add(3)::absolute()::is(pi::subtract(3))
 		absolute() -> Transcendental
 
 		§§ Answers the Transcendental with its sign flipped.
 		§§
 		§§ At least one base term keeps its non-zero coefficient, so the answer is again a Transcendental.
+		§§
+		§§ @example
+		§§   expect Number.Pi::negate()::toString()::is("-π")
+		§§   expect Number.Tau::negate()::toString()::is("-2·π")
 		negate() -> Transcendental
 
 		§ The two Methods that hand a Transcendental to a reader as digits.
@@ -442,6 +572,11 @@ declarations {
 		§§
 		§§ A value over a single base is always answered for. A value carrying both π and e can not be shown to miss every step of the grid. Deciding that would settle an open problem. A call on such a value is answered while the enclosure the width needs stays inside the cutoff `Number::compare` names. A width past that cutoff stops the Program.
 		§§
+		§§ @example
+		§§   expect Number.Pi::approximate(toPlaces 5)::is(3.14159)
+		§§   expect Number.E::approximate(toPlaces 2, toward #Down)::is(2.71)
+		§§   expect Number.Pi::approximate(toPlaces 0)::is(3/1)
+		§§
 		§§ @param toPlaces — how many decimal places the grid keeps
 		§§ @param toward — the direction to round in, `#Nearest` when it is left out
 		§§ @returns — the value on the grid the width names.
@@ -456,6 +591,10 @@ declarations {
 		overload round {
 			§§ Answers the Transcendental as an Integer, rounded in the named direction.
 			§§
+			§§ @example
+			§§   expect Number.Pi::round()::is(3)
+			§§   expect Number.Pi::round(toward #Up)::is(4)
+			§§
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
 			§§ @returns — the rounded Integer.
 			(toward direction: Rounding = #Nearest) -> Integer
@@ -463,6 +602,10 @@ declarations {
 			§§ Answers the Transcendental rounded to a decimal grid of the given width.
 			§§
 			§§ Two places round to hundredths. The answer is what `approximate(toPlaces:toward:)` answers, and a count below one rounds to a whole number. The entry stands here so that a Number receiver reaches `round` at every width, whichever kind it holds.
+			§§
+			§§ @example
+			§§   expect Number.Pi::round(toPlaces 2)::is(3.14)
+			§§   expect Number.Pi::round(toPlaces 2, toward #Up)::is(3.15)
 			§§
 			§§ @param toPlaces — how many decimal places to keep
 			§§ @param toward — the direction to round in, `#Nearest` when it is left out
@@ -490,6 +633,11 @@ declarations {
 		§§ Answers the power of ten at or below the Transcendental's distance from zero.
 		§§
 		§§ This is the exponent the `#Scientific` format writes after the `e`. A value between one and ten answers zero, and a value between a tenth and one answers minus one. The enclosure widens until it falls inside one such power of ten. A value over a single base always falls inside one, since it is never a power of ten itself. A value carrying both π and e reaches the cutoff `Number::compare` names where it does not, and stops the Program there.
+		§§
+		§§ @example
+		§§   expect Number.Pi::decimalExponent()::is(0)
+		§§   expect Number.Pi::subtract(3)::decimalExponent()::is(-1)
+		§§   expect Number.Pi::multiply(with 100)::decimalExponent()::is(2)
 		§§
 		§§ @returns — the exponent of the power of ten the value falls on.
 		decimalExponent() -> Integer
