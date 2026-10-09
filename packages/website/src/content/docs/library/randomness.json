@@ -167,7 +167,7 @@
 					"origin": "declared",
 					"protocol": null,
 					"condition": null,
-					"summary": "Answers an exact fraction between two bounds, with both bounds included.\n\nThe two bounds name the same range in either order. The entry taking no denominator draws off a lattice of twelve small denominators. Those are 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 100 and 1000, and no other denominator is ever answered. A caller that needs one names it with `over:`. A range too narrow to hold a multiple of the denominator answers the lower bound.",
+					"summary": "Answers an exact fraction between two bounds, with both bounds included.\n\nThe two bounds name the same range in either order. The entry taking no denominator draws over one of twelve small denominators. Those are 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 100 and 1000. A caller that needs another names it with `over:`. Either way the answer is a Rational in lowest terms. Its denominator is the one drawn over or a divisor of it, so a draw of `105/100` answers `21/20`. A range too narrow to hold a multiple of the denominator answers the lower bound.",
 					"returns": null,
 					"examples": [],
 					"entries": [
@@ -190,7 +190,7 @@
 									"href": null
 								}
 							],
-							"returns": "a fraction from the range, over one of the twelve denominators.",
+							"returns": "a fraction from the range, drawn over one of the twelve denominators and reduced.",
 							"examples": []
 						},
 						{
@@ -215,11 +215,11 @@
 									"name": "over",
 									"type": "PositiveInteger",
 									"default": null,
-									"description": "the denominator every answer is written over, proven to be above zero",
+									"description": "the denominator every answer is drawn over, proven to be above zero",
 									"href": "/docs/library/integer#PositiveInteger"
 								}
 							],
-							"returns": "a fraction from the range, over the given denominator.",
+							"returns": "a fraction from the range, drawn over the given denominator and reduced.",
 							"examples": []
 						}
 					]

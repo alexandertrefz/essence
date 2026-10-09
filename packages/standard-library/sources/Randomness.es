@@ -74,17 +74,17 @@ declarations {
 
 		§§ Answers an exact fraction between two bounds, with both bounds included.
 		§§
-		§§ The two bounds name the same range in either order. The entry taking no denominator draws off a lattice of twelve small denominators. Those are 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 100 and 1000, and no other denominator is ever answered. A caller that needs one names it with `over:`. A range too narrow to hold a multiple of the denominator answers the lower bound.
+		§§ The two bounds name the same range in either order. The entry taking no denominator draws over one of twelve small denominators. Those are 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 100 and 1000. A caller that needs another names it with `over:`. Either way the answer is a Rational in lowest terms. Its denominator is the one drawn over or a divisor of it, so a draw of `105/100` answers `21/20`. A range too narrow to hold a multiple of the denominator answers the lower bound.
 		overload drawRational {
 			§§ @param between — one bound of the range.
 			§§ @param and — the other bound of the range.
-			§§ @returns — a fraction from the range, over one of the twelve denominators.
+			§§ @returns — a fraction from the range, drawn over one of the twelve denominators and reduced.
 			(between low: Rational, and high: Rational) -> Rational
 
 			§§ @param between — one bound of the range.
 			§§ @param and — the other bound of the range.
-			§§ @param over — the denominator every answer is written over, proven to be above zero
-			§§ @returns — a fraction from the range, over the given denominator.
+			§§ @param over — the denominator every answer is drawn over, proven to be above zero
+			§§ @returns — a fraction from the range, drawn over the given denominator and reduced.
 			(
 				between low: Rational,
 				and high: Rational,

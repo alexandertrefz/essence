@@ -472,7 +472,7 @@ declarations {
 	{
 		§§ Answers the inner Result, one level down.
 		§§
-		§§ A failed outer Result answers that failure. Where the two levels fail with different Types, the answer fails with both of them joined into one Type.
+		§§ A failed outer Result answers that failure. Where the two levels fail with different Types, the answer is a Union of two Results, one for each failure Type. A Constant declared as one Result whose failure Type joins both holds it, as `Result<Integer, String | Integer>` does.
 		§§
 		§§ @example
 		§§   constant inner: Result<Integer, String> = #Value(3)
