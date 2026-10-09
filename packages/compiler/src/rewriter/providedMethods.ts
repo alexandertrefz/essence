@@ -23,7 +23,7 @@ export function graphProvidedMethods(
 	let protocols = new Map(
 		modules.map((module) => [
 			module.filePath,
-			protocolPreludeNamespaces([module.program]),
+			protocolPreludeNamespaces([module.program], prelude),
 		]),
 	)
 	let providedMembers = providedMemberIdentifiers([
@@ -206,10 +206,18 @@ export function providedMethodImports(
 }
 
 // The Programs' Protocols with provided Methods, as prelude entries. One const
-// answers for every conformer.
+// answers for every conformer. A Protocol the prelude already holds is left
+// out. A standard library source compiled for its `@example` tests declares
+// the very Protocols the prelude carries.
 export function protocolPreludeNamespaces(
 	programs: Array<common.typedSimple.Program>,
+	prelude: Array<PreludeNamespace>,
 ): Array<PreludeNamespace> {
+	let held = new Set(
+		prelude
+			.filter((entry) => entry.protocol === true)
+			.map(protocolEntryIdentity),
+	)
 	let found: Array<PreludeNamespace> = []
 	let visited = new Set<unknown>()
 
@@ -234,7 +242,10 @@ export function protocolPreludeNamespaces(
 			let protocol =
 				value as common.typedSimple.ProtocolDeclarationStatementNode
 
-			if (Object.keys(protocol.methods).length > 0) {
+			if (
+				Object.keys(protocol.methods).length > 0 &&
+				!held.has(protocol.identity)
+			) {
 				found.push({
 					name: protocol.name.name,
 					protocol: true,

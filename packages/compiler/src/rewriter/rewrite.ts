@@ -88,8 +88,8 @@ export function rewrite(
 function rewriteProgram(program: common.typedSimple.Program): string {
 	// The Program's own Protocol-provided Methods join the prelude, so one
 	// const answers for every conformer.
-	const protocolMembers = protocolPreludeNamespaces([program])
-	const prelude = [...stdlibPrelude(), ...protocolMembers]
+	const stdlib = stdlibPrelude()
+	const prelude = [...stdlib, ...protocolPreludeNamespaces([program], stdlib)]
 
 	return withEmission(
 		{

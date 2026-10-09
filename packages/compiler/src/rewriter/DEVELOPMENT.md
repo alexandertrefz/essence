@@ -117,6 +117,8 @@ running the fixed point once per Module.
 
 A lone Program's own Protocol-provided Methods join its prelude through `protocolPreludeNamespaces`, so one
 const answers for every conformer. A graph keeps them out of the prelude. See "Provided Methods in a graph".
+Either way a Protocol the standard library prelude already holds is left out, since a standard library source
+compiled for its `@example` tests declares the very Protocols the prelude carries.
 
 The user's code is rewritten before reachability runs, so the fixed point reads the finished estree. By then
 every reference to a bodied member is a plain `Identifier`, however it was written: a call, a witness's

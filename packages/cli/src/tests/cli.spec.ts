@@ -1121,6 +1121,35 @@ describe("CLI on a standard library source", () => {
 		}
 	})
 
+	// A test compile is what runs a source's `@example` blocks. A source that
+	// declares a Protocol with provided Methods declares one the prelude
+	// already carries, and the two must not be named twice.
+	it("compiles every standard library source for its tests", async () => {
+		let fileNames = readdirSync(STDLIB_DIRECTORY).filter((fileName) =>
+			fileName.endsWith(".es"),
+		)
+
+		// Written out, since a compile that emits nothing never rewrites.
+		let directory = mkdtempSync(path.join(tmpdir(), "essence-stdlib-tests-"))
+
+		try {
+			for (let fileName of fileNames) {
+				let outcome = await compileFile({
+					inputFileName: path.resolve(STDLIB_DIRECTORY, fileName),
+					outputFileName: path.join(directory, `${fileName}.js`),
+					minify: false,
+					sourcemap: false,
+					tests: true,
+				})
+
+				expect([fileName, outcome.diagnostics]).toEqual([fileName, []])
+				expect([fileName, outcome.ok]).toEqual([fileName, true])
+			}
+		} finally {
+			rmSync(directory, { recursive: true, force: true })
+		}
+	})
+
 	// Only the standard library may open with `declarations { … }`; the CLI rejects
 	// it elsewhere, as the Editor does.
 	it("still rejects a 'declarations' header outside the standard library", async () => {
