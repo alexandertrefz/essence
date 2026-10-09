@@ -127,6 +127,111 @@ function answerTo(
 	)
 }
 
+type SessionRun = {
+	end: Message | null
+	logs: Array<string>
+	errors: string
+	exitCode: number
+	// The bundles the Worker staged, named for their hashes.
+	staged: Array<string>
+}
+
+// Starts the bundled server on a workspace of one passing test file, waits
+// for the session's first run, and stops it.
+async function runSession(node: string): Promise<SessionRun> {
+	writeFileSync(
+		path.join(workspace, "Sums.es"),
+		[
+			"tests {",
+			'\ttest "adds up" {',
+			"\t\tconstant total = 2::add(2)",
+			"",
+			"\t\texpect total::is(4)",
+			"\t}",
+			"",
+			'\ttest "adds more" {',
+			"\t\tconstant total = 3::add(4)",
+			"",
+			"\t\texpect total::is(7)",
+			"\t}",
+			"}",
+			"",
+		].join("\n"),
+	)
+
+	// The shim a version manager installs as `node` puts its own directory on
+	// `PATH`, so the server runs on the executable it starts.
+	let executable = Bun.spawnSync([node, "-p", "process.execPath"])
+		.stdout.toString()
+		.trim()
+	// The Worker stages its bundles here.
+	let staging = mkdtempSync(path.join(root, "staging-"))
+	let { NODE_PATH: _, ...environment } = process.env
+	let server = Bun.spawn(
+		[executable, path.join(directory, "server.js"), "--stdio"],
+		{
+			cwd: workspace,
+			stdin: "pipe",
+			stdout: "pipe",
+			stderr: "pipe",
+			env: {
+				...environment,
+				ESSENCE_COMPILER_CACHE: "off",
+				PATH: workspace,
+				TMPDIR: staging,
+			},
+		},
+	)
+	let next = messagesOf(server.stdout)
+	let logs: Array<string> = []
+
+	server.stdin.write(
+		framed({
+			id: 1,
+			method: "initialize",
+			params: {
+				processId: null,
+				rootUri: pathToFileURL(workspace).href,
+				workspaceFolders: [
+					{ uri: pathToFileURL(workspace).href, name: "sums" },
+				],
+				capabilities: { workspace: { workspaceFolders: true } },
+			},
+		}),
+	)
+	server.stdin.flush()
+	await answerTo(next, 1)
+	// The session runs the workspace once the client says it is ready.
+	server.stdin.write(framed({ method: "initialized", params: {} }))
+	server.stdin.flush()
+
+	let end = await firstWhere(next, (message) => {
+		if (message.method === "window/logMessage") {
+			logs.push(message.params?.message ?? "")
+		}
+
+		return (
+			message.method === "essence/testRun" &&
+			message.params?.kind === "end"
+		)
+	})
+	// Read before `shutdown`, which removes them.
+	let staged = readdirSync(staging).flatMap((each) =>
+		readdirSync(path.join(staging, each)),
+	)
+
+	server.stdin.write(framed({ id: 2, method: "shutdown" }))
+	server.stdin.flush()
+	await answerTo(next, 2)
+	server.stdin.write(framed({ method: "exit" }))
+	server.stdin.end()
+
+	let exitCode = await server.exited
+	let errors = await new Response(server.stderr).text()
+
+	return { end, logs, errors, exitCode, staged }
+}
+
 // Every file under `directory`, at any depth.
 function filesUnder(directory: string): Array<string> {
 	return readdirSync(directory, { recursive: true, withFileTypes: true })
@@ -219,106 +324,40 @@ describe("The bundled Language Server", () => {
 
 			expect(reachable).toEqual([])
 
-			writeFileSync(
-				path.join(workspace, "Sums.es"),
-				[
-					"tests {",
-					'\ttest "adds up" {',
-					"\t\tconstant total = 2::add(2)",
-					"",
-					"\t\texpect total::is(4)",
-					"\t}",
-					"",
-					'\ttest "adds more" {',
-					"\t\tconstant total = 3::add(4)",
-					"",
-					"\t\texpect total::is(7)",
-					"\t}",
-					"}",
-					"",
-				].join("\n"),
-			)
+			let run = await runSession(node as string)
 
-			// The shim a version manager installs as `node` puts its own
-			// directory on `PATH`, so the server runs on the executable it
-			// starts.
-			let executable = Bun.spawnSync([
-				node as string,
-				"-p",
-				"process.execPath",
-			])
-				.stdout.toString()
-				.trim()
-			let { NODE_PATH: _, ...environment } = process.env
-			let server = Bun.spawn(
-				[executable, path.join(directory, "server.js"), "--stdio"],
-				{
-					cwd: workspace,
-					stdin: "pipe",
-					stdout: "pipe",
-					stderr: "pipe",
-					env: {
-						...environment,
-						ESSENCE_COMPILER_CACHE: "off",
-						PATH: workspace,
-					},
-				},
-			)
-			let next = messagesOf(server.stdout)
-			let logs: Array<string> = []
-
-			server.stdin.write(
-				framed({
-					id: 1,
-					method: "initialize",
-					params: {
-						processId: null,
-						rootUri: pathToFileURL(workspace).href,
-						workspaceFolders: [
-							{
-								uri: pathToFileURL(workspace).href,
-								name: "sums",
-							},
-						],
-						capabilities: { workspace: { workspaceFolders: true } },
-					},
-				}),
-			)
-			server.stdin.flush()
-			await answerTo(next, 1)
-			// The session runs the workspace once the client says it is ready.
-			server.stdin.write(framed({ method: "initialized", params: {} }))
-			server.stdin.flush()
-
-			let end = await firstWhere(next, (message) => {
-				if (message.method === "window/logMessage") {
-					logs.push(message.params?.message ?? "")
-				}
-
-				return (
-					message.method === "essence/testRun" &&
-					message.params?.kind === "end"
-				)
-			})
-
-			server.stdin.write(framed({ id: 2, method: "shutdown" }))
-			server.stdin.flush()
-			await answerTo(next, 2)
-			server.stdin.write(framed({ method: "exit" }))
-			server.stdin.end()
-
-			let exitCode = await server.exited
-			let errors = await new Response(server.stderr).text()
-
-			expect({ errors, exitCode, logs }).toEqual({
-				errors: "",
-				exitCode: 0,
-				logs: [],
-			})
-			expect(end?.params).toMatchObject({
+			expect({
+				errors: run.errors,
+				exitCode: run.exitCode,
+				logs: run.logs,
+			}).toEqual({ errors: "", exitCode: 0, logs: [] })
+			expect(run.end?.params).toMatchObject({
 				compiled: true,
 				counts: { passed: 2, failed: 0, skipped: 0, deselected: 0 },
 			})
+		},
+	)
+
+	// A bundle is staged under its hash, which mixes in the compiler's version.
+	// Installed, the directory above the extension holds whatever it holds, and
+	// a `package.json` there must not move the hash.
+	it.skipIf(node === null)(
+		"names a test bundle alike whatever sits above the extension",
+		async () => {
+			await built()
+
+			let manifest = path.join(extension, "..", "package.json")
+			let staged: Array<Array<string>> = []
+
+			for (let version of ["1.0.0", "2.0.0"]) {
+				writeFileSync(manifest, JSON.stringify({ version }))
+				staged.push((await runSession(node as string)).staged)
+			}
+
+			rmSync(manifest)
+
+			expect(staged[0]).toHaveLength(1)
+			expect(staged[1]).toEqual(staged[0]!)
 		},
 	)
 

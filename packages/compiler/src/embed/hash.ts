@@ -5,6 +5,7 @@ import * as path from "node:path"
 import { RUNTIME_DIRECTORY } from "@essence-lang/runtime"
 import { readStdlibFiles } from "@essence-lang/standard-library"
 
+import manifest from "../../package.json" with { type: "json" }
 import { type OptimiserOptions, optimiserOptionsKey } from "../optimiser/index"
 
 type BundleHashParts = {
@@ -71,21 +72,10 @@ function digestToolchain(): string {
 	return hash.digest("hex")
 }
 
-// The package manifest two levels up. An unreadable one leaves the version out,
-// which costs a cache invalidation, not a compile.
+// Imported rather than read off disk, so a bundle that inlines the compiler
+// carries the version, and never reads a `package.json` that sits above it.
 function compilerVersion(): string {
-	try {
-		let manifest = JSON.parse(
-			readFileSync(
-				path.resolve(import.meta.dirname, "../../package.json"),
-				"utf8",
-			),
-		) as { version?: string }
-
-		return manifest.version ?? ""
-	} catch {
-		return ""
-	}
+	return manifest.version
 }
 
 // Everything the Bundler could inline: the runtime's TypeScript and the

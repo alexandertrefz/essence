@@ -166,3 +166,7 @@ name, and the runtime's TypeScript and `tsconfig.json`. The version alone would 
 workspace checkout. The compiler's own sources are left out, since reading them in every process costs more than
 the case is worth. Someone editing the Rewriter compiles against a cache directory of their own, or empties the
 shared one. The key is computed once per process.
+
+The compiler's version is imported from its `package.json` rather than read off disk. A bundle that inlines the
+compiler, as the VS Code extension's server does, then carries the version, and never reads a manifest that
+happens to sit above wherever it is installed.
