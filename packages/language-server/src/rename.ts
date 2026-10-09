@@ -21,6 +21,7 @@ import type { common, parser } from "@essence-lang/interfaces"
 
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains, isSamePosition, isSmaller } from "./positions"
+import { groupRelatedShapes, type ShapeGroup } from "./recordShapes"
 import {
 	type ParserSection,
 	programSections,
@@ -416,6 +417,9 @@ export type ProgramIndex = {
 	// Every link, including those this file resolves. The workspace join
 	// resolves them all again, so another Module's Protocol joins the same way.
 	conformances: Array<ConformanceLink>
+	// The Record member Declarations, by the shapes that relate them, so the
+	// workspace join relates them to another Module's.
+	recordMembers: Array<ShapeGroup<Declaration>>
 }
 
 export function indexProgram(
@@ -516,7 +520,7 @@ export function indexProgram(
 
 	bindProtocolMembers(context)
 
-	resolveRecordMembers(context)
+	let recordMembers = resolveRecordMembers(context)
 
 	shareConformanceSites(context)
 
@@ -528,6 +532,7 @@ export function indexProgram(
 		protocolExtensions: context.protocolExtensions,
 		externalMembers: context.externalMembers,
 		conformances: context.conformances,
+		recordMembers,
 	}
 }
 
@@ -2261,53 +2266,30 @@ function editsForBinding(
 // Groups member occurrences across the Record shapes related by subset, so
 // a rename reaches every site that could observe the member. Identically
 // shaped Records are one structural Type and rename together.
-function resolveRecordMembers(context: WalkContext) {
+function resolveRecordMembers(
+	context: WalkContext,
+): Array<ShapeGroup<Declaration>> {
 	let shapes = [
 		...context.recordSites.map((site) => new Set(site.names)),
 		...context.recordLookups.map((lookupSite) => new Set(lookupSite.names)),
 	]
+	let roots = groupRelatedShapes(shapes)
+	let groups = new Map<number, ShapeGroup<Declaration>>()
 
-	let parents = shapes.map((_, shapeIndex) => shapeIndex)
+	for (let [shapeIndex, root] of roots.entries()) {
+		let group = groups.get(root)
 
-	function findRoot(shapeIndex: number): number {
-		while (parents[shapeIndex] !== shapeIndex) {
-			parents[shapeIndex] = parents[parents[shapeIndex]]
-			shapeIndex = parents[shapeIndex]
+		if (group === undefined) {
+			group = { shapes: [], members: new Map() }
+			groups.set(root, group)
 		}
 
-		return shapeIndex
+		group.shapes.push(shapes[shapeIndex])
 	}
-
-	function isSubset(a: Set<string>, b: Set<string>): boolean {
-		for (let name of a) {
-			if (!b.has(name)) {
-				return false
-			}
-		}
-
-		return true
-	}
-
-	for (let i = 0; i < shapes.length; i++) {
-		for (let j = i + 1; j < shapes.length; j++) {
-			if (shapes[i].size === 0 || shapes[j].size === 0) {
-				continue
-			}
-
-			if (
-				isSubset(shapes[i], shapes[j]) ||
-				isSubset(shapes[j], shapes[i])
-			) {
-				parents[findRoot(i)] = findRoot(j)
-			}
-		}
-	}
-
-	let declarations = new Map<string, Declaration>()
 
 	function declarationFor(shapeIndex: number, name: string): Declaration {
-		let key = `${findRoot(shapeIndex)} ${name}`
-		let declaration = declarations.get(key)
+		let { members } = groups.get(roots[shapeIndex])!
+		let declaration = members.get(name)
 
 		if (declaration === undefined) {
 			declaration = {
@@ -2317,7 +2299,7 @@ function resolveRecordMembers(context: WalkContext) {
 				visibleFrom: null,
 				occurrences: [],
 			}
-			declarations.set(key, declaration)
+			members.set(name, declaration)
 		}
 
 		return declaration
@@ -2352,6 +2334,8 @@ function resolveRecordMembers(context: WalkContext) {
 
 		record(declaration, lookupSite.name, lookupSite.position, context)
 	})
+
+	return [...groups.values()].filter((group) => group.members.size > 0)
 }
 
 /****************/

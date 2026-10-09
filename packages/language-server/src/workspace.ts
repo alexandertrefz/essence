@@ -38,6 +38,7 @@ import {
 	findDocumentSymbols,
 } from "./documentSymbols"
 import { type ModuleView, moduleViewsOf } from "./moduleLink"
+import { relatedMembers, type ShapeGroup } from "./recordShapes"
 import {
 	type Declaration,
 	type DeclarationKind,
@@ -1449,6 +1450,18 @@ function joinComponent(
 		}
 	}
 
+	// A Record member joins the members of related shapes in every Module,
+	// as it does within one.
+	for (let [first, ...others] of relatedMemberKeys(
+		component,
+		indices,
+		declarationKeys,
+	)) {
+		for (let key of others) {
+			union(first, key)
+		}
+	}
+
 	for (let filePath of component) {
 		let program = programOf(filePath)
 		let index = indices.get(filePath)
@@ -1877,6 +1890,36 @@ function joinComponent(
 			return null
 		},
 	}
+}
+
+// The join keys of the Record member Declarations one rename reaches across
+// the component's files.
+function relatedMemberKeys(
+	component: Array<string>,
+	indices: Map<string, ProgramIndex>,
+	declarationKeys: Map<string, Map<Declaration, string>>,
+): Array<Array<string>> {
+	let groups: Array<ShapeGroup<string>> = []
+
+	for (let filePath of component) {
+		let keys = declarationKeys.get(filePath)
+
+		for (let group of indices.get(filePath)?.recordMembers ?? []) {
+			let members = new Map<string, string>()
+
+			for (let [name, declaration] of group.members) {
+				let key = keys?.get(declaration)
+
+				if (key !== undefined) {
+					members.set(name, key)
+				}
+			}
+
+			groups.push({ shapes: group.shapes, members })
+		}
+	}
+
+	return relatedMembers(groups)
 }
 
 // Every Declaration an export entry without `from` names, in both symbol

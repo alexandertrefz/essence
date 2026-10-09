@@ -19,6 +19,7 @@ import {
 } from "../codeActions"
 import { findCompletions } from "../completion"
 import { findHover } from "../hover"
+import { renameEdits } from "../rename"
 import { uriOf } from "../server"
 import { createWorkspace, type Workspace } from "../workspace"
 import { applyEdits } from "./textEdits"
@@ -101,7 +102,8 @@ function spanOf(source: string, line: number, needle: string): common.Position {
 }
 
 // Applies a workspace rename textually, file by file, so an expectation can
-// state whole Programs, as `rename.spec.ts` does for one file.
+// state whole Programs, as `rename.spec.ts` does for one file. It goes through
+// `renameEdits`, as the Server does, so a shorthand is spelled out.
 function renameAcross(
 	workspace: Workspace,
 	filePath: string,
@@ -114,37 +116,34 @@ function renameAcross(
 		return null
 	}
 
-	let byFile = new Map<string, Array<common.Position>>()
+	let byFile = new Map<
+		string,
+		Array<{ range: common.Position; newText: string }>
+	>()
 
 	for (let occurrence of symbol.occurrences) {
-		let positions = byFile.get(occurrence.filePath)
+		let edits = byFile.get(occurrence.filePath)
 
-		if (positions === undefined) {
-			positions = []
-			byFile.set(occurrence.filePath, positions)
+		if (edits === undefined) {
+			edits = []
+			byFile.set(occurrence.filePath, edits)
 		}
 
-		positions.push(occurrence.position)
+		for (let edit of renameEdits(
+			{ position: occurrence.position, edits: occurrence.edits ?? null },
+			newName,
+		)) {
+			edits.push({ range: edit.position, newText: edit.newText })
+		}
 	}
 
 	let result: Record<string, string> = {}
 
-	for (let [file, positions] of byFile) {
-		let lines = (workspace.sourceOf(file) ?? "").split("\n")
-
-		for (let position of [...positions].sort(
-			(a, b) =>
-				b.start.line - a.start.line || b.start.column - a.start.column,
-		)) {
-			let line = lines[position.start.line - 1] ?? ""
-
-			lines[position.start.line - 1] =
-				line.slice(0, position.start.column - 1) +
-				newName +
-				line.slice(position.end.column - 1)
-		}
-
-		result[path.basename(file)] = lines.join("\n")
+	for (let [file, edits] of byFile) {
+		result[path.basename(file)] = applyEdits(
+			workspace.sourceOf(file) ?? "",
+			edits,
+		)
 	}
 
 	return result
@@ -1591,6 +1590,337 @@ describe("Workspace", () => {
 			])
 			expect(renamed?.["Main.es"]).toContain("<- shape::surface()")
 			expect(renamed?.["Main.es"]).toContain("Measures.surface({")
+		})
+
+		// Record Types are structural, so a member is joined to its uses in
+		// another Module by the shapes both write, as within one file.
+		describe("a Record member another Module declares", () => {
+			const types = [
+				"implementation {",
+				"\ttype Server = { host: String, port: Integer }",
+				"\ttype Config = { name: String, server: Server }",
+				"\ttype Endpoint = Server",
+				"",
+				"\tchoice Fetch {",
+				"\t\tGet { url: String, retries: Integer },",
+				"\t\tStop,",
+				"\t}",
+				"}",
+				"",
+				"export {",
+				"\tServer",
+				"\tConfig",
+				"\tEndpoint",
+				"\tFetch",
+				"}",
+				"",
+			].join("\n")
+
+			const main = [
+				"import {",
+				'\tfrom "./Types.es" {',
+				"\t\tServer",
+				"\t\tConfig",
+				"\t\tEndpoint",
+				"\t\tFetch",
+				"\t}",
+				"}",
+				"",
+				"implementation {",
+				"\t§§ Answers the port.",
+				"\t§§",
+				"\t§§ @param using — where to connect.",
+				"\t§§ @returns — the port.",
+				'\tfunction connect(using server: Server = { host = "h", port = 80 }) -> Integer {',
+				"\t\t<- server.port",
+				"\t}",
+				"",
+				"\t§§ Answers the port.",
+				"\t§§",
+				"\t§§ @param _ — what to read.",
+				"\t§§ @returns — the port.",
+				"\tfunction portOf(_ server: Server) -> Integer {",
+				"\t\tconstant { port } = server",
+				"\t\t<- port",
+				"\t}",
+				"",
+				'\tconstant s: Server = { host = "a", port = 80 }',
+				"\tconstant moved = { s with port = 81 }",
+				"\tconstant servers: List<Server> = [s]",
+				"\tconstant ports = servers::map(.port)",
+				"\tconstant port = 8080",
+				'\tconstant short: Server = { host = "b", port }',
+				'\tconstant config: Config = { name = "c", server = s }',
+				"\tconstant deeper = { config with server.port = 2 }",
+				'\tconstant e: Endpoint = { host = "e", port = 3 }',
+				'\tconstant f: Fetch = #Get({ url = "u", retries = 1 })',
+				"\tconstant tries = match f -> Integer {",
+				"\t\tcase #Get({ retries }) { <- retries }",
+				"\t\tcase #Stop { <- 0 }",
+				"\t}",
+				"",
+				"\tTerminal.inspect(e.port::add(config.server.port))",
+				"}",
+				"",
+			].join("\n")
+
+			// The Diagnostics of every file once the rename is written back.
+			function codesAfter(
+				workspace: Workspace,
+				pathOf: (name: string) => string,
+				renamed: Record<string, string> | null,
+			): Record<string, Array<common.DiagnosticCode>> {
+				for (let [name, text] of Object.entries(renamed ?? {})) {
+					writeFileSync(pathOf(name), text)
+					workspace.changed(pathOf(name))
+				}
+
+				let codes: Record<string, Array<common.DiagnosticCode>> = {}
+
+				for (let name of ["Types.es", "Main.es"]) {
+					codes[name] = analyseDocument(
+						workspace.sourceOf(pathOf(name)) ?? "",
+						pathOf(name),
+						{ host: workspace.host },
+					).diagnostics.map((diagnostic) => diagnostic.code)
+				}
+
+				return codes
+			}
+
+			const renamedMain = main
+				.replace("port = 80 }) -> Integer", "socket = 80 }) -> Integer")
+				.replace("<- server.port", "<- server.socket")
+				.replace("constant { port }", "constant { socket as port }")
+				.replace('"a", port = 80', '"a", socket = 80')
+				.replace("s with port", "s with socket")
+				.replace("map(.port)", "map(.socket)")
+				.replace('"b", port }', '"b", socket = port }')
+				.replace("server.port = 2", "server.socket = 2")
+				.replace('"e", port = 3', '"e", socket = 3')
+				.replace(
+					"e.port::add(config.server.port)",
+					"e.socket::add(config.server.socket)",
+				)
+
+			it("should rename every use in the importing Module from the declaration", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": main,
+				})
+
+				let renamed = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(types, 2, "port"),
+					"socket",
+				)
+
+				expect(renamed).toEqual({
+					"Types.es": types.replace(
+						"port: Integer",
+						"socket: Integer",
+					),
+					"Main.es": renamedMain,
+				})
+				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
+
+			it("should reach the declaration from a member read and from a Record key", () => {
+				for (let [line, needle] of [
+					[16, "port"],
+					[28, "port"],
+				] as const) {
+					let { workspace, pathOf } = makeWorkspace({
+						"Types.es": types,
+						"Main.es": main,
+					})
+
+					let renamed = renameAcross(
+						workspace,
+						pathOf("Main.es"),
+						cursorAt(main, line, needle),
+						"socket",
+					)
+
+					expect(renamed).toEqual({
+						"Types.es": types.replace(
+							"port: Integer",
+							"socket: Integer",
+						),
+						"Main.es": renamedMain,
+					})
+					expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+						"Types.es": [],
+						"Main.es": [],
+					})
+				}
+			})
+
+			it("should list the uses in the importing Module as references", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": main,
+				})
+
+				let symbol = workspace.symbolAt(
+					pathOf("Types.es"),
+					cursorAt(types, 2, "port"),
+				)
+
+				expect(
+					symbol?.occurrences
+						.map(
+							(occurrence) =>
+								`${path.basename(occurrence.filePath)}:${occurrence.position.start.line}`,
+						)
+						.sort(),
+				).toEqual(
+					[
+						"Types.es:2",
+						"Main.es:15",
+						"Main.es:16",
+						"Main.es:24",
+						"Main.es:28",
+						"Main.es:29",
+						"Main.es:31",
+						"Main.es:33",
+						"Main.es:35",
+						"Main.es:36",
+						"Main.es:43",
+						"Main.es:43",
+					].sort(),
+				)
+			})
+
+			it("should rename a Case payload member of an exported Choice", () => {
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": main,
+				})
+
+				let renamed = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(types, 7, "retries"),
+					"attempts",
+				)
+
+				expect(renamed).toEqual({
+					"Types.es": types.replace("retries:", "attempts:"),
+					"Main.es": main
+						.replace("retries = 1", "attempts = 1")
+						.replace("{ retries }", "{ attempts as retries }"),
+				})
+				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
+
+			// A bare path key is refused. Its last step is also the value it reads,
+			// so renaming the member spells the value out and the update compiles.
+			it("should spell out a bare path key in the importing Module", () => {
+				let bare = [
+					"import {",
+					'\tfrom "./Types.es" { Config }',
+					"}",
+					"",
+					"implementation {",
+					'\tconstant config: Config = { name = "c", server = { host = "h", port = 1 } }',
+					"\tconstant port = 8080",
+					'\tconstant moved = { config with server.port, name = "d" }',
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": bare,
+				})
+
+				let renamed = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(types, 2, "port"),
+					"socket",
+				)
+
+				expect(renamed).toEqual({
+					"Types.es": types.replace(
+						"port: Integer",
+						"socket: Integer",
+					),
+					"Main.es": bare
+						.replace("port = 1 }", "socket = 1 }")
+						.replace("server.port,", "server.socket = port,"),
+				})
+				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
+
+			// `Proxy` shares the member's name, and neither shape holds the
+			// other.
+			it("should leave a member of another Type with the same name", () => {
+				let proxied = [
+					"import {",
+					'\tfrom "./Types.es" { Server }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Proxy = { port: Integer, timeout: Integer }",
+					"",
+					"\tconstant proxy: Proxy = { port = 1, timeout = 2 }",
+					'\tconstant s: Server = { host = "a", port = 80 }',
+					"",
+					"\tTerminal.inspect(proxy.port::add(s.port))",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": proxied,
+				})
+
+				let fromServer = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(types, 2, "port"),
+					"socket",
+				)
+
+				expect(fromServer).toEqual({
+					"Types.es": types.replace(
+						"port: Integer",
+						"socket: Integer",
+					),
+					"Main.es": proxied
+						.replace('"a", port = 80', '"a", socket = 80')
+						.replace("s.port)", "s.socket)"),
+				})
+
+				expect(
+					renameAcross(
+						workspace,
+						pathOf("Main.es"),
+						cursorAt(proxied, 6, "port"),
+						"gate",
+					),
+				).toEqual({
+					"Main.es": proxied
+						.replace("{ port: Integer", "{ gate: Integer")
+						.replace("{ port = 1", "{ gate = 1")
+						.replace("proxy.port", "proxy.gate"),
+				})
+				expect(codesAfter(workspace, pathOf, fromServer)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
 		})
 	})
 

@@ -209,8 +209,21 @@ reaches every child the typed table holds, and only the kinds that bind a member
 - A Method that answers a Protocol requirement is one name with the requirement. `shareConformanceSites` gives them
   one occurrence list. A Method answering a standard library Protocol is marked `answersBuiltin`, since nothing
   reaches the requirement.
-- Record Types are structural. `resolveRecordMembers` groups a member's occurrences across the file's Record shapes
-  that share it and are related by subset. One such shape could flow into the other.
+- Record Types are structural, so a member is grouped by the shapes it is written and read through. "Record members"
+  explains how.
+
+### Record members
+
+A Record member has no Type that declares it alone, since any Record of the same shape is the same Type.
+`resolveRecordMembers` instead groups the shapes a file writes or reads members through: a Record Type, a literal, a
+Pattern, the keys of an update and the base of a Lookup. Two shapes share a group when one holds every name of the
+other, since a value of the larger could flow into the smaller. The relation is closed transitively, and each name of a
+group is one Declaration. Shapes neither of which holds the other stay apart, so two Types sharing a member's name do
+not rename together.
+
+`groupRelatedShapes` in `src/recordShapes.ts` does the grouping, and the index keeps each group's shapes as
+`recordMembers`. The symbol join groups the shapes of every file of a component the same way, so a member declared in
+one Module joins its uses in the Modules importing it.
 
 ### Shorthand edits
 
@@ -358,7 +371,8 @@ Declarations to another's, and each tie has two kinds of end:
 
 The join runs in an order each step depends on:
 
-1. Every Declaration of every file becomes a site.
+1. Every Declaration of every file becomes a site. Record members whose groups hold related shapes join across files,
+   as "Record members" explains.
 2. Each import entry ties its local binding to the dependency's export site, and each export entry ties its export
    site to what it names. An entry that writes one Identifier for both roles merges the two sites, so a rename writes
    that Position once. An aliased entry records the alias instead, so `followAliases` can reach the declaring Module.
