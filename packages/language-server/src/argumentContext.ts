@@ -1,5 +1,6 @@
 import {
 	argumentPairingInverse,
+	bindNamespaceTarget,
 	pairArguments,
 } from "@essence-lang/compiler/helpers"
 import {
@@ -364,8 +365,8 @@ function visitArgument(
 	)
 }
 
-// Exported for the path-key probe, which needs an Argument's Parameter to
-// know which Record a key reaches into.
+// Which Parameter each Argument fills, by the Compiler's walk. Empty where
+// no Parameter has a default, since each Argument then fills its place.
 export function pairedParameters(
 	nodeArguments: Array<common.typed.ArgumentNode>,
 	parameterTypes: common.BaseFunction["parameterTypes"] | null,
@@ -388,6 +389,74 @@ export function pairedParameters(
 	// Inverted by the Compiler's helper, as `matchArguments` does, so the two
 	// agree on which Parameter an Argument answers.
 	return pairing === null ? [] : argumentPairingInverse(pairing)
+}
+
+// The signature a call resolved to, with its Parameters as its Arguments see
+// them and what the receiver bound. A Method's receiver is its first
+// Parameter.
+export function calledSignature(invocation: TypedNode | undefined): {
+	signature: common.BaseFunction
+	parameters: Array<common.Parameter>
+	bindings: Map<string, common.Type>
+} | null {
+	if (invocation?.nodeType === "FunctionInvocation") {
+		let signature = signatureOf(
+			invocation.name.type,
+			invocation.overloadedMethodIndex,
+		)
+
+		return signature === null
+			? null
+			: {
+					signature,
+					parameters: signature.parameterTypes,
+					bindings: new Map(),
+				}
+	}
+
+	if (invocation?.nodeType !== "MethodInvocation" || invocation.dispatch) {
+		return null
+	}
+
+	let namespace = invocation.namespace.type
+	let signature = signatureOf(
+		namespace.methods[invocation.member.name],
+		invocation.overloadedMethodIndex,
+	)
+
+	if (signature === null) {
+		return null
+	}
+
+	return {
+		signature,
+		parameters: signature.parameterTypes.slice(1),
+		bindings:
+			bindNamespaceTarget(
+				{
+					targetType: namespace.targetType,
+					generics: namespace.generics,
+				},
+				invocation.base.type,
+			) ?? new Map(),
+	}
+}
+
+function signatureOf(
+	type: common.Type | common.MethodType | undefined,
+	overload: number | null,
+): common.BaseFunction | null {
+	switch (type?.type) {
+		case "Function":
+		case "StaticMethod":
+		case "SimpleMethod":
+			return type
+		case "OverloadedMethod":
+		case "OverloadedStaticMethod":
+			return overload === null ? null : (type.overloads[overload] ?? null)
+		default:
+			return null
+	}
 }
 
 function asRecordType(type: common.Type | null): common.RecordType | null {

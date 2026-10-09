@@ -1,6 +1,5 @@
 import {
 	applyGenericBindings,
-	bindNamespaceTarget,
 	genericNamesMentioned,
 	isFunctionRefusedAsValue,
 	matchesType,
@@ -17,7 +16,7 @@ import {
 } from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
-import { pairedParameters } from "../argumentContext"
+import { calledSignature, pairedParameters } from "../argumentContext"
 import { isSamePosition } from "../positions"
 import { typedProgramBodies } from "../sections"
 import { spellTypeAt } from "../spellableTypes"
@@ -497,74 +496,6 @@ function parameterAt(path: Array<Step>, index: number): Expectation {
 
 	// Where the call's own position expects nothing, nothing else decides.
 	return expectationAt(path, index - 1) === "none" ? "none" : "own"
-}
-
-// The signature a call resolved to, with its Parameters as its Arguments see
-// them and what the receiver bound. A Method's receiver is its first
-// Parameter.
-function calledSignature(invocation: TypedNode | undefined): {
-	signature: common.BaseFunction
-	parameters: Array<common.Parameter>
-	bindings: Map<string, common.Type>
-} | null {
-	if (invocation?.nodeType === "FunctionInvocation") {
-		let signature = signatureOf(
-			invocation.name.type,
-			invocation.overloadedMethodIndex,
-		)
-
-		return signature === null
-			? null
-			: {
-					signature,
-					parameters: signature.parameterTypes,
-					bindings: new Map(),
-				}
-	}
-
-	if (invocation?.nodeType !== "MethodInvocation" || invocation.dispatch) {
-		return null
-	}
-
-	let namespace = invocation.namespace.type
-	let signature = signatureOf(
-		namespace.methods[invocation.member.name],
-		invocation.overloadedMethodIndex,
-	)
-
-	if (signature === null) {
-		return null
-	}
-
-	return {
-		signature,
-		parameters: signature.parameterTypes.slice(1),
-		bindings:
-			bindNamespaceTarget(
-				{
-					targetType: namespace.targetType,
-					generics: namespace.generics,
-				},
-				invocation.base.type,
-			) ?? new Map(),
-	}
-}
-
-function signatureOf(
-	type: common.Type | common.MethodType | undefined,
-	overload: number | null,
-): common.BaseFunction | null {
-	switch (type?.type) {
-		case "Function":
-		case "StaticMethod":
-		case "SimpleMethod":
-			return type
-		case "OverloadedMethod":
-		case "OverloadedStaticMethod":
-			return overload === null ? null : (type.overloads[overload] ?? null)
-		default:
-			return null
-	}
 }
 
 // The typed Node written where the parser Node is, with every Node around it.

@@ -19,6 +19,7 @@ import {
 } from "@essence-lang/compiler/visitor"
 import type { common, parser } from "@essence-lang/interfaces"
 
+import { calledSignature, pairedParameters } from "./argumentContext"
 import { methodsOf, nativeSignaturesOf } from "./namespaceMembers"
 import { contains, isSamePosition, isSmaller } from "./positions"
 import { groupRelatedShapes, type ShapeGroup } from "./recordShapes"
@@ -2291,7 +2292,7 @@ function editsForBinding(
 // relate two Types that share them.
 function widenLiteral(
 	value: common.typed.ExpressionNode | null,
-	type: common.Type,
+	type: common.Type | common.GenericUse,
 	context: WalkContext,
 ) {
 	if (
@@ -2319,6 +2320,31 @@ function widenLiteral(
 
 		if (memberType !== undefined) {
 			widenLiteral(member, memberType, context)
+		}
+	}
+}
+
+// A literal Argument merged into a default writes part of its Parameter's
+// Record. Pairing goes by label, as the Compiler's does.
+function widenArguments(
+	node:
+		| common.typed.FunctionInvocationNode
+		| common.typed.MethodInvocationNode,
+	context: WalkContext,
+) {
+	let call = calledSignature(node)
+
+	if (call === null) {
+		return
+	}
+
+	let paired = pairedParameters(node.arguments, call.parameters)
+
+	for (let [index, argument] of node.arguments.entries()) {
+		let parameter = call.parameters[paired[index] ?? index]
+
+		if (parameter !== undefined) {
+			widenLiteral(argument.value, parameter.type, context)
 		}
 	}
 }
@@ -2740,7 +2766,11 @@ function walkTypedNode(node: TypedNode, context: WalkContext) {
 				protocolIdentityKey(node.protocolType.identity),
 			)
 			break
+		case "FunctionInvocation":
+			widenArguments(node, context)
+			break
 		case "MethodInvocation":
+			widenArguments(node, context)
 			bindNamespaceMember(
 				node.namespace.name,
 				node.namespace.type,

@@ -873,6 +873,94 @@ describe("Rename of Methods and Record members", () => {
 			)
 		})
 
+		// A literal Argument merged into a default writes part of the Record its
+		// Parameter takes, whichever way the call reaches the Parameter.
+		describe("in an Argument", () => {
+			let calls = [
+				"implementation {",
+				"\ttype Server = { host: String, port: Integer }",
+				"\ttype Proxy = { port: Integer, timeout: Integer }",
+				"",
+				"\t§§ Answers the port.",
+				"\t§§",
+				"\t§§ @param retries — how often.",
+				"\t§§ @param via — where to connect.",
+				"\t§§ @returns — the port.",
+				'\tfunction dial(retries: Integer = 1, via server: Server = { host = "h", port = 80 }) -> Integer {',
+				"\t\t<- server.port::add(retries)",
+				"\t}",
+				"",
+				"\tnamespace Servers for Server {",
+				"\t\t§§ Answers the port.",
+				"\t\t§§",
+				"\t\t§§ @param through — the proxy.",
+				"\t\t§§ @returns — the port.",
+				"\t\trelay(through proxy: Proxy = { port = 1, timeout = 2 }) -> Integer {",
+				"\t\t\t<- proxy.port",
+				"\t\t}",
+				"",
+				"\t\t§§ Answers the port.",
+				"\t\t§§",
+				"\t\t§§ @param using — where to connect.",
+				"\t\t§§ @returns — the port.",
+				'\t\tstatic open(using server: Server = { host = "h", port = 80 }) -> Integer {',
+				"\t\t\t<- server.port",
+				"\t\t}",
+				"",
+				"\t\t§§ Picks a port.",
+				"\t\toverload pick {",
+				"\t\t\t§§ Answers the port.",
+				"\t\t\t§§",
+				"\t\t\t§§ @param using — where to connect.",
+				"\t\t\t§§ @returns — the port.",
+				'\t\t\t(using server: Server = { host = "h", port = 80 }) -> Integer {',
+				"\t\t\t\t<- server.port",
+				"\t\t\t}",
+				"",
+				"\t\t\t§§ Answers the count.",
+				"\t\t\t§§",
+				"\t\t\t§§ @param _ — what to answer.",
+				"\t\t\t§§ @returns — the count.",
+				"\t\t\t(_ count: Integer) -> Integer {",
+				"\t\t\t\t<- count",
+				"\t\t\t}",
+				"\t\t}",
+				"\t}",
+				"",
+				'\tconstant s: Server = { host = "a", port = 3 }',
+				"\tconstant a = dial(via { port = 81 })",
+				"\tconstant b = s::relay(through { port = 82 })",
+				"\tconstant c = Servers.open(using { port = 83 })",
+				"\tconstant d = s::pick(using { port = 84 })",
+				"}",
+			].join("\n")
+
+			it("should keep a Record's member apart from another Type's", () => {
+				expect(rename(calls, { line: 2, column: 32 }, "socket")).toBe(
+					calls
+						.replace("String, port", "String, socket")
+						.replaceAll('"h", port = 80', '"h", socket = 80')
+						.replaceAll("server.port", "server.socket")
+						.replace('"a", port = 3', '"a", socket = 3')
+						.replace("via { port", "via { socket")
+						.replaceAll("using { port", "using { socket"),
+				)
+			})
+
+			it("should keep another Type's member apart from the Record's", () => {
+				expect(rename(calls, { line: 3, column: 17 }, "gate")).toBe(
+					calls
+						.replace(
+							"{ port: Integer, timeout",
+							"{ gate: Integer, timeout",
+						)
+						.replace("{ port = 1, timeout", "{ gate = 1, timeout")
+						.replace("proxy.port", "proxy.gate")
+						.replace("through { port", "through { gate"),
+				)
+			})
+		})
+
 		// `#Has({ host = "a", port = 1 })` writes the payload's one member
 		// positionally, so the literal is a `Server` and not the payload.
 		it("should widen a positional payload by its member's Type", () => {

@@ -1927,6 +1927,71 @@ describe("Workspace", () => {
 				})
 			})
 
+			// The Argument is merged into the default of a Function the declaring
+			// Module writes, so it writes part of a `Server`.
+			it("should leave another Type's member through a literal Argument", () => {
+				let connecting = [
+					"implementation {",
+					"\ttype Server = { host: String, port: Integer }",
+					"",
+					"\t§§ Answers the port.",
+					"\t§§",
+					"\t§§ @param using — where to connect.",
+					"\t§§ @returns — the port.",
+					'\tfunction connect(using server: Server = { host = "h", port = 80 }) -> Integer {',
+					"\t\t<- server.port",
+					"\t}",
+					"}",
+					"",
+					"export {",
+					"\tServer",
+					"\tconnect",
+					"}",
+					"",
+				].join("\n")
+				let proxied = [
+					"import {",
+					'\tfrom "./Types.es" { connect }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Proxy = { port: Integer, timeout: Integer }",
+					"",
+					"\tconstant proxy: Proxy = { port = 1, timeout = 2 }",
+					"\tconstant chosen = connect(using { port = 81 })",
+					"",
+					"\tTerminal.inspect(proxy.port::add(chosen))",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": connecting,
+					"Main.es": proxied,
+				})
+
+				let renamed = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(connecting, 2, "port"),
+					"socket",
+				)
+
+				expect(renamed).toEqual({
+					"Types.es": connecting
+						.replace("port: Integer", "socket: Integer")
+						.replace("port = 80", "socket = 80")
+						.replace("server.port", "server.socket"),
+					"Main.es": proxied.replace(
+						"using { port",
+						"using { socket",
+					),
+				})
+				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
+
 			// An update and a Pattern write part of a `Server`, by keys `Proxy`
 			// shares.
 			it("should leave another Type's member through an update and a Pattern", () => {

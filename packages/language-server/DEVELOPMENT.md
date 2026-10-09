@@ -222,9 +222,10 @@ group is one Declaration. Shapes neither of which holds the other stay apart, so
 not rename together. A Case's payload members read like a Record's, so a Lookup on a Case value counts as a shape too.
 
 A site that writes part of a Record would relate, by its keys alone, every Type holding them. The typed pass widens it
-to the Record it writes into. `widenLiteral` does so for the keys of an update, a Parameter's default, a Case value and
-a payload default, and the Lookup a Pattern desugars into does so for the Pattern. A literal Argument merged into a
-default still relates by its own keys, since the index does not pair an Argument with its Parameter.
+to the Record it writes into. `widenLiteral` does so for the keys of an update, a Parameter's default, a Case value, a
+payload default and a literal Argument, and the Lookup a Pattern desugars into does so for the Pattern. An Argument
+meets its Parameter through `calledSignature` and `pairedParameters` in `src/argumentContext.ts`, which pair by label
+as the Compiler does.
 
 `groupRelatedShapes` in `src/recordShapes.ts` does the grouping, and the index keeps each group's shapes as
 `recordMembers`. The symbol join groups the shapes of every file of a component the same way, so a member declared in
