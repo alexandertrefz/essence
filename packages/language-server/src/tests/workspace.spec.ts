@@ -1926,6 +1926,54 @@ describe("Workspace", () => {
 					"Main.es": [],
 				})
 			})
+
+			// An update and a Pattern write part of a `Server`, by keys `Proxy`
+			// shares.
+			it("should leave another Type's member through an update and a Pattern", () => {
+				let proxied = [
+					"import {",
+					'\tfrom "./Types.es" { Server }',
+					"}",
+					"",
+					"implementation {",
+					"\ttype Proxy = { port: Integer, timeout: Integer }",
+					"",
+					"\tconstant proxy: Proxy = { port = 1, timeout = 2 }",
+					'\tconstant s: Server = { host = "a", port = 80 }',
+					"\tconstant moved = { s with port = 81 }",
+					"\tconstant { port } = moved",
+					"",
+					"\tTerminal.inspect(proxy.port::add(port))",
+					"}",
+					"",
+				].join("\n")
+				let { workspace, pathOf } = makeWorkspace({
+					"Types.es": types,
+					"Main.es": proxied,
+				})
+
+				let renamed = renameAcross(
+					workspace,
+					pathOf("Types.es"),
+					cursorAt(types, 2, "port"),
+					"socket",
+				)
+
+				expect(renamed).toEqual({
+					"Types.es": types.replace(
+						"port: Integer",
+						"socket: Integer",
+					),
+					"Main.es": proxied
+						.replace('"a", port = 80', '"a", socket = 80')
+						.replace("s with port", "s with socket")
+						.replace("{ port } =", "{ socket as port } ="),
+				})
+				expect(codesAfter(workspace, pathOf, renamed)).toEqual({
+					"Types.es": [],
+					"Main.es": [],
+				})
+			})
 		})
 	})
 

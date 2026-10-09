@@ -209,6 +209,12 @@ type WalkContext = {
 	// declarations) and member Lookups, grouped structurally after the walk.
 	recordSites: Array<RecordMemberSite>
 	recordLookups: Array<RecordMemberLookup>
+	// A literal's site by the Position of its braces, and a Pattern's by each
+	// member's name, so the typed pass can widen them.
+	literalSites: Map<string, RecordMemberSite>
+	patternSites: Map<string, RecordMemberSite>
+	// The shape each typed literal writes into, where `widenLiteral` knew it.
+	writtenShapes: Map<common.typed.RecordValueNode, Array<string>>
 	// Every Scope with the Position it spans, for `scopeAt`.
 	scopes: Array<ScopeRange>
 }
@@ -444,6 +450,9 @@ export function indexProgram(
 		externalMembers: [],
 		recordSites: [],
 		recordLookups: [],
+		literalSites: new Map(),
+		patternSites: new Map(),
+		writtenShapes: new Map(),
 		scopes: [],
 	}
 
@@ -1308,7 +1317,7 @@ function walkNode(node: ParserNode, walk: Walk) {
 			let { members } = node
 
 			walkTypeDeclaration(node.type, walk)
-			registerRecordSite(Object.values(members), context)
+			registerRecordSite(Object.values(members), context, node.position)
 			forEachParserChild(
 				node,
 				(child, memberWalk, field, key) => {
@@ -1980,12 +1989,14 @@ function walkTypeDeclaration(
 function registerRecordSite(
 	members: Array<parser.RecordValueMemberNode | parser.RecordTypeMemberNode>,
 	context: WalkContext,
+	// A literal's braces, which the typed tree finds it by.
+	literal: common.Position | null = null,
 ) {
 	if (members.length === 0) {
 		return
 	}
 
-	context.recordSites.push({
+	let site: RecordMemberSite = {
 		names: members.map((member) => member.name.content),
 		declares: true,
 		members: members.map((member) => ({
@@ -1993,7 +2004,13 @@ function registerRecordSite(
 			position: member.name.position,
 			edits: shorthandMemberEdits(member),
 		})),
-	})
+	}
+
+	context.recordSites.push(site)
+
+	if (literal !== null) {
+		context.literalSites.set(positionKey(literal), site)
+	}
 }
 
 // The keys of an update the Enricher wrote out of a path key. In
@@ -2034,7 +2051,7 @@ function registerPathKeySite(
 
 // The path keys of a Literal merged into a default, an Argument or a Case
 // payload, as `registerPathKeySite` records an update's. The shape is the
-// level's own keys, which the grouping relates to the full Record by subset.
+// level's own keys and the Record it writes into, where `widenLiteral` knew it.
 function registerMergedKeySite(
 	node: common.typed.RecordValueNode,
 	context: WalkContext,
@@ -2056,7 +2073,7 @@ function registerMergedKeySite(
 	}
 
 	context.recordSites.push({
-		names: members,
+		names: [...members, ...(context.writtenShapes.get(node) ?? [])],
 		declares: false,
 		members: members.map((name) => ({
 			name,
@@ -2131,7 +2148,7 @@ function registerPatternSite(
 	let members = Object.values(pattern.members)
 
 	if (members.length > 0) {
-		context.recordSites.push({
+		let site: RecordMemberSite = {
 			names: members.map((member) => member.name.content),
 			declares: false,
 			members: members.map((member) => ({
@@ -2139,7 +2156,13 @@ function registerPatternSite(
 				position: member.name.position,
 				edits: memberRenameEdits(member),
 			})),
-		})
+		}
+
+		context.recordSites.push(site)
+
+		for (let member of members) {
+			context.patternSites.set(positionKey(member.name.position), site)
+		}
 	}
 
 	for (let member of members) {
@@ -2261,6 +2284,50 @@ function editsForBinding(
 	}
 
 	return null
+}
+
+// A literal writing part of a Record, as an update, a default or a payload
+// does, takes the shape of the Record it writes into. Its own keys alone could
+// relate two Types that share them.
+function widenLiteral(
+	value: common.typed.ExpressionNode | null,
+	type: common.Type,
+	context: WalkContext,
+) {
+	if (
+		value?.nodeType !== "RecordValue" ||
+		(type.type !== "Record" && type.type !== "Case")
+	) {
+		return
+	}
+
+	let site = context.literalSites.get(positionKey(value.position))
+
+	// A positional payload's wrapper stands at the Position of the literal it
+	// wraps, and its key is the Case's member, which the literal lacks.
+	if (
+		site !== undefined &&
+		Object.keys(value.members).every((name) => site.names.includes(name))
+	) {
+		widenSite(site, type)
+	}
+
+	context.writtenShapes.set(value, Object.keys(type.members))
+
+	for (let [name, member] of Object.entries(value.members)) {
+		let memberType = type.members[name]
+
+		if (memberType !== undefined) {
+			widenLiteral(member, memberType, context)
+		}
+	}
+}
+
+function widenSite(
+	site: RecordMemberSite,
+	type: common.RecordType | common.CaseType,
+) {
+	site.names = [...new Set([...site.names, ...Object.keys(type.members)])]
 }
 
 // Groups member occurrences across the Record shapes related by subset, so
@@ -2694,6 +2761,18 @@ function walkTypedNode(node: TypedNode, context: WalkContext) {
 			return
 		case "Combination":
 			registerPathKeySite(node, context)
+			widenLiteral(node.rhs, node.lhs.type, context)
+			break
+		case "Parameter":
+			widenLiteral(node.defaultValue, node.type, context)
+			break
+		case "CaseValue":
+			widenLiteral(node.value, node.type, context)
+			break
+		case "ChoiceDeclarationStatement":
+			for (let { defaultValue, type } of node.cases) {
+				widenLiteral(defaultValue, type, context)
+			}
 			break
 		case "RecordValue":
 			registerMergedKeySite(node, context)
@@ -2733,6 +2812,15 @@ function bindLookupMember(node: common.typed.LookupNode, context: WalkContext) {
 			)
 		}
 	} else if (baseType.type === "Record" || baseType.type === "Case") {
+		// A Pattern's member is read through the Lookup its desugar writes.
+		let pattern = context.patternSites.get(
+			positionKey(node.member.position),
+		)
+
+		if (pattern !== undefined) {
+			widenSite(pattern, baseType)
+		}
+
 		// A Case's payload members read like a Record's.
 		context.recordLookups.push({
 			names: Object.keys(baseType.members),

@@ -821,6 +821,93 @@ describe("Rename of Methods and Record members", () => {
 		)
 	})
 
+	// An update, a Pattern, a default and a payload each write part of a
+	// Record. They relate by the Record they write into, since their keys alone
+	// are also `Proxy`'s.
+	describe("partial writes", () => {
+		let source = [
+			"implementation {",
+			"\ttype Server = { host: String, port: Integer }",
+			"\ttype Proxy = { port: Integer, timeout: Integer }",
+			"",
+			"\tchoice Fetch {",
+			"\t\tGet { url: String, port: Integer } = { port = 3 },",
+			"\t\tStop,",
+			"\t}",
+			"",
+			"\t§§ Answers the port.",
+			"\t§§",
+			"\t§§ @param using — where to connect.",
+			"\t§§ @returns — the port.",
+			"\tfunction connect(using server: Server = { port = 80 }) -> Integer {",
+			"\t\tconstant { port } = server",
+			"\t\t<- port",
+			"\t}",
+			"",
+			"\tconstant proxy: Proxy = { port = 1, timeout = 2 }",
+			'\tconstant s: Server = { host = "a", port = 80 }',
+			"\tconstant moved = { s with port = 81 }",
+			'\tconstant f: Fetch = #Get({ url = "u" })',
+			"\tTerminal.inspect(proxy.port::add(moved.port))",
+			"}",
+		].join("\n")
+
+		it("should keep a Record's member apart from another Type's", () => {
+			expect(rename(source, { line: 2, column: 32 }, "socket")).toBe(
+				source
+					.replace("String, port", "String, socket")
+					.replace("{ port = 80 }", "{ socket = 80 }")
+					.replace("{ port } =", "{ socket as port } =")
+					.replace('"a", port', '"a", socket')
+					.replace("s with port", "s with socket")
+					.replace("moved.port", "moved.socket"),
+			)
+			expect(rename(source, { line: 3, column: 17 }, "gate")).toBe(
+				source
+					.replace(
+						"{ port: Integer, timeout",
+						"{ gate: Integer, timeout",
+					)
+					.replace("{ port = 1", "{ gate = 1")
+					.replace("proxy.port", "proxy.gate"),
+			)
+		})
+
+		// `#Has({ host = "a", port = 1 })` writes the payload's one member
+		// positionally, so the literal is a `Server` and not the payload.
+		it("should widen a positional payload by its member's Type", () => {
+			let positional = [
+				"implementation {",
+				"\ttype Server = { host: String, port: Integer }",
+				"\ttype Mirror = { host: String, server: Server }",
+				"\tchoice Holder {",
+				"\t\tHas { server: Server },",
+				"\t\tNothing,",
+				"\t}",
+				"",
+				'\tconstant a: Holder = #Has({ host = "a", port = 1 })',
+				'\tconstant m: Mirror = { host = "m", server = { host = "s", port = 2 } }',
+				"\tTerminal.inspect(m.host)",
+				"}",
+			].join("\n")
+
+			expect(rename(positional, { line: 2, column: 18 }, "address")).toBe(
+				positional
+					.replace("{ host: String, port", "{ address: String, port")
+					.replace('{ host = "a"', '{ address = "a"')
+					.replace('{ host = "s"', '{ address = "s"'),
+			)
+		})
+
+		it("should keep a Case payload's member apart from a Record's", () => {
+			expect(rename(source, { line: 6, column: 22 }, "slot")).toBe(
+				source
+					.replace("url: String, port", "url: String, slot")
+					.replace("{ port = 3 }", "{ slot = 3 }"),
+			)
+		})
+	})
+
 	it("should still reject Methods of builtin Namespaces", () => {
 		let source = [
 			"implementation {",
