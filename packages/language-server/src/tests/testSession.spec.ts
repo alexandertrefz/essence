@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "bun:test"
+import { afterAll, beforeAll, describe, expect, it, jest } from "bun:test"
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -241,6 +241,78 @@ describe("A session whose run never ends", () => {
 			rmSync(file, { force: true })
 		}
 	}, 60_000)
+
+	// A stopped cycle stops every entry, but one the Worker had answered for
+	// finished in time. A stub Worker answers the first entry and never the
+	// second, and the deadline fires on fake time once that answer arrived.
+	it("blames only the entries that had not answered", async () => {
+		let worker = path.join(root, "answersOnce.mjs")
+		let answered = path.join(root, "Answered.tests.es")
+		let hung = path.join(root, "Hung.tests.es")
+
+		writeFileSync(
+			worker,
+			[
+				'import { parentPort } from "node:worker_threads"',
+				"",
+				'parentPort.on("message", (request) => {',
+				'\tif (request.kind === "run") {',
+				"\t\tparentPort.postMessage({",
+				'\t\t\tkind: "entry",',
+				"\t\t\trun: request.run,",
+				"\t\t\tentry: request.entries[0].filePath,",
+				"\t\t\tevents: [],",
+				"\t\t\tsites: [],",
+				"\t\t\tfocused: false,",
+				"\t\t\tcompiled: true,",
+				'\t\t\tproblem: "answered",',
+				"\t\t\trewrites: [],",
+				"\t\t})",
+				"\t}",
+				"})",
+				"",
+			].join("\n"),
+		)
+
+		let problems: Array<{ filePath: string; problem: string }> = []
+		let firstAnswer = Promise.withResolvers<void>()
+
+		jest.useFakeTimers()
+
+		let session = createTestSession({
+			workerPath: worker,
+			settingsFor: () => ({ skipTags: [], contracts: false }),
+			testFiles: () => [answered, hung],
+			dependentsOf: (filePath) => [filePath],
+			overlays: () => ({}),
+			notify: () => {},
+			onResults: () => {},
+			onProblem: (filePath, problem) => {
+				problems.push({ filePath, problem })
+
+				if (problem === "answered") {
+					firstAnswer.resolve()
+				}
+			},
+			deadline: 60_000,
+		})
+
+		try {
+			session.run({ files: [answered, hung] })
+			await firstAnswer.promise
+			jest.advanceTimersByTime(60_000)
+
+			expect(
+				problems
+					.filter(({ problem }) => problem.includes("did not finish"))
+					.map(({ filePath }) => filePath),
+			).toEqual([hung])
+		} finally {
+			jest.useRealTimers()
+			await session.dispose()
+			rmSync(worker, { force: true })
+		}
+	})
 })
 
 // Every Worker stages its bundles in a directory of its own, here under

@@ -566,7 +566,8 @@ as they are when it starts.
   answered with the number of the cycle that will run it, and that cycle carries it. A promised cycle that ends up
   with nothing to run still sends an end under its number, so no client waits for ever.
 - A cycle that does not finish within the deadline takes the Worker with it. Nothing else ends a test that loops for
-  ever, and every later run waits on the one in flight. What the cycle reported before it was stopped is kept.
+  ever, and every later run waits on the one in flight. What the cycle reported before it was stopped is kept, and
+  only the entries it had not answered for are told they did not finish.
 - A switched-off session runs nothing by itself, but still runs what an Editor asks for, such as a Run lens.
 - A cycle that recorded snapshots runs again, so the results compare against what was recorded and the lens goes.
   The Server applies a rewritten source as an edit, since the buffer the run compiled may be unsaved.

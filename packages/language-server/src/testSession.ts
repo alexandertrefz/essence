@@ -44,6 +44,11 @@ const debounceInMilliseconds = 450
 // to end a test that loops for ever. Generous enough for a cold compile.
 const deadlineInMilliseconds = 60_000
 
+// Said of each entry a stopped cycle had not answered for. One that answered
+// finished in time.
+const stoppedProblem = (deadline: number): string =>
+	`The test run did not finish within ${Math.round(deadline / 1000)}s and was stopped. A test that never ends — a loop with no way out — is the usual reason.`
+
 // One staging directory per Worker, named for the Server's process.
 const stagingPrefix = "essence-lsp-tests-"
 
@@ -181,6 +186,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 		run: number
 		reason: TestRunNotification["reason"]
 		entries: Array<string>
+		// The entries the Worker has not answered for yet.
+		waiting: Set<string>
 		// The tests this run was narrowed to, which decides whether a batch replaces
 		// a file's results or merges into them.
 		ids: Array<string>
@@ -290,6 +297,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 						]
 
 			eventsByEntry.set(message.entry, events)
+			inFlight.waiting.delete(message.entry)
 			inFlight.events.push(...visible)
 			inFlight.sites.push(...message.sites)
 
@@ -513,6 +521,7 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			run,
 			reason,
 			entries,
+			waiting: new Set(entries),
 			ids,
 			started: Date.now(),
 			events: [],
@@ -574,13 +583,8 @@ export function createTestSession(options: TestSessionOptions): TestSession {
 			void worker?.terminate()
 			worker = null
 
-			for (let entry of inFlight.entries) {
-				options.onProblem?.(
-					entry,
-					`The test run did not finish within ${Math.round(
-						deadline / 1000,
-					)}s and was stopped. A test that never ends — a loop with no way out — is the usual reason.`,
-				)
+			for (let entry of inFlight.waiting) {
+				options.onProblem?.(entry, stoppedProblem(deadline))
 			}
 
 			finish(false)
