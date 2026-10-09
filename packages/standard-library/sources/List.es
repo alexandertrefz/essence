@@ -78,6 +78,10 @@ declarations {
 			§§
 			§§ A count of zero or less answers the empty List.
 			§§
+			§§ @example
+			§§   expect List.repeat("ho", times 3)::is(["ho", "ho", "ho"])
+			§§   expect List.repeat("ho", times 0)::isEmpty()
+			§§
 			§§ @param _ — the item to repeat
 			§§ @param times — how many copies the List holds
 			§§ @returns — the List of repeated items.
@@ -97,6 +101,11 @@ declarations {
 			§§ Answers a List holding the given item a number of times proven to be above zero.
 			§§
 			§§ At least one copy is held, so the answer certainly has something in it.
+			§§
+			§§ @example
+			§§   constant row: NonEmptyList<String> = List.repeat("-", times 3)
+			§§
+			§§   expect row::is(["-", "-", "-"])
 			§§
 			§§ @param _ — the item to repeat
 			§§ @param times — how many copies the List holds, proven to be above zero
@@ -259,6 +268,10 @@ declarations {
 		§§
 		§§ Each pair of items is compared with the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
+		§§ @example
+		§§   expect ["Ada", "Grace"]::is(["Ada", "Grace"])
+		§§   expect ["Ada", "Grace"]::is(["Grace", "Ada"])::negate()
+		§§
 		§§ @param _ — the List to compare with
 		§§ @returns — `true` when the Lists are equal.
 		is<ItemType is Equatable>(_ other: List<ItemType>) -> Boolean
@@ -269,6 +282,10 @@ declarations {
 		§§
 		§§ The first differing pair of items decides. On an equal prefix the shorter List comes first. The Method is available whenever the items conform to `Comparable`.
 		§§
+		§§ @example
+		§§   expect [1, 2, 9]::compare(to [1, 3])::is(#Less)
+		§§   expect [1, 2]::compare(to [1, 2, 3])::is(#Less)
+		§§
 		§§ @param to — the List to compare with
 		§§ @returns — `Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.
 		compare<ItemType is Comparable>(to other: List<ItemType>) -> Ordering
@@ -276,6 +293,10 @@ declarations {
 		§§ Answers the List and its items as a String, in the form `[1, 2, 3]`.
 		§§
 		§§ Each item is rendered by its own `toString`, and a String item is quoted: `["a", "b"]` answers `["a", "b"]`. A String prints bare on its own and quoted inside a structure. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3]::toString()::is("[1, 2, 3]")
+		§§   expect ["a", "b"]::toString()::is("[\"a\", \"b\"]")
 		§§
 		§§ @returns — the String representation of the List.
 		toString<ItemType is Printable>() -> String
@@ -293,6 +314,12 @@ declarations {
 			§§
 			§§ It is the opposite of `isEmpty`.
 			§§
+			§§ @example
+			§§   constant guests: List<String> = []
+			§§
+			§§   expect ["Ada"]::hasItems()
+			§§   expect guests::hasItems()::negate()
+			§§
 			§§ @returns — `true` when the List is not empty.
 			() -> Boolean {
 				§ This body is read as well as run. A predicate written as
@@ -306,6 +333,12 @@ declarations {
 			§§ Answers whether the check accepts at least one item.
 			§§
 			§§ The walk stops at the first accepted item. The empty List has no item to accept, so it answers `false`.
+			§§
+			§§ @example
+			§§   constant none: List<Integer> = []
+			§§
+			§§   expect [1, 2, 3]::hasItems(where (n) { <- n::isEven() })
+			§§   expect none::hasItems(where (n) { <- n::isEven() })::negate()
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — `true` when the check accepts an item.
@@ -321,6 +354,12 @@ declarations {
 		}
 
 		§§ Answers whether the List has no items at all.
+		§§
+		§§ @example
+		§§   constant guests: List<String> = []
+		§§
+		§§   expect guests::isEmpty()
+		§§   expect ["Ada"]::isEmpty()::negate()
 		§§
 		§§ @returns — `true` for the empty List.
 		isEmpty() -> Boolean {
@@ -340,6 +379,10 @@ declarations {
 			§§ Answers whether an item equal to the given one is in the List.
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect ["Ada", "Grace"]::contains("Grace")
+			§§   expect ["Ada", "Grace"]::contains("Alan")::negate()
 			§§
 			§§ @param _ — the item to look for
 			§§ @returns — `true` when the item occurs.
@@ -371,6 +414,10 @@ declarations {
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
+		§§ @example
+		§§   expect ["Ada", "Grace"]::doesNotContain("Alan")
+		§§   expect ["Ada", "Grace"]::doesNotContain("Ada")::negate()
+		§§
 		§§ @param _ — the item to look for
 		§§ @returns — `true` when the item does not occur.
 		doesNotContain<ItemType is Equatable>(_ item: ItemType) -> Boolean {
@@ -390,6 +437,13 @@ declarations {
 		§§
 		§§ The walk stops at the first item the check refuses. The empty List has no item to fail the check, so it answers `true`.
 		§§
+		§§ @example
+		§§   constant none: List<Integer> = []
+		§§
+		§§   expect [2, 4]::hasOnlyItems(where (n) { <- n::isEven() })
+		§§   expect [2, 3]::hasOnlyItems(where (n) { <- n::isEven() })::negate()
+		§§   expect none::hasOnlyItems(where (n) { <- n::isEven() })
+		§§
 		§§ @param where — the check each item is offered to
 		§§ @returns — `true` when the check accepts every item.
 		hasOnlyItems(where check: (_: ItemType) -> Boolean) -> Boolean {
@@ -399,6 +453,13 @@ declarations {
 		§§ Answers whether the check accepts no item at all.
 		§§
 		§§ The walk stops at the first accepted item. The empty List has no item to accept, so it answers `true`.
+		§§
+		§§ @example
+		§§   constant none: List<Integer> = []
+		§§
+		§§   expect [1, 3]::hasNoItems(where (n) { <- n::isEven() })
+		§§   expect [1, 2]::hasNoItems(where (n) { <- n::isEven() })::negate()
+		§§   expect none::hasNoItems(where (n) { <- n::isEven() })
 		§§
 		§§ @param where — the check each item is offered to
 		§§ @returns — `true` when the check accepts no item.
@@ -475,6 +536,10 @@ declarations {
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
 		§§
+		§§ @example
+		§§   expect [1, 2, 3]::doesNotStart(with [2, 3])
+		§§   expect [1, 2, 3]::doesNotStart(with [1])::negate()
+		§§
 		§§ @param with — the leading items to look for
 		§§ @returns — `true` when the List begins with other items.
 		doesNotStart<ItemType is Equatable>(
@@ -487,6 +552,10 @@ declarations {
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`. Every List ends with the empty List.
 		§§
+		§§ @example
+		§§   expect [1, 2, 3]::ends(with [2, 3])
+		§§   expect [1, 2, 3]::ends(with [])
+		§§
 		§§ @param with — the trailing items to look for
 		§§ @returns — `true` when the List ends with those items.
 		ends<ItemType is Equatable>(with suffix: List<ItemType>) -> Boolean {
@@ -496,6 +565,10 @@ declarations {
 		§§ Answers whether the List does not end with the items of the given one.
 		§§
 		§§ Equality is the items' own `is`. The Method is available whenever the items conform to `Equatable`.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3]::doesNotEnd(with [1, 2])
+		§§   expect [1, 2, 3]::doesNotEnd(with [3])::negate()
 		§§
 		§§ @param with — the trailing items to look for
 		§§ @returns — `true` when the List ends with other items.
@@ -538,6 +611,11 @@ declarations {
 
 		§§ Answers how many items the List has.
 		§§
+		§§ @example
+		§§   constant guests: List<String> = ["Ada", "Grace"]
+		§§
+		§§   expect guests::length()::is(2)
+		§§
 		§§ @returns — the number of items, which is never negative.
 		length() -> NonNegativeInteger
 
@@ -551,6 +629,13 @@ declarations {
 		overload firstItem {
 			§§ Answers the first item of the List.
 			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Ada", "Grace"]
+			§§   constant nobody: List<String> = []
+			§§
+			§§   expect queue::firstItem()::is("Ada")
+			§§   expect nobody::firstItem()::isEmpty()
+			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<ItemType> {
 				§ `item(at:)` answers empty for a position outside the List, so
@@ -559,6 +644,10 @@ declarations {
 			}
 
 			§§ Answers the first item the check accepts.
+			§§
+			§§ @example
+			§§   expect [1, 4, 6]::firstItem(where (n) { <- n::isEven() })::is(4)
+			§§   expect [1, 3]::firstItem(where (n) { <- n::isEven() })::isEmpty()
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the matching item, or nothing when no item is accepted.
@@ -585,6 +674,13 @@ declarations {
 
 			§§ Answers the first item, or the given fallback for the empty List.
 			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Ada", "Grace"]
+			§§   constant nobody: List<String> = []
+			§§
+			§§   expect queue::firstItem(defaultingTo "none")::is("Ada")
+			§§   expect nobody::firstItem(defaultingTo "none")::is("none")
+			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the first item, or the fallback in its place.
 			(defaultingTo fallback: ItemType) -> ItemType {
@@ -592,6 +688,12 @@ declarations {
 			}
 
 			§§ Answers the first item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @example
+			§§   constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }
+			§§
+			§§   expect [1, 4, 6]::firstItem(where isEven, defaultingTo 0)::is(4)
+			§§   expect [1, 3]::firstItem(where isEven, defaultingTo 0)::is(0)
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -610,6 +712,13 @@ declarations {
 		overload lastItem {
 			§§ Answers the last item of the List.
 			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Ada", "Grace"]
+			§§   constant nobody: List<String> = []
+			§§
+			§§   expect queue::lastItem()::is("Grace")
+			§§   expect nobody::lastItem()::isEmpty()
+			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<ItemType> {
 				§ -1 is the last position. The empty List has no such item: the
@@ -621,6 +730,10 @@ declarations {
 			§§ Answers the last item the check accepts.
 			§§
 			§§ The walk runs backwards and stops at the first item it accepts.
+			§§
+			§§ @example
+			§§   expect [2, 4, 5]::lastItem(where (n) { <- n::isEven() })::is(4)
+			§§   expect [1, 3]::lastItem(where (n) { <- n::isEven() })::isEmpty()
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the matching item, or nothing when no item is accepted.
@@ -639,6 +752,13 @@ declarations {
 
 			§§ Answers the last item, or the given fallback for the empty List.
 			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Ada", "Grace"]
+			§§   constant nobody: List<String> = []
+			§§
+			§§   expect queue::lastItem(defaultingTo "none")::is("Grace")
+			§§   expect nobody::lastItem(defaultingTo "none")::is("none")
+			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the last item, or the fallback in its place.
 			(defaultingTo fallback: ItemType) -> ItemType {
@@ -646,6 +766,12 @@ declarations {
 			}
 
 			§§ Answers the last item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @example
+			§§   constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }
+			§§
+			§§   expect [2, 4, 5]::lastItem(where isEven, defaultingTo 0)::is(4)
+			§§   expect [1, 3]::lastItem(where isEven, defaultingTo 0)::is(0)
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -664,11 +790,20 @@ declarations {
 		overload item {
 			§§ Answers the item at the given position.
 			§§
+			§§ @example
+			§§   expect ["a", "b", "c"]::item(at 0)::is("a")
+			§§   expect ["a", "b", "c"]::item(at -1)::is("c")
+			§§   expect ["a", "b", "c"]::item(at 3)::isEmpty()
+			§§
 			§§ @param at — the position of the item
 			§§ @returns — the item, or nothing when the position is outside the List.
 			(at index: Integer) -> Optional<ItemType>
 
 			§§ Answers the item at the given position, or the given fallback when the position is outside the List.
+			§§
+			§§ @example
+			§§   expect ["a", "b"]::item(at 1, defaultingTo "?")::is("b")
+			§§   expect ["a", "b"]::item(at 5, defaultingTo "?")::is("?")
 			§§
 			§§ @param at — the position of the item
 			§§ @param defaultingTo — the item to answer with when the position names none
@@ -692,6 +827,10 @@ declarations {
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::firstIndex(of "a")::is(0)
+			§§   expect ["a", "b", "a"]::firstIndex(of "z")::isEmpty()
+			§§
 			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
 			<ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
@@ -699,6 +838,10 @@ declarations {
 			}
 
 			§§ Answers the position of the first item the check accepts.
+			§§
+			§§ @example
+			§§   expect [1, 4, 6]::firstIndex(where (n) { <- n::isEven() })::is(1)
+			§§   expect [1, 3]::firstIndex(where (n) { <- n::isEven() })::isEmpty()
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the zero-based position, or nothing when no item is accepted.
@@ -730,6 +873,10 @@ declarations {
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::firstIndex(of "a", defaultingTo -1)::is(0)
+			§§   expect ["a", "b", "a"]::firstIndex(of "z", defaultingTo -1)::is(-1)
+			§§
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
 			§§ @returns — the zero-based position, or the fallback in its place.
@@ -741,6 +888,12 @@ declarations {
 			}
 
 			§§ Answers the position of the first item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @example
+			§§   constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }
+			§§
+			§§   expect [1, 4, 6]::firstIndex(where isEven, defaultingTo -1)::is(1)
+			§§   expect [1, 3]::firstIndex(where isEven, defaultingTo -1)::is(-1)
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the position to answer with when no item is accepted
@@ -761,6 +914,10 @@ declarations {
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::lastIndex(of "a")::is(2)
+			§§   expect ["a", "b", "a"]::lastIndex(of "z")::isEmpty()
+			§§
 			§§ @param of — the item to look for
 			§§ @returns — the zero-based position, or nothing when the item is absent.
 			<ItemType is Equatable>(of item: ItemType) -> Optional<Integer> {
@@ -770,6 +927,10 @@ declarations {
 			§§ Answers the position of the last item equal to the given one, or the given fallback when the item is absent.
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
+			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::lastIndex(of "a", defaultingTo -1)::is(2)
+			§§   expect ["a", "b", "a"]::lastIndex(of "z", defaultingTo -1)::is(-1)
 			§§
 			§§ @param of — the item to look for
 			§§ @param defaultingTo — the position to answer with when the item is absent
@@ -796,11 +957,21 @@ declarations {
 			§§
 			§§ The walk runs backwards and stops at the first item it accepts.
 			§§
+			§§ @example
+			§§   expect [2, 4, 5]::lastIndex(where (n) { <- n::isEven() })::is(1)
+			§§   expect [1, 3]::lastIndex(where (n) { <- n::isEven() })::isEmpty()
+			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the zero-based position, or nothing when no item is accepted.
 			(where check: (_: ItemType) -> Boolean) -> Optional<Integer>
 
 			§§ Answers the position of the last item the check accepts, or the given fallback when it accepts none.
+			§§
+			§§ @example
+			§§   constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }
+			§§
+			§§   expect [2, 4, 5]::lastIndex(where isEven, defaultingTo -1)::is(1)
+			§§   expect [1, 3]::lastIndex(where isEven, defaultingTo -1)::is(-1)
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @param defaultingTo — the position to answer with when no item is accepted
@@ -833,6 +1004,13 @@ declarations {
 			§§ Answers the positions the List has, in order.
 			§§
 			§§ The positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
+			§§
+			§§ @example
+			§§   constant letters: List<String> = ["a", "b", "c"]
+			§§   constant none: List<String> = []
+			§§
+			§§   expect letters::indices()::is([0, 1, 2])
+			§§   expect none::indices()::isEmpty()
 			§§
 			§§ @returns — the List of positions.
 			() -> List<Integer>
@@ -897,6 +1075,10 @@ declarations {
 
 			§§ Answers the only item of the List, or the given fallback for a List of any other length.
 			§§
+			§§ @example
+			§§   expect [7]::onlyItem(defaultingTo 0)::is(7)
+			§§   expect [7, 8]::onlyItem(defaultingTo 0)::is(0)
+			§§
 			§§ @param defaultingTo — the item to answer with when there is no only item
 			§§ @returns — the item, or the fallback in its place.
 			(defaultingTo fallback: ItemType) -> ItemType {
@@ -928,6 +1110,14 @@ declarations {
 		§§
 		§§ The position counts from zero. The empty List answers no entries.
 		§§
+		§§ @example
+		§§   constant letters: List<String> = ["a", "b"]
+		§§
+		§§   expect letters::enumerate()::is([
+		§§   	{ index = 0, item = "a" },
+		§§   	{ index = 1, item = "b" },
+		§§   ])
+		§§
 		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`.
 		enumerate() -> List<{ index: Integer, item: ItemType }>
 
@@ -958,6 +1148,11 @@ declarations {
 			§§ Answers a new List without the first item, or without the given number of leading items.
 			§§
 			§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::removeFirst()::is([2, 3])
+			§§   expect [1, 2, 3]::removeFirst(2)::is([3])
+			§§   expect [1, 2, 3]::removeFirst(5)::isEmpty()
 			§§
 			§§ @param _ — how many leading items to remove, which is one when it is left out
 			§§ @returns — the shortened List.
@@ -1007,6 +1202,11 @@ declarations {
 		§§
 		§§ The position counts from zero. A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
 		§§
+		§§ @example
+		§§   expect ["a", "b", "c"]::remove(at 1)::is(["a", "c"])
+		§§   expect ["a", "b", "c"]::remove(at -1)::is(["a", "b"])
+		§§   expect ["a", "b", "c"]::remove(at 5)::is(["a", "b", "c"])
+		§§
 		§§ @param at — the position of the item to remove
 		§§ @returns — the List without that item.
 		remove(at index: Integer) -> List<ItemType>
@@ -1021,6 +1221,9 @@ declarations {
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   expect [1, 2, 1, 3]::removeEvery(1)::is([2, 3])
+			§§
 			§§ @param _ — the item to remove
 			§§ @returns — the List of remaining items.
 			<ItemType is Equatable>(_ item: ItemType) -> List<ItemType> {
@@ -1028,6 +1231,11 @@ declarations {
 			}
 
 			§§ Answers a new List without every item the check accepts.
+			§§
+			§§ @example
+			§§   constant odds = [1, 2, 3, 4]::removeEvery(where (n) { <- n::isEven() })
+			§§
+			§§   expect odds::is([1, 3])
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the List of the items the check rejects.
@@ -1063,6 +1271,11 @@ declarations {
 			§§ Answers a new List without the last item, or without the given number of trailing items.
 			§§
 			§§ The answer is empty when more items are removed than the List has. A count below one removes nothing.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::removeLast()::is([1, 2])
+			§§   expect [1, 2, 3]::removeLast(2)::is([1])
+			§§   expect [1, 2, 3]::removeLast(5)::isEmpty()
 			§§
 			§§ @param _ — how many trailing items to remove, which is one when it is left out
 			§§ @returns — the shortened List.
@@ -1115,11 +1328,22 @@ declarations {
 			§§
 			§§ The item is never dropped, so the answer certainly has something in it.
 			§§
+			§§ @example
+			§§   constant guests: List<String> = ["Grace"]
+			§§   constant queue: NonEmptyList<String> = guests::prepend("Ada")
+			§§
+			§§   expect queue::is(["Ada", "Grace"])
+			§§
 			§§ @param _ — the item to add
 			§§ @returns — the extended List, which is never empty.
 			(_ item: ItemType) -> NonEmptyList<ItemType>
 
 			§§ Answers a new List with the contents of the given List added at the front.
+			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Cy"]
+			§§
+			§§   expect queue::prepend(contentsOf ["Ada", "Bo"])::is(["Ada", "Bo", "Cy"])
 			§§
 			§§ @param contentsOf — the List whose items to add
 			§§ @returns — the extended List.
@@ -1143,11 +1367,22 @@ declarations {
 			§§
 			§§ The item is never dropped, so the answer certainly has something in it.
 			§§
+			§§ @example
+			§§   constant guests: List<String> = ["Ada"]
+			§§   constant queue: NonEmptyList<String> = guests::append("Grace")
+			§§
+			§§   expect queue::is(["Ada", "Grace"])
+			§§
 			§§ @param _ — the item to add
 			§§ @returns — the extended List, which is never empty.
 			(_ item: ItemType) -> NonEmptyList<ItemType>
 
 			§§ Answers a new List with the contents of the given List added at the end.
+			§§
+			§§ @example
+			§§   constant queue: List<String> = ["Ada"]
+			§§
+			§§   expect queue::append(contentsOf ["Bo", "Cy"])::is(["Ada", "Bo", "Cy"])
 			§§
 			§§ @param contentsOf — the List whose items to add
 			§§ @returns — the extended List.
@@ -1161,6 +1396,11 @@ declarations {
 		§ `map` is generic in `[ItemType, Other]`.
 
 		§§ Answers a new List with the given transform applied to every item.
+		§§
+		§§ @example
+		§§   constant names: List<String> = ["Ada", "Grace"]
+		§§
+		§§   expect names::map((name) { <- name::length() })::is([3, 5])
 		§§
 		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items.
@@ -1177,6 +1417,13 @@ declarations {
 		overload reduce {
 			§§ Answers the items combined into a single value, starting from the given one.
 			§§
+			§§ @example
+			§§   constant total = [1, 2, 3]::reduce(startingWith 10, (sum, item) {
+			§§   	<- sum::add(item)
+			§§   })
+			§§
+			§§   expect total::is(16)
+			§§
 			§§ @param startingWith — the value the first combination builds on
 			§§ @param _ — the combiner, handed the value so far and each item
 			§§ @returns — the combined value.
@@ -1188,6 +1435,22 @@ declarations {
 			§§ Answers the items combined into a single value, starting from the given one, and can stop before the end.
 			§§
 			§§ The `step` combiner answers with a `Step`: `#Continue` carries the value forward, and `#Done` finishes at once with its own value. Both of that `Step`'s Type Parameters are the `Answer` here, so a fold stops with the Type it carries. The empty List answers the starting value untouched.
+			§§
+			§§ @example
+			§§   constant spent = [40, 30, 50, 20]::reduce(
+			§§   	startingWith 0,
+			§§   	step (total, price) {
+			§§   		constant next = total::add(price)
+			§§
+			§§   		if next::isGreaterThan(100) {
+			§§   			<- #Done(total)
+			§§   		}
+			§§
+			§§   		<- #Continue(next)
+			§§   	},
+			§§   )
+			§§
+			§§   expect spent::is(70)
 			§§
 			§§ @param startingWith — the value the first combination builds on
 			§§ @param step — the combiner, handed the value so far and each item, answering with a `Step`
@@ -1211,6 +1474,11 @@ declarations {
 			§§ Answers a new List of every item the check accepts.
 			§§
 			§§ Each item is offered to the check, and the accepted items keep their order.
+			§§
+			§§ @example
+			§§   constant evens = [1, 2, 3, 4]::everyItem(where (n) { <- n::isEven() })
+			§§
+			§§   expect evens::is([2, 4])
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — the List of accepted items.
@@ -1246,6 +1514,13 @@ declarations {
 		§§ Answers a new List of the items from one position up to, but not including, another.
 		§§
 		§§ A negative position counts back from the end, so `slice(from 0, to -1)` drops the last item.
+		§§
+		§§ @example
+		§§   constant letters = ["a", "b", "c", "d"]
+		§§
+		§§   expect letters::slice(from 1, to 3)::is(["b", "c"])
+		§§   expect letters::slice(from 0, to -1)::is(["a", "b", "c"])
+		§§   expect letters::slice(from 2)::is(["c", "d"])
 		§§
 		§§ @param from — the first position to include, counting from zero, or back from the end when negative. It is zero when the call leaves it out.
 		§§ @param to — the position to stop before, counting the same way. It is the length when the call leaves it out.
@@ -1293,6 +1568,12 @@ declarations {
 			§§
 			§§ The sort is stable. The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [3, 1, 2]
+			§§
+			§§   expect scores::sort()::is([1, 2, 3])
+			§§   expect scores::sort(in #Descending)::is([3, 2, 1])
+			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List.
 			<ItemType is Comparable>(
@@ -1302,6 +1583,14 @@ declarations {
 			§§ Answers a new List ordered by the given comparison, applied to each pair of items.
 			§§
 			§§ The sort is stable.
+			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "fig", "apple"]
+			§§   constant byLength = fruit::sort(by (a, b) {
+			§§   	<- a::length()::compare(to b::length())
+			§§   })
+			§§
+			§§   expect byLength::is(["fig", "pear", "apple"])
 			§§
 			§§ @param by — the comparison to order the items with
 			§§ @returns — the ordered List.
@@ -1331,6 +1620,12 @@ declarations {
 			§§
 			§§ The key is read once per item. The sort is stable, so items whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
 			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "fig", "kiwi"]
+			§§   constant bySize = fruit::sort(on (word) { <- word::length() })
+			§§
+			§§   expect bySize::is(["fig", "pear", "kiwi"])
+			§§
 			§§ @param on — the key each item is ordered by
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List.
@@ -1350,6 +1645,10 @@ declarations {
 			§§
 			§§ Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   expect ["a", "b", "a"]::count(of "a")::is(2)
+			§§   expect ["a", "b", "a"]::count(of "z")::is(0)
+			§§
 			§§ @param of — the item to look for
 			§§ @returns — how many items equal it, which is never negative.
 			<ItemType is Equatable>(of item: ItemType) -> NonNegativeInteger {
@@ -1357,6 +1656,9 @@ declarations {
 			}
 
 			§§ Answers how many items the check accepts.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3, 4]::count(where (n) { <- n::isEven() })::is(2)
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — how many items the check accepts, which is never negative.
@@ -1400,6 +1702,11 @@ declarations {
 		§§
 		§§ A negative position counts back from the end, so `insert(_, at -1)` puts the item before the last one. A position outside the List clamps to the nearer end. The item is never dropped, so the answer certainly has something in it.
 		§§
+		§§ @example
+		§§   expect ["a", "c"]::insert("b", at 1)::is(["a", "b", "c"])
+		§§   expect ["a", "b", "d"]::insert("c", at -1)::is(["a", "b", "c", "d"])
+		§§   expect ["a", "b"]::insert("z", at 9)::is(["a", "b", "z"])
+		§§
 		§§ @param _ — the item to insert
 		§§ @param at — the position to insert the item before
 		§§ @returns — the List with the item inserted. It is never empty.
@@ -1414,6 +1721,13 @@ declarations {
 			§§ Answers a new List with the item at the given position replaced.
 			§§
 			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged.
+			§§
+			§§ @example
+			§§   constant letters: List<String> = ["a", "b", "c"]
+			§§
+			§§   expect letters::replace("B", at 1)::is(["a", "B", "c"])
+			§§   expect letters::replace("C", at -1)::is(["a", "b", "C"])
+			§§   expect letters::replace("z", at 5)::is(["a", "b", "c"])
 			§§
 			§§ @param _ — the item to put at that position
 			§§ @param at — the position of the item to replace
@@ -1445,6 +1759,12 @@ declarations {
 			§§
 			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged, and the transform is not run.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [10, 20, 30]
+			§§
+			§§   expect scores::replace(at 1, (n) { <- n::add(5) })::is([10, 25, 30])
+			§§   expect scores::replace(at 7, (n) { <- n::add(5) })::is([10, 20, 30])
+			§§
 			§§ @param at — the position of the item to replace
 			§§ @param _ — the transform the item at that position is handed to
 			§§ @returns — the List with the item replaced.
@@ -1473,6 +1793,10 @@ declarations {
 		§§ Answers the items joined into one String, with the given separator between them.
 		§§
 		§§ Each item is rendered by its own `toString`: `[1, 2, 3]::join(with ", ")` is `"1, 2, 3"`. The answer is the raw text, so a String item is not quoted, which is where joining differs from `toString`. For a List of Strings the Method undoes `String::split(on:)`. It is available whenever the items conform to `Printable`.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3]::join(with ", ")::is("1, 2, 3")
+		§§   expect ["Ada", "Grace"]::join(with " & ")::is("Ada & Grace")
 		§§
 		§§ @param with — the separator to place between the items
 		§§ @returns — the joined String. The empty List answers the empty String.
@@ -1509,6 +1833,12 @@ declarations {
 			§§ Answers the List split in two by the check: the items it accepts, and the items it refuses.
 			§§
 			§§ Both halves keep the original order. Each item is offered to the check once.
+			§§
+			§§ @example
+			§§   constant halves = [1, 2, 3, 4]::partition(where (n) { <- n::isEven() })
+			§§
+			§§   expect halves.accepted::is([2, 4])
+			§§   expect halves.refused::is([1, 3])
 			§§
 			§§ @param where — the check each item is offered to
 			§§ @returns — a Record holding the accepted items under `accepted` and the others under `refused`.
@@ -1570,6 +1900,14 @@ declarations {
 		§§
 		§§ The pairing stops with the shorter List.
 		§§
+		§§ @example
+		§§   constant letters: List<String> = ["a", "b", "c"]
+		§§
+		§§   expect letters::pair(with [1, 2])::is([
+		§§   	{ first = "a", second = 1 },
+		§§   	{ first = "b", second = 2 },
+		§§   ])
+		§§
 		§§ @param with — the List to pair the items with
 		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`.
 		pair<infer Other>(
@@ -1598,6 +1936,14 @@ declarations {
 			§§ Answers the List split into groups of the given size, in order.
 			§§
 			§§ The last group holds whatever remains, so it can be shorter. Every group holds at least one item. A size below one names no grouping, and the answer is one group holding every item. The empty List answers no groups at all, whatever the size.
+			§§
+			§§ @example
+			§§   constant digits: List<Integer> = [1, 2, 3, 4, 5]
+			§§   constant none: List<Integer> = []
+			§§
+			§§   expect digits::split(intoGroupsOf 2)::is([[1, 2], [3, 4], [5]])
+			§§   expect digits::split(intoGroupsOf 0)::is([[1, 2, 3, 4, 5]])
+			§§   expect none::split(intoGroupsOf 2)::isEmpty()
 			§§
 			§§ @param intoGroupsOf — how many items each group holds
 			§§ @returns — the List of groups, each of which certainly has something in it.
@@ -1651,6 +1997,13 @@ declarations {
 		overload lowestItem {
 			§§ Answers the item whose key is lowest.
 			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "fig", "kiwi"]
+			§§   constant none: List<String> = []
+			§§
+			§§   expect fruit::lowestItem(on (word) { <- word::length() })::is("fig")
+			§§   expect none::lowestItem(on (word) { <- word::length() })::isEmpty()
+			§§
 			§§ @param on — the key the items are ordered by
 			§§ @returns — the item, or nothing for the empty List.
 			<infer Key is Comparable>(
@@ -1677,6 +2030,14 @@ declarations {
 			}
 
 			§§ Answers the item whose key is lowest, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant length = (_ word: String) -> Integer { <- word::length() }
+			§§   constant fruit: List<String> = ["pear", "fig"]
+			§§   constant none: List<String> = []
+			§§
+			§§   expect fruit::lowestItem(on length, defaultingTo "none")::is("fig")
+			§§   expect none::lowestItem(on length, defaultingTo "none")::is("none")
 			§§
 			§§ @param on — the key the items are ordered by
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -1720,6 +2081,13 @@ declarations {
 			§§
 			§§ The entry is available whenever the items conform to `Comparable`.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [3, 1, 2]
+			§§   constant none: List<Integer> = []
+			§§
+			§§   expect scores::lowestItem(defaultingTo 0)::is(1)
+			§§   expect none::lowestItem(defaultingTo 0)::is(0)
+			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
 			<ItemType is Comparable>(
@@ -1734,6 +2102,13 @@ declarations {
 		§§ Ties keep the earlier item. The empty List has no such item, and the `defaultingTo:` entries answer the given item in place of nothing.
 		overload highestItem {
 			§§ Answers the item whose key is highest.
+			§§
+			§§ @example
+			§§   constant fruit: List<String> = ["pear", "fig", "kiwi"]
+			§§   constant none: List<String> = []
+			§§
+			§§   expect fruit::highestItem(on (word) { <- word::length() })::is("pear")
+			§§   expect none::highestItem(on (word) { <- word::length() })::isEmpty()
 			§§
 			§§ @param on — the key the items are ordered by
 			§§ @returns — the item, or nothing for the empty List.
@@ -1761,6 +2136,14 @@ declarations {
 			}
 
 			§§ Answers the item whose key is highest, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant length = (_ word: String) -> Integer { <- word::length() }
+			§§   constant fruit: List<String> = ["fig", "pear"]
+			§§   constant none: List<String> = []
+			§§
+			§§   expect fruit::highestItem(on length, defaultingTo "none")::is("pear")
+			§§   expect none::highestItem(on length, defaultingTo "none")::is("none")
 			§§
 			§§ @param on — the key the items are ordered by
 			§§ @param defaultingTo — the item to answer with when there is none
@@ -1804,6 +2187,13 @@ declarations {
 			§§
 			§§ The entry is available whenever the items conform to `Comparable`.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [3, 1, 2]
+			§§   constant none: List<Integer> = []
+			§§
+			§§   expect scores::highestItem(defaultingTo 0)::is(3)
+			§§   expect none::highestItem(defaultingTo 0)::is(0)
+			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
 			<ItemType is Comparable>(
@@ -1833,6 +2223,11 @@ declarations {
 			§§ Answers a new List of the leading items, up to the given count.
 			§§
 			§§ A count below one answers the empty List. A count past the length answers every item.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::firstItems(2)::is([1, 2])
+			§§   expect [1, 2, 3]::firstItems(5)::is([1, 2, 3])
+			§§   expect [1, 2, 3]::firstItems(0)::isEmpty()
 			§§
 			§§ @param _ — how many leading items to keep
 			§§ @returns — the List of leading items, in the order they were in.
@@ -1885,6 +2280,11 @@ declarations {
 			§§ Answers a new List of the trailing items, up to the given count.
 			§§
 			§§ A count below one answers the empty List. A count past the length reaches back past the start, where `slice` settles on zero, so it answers every item.
+			§§
+			§§ @example
+			§§   expect [1, 2, 3]::lastItems(2)::is([2, 3])
+			§§   expect [1, 2, 3]::lastItems(5)::is([1, 2, 3])
+			§§   expect [1, 2, 3]::lastItems(0)::isEmpty()
 			§§
 			§§ @param _ — how many trailing items to keep
 			§§ @returns — the List of trailing items, in the order they were in.
@@ -2151,6 +2551,9 @@ declarations {
 		§§
 		§§ Every inner List's items keep their order.
 		§§
+		§§ @example
+		§§   expect [[1, 2], [], [3]]::flatten()::is([1, 2, 3])
+		§§
 		§§ @returns — the flattened List.
 		flatten() -> List<ItemType>
 
@@ -2192,6 +2595,13 @@ declarations {
 		§§ Answers the values the Optionals hold, in order.
 		§§
 		§§ The empty Optionals are left out, so the answer can be shorter than the receiver. A List of empty Optionals answers the empty List. Where one empty Optional has to answer nothing at all, the Method is `allValues()`.
+		§§
+		§§ @example
+		§§   constant parsed = ["1", "x", "3"]::map((text) {
+		§§   	<- Integer.parse(text)
+		§§   })
+		§§
+		§§   expect parsed::values()::is([1, 3])
 		§§
 		§§ @returns — the List of values.
 		values() -> List<ItemType> {
@@ -2240,6 +2650,15 @@ declarations {
 		§§
 		§§ The walk stops at that Optional. A List holding nothing but empty Optionals answers empty, and so does the empty List.
 		§§
+		§§ @example
+		§§   constant parsed = ["x", "2", "3"]::map((text) {
+		§§   	<- Integer.parse(text)
+		§§   })
+		§§   constant none: List<Optional<Integer>> = [#Empty, #Empty]
+		§§
+		§§   expect parsed::firstValue()::is(2)
+		§§   expect none::firstValue()::isEmpty()
+		§§
 		§§ @returns — the first value, or an empty Optional.
 		firstValue() -> Optional<ItemType> {
 			constant start: Optional<ItemType> = #Empty
@@ -2265,6 +2684,15 @@ declarations {
 		§§
 		§§ The failed Results are left out, so the answer can be shorter than the receiver. A List of failed Results answers the empty List. Where one failure has to answer nothing at all, the Method is `allValues()`.
 		§§
+		§§ @example
+		§§   constant rows: List<Result<Integer, String>> = [
+		§§   	#Value(1),
+		§§   	#Failure("bad row"),
+		§§   	#Value(3),
+		§§   ]
+		§§
+		§§   expect rows::values()::is([1, 3])
+		§§
 		§§ @returns — the List of values.
 		values() -> List<ValueType> {
 			constant kept: List<ValueType> = []
@@ -2280,6 +2708,15 @@ declarations {
 		§§ Answers the reasons the failed Results hold, in order.
 		§§
 		§§ The Results holding a value are left out. A List of values answers the empty List.
+		§§
+		§§ @example
+		§§   constant rows: List<Result<Integer, String>> = [
+		§§   	#Value(1),
+		§§   	#Failure("bad row"),
+		§§   	#Value(3),
+		§§   ]
+		§§
+		§§   expect rows::reasons()::is(["bad row"])
 		§§
 		§§ @returns — the List of reasons.
 		reasons() -> List<FailureType> {
@@ -2308,6 +2745,17 @@ declarations {
 		§§ Answers the Results split in two: the values they hold, and the reasons they failed with.
 		§§
 		§§ Both halves keep the original order. Every item of the receiver is in exactly one of them.
+		§§
+		§§ @example
+		§§   constant rows: List<Result<Integer, String>> = [
+		§§   	#Value(1),
+		§§   	#Failure("bad row"),
+		§§   	#Value(3),
+		§§   ]
+		§§   constant halves = rows::partition()
+		§§
+		§§   expect halves.values::is([1, 3])
+		§§   expect halves.reasons::is(["bad row"])
 		§§
 		§§ @returns — a Record holding the values under `values` and the reasons under `reasons`.
 		partition() -> { values: List<ValueType>, reasons: List<FailureType> } {
@@ -2373,15 +2821,33 @@ declarations {
 	namespace NonEmptyList<infer ItemType> for NonEmptyList<ItemType> {
 		§§ Answers the first item of the List, which certainly has one.
 		§§
+		§§ @example
+		§§   constant queue: NonEmptyList<String> = ["Ada", "Grace"]
+		§§   constant first: String = queue::firstItem()
+		§§
+		§§   expect first::is("Ada")
+		§§
 		§§ @returns — the first item.
 		firstItem() -> ItemType
 
 		§§ Answers the last item of the List, which certainly has one.
 		§§
+		§§ @example
+		§§   constant queue: NonEmptyList<String> = ["Ada", "Grace"]
+		§§   constant last: String = queue::lastItem()
+		§§
+		§§   expect last::is("Grace")
+		§§
 		§§ @returns — the last item.
 		lastItem() -> ItemType
 
 		§§ Answers how many items the List has, which is at least one.
+		§§
+		§§ @example
+		§§   constant queue: NonEmptyList<String> = ["Ada", "Grace"]
+		§§   constant count: PositiveInteger = queue::length()
+		§§
+		§§   expect count::is(2)
 		§§
 		§§ @returns — the number of items, which is above zero.
 		length() -> PositiveInteger
@@ -2401,12 +2867,23 @@ declarations {
 		§§
 		§§ The positions count from zero and stop before the length. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.
 		§§
+		§§ @example
+		§§   constant letters: NonEmptyList<String> = ["a", "b", "c"]
+		§§   constant positions: NonEmptyList<Integer> = letters::indices()
+		§§
+		§§   expect positions::is([0, 1, 2])
+		§§
 		§§ @returns — the List of positions, which is never empty.
 		indices() -> NonEmptyList<Integer>
 
 		§§ Answers every item beside the position it stands at.
 		§§
 		§§ The position counts from zero.
+		§§
+		§§ @example
+		§§   constant letters: NonEmptyList<String> = ["a", "b"]
+		§§
+		§§   expect letters::enumerate()::firstItem()::is({ index = 0, item = "a" })
 		§§
 		§§ @returns — the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.
 		enumerate() -> NonEmptyList<{ index: Integer, item: ItemType }>
@@ -2417,17 +2894,35 @@ declarations {
 
 		§§ Answers a new List with the contents of the given List added at the front.
 		§§
+		§§ @example
+		§§   constant queue: NonEmptyList<String> = ["Cy"]
+		§§
+		§§   expect queue::prepend(contentsOf ["Ada", "Bo"])::is(["Ada", "Bo", "Cy"])
+		§§
 		§§ @param contentsOf — the List whose items to add
 		§§ @returns — the extended List, which is never empty.
 		prepend(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
 
 		§§ Answers a new List with the contents of the given List added at the end.
 		§§
+		§§ @example
+		§§   constant queue: NonEmptyList<String> = ["Ada"]
+		§§
+		§§   expect queue::append(contentsOf ["Bo", "Cy"])::is(["Ada", "Bo", "Cy"])
+		§§
 		§§ @param contentsOf — the List whose items to add
 		§§ @returns — the extended List, which is never empty.
 		append(contentsOf other: List<ItemType>) -> NonEmptyList<ItemType>
 
 		§§ Answers a new List with the given transform applied to every item.
+		§§
+		§§ @example
+		§§   constant names: NonEmptyList<String> = ["Ada", "Grace"]
+		§§   constant lengths: NonEmptyList<Integer> = names::map((name) {
+		§§   	<- name::length()
+		§§   })
+		§§
+		§§   expect lengths::is([3, 5])
 		§§
 		§§ @param _ — the transform each item is handed to
 		§§ @returns — the List of transformed items, which certainly has something in it.
@@ -2467,6 +2962,11 @@ declarations {
 
 		§§ Answers a new List with the items in the opposite order.
 		§§
+		§§ @example
+		§§   constant names: NonEmptyList<String> = ["Ada", "Grace"]
+		§§
+		§§   expect names::reverse()::is(["Grace", "Ada"])
+		§§
 		§§ @returns — the reversed List, which certainly has something in it.
 		reverse() -> NonEmptyList<ItemType>
 
@@ -2482,6 +2982,12 @@ declarations {
 			§§
 			§§ The sort is stable. The entry is available whenever the items conform to `Comparable`. The direction is `#Ascending` when a call names none. For any other order, use the `by:` entry.
 			§§
+			§§ @example
+			§§   constant scores: NonEmptyList<Integer> = [3, 1, 2]
+			§§
+			§§   expect scores::sort()::is([1, 2, 3])
+			§§   expect scores::sort(in #Descending)::is([3, 2, 1])
+			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered List, which certainly has something in it.
 			<ItemType is Comparable>(
@@ -2492,6 +2998,14 @@ declarations {
 			§§
 			§§ The sort is stable.
 			§§
+			§§ @example
+			§§   constant fruit: NonEmptyList<String> = ["pear", "fig", "apple"]
+			§§   constant longestFirst = fruit::sort(by (a, b) {
+			§§   	<- b::length()::compare(to a::length())
+			§§   })
+			§§
+			§§   expect longestFirst::is(["apple", "pear", "fig"])
+			§§
 			§§ @param by — the comparison to order the items with
 			§§ @returns — the ordered List, which certainly has something in it.
 			(
@@ -2501,6 +3015,15 @@ declarations {
 			§§ Answers a new List in the given direction of what the key reads off each item.
 			§§
 			§§ The key is read once per item. The sort is stable, so items whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @example
+			§§   constant fruit: NonEmptyList<String> = ["fig", "pear", "kiwi"]
+			§§   constant longestFirst = fruit::sort(
+			§§   	on (word) { <- word::length() },
+			§§   	in #Descending,
+			§§   )
+			§§
+			§§   expect longestFirst::is(["pear", "kiwi", "fig"])
 			§§
 			§§ @param on — the key each item is ordered by
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
@@ -2525,6 +3048,12 @@ declarations {
 			§§
 			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged. Neither case can empty the List.
 			§§
+			§§ @example
+			§§   constant names: NonEmptyList<String> = ["Ada", "Bo"]
+			§§
+			§§   expect names::replace("Al", at -1)::is(["Ada", "Al"])
+			§§   expect names::replace("Al", at 5)::is(["Ada", "Bo"])
+			§§
 			§§ @param _ — the item to put at that position
 			§§ @param at — the position of the item to replace
 			§§ @returns — the List with the item replaced, which is never empty.
@@ -2538,6 +3067,11 @@ declarations {
 			§§ Answers a new List with the item at the given position replaced by what the transform answers for it.
 			§§
 			§§ A negative position counts back from the end: -1 is the last item. A position outside the List leaves it unchanged, and the transform is not run.
+			§§
+			§§ @example
+			§§   constant scores: NonEmptyList<Integer> = [10, 20]
+			§§
+			§§   expect scores::replace(at 0, (n) { <- n::add(5) })::is([15, 20])
 			§§
 			§§ @param at — the position of the item to replace
 			§§ @param _ — the transform the item at that position is handed to
@@ -2570,6 +3104,13 @@ declarations {
 		§§
 		§§ The pairing stops with the shorter List, which certainly has something in it.
 		§§
+		§§ @example
+		§§   constant letters: NonEmptyList<String> = ["a", "b"]
+		§§   constant pairs = letters::pair(with [1, 2, 3])
+		§§
+		§§   expect pairs::firstItem()::is({ first = "a", second = 1 })
+		§§   expect pairs::length()::is(2)
+		§§
 		§§ @param with — the List to pair the items with
 		§§ @returns — a List of Records, each holding one item of this List under `first` and its counterpart under `second`. It is never empty.
 		pair<infer Other>(
@@ -2583,6 +3124,13 @@ declarations {
 		§§ Answers the List split into groups of the given size, in order.
 		§§
 		§§ The last group holds whatever remains, so it can be shorter. A size below one names no grouping, and the answer is one group holding every item.
+		§§
+		§§ @example
+		§§   constant digits: NonEmptyList<Integer> = [1, 2, 3]
+		§§   constant groups = digits::split(intoGroupsOf 2)
+		§§
+		§§   expect groups::is([[1, 2], [3]])
+		§§   expect groups::firstItem()::firstItem()::is(1)
 		§§
 		§§ @param intoGroupsOf — how many items each group holds
 		§§ @returns — the List of groups, which certainly has one, and each group certainly has an item.
@@ -2610,6 +3158,14 @@ declarations {
 			§§
 			§§ Ties keep the earlier item.
 			§§
+			§§ @example
+			§§   constant people: NonEmptyList<{ name: String, age: Integer }> = [
+			§§   	{ name = "Ada", age = 36 },
+			§§   	{ name = "Bo", age = 7 },
+			§§   ]
+			§§
+			§§   expect people::lowestItem(on .age).name::is("Bo")
+			§§
 			§§ @param on — the key the items are ordered by
 			§§ @returns — the item.
 			<infer Key is Comparable>(
@@ -2622,6 +3178,12 @@ declarations {
 			§§ Answers the lowest item, which a non-empty List always has.
 			§§
 			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @example
+			§§   constant scores: NonEmptyList<Integer> = [3, 1, 2]
+			§§   constant lowest: Integer = scores::lowestItem()
+			§§
+			§§   expect lowest::is(1)
 			§§
 			§§ @returns — the item.
 			<ItemType is Comparable>() -> ItemType {
@@ -2639,6 +3201,14 @@ declarations {
 			§§
 			§§ Ties keep the earlier item.
 			§§
+			§§ @example
+			§§   constant people: NonEmptyList<{ name: String, age: Integer }> = [
+			§§   	{ name = "Ada", age = 36 },
+			§§   	{ name = "Bo", age = 7 },
+			§§   ]
+			§§
+			§§   expect people::highestItem(on .age).name::is("Ada")
+			§§
 			§§ @param on — the key the items are ordered by
 			§§ @returns — the item.
 			<infer Key is Comparable>(
@@ -2651,6 +3221,12 @@ declarations {
 			§§ Answers the highest item, which a non-empty List always has.
 			§§
 			§§ Ties keep the earlier item. The entry is available whenever the items conform to `Comparable`.
+			§§
+			§§ @example
+			§§   constant scores: NonEmptyList<Integer> = [3, 1, 2]
+			§§   constant highest: Integer = scores::highestItem()
+			§§
+			§§   expect highest::is(3)
 			§§
 			§§ @returns — the item.
 			<ItemType is Comparable>() -> ItemType {
@@ -2673,12 +3249,26 @@ declarations {
 			§§
 			§§ The kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.
 			§§
+			§§ @example
+			§§   constant tags: NonEmptyList<String> = ["a", "b", "a"]
+			§§   constant unique: NonEmptyList<String> = tags::removeDuplicates()
+			§§
+			§§   expect unique::is(["a", "b"])
+			§§
 			§§ @returns — the List without duplicates, which certainly has something in it.
 			<ItemType is Equatable>() -> NonEmptyList<ItemType>
 
 			§§ Answers a new List keeping only the first item met at each key.
 			§§
 			§§ The kept items keep the order they had. Equality is the keys' own `is`. The entry is available whenever what the key answers conforms to `Equatable`.
+			§§
+			§§ @example
+			§§   constant rows: NonEmptyList<{ id: Integer, name: String }> = [
+			§§   	{ id = 1, name = "a" },
+			§§   	{ id = 1, name = "b" },
+			§§   ]
+			§§
+			§§   expect rows::removeDuplicates(on .id)::is([{ id = 1, name = "a" }])
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the List holding the first item met at each key, which certainly has something in it.
@@ -2703,6 +3293,12 @@ declarations {
 		§§ Answers the inner Lists flattened by one level, into a single List.
 		§§
 		§§ Every inner List's items keep their order.
+		§§
+		§§ @example
+		§§   constant groups: NonEmptyList<NonEmptyList<Integer>> = [[1, 2], [3]]
+		§§   constant digits: NonEmptyList<Integer> = groups::flatten()
+		§§
+		§§   expect digits::is([1, 2, 3])
 		§§
 		§§ @returns — the flattened List, which certainly has something in it.
 		flatten() -> NonEmptyList<ItemType>

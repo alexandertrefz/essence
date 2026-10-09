@@ -38,6 +38,12 @@ declarations {
 		§§
 		§§ The empty List totals zero.
 		§§
+		§§ @example
+		§§   constant empty: List<Integer> = []
+		§§
+		§§   expect [3, 5, 2]::sum()::is(10)
+		§§   expect empty::sum()::is(0)
+		§§
 		§§ @returns — the total.
 		sum() -> Integer {
 			<- Number.sum(@)
@@ -46,6 +52,12 @@ declarations {
 		§§ Multiplies every item together.
 		§§
 		§§ The empty List answers one.
+		§§
+		§§ @example
+		§§   constant empty: List<Integer> = []
+		§§
+		§§   expect [2, 3, 4]::product()::is(24)
+		§§   expect empty::product()::is(1)
 		§§
 		§§ @returns — the product.
 		product() -> Integer {
@@ -67,6 +79,12 @@ declarations {
 		§§
 		§§ The answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. The last total is what `sum` answers.
 		§§
+		§§ @example
+		§§   constant empty: List<Integer> = []
+		§§
+		§§   expect [3, 5, 2]::runningTotal()::is([0, 3, 8, 10])
+		§§   expect empty::runningTotal()::is([0])
+		§§
 		§§ @returns — the List of totals, which is never empty.
 		runningTotal() -> NonEmptyList<Integer> {
 			<- @::accumulate(startingWith 0, (total, item) {
@@ -80,12 +98,26 @@ declarations {
 		overload average {
 			§§ The mean of the items.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 2, 3, 4]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::average()::is(5/2)
+			§§   expect empty::average()::isEmpty()
+			§§
 			§§ @returns — the mean, or nothing for the empty List.
 			() -> Optional<Rational> {
 				<- Number.average(@)
 			}
 
 			§§ The mean of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 2, 3, 4]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::average(defaultingTo 0/1)::is(5/2)
+			§§   expect empty::average(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the mean to answer with when there is none
 			§§ @returns — the mean, or the fallback in its place.
@@ -100,12 +132,26 @@ declarations {
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [7, 3, 9]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::lowestNumber()::is(3)
+			§§   expect empty::lowestNumber()::isEmpty()
+			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Integer> {
 				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [7, 3, 9]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::lowestNumber(defaultingTo 0)::is(3)
+			§§   expect empty::lowestNumber(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the lowest item, or the fallback in its place.
@@ -120,12 +166,26 @@ declarations {
 		overload highestNumber {
 			§§ The highest item.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [7, 3, 9]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::highestNumber()::is(9)
+			§§   expect empty::highestNumber()::isEmpty()
+			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Integer> {
 				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [7, 3, 9]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::highestNumber(defaultingTo 0)::is(9)
+			§§   expect empty::highestNumber(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the highest item, or the fallback in its place.
@@ -159,6 +219,13 @@ declarations {
 		overload median {
 			§§ The median of the items.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [9, 1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::median()::is(5/1)
+			§§   expect empty::median()::isEmpty()
+			§§
 			§§ @returns — the median, or nothing for the empty List.
 			() -> Optional<Rational> {
 				if @::hasItems() {
@@ -169,6 +236,13 @@ declarations {
 			}
 
 			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [9, 1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::median(defaultingTo 0/1)::is(5/1)
+			§§   expect empty::median(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the median to answer with when there is none
 			§§ @returns — the median, or the fallback in its place.
@@ -183,6 +257,13 @@ declarations {
 		overload percentile {
 			§§ The value at the given position through the items.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [40, 10, 30, 20]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::percentile(1/2)::is(25/1)
+			§§   expect empty::percentile(1/2)::isEmpty()
+			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @returns — the value, or nothing for the empty List.
 			(_ fraction: Rational) -> Optional<Rational> {
@@ -194,6 +275,13 @@ declarations {
 			}
 
 			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [40, 10, 30, 20]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::percentile(1/2, defaultingTo 0/1)::is(25/1)
+			§§   expect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @param defaultingTo — the value to answer with when there is none
@@ -212,6 +300,13 @@ declarations {
 		overload mode {
 			§§ The item that occurs most often.
 			§§
+			§§ @example
+			§§   constant rolls: List<Integer> = [2, 6, 6, 3]
+			§§   constant empty: List<Integer> = []
+			§§
+			§§   expect rolls::mode()::is(6)
+			§§   expect empty::mode()::isEmpty()
+			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<Integer> {
 				if @::hasItems() {
@@ -222,6 +317,13 @@ declarations {
 			}
 
 			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant rolls: List<Integer> = [2, 6, 6, 3]
+			§§   constant empty: List<Integer> = []
+			§§
+			§§   expect rolls::mode(defaultingTo 0)::is(6)
+			§§   expect empty::mode(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
@@ -236,6 +338,13 @@ declarations {
 		overload variance {
 			§§ The variance of the items.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::variance()::is(4/1)
+			§§   expect empty::variance()::isEmpty()
+			§§
 			§§ @returns — the variance, which is never negative, or nothing for the empty List.
 			() -> Optional<NonNegativeRational> {
 				if @::hasItems() {
@@ -246,6 +355,13 @@ declarations {
 			}
 
 			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::variance(defaultingTo 0/1)::is(4/1)
+			§§   expect empty::variance(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the variance to answer with when there is none
 			§§ @returns — the variance, or the fallback in its place.
@@ -262,6 +378,13 @@ declarations {
 		overload standardDeviation {
 			§§ The standard deviation of the items.
 			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::standardDeviation()::is(2/1)
+			§§   expect empty::standardDeviation()::isEmpty()
+			§§
 			§§ @returns — the standard deviation, or nothing for the empty List.
 			() -> Optional<Rational | Algebraic> {
 				if @::hasItems() {
@@ -272,6 +395,13 @@ declarations {
 			}
 
 			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant scores: List<Integer> = [1, 5]
+			§§   constant empty: List<Integer>  = []
+			§§
+			§§   expect scores::standardDeviation(defaultingTo 0/1)::is(2/1)
+			§§   expect empty::standardDeviation(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is none
 			§§ @returns — the standard deviation, or the fallback in its place.
@@ -288,6 +418,12 @@ declarations {
 		§§
 		§§ The empty List totals zero.
 		§§
+		§§ @example
+		§§   constant empty: List<Rational> = []
+		§§
+		§§   expect [1/2, 1/4, 1/4]::sum()::is(1/1)
+		§§   expect empty::sum()::is(0/1)
+		§§
 		§§ @returns — the total.
 		sum() -> Rational {
 			<- Number.sum(@)
@@ -297,6 +433,12 @@ declarations {
 		§§
 		§§ The empty List answers one.
 		§§
+		§§ @example
+		§§   constant empty: List<Rational> = []
+		§§
+		§§   expect [1/2, 2/3]::product()::is(1/3)
+		§§   expect empty::product()::is(1/1)
+		§§
 		§§ @returns — the product.
 		product() -> Rational {
 			<- Number.product(@)
@@ -305,6 +447,12 @@ declarations {
 		§§ Every total the items build, one after another.
 		§§
 		§§ The answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. The last total is what `sum` answers.
+		§§
+		§§ @example
+		§§   constant empty: List<Rational> = []
+		§§
+		§§   expect [1/2, 1/4, 1/4]::runningTotal()::is([0/1, 1/2, 3/4, 1/1])
+		§§   expect empty::runningTotal()::is([0/1])
 		§§
 		§§ @returns — the List of totals, which is never empty.
 		runningTotal() -> NonEmptyList<Rational> {
@@ -319,12 +467,26 @@ declarations {
 		overload average {
 			§§ The mean of the items.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::average()::is(1/1)
+			§§   expect empty::average()::isEmpty()
+			§§
 			§§ @returns — the mean, or nothing for the empty List.
 			() -> Optional<Rational> {
 				<- Number.average(@)
 			}
 
 			§§ The mean of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::average(defaultingTo 0/1)::is(1/1)
+			§§   expect empty::average(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the mean to answer with when there is none
 			§§ @returns — the mean, or the fallback in its place.
@@ -339,12 +501,26 @@ declarations {
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/2, 5/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::lowestNumber()::is(1/2)
+			§§   expect empty::lowestNumber()::isEmpty()
+			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Rational> {
 				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/2, 5/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::lowestNumber(defaultingTo 0/1)::is(1/2)
+			§§   expect empty::lowestNumber(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the lowest item, or the fallback in its place.
@@ -359,12 +535,26 @@ declarations {
 		overload highestNumber {
 			§§ The highest item.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/2, 5/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::highestNumber()::is(5/4)
+			§§   expect empty::highestNumber()::isEmpty()
+			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Rational> {
 				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/2, 5/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::highestNumber(defaultingTo 0/1)::is(5/4)
+			§§   expect empty::highestNumber(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the highest item, or the fallback in its place.
@@ -379,6 +569,13 @@ declarations {
 		overload median {
 			§§ The median of the items.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/4, 1/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::median()::is(1/2)
+			§§   expect empty::median()::isEmpty()
+			§§
 			§§ @returns — the median, or nothing for the empty List.
 			() -> Optional<Rational> {
 				if @::hasItems() {
@@ -389,6 +586,13 @@ declarations {
 			}
 
 			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/4, 1/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::median(defaultingTo 0/1)::is(1/2)
+			§§   expect empty::median(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the median to answer with when there is none
 			§§ @returns — the median, or the fallback in its place.
@@ -403,6 +607,13 @@ declarations {
 		overload percentile {
 			§§ The value at the given position through the items.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::percentile(1/2)::is(1/2)
+			§§   expect empty::percentile(1/2)::isEmpty()
+			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @returns — the value, or nothing for the empty List.
 			(_ fraction: Rational) -> Optional<Rational> {
@@ -414,6 +625,13 @@ declarations {
 			}
 
 			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [3/4, 1/4]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::percentile(1/2, defaultingTo 0/1)::is(1/2)
+			§§   expect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @param defaultingTo — the value to answer with when there is none
@@ -432,6 +650,13 @@ declarations {
 		overload mode {
 			§§ The item that occurs most often.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 1/3, 1/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::mode()::is(1/2)
+			§§   expect empty::mode()::isEmpty()
+			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<Rational> {
 				if @::hasItems() {
@@ -442,6 +667,13 @@ declarations {
 			}
 
 			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 1/3, 1/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::mode(defaultingTo 0/1)::is(1/2)
+			§§   expect empty::mode(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
@@ -456,6 +688,13 @@ declarations {
 		overload variance {
 			§§ The variance of the items.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::variance()::is(1/4)
+			§§   expect empty::variance()::isEmpty()
+			§§
 			§§ @returns — the variance, which is never negative, or nothing for the empty List.
 			() -> Optional<NonNegativeRational> {
 				if @::hasItems() {
@@ -466,6 +705,13 @@ declarations {
 			}
 
 			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::variance(defaultingTo 0/1)::is(1/4)
+			§§   expect empty::variance(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the variance to answer with when there is none
 			§§ @returns — the variance, or the fallback in its place.
@@ -482,6 +728,13 @@ declarations {
 		overload standardDeviation {
 			§§ The standard deviation of the items.
 			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::standardDeviation()::is(1/2)
+			§§   expect empty::standardDeviation()::isEmpty()
+			§§
 			§§ @returns — the standard deviation, or nothing for the empty List.
 			() -> Optional<Rational | Algebraic> {
 				if @::hasItems() {
@@ -492,6 +745,13 @@ declarations {
 			}
 
 			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant weights: List<Rational> = [1/2, 3/2]
+			§§   constant empty: List<Rational>   = []
+			§§
+			§§   expect weights::standardDeviation(defaultingTo 0/1)::is(1/2)
+			§§   expect empty::standardDeviation(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is none
 			§§ @returns — the standard deviation, or the fallback in its place.
@@ -508,6 +768,13 @@ declarations {
 		§§
 		§§ The empty List totals zero. A whole total answers as an Integer, and a fractional one as a Rational.
 		§§
+		§§ @example
+		§§   constant empty: List<Scalar> = []
+		§§
+		§§   expect [1, 1/2, 1/2]::sum()::is(2)
+		§§   expect [1, 1/2]::sum()::is(3/2)
+		§§   expect empty::sum()::is(0)
+		§§
 		§§ @returns — the total.
 		sum() -> Scalar {
 			<- Number.sum(@)
@@ -516,6 +783,13 @@ declarations {
 		§§ Multiplies every item together.
 		§§
 		§§ The empty List answers one. A whole product answers as an Integer, and a fractional one as a Rational.
+		§§
+		§§ @example
+		§§   constant empty: List<Scalar> = []
+		§§
+		§§   expect [4, 1/2]::product()::is(2)
+		§§   expect [3, 1/2]::product()::is(3/2)
+		§§   expect empty::product()::is(1)
 		§§
 		§§ @returns — the product.
 		product() -> Scalar {
@@ -534,6 +808,12 @@ declarations {
 		§§
 		§§ The answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. A total stays a Rational once a Rational has been added to it, where `sum` collapses a whole total to an Integer.
 		§§
+		§§ @example
+		§§   constant empty: List<Scalar> = []
+		§§
+		§§   expect [1, 1/2, 1/2]::runningTotal()::is([0, 1, 3/2, 2])
+		§§   expect empty::runningTotal()::is([0])
+		§§
 		§§ @returns — the List of totals, which is never empty.
 		runningTotal() -> NonEmptyList<Scalar> {
 			constant start: Scalar = 0
@@ -549,12 +829,26 @@ declarations {
 		overload average {
 			§§ The mean of the items.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::average()::is(3/4)
+			§§   expect empty::average()::isEmpty()
+			§§
 			§§ @returns — the mean, or nothing for the empty List.
 			() -> Optional<Rational> {
 				<- Number.average(@)
 			}
 
 			§§ The mean of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::average(defaultingTo 0/1)::is(3/4)
+			§§   expect empty::average(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the mean to answer with when there is none
 			§§ @returns — the mean, or the fallback in its place.
@@ -569,12 +863,26 @@ declarations {
 		overload lowestNumber {
 			§§ The lowest item.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::lowestNumber()::is(1/2)
+			§§   expect empty::lowestNumber()::isEmpty()
+			§§
 			§§ @returns — the lowest item, or nothing for the empty List.
 			() -> Optional<Scalar> {
 				<- Number.lowest(@)
 			}
 
 			§§ The lowest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::lowestNumber(defaultingTo 0)::is(1/2)
+			§§   expect empty::lowestNumber(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the lowest item, or the fallback in its place.
@@ -589,12 +897,26 @@ declarations {
 		overload highestNumber {
 			§§ The highest item.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::highestNumber()::is(2)
+			§§   expect empty::highestNumber()::isEmpty()
+			§§
 			§§ @returns — the highest item, or nothing for the empty List.
 			() -> Optional<Scalar> {
 				<- Number.highest(@)
 			}
 
 			§§ The highest item, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::highestNumber(defaultingTo 0)::is(2)
+			§§   expect empty::highestNumber(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the highest item, or the fallback in its place.
@@ -609,6 +931,13 @@ declarations {
 		overload median {
 			§§ The median of the items.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::median()::is(1/1)
+			§§   expect empty::median()::isEmpty()
+			§§
 			§§ @returns — the median, or nothing for the empty List.
 			() -> Optional<Rational> {
 				if @::hasItems() {
@@ -619,6 +948,13 @@ declarations {
 			}
 
 			§§ The median of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [2, 1/2, 1]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::median(defaultingTo 0/1)::is(1/1)
+			§§   expect empty::median(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the median to answer with when there is none
 			§§ @returns — the median, or the fallback in its place.
@@ -633,6 +969,13 @@ declarations {
 		overload percentile {
 			§§ The value at the given position through the items.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::percentile(1/2)::is(3/4)
+			§§   expect empty::percentile(1/2)::isEmpty()
+			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @returns — the value, or nothing for the empty List.
 			(_ fraction: Rational) -> Optional<Rational> {
@@ -644,6 +987,13 @@ declarations {
 			}
 
 			§§ The value at the given position, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::percentile(1/2, defaultingTo 0/1)::is(3/4)
+			§§   expect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param _ — the position through the items, from zero to one
 			§§ @param defaultingTo — the value to answer with when there is none
@@ -662,6 +1012,13 @@ declarations {
 		overload mode {
 			§§ The item that occurs most often.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1/2, 1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::mode()::is(1/2)
+			§§   expect empty::mode()::isEmpty()
+			§§
 			§§ @returns — the item, or nothing for the empty List.
 			() -> Optional<Scalar> {
 				if @::hasItems() {
@@ -672,6 +1029,13 @@ declarations {
 			}
 
 			§§ The item that occurs most often, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1/2, 1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::mode(defaultingTo 0)::is(1/2)
+			§§   expect empty::mode(defaultingTo 0)::is(0)
 			§§
 			§§ @param defaultingTo — the item to answer with when there is none
 			§§ @returns — the item, or the fallback in its place.
@@ -686,6 +1050,13 @@ declarations {
 		overload variance {
 			§§ The variance of the items.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::variance()::is(1/16)
+			§§   expect empty::variance()::isEmpty()
+			§§
 			§§ @returns — the variance, which is never negative, or nothing for the empty List.
 			() -> Optional<NonNegativeRational> {
 				if @::hasItems() {
@@ -696,6 +1067,13 @@ declarations {
 			}
 
 			§§ The variance of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::variance(defaultingTo 0/1)::is(1/16)
+			§§   expect empty::variance(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the variance to answer with when there is none
 			§§ @returns — the variance, or the fallback in its place.
@@ -712,6 +1090,13 @@ declarations {
 		overload standardDeviation {
 			§§ The standard deviation of the items.
 			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::standardDeviation()::is(1/4)
+			§§   expect empty::standardDeviation()::isEmpty()
+			§§
 			§§ @returns — the standard deviation, or nothing for the empty List.
 			() -> Optional<Rational | Algebraic> {
 				if @::hasItems() {
@@ -722,6 +1107,13 @@ declarations {
 			}
 
 			§§ The standard deviation of the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant amounts: List<Scalar> = [1, 1/2]
+			§§   constant empty: List<Scalar>   = []
+			§§
+			§§   expect amounts::standardDeviation(defaultingTo 0/1)::is(1/4)
+			§§   expect empty::standardDeviation(defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param defaultingTo — the value to answer with when there is none
 			§§ @returns — the standard deviation, or the fallback in its place.
@@ -758,6 +1150,11 @@ declarations {
 		overload sum {
 			§§ Adds together the Integers the key reads off the items.
 			§§
+			§§ @example
+			§§   constant orders = [{ total = 30 }, { total = 12 }]
+			§§
+			§§   expect orders::sum(on .total)::is(42)
+			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
 			(on key: (_: ItemType) -> Integer) -> Integer {
@@ -765,6 +1162,11 @@ declarations {
 			}
 
 			§§ Adds together the Rationals the key reads off the items.
+			§§
+			§§ @example
+			§§   constant parcels = [{ weight = 1/2 }, { weight = 3/4 }]
+			§§
+			§§   expect parcels::sum(on .weight)::is(5/4)
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
@@ -775,6 +1177,14 @@ declarations {
 			§§ Adds together the Numbers the key reads off the items.
 			§§
 			§§ A whole total answers as an Integer, and a fractional one as a Rational.
+			§§
+			§§ @example
+			§§   constant cells = ["3", "1/2", "1/2"]
+			§§   constant total = cells::sum(on (text) {
+			§§   	<- Number.parse(text, defaultingTo 0)
+			§§   })
+			§§
+			§§   expect total::is(4)
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the total.
@@ -791,6 +1201,11 @@ declarations {
 		overload product {
 			§§ Multiplies together the Integers the key reads off the items.
 			§§
+			§§ @example
+			§§   constant dice = [{ sides = 6 }, { sides = 4 }]
+			§§
+			§§   expect dice::product(on .sides)::is(24)
+			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the product.
 			(on key: (_: ItemType) -> Integer) -> Integer {
@@ -798,6 +1213,11 @@ declarations {
 			}
 
 			§§ Multiplies together the Rationals the key reads off the items.
+			§§
+			§§ @example
+			§§   constant steps = [{ chance = 1/2 }, { chance = 1/3 }]
+			§§
+			§§   expect steps::product(on .chance)::is(1/6)
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the product.
@@ -808,6 +1228,14 @@ declarations {
 			§§ Multiplies together the Numbers the key reads off the items.
 			§§
 			§§ A whole product answers as an Integer, and a fractional one as a Rational.
+			§§
+			§§ @example
+			§§   constant cells   = ["4", "1/2"]
+			§§   constant product = cells::product(on (text) {
+			§§   	<- Number.parse(text, defaultingTo 0)
+			§§   })
+			§§
+			§§   expect product::is(2)
 			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the product.
@@ -822,6 +1250,16 @@ declarations {
 		overload average {
 			§§ The mean of what the key reads off the items.
 			§§
+			§§ @example
+			§§   constant orders: List<{ total: Integer }> = [
+			§§   	{ total = 30 },
+			§§   	{ total = 12 },
+			§§   ]
+			§§   constant empty: List<{ total: Integer }>  = []
+			§§
+			§§   expect orders::average(on .total)::is(21/1)
+			§§   expect empty::average(on .total)::isEmpty()
+			§§
 			§§ @param on — the key read off each item
 			§§ @returns — the mean, or nothing for the empty List.
 			(on key: (_: ItemType) -> Scalar) -> Optional<Rational> {
@@ -829,6 +1267,16 @@ declarations {
 			}
 
 			§§ The mean of what the key reads off the items, or the given fallback for the empty List.
+			§§
+			§§ @example
+			§§   constant orders: List<{ total: Integer }> = [
+			§§   	{ total = 30 },
+			§§   	{ total = 12 },
+			§§   ]
+			§§   constant empty: List<{ total: Integer }>  = []
+			§§
+			§§   expect orders::average(on .total, defaultingTo 0/1)::is(21/1)
+			§§   expect empty::average(on .total, defaultingTo 0/1)::is(0/1)
 			§§
 			§§ @param on — the key read off each item
 			§§ @param defaultingTo — the mean to answer with when there is none
@@ -853,6 +1301,9 @@ declarations {
 	namespace NonEmptyIntegerList for NonEmptyList<Integer> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [7, 3, 9]::lowestNumber()::is(3)
+		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Integer {
 			<- Number.lowest(@)
@@ -860,12 +1311,18 @@ declarations {
 
 		§§ The highest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [7, 3, 9]::highestNumber()::is(9)
+		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Integer {
 			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
+		§§
+		§§ @example
+		§§   expect [1, 2, 3, 4]::average()::is(5/2)
 		§§
 		§§ @returns — the mean.
 		average() -> Rational {
@@ -883,6 +1340,10 @@ declarations {
 		§§ The middle item, once the items are put in order.
 		§§
 		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @example
+		§§   expect [9, 1, 5]::median()::is(5/1)
+		§§   expect [4, 1, 3, 2]::median()::is(5/2)
 		§§
 		§§ @returns — the median.
 		median() -> Rational {
@@ -912,6 +1373,12 @@ declarations {
 		§§ The value at the given position through the items, once they are put in order.
 		§§
 		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
+		§§
+		§§ @example
+		§§   constant scores: NonEmptyList<Integer> = [40, 10, 30, 20]
+		§§
+		§§   expect scores::percentile(1/2)::is(25/1)
+		§§   expect scores::percentile(2/1)::is(40/1)
 		§§
 		§§ @param _ — the position through the items, from zero to one
 		§§ @returns — the value at that position.
@@ -946,6 +1413,10 @@ declarations {
 		§§
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
+		§§ @example
+		§§   expect [2, 6, 6, 3]::mode()::is(6)
+		§§   expect [3, 1, 1, 3]::mode()::is(3)
+		§§
 		§§ @returns — the item that occurs most often.
 		mode() -> Integer
 
@@ -958,6 +1429,9 @@ declarations {
 		§§ The mean of the squared distances from the mean.
 		§§
 		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @example
+		§§   expect [1, 5]::variance()::is(4/1)
 		§§
 		§§ @returns — the variance, which is never negative.
 		variance() -> NonNegativeRational {
@@ -976,6 +1450,10 @@ declarations {
 		§§
 		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
 		§§
+		§§ @example
+		§§   expect [1, 5]::standardDeviation()::is(2/1)
+		§§   expect [0, 2, 2, 4]::standardDeviation()::is(2::squareRoot())
+		§§
 		§§ @returns — the standard deviation.
 		standardDeviation() -> Rational | Algebraic {
 			<- @::variance()::squareRoot()
@@ -985,6 +1463,9 @@ declarations {
 	namespace NonEmptyRationalList for NonEmptyList<Rational> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [3/4, 1/2, 5/4]::lowestNumber()::is(1/2)
+		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Rational {
 			<- Number.lowest(@)
@@ -992,12 +1473,18 @@ declarations {
 
 		§§ The highest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [3/4, 1/2, 5/4]::highestNumber()::is(5/4)
+		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Rational {
 			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
+		§§
+		§§ @example
+		§§   expect [1/2, 3/2]::average()::is(1/1)
 		§§
 		§§ @returns — the mean.
 		average() -> Rational {
@@ -1007,6 +1494,10 @@ declarations {
 		§§ The middle item, once the items are put in order.
 		§§
 		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @example
+		§§   expect [3/4, 1/4, 1/2]::median()::is(1/2)
+		§§   expect [3/4, 1/4]::median()::is(1/2)
 		§§
 		§§ @returns — the median.
 		median() -> Rational {
@@ -1027,6 +1518,12 @@ declarations {
 		§§ The value at the given position through the items, once they are put in order.
 		§§
 		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
+		§§
+		§§ @example
+		§§   constant weights: NonEmptyList<Rational> = [3/4, 1/4]
+		§§
+		§§   expect weights::percentile(1/2)::is(1/2)
+		§§   expect weights::percentile(2/1)::is(3/4)
 		§§
 		§§ @param _ — the position through the items, from zero to one
 		§§ @returns — the value at that position.
@@ -1050,12 +1547,19 @@ declarations {
 		§§
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
+		§§ @example
+		§§   expect [1/2, 1/3, 1/2]::mode()::is(1/2)
+		§§   expect [1/3, 1/2]::mode()::is(1/3)
+		§§
 		§§ @returns — the item that occurs most often.
 		mode() -> Rational
 
 		§§ The mean of the squared distances from the mean.
 		§§
 		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @example
+		§§   expect [1/2, 3/2]::variance()::is(1/4)
 		§§
 		§§ @returns — the variance, which is never negative.
 		variance() -> NonNegativeRational {
@@ -1074,6 +1578,9 @@ declarations {
 		§§
 		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
 		§§
+		§§ @example
+		§§   expect [1/2, 3/2]::standardDeviation()::is(1/2)
+		§§
 		§§ @returns — the standard deviation.
 		standardDeviation() -> Rational | Algebraic {
 			<- @::variance()::squareRoot()
@@ -1083,6 +1590,9 @@ declarations {
 	namespace NonEmptyNumberList for NonEmptyList<Scalar> {
 		§§ The lowest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [2, 1/2, 1]::lowestNumber()::is(1/2)
+		§§
 		§§ @returns — the lowest item.
 		lowestNumber() -> Scalar {
 			<- Number.lowest(@)
@@ -1090,12 +1600,18 @@ declarations {
 
 		§§ The highest item, which a non-empty List always has.
 		§§
+		§§ @example
+		§§   expect [2, 1/2, 1]::highestNumber()::is(2)
+		§§
 		§§ @returns — the highest item.
 		highestNumber() -> Scalar {
 			<- Number.highest(@)
 		}
 
 		§§ The mean of the items: their total divided by their count.
+		§§
+		§§ @example
+		§§   expect [1, 1/2]::average()::is(3/4)
 		§§
 		§§ @returns — the mean.
 		average() -> Rational {
@@ -1105,6 +1621,10 @@ declarations {
 		§§ The middle item, once the items are put in order.
 		§§
 		§§ A count that is even has two middle items, and the answer is their mean.
+		§§
+		§§ @example
+		§§   expect [2, 1/2, 1]::median()::is(1/1)
+		§§   expect [1, 1/2]::median()::is(3/4)
 		§§
 		§§ @returns — the median.
 		median() -> Rational {
@@ -1132,6 +1652,12 @@ declarations {
 		§§
 		§§ A position between two items answers the point between those items, in proportion. The fraction is clamped between zero and one.
 		§§
+		§§ @example
+		§§   constant amounts: NonEmptyList<Scalar> = [1, 1/2]
+		§§
+		§§   expect amounts::percentile(1/2)::is(3/4)
+		§§   expect amounts::percentile(2/1)::is(1/1)
+		§§
 		§§ @param _ — the position through the items, from zero to one
 		§§ @returns — the value at that position.
 		percentile(_ fraction: Rational) -> Rational {
@@ -1142,12 +1668,19 @@ declarations {
 		§§
 		§§ Items occurring equally often keep the earlier one, by where each first stands.
 		§§
+		§§ @example
+		§§   expect [1/2, 1, 1/2]::mode()::is(1/2)
+		§§   expect [1, 1/2]::mode()::is(1)
+		§§
 		§§ @returns — the item that occurs most often.
 		mode() -> Scalar
 
 		§§ The mean of the squared distances from the mean.
 		§§
 		§§ The count divides, so the answer is the variance of the items as a whole population.
+		§§
+		§§ @example
+		§§   expect [1, 1/2]::variance()::is(1/16)
 		§§
 		§§ @returns — the variance, which is never negative.
 		variance() -> NonNegativeRational {
@@ -1157,6 +1690,9 @@ declarations {
 		§§ The square root of the variance.
 		§§
 		§§ A variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.
+		§§
+		§§ @example
+		§§   expect [1, 1/2]::standardDeviation()::is(1/4)
 		§§
 		§§ @returns — the standard deviation.
 		standardDeviation() -> Rational | Algebraic {
@@ -1176,6 +1712,14 @@ declarations {
 		§§ The mean of what the key reads off every item: their total divided by their count.
 		§§
 		§§ The List has an item, so the answer is the mean itself rather than an Optional.
+		§§
+		§§ @example
+		§§   constant orders: NonEmptyList<{ total: Integer }> = [
+		§§   	{ total = 30 },
+		§§   	{ total = 12 },
+		§§   ]
+		§§
+		§§   expect orders::average(on .total)::is(21/1)
 		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the mean.

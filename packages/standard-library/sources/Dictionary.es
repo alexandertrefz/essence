@@ -75,6 +75,16 @@ declarations {
 			§§
 			§§ Two entries with equal keys collapse into one. The later value wins, and the key keeps the place of its first occurrence. Equality is the keys' own `is`.
 			§§
+			§§ @example
+			§§   constant stock = Dictionary.of([
+			§§   	{ key = "tea", value = 2 },
+			§§   	{ key = "jam", value = 1 },
+			§§   	{ key = "tea", value = 5 },
+			§§   ])
+			§§
+			§§   expect stock::is(["tea" = 5, "jam" = 1])
+			§§   expect stock::keys()::is(["tea", "jam"])
+			§§
 			§§ @param _ — the entries the Dictionary holds
 			§§ @returns — the Dictionary of those entries.
 			<KeyType is Equatable>(
@@ -84,6 +94,13 @@ declarations {
 			§§ Answers a Dictionary of the given keys, each holding what the Function answers for it.
 			§§
 			§§ The Function is asked once for each key, in the order the keys stand in. A key written down twice keeps the place of its first occurrence and holds what the Function answered the second time. The empty List answers the empty Dictionary.
+			§§
+			§§ @example
+			§§   constant lengths = Dictionary.of(["Ada", "Grace"], valuedBy (name) {
+			§§   	<- name::length()
+			§§   })
+			§§
+			§§   expect lengths::is(["Ada" = 3, "Grace" = 5])
 			§§
 			§§ @param _ — the keys the Dictionary holds
 			§§ @param valuedBy — the Function answering the value of each key
@@ -102,6 +119,10 @@ declarations {
 		§§
 		§§ The order the entries stand in does not matter. Each key is found by the keys' own `is`, and each pair of values is compared by the values' own `is`. The Method is available whenever the keys and the values conform to `Equatable`.
 		§§
+		§§ @example
+		§§   expect ["tea" = 2, "jam" = 1]::is(["jam" = 1, "tea" = 2])
+		§§   expect ["tea" = 2]::is(["tea" = 3])::negate()
+		§§
 		§§ @param _ — the Dictionary to compare with
 		§§ @returns — `true` when the two hold the same entries.
 		is<KeyType is Equatable, ValueType is Equatable>(
@@ -112,10 +133,23 @@ declarations {
 		§§
 		§§ Each key and each value is rendered by its own `toString`, and a String is quoted: `["a" = "b"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.
 		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 1]
+		§§   constant empty: Dictionary<String, Integer> = [=]
+		§§
+		§§   expect stock::toString()::is("[\"tea\" = 2, \"jam\" = 1]")
+		§§   expect empty::toString()::is("[=]")
+		§§
 		§§ @returns — the String representation of the Dictionary.
 		toString<KeyType is Printable, ValueType is Printable>() -> String
 
 		§§ Answers whether the Dictionary has no entries at all.
+		§§
+		§§ @example
+		§§   constant empty: Dictionary<String, Integer> = [=]
+		§§
+		§§   expect empty::isEmpty()
+		§§   expect ["tea" = 2]::isEmpty()::negate()
 		§§
 		§§ @returns — `true` for the empty Dictionary.
 		isEmpty() -> Boolean
@@ -139,6 +173,12 @@ declarations {
 			§§
 			§§ It is the opposite of `isEmpty`.
 			§§
+			§§ @example
+			§§   constant empty: Dictionary<String, Integer> = [=]
+			§§
+			§§   expect ["tea" = 2]::hasEntries()
+			§§   expect empty::hasEntries()::negate()
+			§§
 			§§ @returns — `true` when the Dictionary is not empty.
 			() -> Boolean {
 				§ This body is read as well as run. A predicate written as one
@@ -152,6 +192,13 @@ declarations {
 			§§ Answers whether the check accepts at least one entry.
 			§§
 			§§ The walk stops at the first accepted entry. The empty Dictionary has no entry to accept, so it answers `false`.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 0]
+			§§   constant empty: Dictionary<String, Integer> = [=]
+			§§
+			§§   expect stock::hasEntries(where ({ value }) { <- value::is(0) })
+			§§   expect empty::hasEntries(where (_) { <- true })::negate()
 			§§
 			§§ @param where — the check each entry is offered to
 			§§ @returns — `true` when the check accepts an entry.
@@ -172,6 +219,10 @@ declarations {
 		§§ Answers whether the Dictionary holds a value for the given key.
 		§§
 		§§ Equality is the keys' own `is`. The Method is available whenever the keys conform to `Equatable`.
+		§§
+		§§ @example
+		§§   expect ["tea" = 2]::hasKey("tea")
+		§§   expect ["tea" = 2]::hasKey("jam")::negate()
 		§§
 		§§ @param _ — the key to look for
 		§§ @returns — `true` when the key holds a value.
@@ -197,6 +248,10 @@ declarations {
 		§§
 		§§ Equality is the values' own `is`. The Method is available whenever the values conform to `Equatable`.
 		§§
+		§§ @example
+		§§   expect ["tea" = 2]::hasValue(2)
+		§§   expect ["tea" = 2]::hasValue(5)::negate()
+		§§
 		§§ @param _ — the value to look for
 		§§ @returns — `true` when an entry holds the value.
 		hasValue<ValueType is Equatable>(_ value: ValueType) -> Boolean {
@@ -215,6 +270,13 @@ declarations {
 		§§
 		§§ The walk stops at the first entry the check refuses. The empty Dictionary has no entry to fail the check, so it answers `true`.
 		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 5]
+		§§   constant empty: Dictionary<String, Integer> = [=]
+		§§
+		§§   expect stock::hasOnlyEntries(where ({ value }) { <- value::isNot(0) })
+		§§   expect empty::hasOnlyEntries(where (_) { <- false })
+		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — `true` when the check accepts every entry.
 		hasOnlyEntries(
@@ -228,6 +290,13 @@ declarations {
 		§§
 		§§ The walk stops at the first accepted entry. The empty Dictionary has no entry to accept, so it answers `true`.
 		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 5]
+		§§   constant empty: Dictionary<String, Integer> = [=]
+		§§
+		§§   expect stock::hasNoEntries(where ({ value }) { <- value::is(0) })
+		§§   expect empty::hasNoEntries(where (_) { <- true })
+		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — `true` when the check accepts no entry.
 		hasNoEntries(
@@ -237,6 +306,13 @@ declarations {
 		}
 
 		§§ Answers how many entries the Dictionary has.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 1]
+		§§   constant empty: Dictionary<String, Integer> = [=]
+		§§
+		§§   expect stock::length()::is(2)
+		§§   expect empty::length()::is(0)
 		§§
 		§§ @returns — the number of entries, which is never negative.
 		length() -> NonNegativeInteger
@@ -251,6 +327,12 @@ declarations {
 			§§
 			§§ Equality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.
 			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§
+			§§   expect stock::value(at "tea")::is(2)
+			§§   expect stock::value(at "milk")::isEmpty()
+			§§
 			§§ @param at — the key to look for
 			§§ @returns — the value in an Optional, or an empty Optional when the key holds no value.
 			<KeyType is Equatable>(at key: KeyType) -> Optional<ValueType>
@@ -258,6 +340,12 @@ declarations {
 			§§ Answers the value the given key holds, or the given fallback when the key holds no value.
 			§§
 			§§ Equality is the keys' own `is`. The entry is available whenever the keys conform to `Equatable`.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§
+			§§   expect stock::value(at "tea", defaultingTo 0)::is(2)
+			§§   expect stock::value(at "milk", defaultingTo 0)::is(0)
 			§§
 			§§ @param at — the key to look for
 			§§ @param defaultingTo — the value to answer with when the key holds no value
@@ -272,10 +360,20 @@ declarations {
 
 		§§ Answers the keys, in the order they were first set.
 		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 1]
+		§§
+		§§   expect stock::keys()::is(["tea", "jam"])
+		§§
 		§§ @returns — the List of keys.
 		keys() -> List<KeyType>
 
 		§§ Answers the values, in the order their keys were first set.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 1]
+		§§
+		§§   expect stock::values()::is([2, 1])
 		§§
 		§§ @returns — the List of values.
 		values() -> List<ValueType>
@@ -283,6 +381,11 @@ declarations {
 		§§ Answers the entries, in the order their keys were first set.
 		§§
 		§§ Each entry is a Record of a `key` and a `value`, which a Pattern can take apart.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2]
+		§§
+		§§   expect stock::entries()::is([{ key = "tea", value = 2 }])
 		§§
 		§§ @returns — the List of entries.
 		entries() -> List<{ key: KeyType, value: ValueType }>
@@ -305,10 +408,25 @@ declarations {
 			§§
 			§§ The entry is a Record of a `key` and a `value`, which a Pattern can take apart.
 			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§   constant empty: Dictionary<String, Integer> = [=]
+			§§
+			§§   expect stock::firstEntry()::is({ key = "tea", value = 2 })
+			§§   expect empty::firstEntry()::isEmpty()
+			§§
 			§§ @returns — the entry in an Optional, or an empty Optional for the empty Dictionary.
 			() -> Optional<{ key: KeyType, value: ValueType }>
 
 			§§ Answers the first entry of the Dictionary, or the given entry where it has none.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§   constant empty: Dictionary<String, Integer> = [=]
+			§§   constant fallback = { key = "none", value = 0 }
+			§§
+			§§   expect stock::firstEntry(defaultingTo fallback).key::is("tea")
+			§§   expect empty::firstEntry(defaultingTo fallback)::is(fallback)
 			§§
 			§§ @param defaultingTo — the entry to answer with for the empty Dictionary
 			§§ @returns — the entry, or the given one in its place.
@@ -322,6 +440,13 @@ declarations {
 		§§ Answers a new Dictionary with the given key holding the given value.
 		§§
 		§§ A key that is already there keeps its place and takes the new value. A key that is not there is added at the end. Equality is the keys' own `is`. The answer holds the entry that was set, so it is never empty.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 1]
+		§§
+		§§   expect stock::set("tea", to 5)::is(["tea" = 5, "jam" = 1])
+		§§   expect stock::set("tea", to 5)::keys()::is(["tea", "jam"])
+		§§   expect stock::set("milk", to 4)::keys()::is(["tea", "jam", "milk"])
 		§§
 		§§ @param _ — the key to set
 		§§ @param to — the value the key holds
@@ -340,6 +465,13 @@ declarations {
 			§§ Answers a new Dictionary with the given key's value transformed.
 			§§
 			§§ A key that holds no value answers the receiver unchanged, and the transform does not run.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§   constant addTen = (_ count: Integer) -> Integer { <- count::add(10) }
+			§§
+			§§   expect stock::update(at "tea", with addTen)::is(["tea" = 12, "jam" = 1])
+			§§   expect stock::update(at "milk", with addTen)::is(stock)
 			§§
 			§§ @param at — the key whose value to transform
 			§§ @param with — the transform the value is handed to
@@ -362,6 +494,15 @@ declarations {
 			§§ Answers a new Dictionary with the given key's value transformed, starting from the given value where the key holds no value.
 			§§
 			§§ A key that holds no value is set to the transform of the given value.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2]
+			§§   constant addOne = (_ count: Integer) -> Integer { <- count::add(1) }
+			§§   constant more = stock::update(at "tea", defaultingTo 0, with addOne)
+			§§   constant added = stock::update(at "jam", defaultingTo 0, with addOne)
+			§§
+			§§   expect more::is(["tea" = 3])
+			§§   expect added::is(["tea" = 2, "jam" = 1])
 			§§
 			§§ @param at — the key whose value to transform
 			§§ @param defaultingTo — the value to transform when the key holds no value
@@ -399,6 +540,12 @@ declarations {
 			§§
 			§§ A key that is not there answers the receiver unchanged. Equality is the keys' own `is`.
 			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§
+			§§   expect stock::remove(at "tea")::is(["jam" = 1])
+			§§   expect stock::remove(at "milk")::is(stock)
+			§§
 			§§ @param at — the key to remove
 			§§ @returns — the Dictionary without that entry.
 			<KeyType is Equatable>(
@@ -408,6 +555,12 @@ declarations {
 			§§ Answers a new Dictionary without any of the given keys.
 			§§
 			§§ A key that is not there changes nothing, and a key written down twice is removed once. The empty List answers the receiver unchanged. The entries that are left keep the order they had. Equality is the keys' own `is`.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1]
+			§§
+			§§   expect stock::remove(atEvery ["tea", "milk"])::is(["jam" = 1])
+			§§   expect stock::remove(atEvery [])::is(stock)
 			§§
 			§§ @param atEvery — the keys to remove
 			§§ @returns — the Dictionary without those entries.
@@ -441,6 +594,14 @@ declarations {
 		§§
 		§§ Each entry is offered to the check, and the entries it rejects keep their order. A check that accepts every entry answers the empty Dictionary.
 		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 0, "milk" = 4]
+		§§   constant inStock = stock::removeEvery(where ({ value }) {
+		§§   	<- value::is(0)
+		§§   })
+		§§
+		§§   expect inStock::is(["tea" = 2, "milk" = 4])
+		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — the Dictionary of the entries the check rejects.
 		removeEvery(
@@ -450,6 +611,14 @@ declarations {
 		§§ Answers a new Dictionary of every entry the check accepts.
 		§§
 		§§ Each entry is offered to the check, and the accepted entries keep their order. It is named as `List::everyItem(where:)` is.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 0, "milk" = 4]
+		§§   constant soldOut = stock::everyEntry(where ({ value }) {
+		§§   	<- value::is(0)
+		§§   })
+		§§
+		§§   expect soldOut::is(["jam" = 0])
 		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — the Dictionary of accepted entries.
@@ -464,6 +633,14 @@ declarations {
 		§§ Answers a new Dictionary with the given transform applied to every entry.
 		§§
 		§§ The keys are kept, and what the transform answers becomes the value of the entry it was handed. The answer holds the same keys in the same order.
+		§§
+		§§ @example
+		§§   constant prices = ["tea" = 3, "jam" = 5]
+		§§   constant doubled = prices::map(({ value }) {
+		§§   	<- value::multiply(with 2)
+		§§   })
+		§§
+		§§   expect doubled::is(["tea" = 6, "jam" = 10])
 		§§
 		§§ @param _ — the transform each entry is handed to
 		§§ @returns — the Dictionary of transformed values.
@@ -480,6 +657,14 @@ declarations {
 			§§ Answers a new Dictionary holding the entries of both, where the given Dictionary wins.
 			§§
 			§§ A key both hold takes the given Dictionary's value. A key only the given Dictionary holds is added at the end.
+			§§
+			§§ @example
+			§§   constant shelf = ["tea" = 2, "jam" = 1]
+			§§   constant delivery = ["tea" = 5, "milk" = 3]
+			§§   constant merged = shelf::merge(with delivery)
+			§§
+			§§   expect merged::is(["tea" = 5, "jam" = 1, "milk" = 3])
+			§§   expect merged::keys()::is(["tea", "jam", "milk"])
 			§§
 			§§ @param with — the Dictionary whose entries to add
 			§§ @returns — the merged Dictionary.
@@ -502,6 +687,15 @@ declarations {
 			§§ Answers a new Dictionary holding the entries of both, asking the given Function for the value of a key both hold.
 			§§
 			§§ The Function is handed the receiver's value and then the given Dictionary's value. A key only one of the two holds is taken as it stands.
+			§§
+			§§ @example
+			§§   constant shelf = ["tea" = 2, "jam" = 1]
+			§§   constant delivery = ["tea" = 5, "milk" = 3]
+			§§   constant total = shelf::merge(with delivery, choosing (held, arrived) {
+			§§   	<- held::add(arrived)
+			§§   })
+			§§
+			§§   expect total::is(["tea" = 7, "jam" = 1, "milk" = 3])
 			§§
 			§§ @param with — the Dictionary whose entries to add
 			§§ @param choosing — the Function answering the value of a key both hold
@@ -575,6 +769,12 @@ declarations {
 			§§
 			§§ The sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.
 			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1, "milk" = 4]
+			§§
+			§§   expect stock::sort()::keys()::is(["jam", "milk", "tea"])
+			§§   expect stock::sort(in #Descending)::keys()::is(["tea", "milk", "jam"])
+			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered Dictionary.
 			<KeyType is Comparable>(
@@ -584,6 +784,13 @@ declarations {
 			§§ Answers a new Dictionary in the given direction of what the key reads off each entry.
 			§§
 			§§ The key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @example
+			§§   constant stock = ["tea" = 2, "jam" = 1, "milk" = 2]
+			§§   constant fullest = stock::sort(on .value, in #Descending)
+			§§
+			§§   expect stock::sort(on .value)::keys()::is(["jam", "tea", "milk"])
+			§§   expect fullest::keys()::is(["tea", "milk", "jam"])
 			§§
 			§§ @param on — the key each entry is ordered by
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
@@ -606,6 +813,11 @@ declarations {
 		§ inside.
 
 		§§ Answers how many entries the check accepts.
+		§§
+		§§ @example
+		§§   constant stock = ["tea" = 2, "jam" = 0, "milk" = 0]
+		§§
+		§§   expect stock::count(where ({ value }) { <- value::is(0) })::is(2)
 		§§
 		§§ @param where — the check each entry is offered to
 		§§ @returns — how many entries the check accepts, which is never negative.
@@ -654,15 +866,30 @@ declarations {
 	{
 		§§ Answers how many entries the Dictionary has, which is at least one.
 		§§
+		§§ @example
+		§§   constant size: PositiveInteger = ["tea" = 2, "jam" = 1]::length()
+		§§
+		§§   expect size::is(2)
+		§§
 		§§ @returns — the number of entries, which is above zero.
 		length() -> PositiveInteger
 
 		§§ Answers the keys, in the order they were first set.
 		§§
+		§§ @example
+		§§   constant first: String = ["tea" = 2, "jam" = 1]::keys()::firstItem()
+		§§
+		§§   expect first::is("tea")
+		§§
 		§§ @returns — the List of keys, which certainly has something in it.
 		keys() -> NonEmptyList<KeyType>
 
 		§§ Answers the values, in the order their keys were first set.
+		§§
+		§§ @example
+		§§   constant first: Integer = ["tea" = 2, "jam" = 1]::values()::firstItem()
+		§§
+		§§   expect first::is(2)
 		§§
 		§§ @returns — the List of values, which certainly has something in it.
 		values() -> NonEmptyList<ValueType>
@@ -671,6 +898,12 @@ declarations {
 		§§
 		§§ Each entry is a Record of a `key` and a `value`, which a Pattern can take apart.
 		§§
+		§§ @example
+		§§   constant { key, value } = ["tea" = 2, "jam" = 1]::entries()::firstItem()
+		§§
+		§§   expect key::is("tea")
+		§§   expect value::is(2)
+		§§
 		§§ @returns — the List of entries, which certainly has something in it.
 		entries() -> NonEmptyList<{ key: KeyType, value: ValueType }>
 
@@ -678,12 +911,25 @@ declarations {
 		§§
 		§§ The entry is a Record of a `key` and a `value`, which a Pattern can take apart.
 		§§
+		§§ @example
+		§§   constant { key, value } = ["tea" = 2, "jam" = 1]::firstEntry()
+		§§
+		§§   expect key::is("tea")
+		§§   expect value::is(2)
+		§§
 		§§ @returns — the entry, which certainly is there.
 		firstEntry() -> { key: KeyType, value: ValueType }
 
 		§§ Answers a new Dictionary with the given transform applied to every entry.
 		§§
 		§§ The keys are kept, and what the transform answers becomes the value of the entry it was handed. The answer holds the same keys in the same order.
+		§§
+		§§ @example
+		§§   constant doubled = ["tea" = 3, "jam" = 5]::map(({ value }) {
+		§§   	<- value::multiply(with 2)
+		§§   })
+		§§
+		§§   expect doubled::is(["tea" = 6, "jam" = 10])
 		§§
 		§§ @param _ — the transform each entry is handed to
 		§§ @returns — the Dictionary of transformed values, which certainly has an entry.
@@ -701,6 +947,9 @@ declarations {
 			§§
 			§§ The sort is stable. The entry is available whenever the keys conform to `Comparable`. The direction is `#Ascending` when a call names none.
 			§§
+			§§ @example
+			§§   expect ["tea" = 2, "jam" = 1]::sort()::firstEntry().key::is("jam")
+			§§
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
 			§§ @returns — the ordered Dictionary, which certainly has an entry.
 			<KeyType is Comparable>(
@@ -710,6 +959,11 @@ declarations {
 			§§ Answers a new Dictionary in the given direction of what the key reads off each entry.
 			§§
 			§§ The key is read once per entry. The sort is stable, so entries whose keys compare equal keep the order they had. The entry is available whenever what the key answers conforms to `Comparable`. The direction is `#Ascending` when a call names none.
+			§§
+			§§ @example
+			§§   constant first = ["tea" = 2, "jam" = 1]::sort(on .value)::firstEntry()
+			§§
+			§§   expect first.key::is("jam")
 			§§
 			§§ @param on — the key each entry is ordered by
 			§§ @param in — the direction to order in, `#Ascending` when it is left out
@@ -757,6 +1011,15 @@ declarations {
 		§§
 		§§ The groups stand in the order their keys first appear, and the items of a group keep the order they had. Every group holds at least one item, and the empty List answers the empty Dictionary. Equality is the keys' own `is`. The List of groups is what `entries()` answers: one Record per group, holding the `key` and its items under `value`.
 		§§
+		§§ @example
+		§§   constant names = ["Ada", "Alan", "Bob"]
+		§§   constant nobody: List<String> = []
+		§§   constant byLength = names::group(on (name) { <- name::length() })
+		§§
+		§§   expect byLength::is([3 = ["Ada", "Bob"], 4 = ["Alan"]])
+		§§   expect byLength::keys()::is([3, 4])
+		§§   expect nobody::group(on (name) { <- name::length() })::isEmpty()
+		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the Dictionary of groups, each of which has an item in it.
 		group<infer Key is Equatable>(
@@ -767,12 +1030,25 @@ declarations {
 		§§
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
+		§§ @example
+		§§   constant orders = ["tea", "jam", "tea"]
+		§§
+		§§   expect orders::tally()::is(["tea" = 2, "jam" = 1])
+		§§   expect orders::tally()::keys()::is(["tea", "jam"])
+		§§
 		§§ @returns — the Dictionary of counts, each of which is above zero.
 		tally<ItemType is Equatable>() -> Dictionary<ItemType, PositiveInteger>
 
 		§§ Answers the items under the key the given Function reads off each one, one item per key.
 		§§
 		§§ A later item with the same key replaces the earlier one as the value. The key keeps the place it was first met at, as `set` does. The keys stand in the order they first appear. Equality is the keys' own `is`. To keep every item under a key, use `group(on:)`.
+		§§
+		§§ @example
+		§§   constant names = ["Ada", "Alan", "Bob"]
+		§§   constant byLength = names::index(on (name) { <- name::length() })
+		§§
+		§§   expect byLength::is([3 = "Bob", 4 = "Alan"])
+		§§   expect byLength::keys()::is([3, 4])
 		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the Dictionary of items, keyed by what the Function read off each.
@@ -797,6 +1073,13 @@ declarations {
 		§§
 		§§ The groups stand in the order their keys first appear, and the items of a group keep the order they had. Every group holds at least one item. Equality is the keys' own `is`.
 		§§
+		§§ @example
+		§§   constant byLength = ["Ada", "Alan", "Bob"]::group(on (name) {
+		§§   	<- name::length()
+		§§   })
+		§§
+		§§   expect byLength::is([3 = ["Ada", "Bob"], 4 = ["Alan"]])
+		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the Dictionary of groups, which certainly has a group in it.
 		group<infer Key is Equatable>(
@@ -807,6 +1090,12 @@ declarations {
 		§§
 		§§ The items stand in the order they first appear. Equality is the items' own `is`.
 		§§
+		§§ @example
+		§§   constant { key, value } = ["tea", "jam", "tea"]::tally()::firstEntry()
+		§§
+		§§   expect key::is("tea")
+		§§   expect value::is(2)
+		§§
 		§§ @returns — the Dictionary of counts, which certainly has a count in it.
 		tally<ItemType is Equatable>()
 			-> NonEmptyDictionary<ItemType, PositiveInteger>
@@ -814,6 +1103,13 @@ declarations {
 		§§ Answers the items under the key the given Function reads off each one, one item per key.
 		§§
 		§§ A later item with the same key replaces the earlier one as the value. The key keeps the place it was first met at, as `set` does. The keys stand in the order they first appear. Equality is the keys' own `is`.
+		§§
+		§§ @example
+		§§   constant byLength = ["Ada", "Alan", "Bob"]::index(on (name) {
+		§§   	<- name::length()
+		§§   })
+		§§
+		§§   expect byLength::is([3 = "Bob", 4 = "Alan"])
 		§§
 		§§ @param on — the key read off each item
 		§§ @returns — the Dictionary of items, which certainly has an entry in it.

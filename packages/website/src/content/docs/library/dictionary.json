@@ -46,7 +46,9 @@
 								}
 							],
 							"returns": "the Dictionary of those entries.",
-							"examples": []
+							"examples": [
+								"constant stock = Dictionary.of([\n\t{ key = \"tea\", value = 2 },\n\t{ key = \"jam\", value = 1 },\n\t{ key = \"tea\", value = 5 },\n])\n\nexpect stock::is([\"tea\" = 5, \"jam\" = 1])\nexpect stock::keys()::is([\"tea\", \"jam\"])"
+							]
 						},
 						{
 							"signature": "static of<KeyType is Equatable>(\n\t_ keys: List<KeyType>,\n\tvaluedBy valueOf: (_: KeyType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
@@ -68,7 +70,9 @@
 								}
 							],
 							"returns": "the Dictionary of those keys.",
-							"examples": []
+							"examples": [
+								"constant lengths = Dictionary.of([\"Ada\", \"Grace\"], valuedBy (name) {\n\t<- name::length()\n})\n\nexpect lengths::is([\"Ada\" = 3, \"Grace\" = 5])"
+							]
 						}
 					]
 				}
@@ -104,7 +108,9 @@
 								}
 							],
 							"returns": "`true` when the two hold the same entries.",
-							"examples": []
+							"examples": [
+								"expect [\"tea\" = 2, \"jam\" = 1]::is([\"jam\" = 1, \"tea\" = 2])\nexpect [\"tea\" = 2]::is([\"tea\" = 3])::negate()"
+							]
 						}
 					]
 				},
@@ -126,7 +132,9 @@
 							"summary": "Answers the Dictionary and its entries as a String, in the form `[\"a\" = 1, \"b\" = 2]`.\n\nEach key and each value is rendered by its own `toString`, and a String is quoted: `[\"a\" = \"b\"]`. The empty Dictionary answers `[=]`. The empty List answers `[]`, so the two are never the same text. The Method is available whenever the keys and the values conform to `Printable`.",
 							"parameters": [],
 							"returns": "the String representation of the Dictionary.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::toString()::is(\"[\\\"tea\\\" = 2, \\\"jam\\\" = 1]\")\nexpect empty::toString()::is(\"[=]\")"
+							]
 						}
 					]
 				},
@@ -184,7 +192,9 @@
 							"summary": "Answers whether the Dictionary has no entries at all.",
 							"parameters": [],
 							"returns": "`true` for the empty Dictionary.",
-							"examples": []
+							"examples": [
+								"constant empty: Dictionary<String, Integer> = [=]\n\nexpect empty::isEmpty()\nexpect [\"tea\" = 2]::isEmpty()::negate()"
+							]
 						}
 					]
 				},
@@ -206,7 +216,9 @@
 							"summary": "Answers whether the Dictionary has at least one entry.\n\nIt is the opposite of `isEmpty`.",
 							"parameters": [],
 							"returns": "`true` when the Dictionary is not empty.",
-							"examples": []
+							"examples": [
+								"constant empty: Dictionary<String, Integer> = [=]\n\nexpect [\"tea\" = 2]::hasEntries()\nexpect empty::hasEntries()::negate()"
+							]
 						},
 						{
 							"signature": "hasEntries(\n\twhere check: (_: { key: KeyType, value: ValueType }) -> Boolean,\n) -> Boolean",
@@ -221,7 +233,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts an entry.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 0]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::hasEntries(where ({ value }) { <- value::is(0) })\nexpect empty::hasEntries(where (_) { <- true })::negate()"
+							]
 						}
 					]
 				},
@@ -251,7 +265,9 @@
 								}
 							],
 							"returns": "`true` when the key holds a value.",
-							"examples": []
+							"examples": [
+								"expect [\"tea\" = 2]::hasKey(\"tea\")\nexpect [\"tea\" = 2]::hasKey(\"jam\")::negate()"
+							]
 						}
 					]
 				},
@@ -281,7 +297,9 @@
 								}
 							],
 							"returns": "`true` when an entry holds the value.",
-							"examples": []
+							"examples": [
+								"expect [\"tea\" = 2]::hasValue(2)\nexpect [\"tea\" = 2]::hasValue(5)::negate()"
+							]
 						}
 					]
 				},
@@ -311,7 +329,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts every entry.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 5]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::hasOnlyEntries(where ({ value }) { <- value::isNot(0) })\nexpect empty::hasOnlyEntries(where (_) { <- false })"
+							]
 						}
 					]
 				},
@@ -341,7 +361,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts no entry.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 5]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::hasNoEntries(where ({ value }) { <- value::is(0) })\nexpect empty::hasNoEntries(where (_) { <- true })"
+							]
 						}
 					]
 				}
@@ -369,7 +391,9 @@
 							"summary": "Answers how many entries the Dictionary has.",
 							"parameters": [],
 							"returns": "the number of entries, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::length()::is(2)\nexpect empty::length()::is(0)"
+							]
 						}
 					]
 				},
@@ -391,7 +415,9 @@
 							"summary": "Answers how many entries the Dictionary has, which is at least one.",
 							"parameters": [],
 							"returns": "the number of entries, which is above zero.",
-							"examples": []
+							"examples": [
+								"constant size: PositiveInteger = [\"tea\" = 2, \"jam\" = 1]::length()\n\nexpect size::is(2)"
+							]
 						}
 					]
 				},
@@ -421,7 +447,9 @@
 								}
 							],
 							"returns": "the value in an Optional, or an empty Optional when the key holds no value.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::value(at \"tea\")::is(2)\nexpect stock::value(at \"milk\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "value<KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo fallback: ValueType,\n) -> ValueType",
@@ -443,7 +471,9 @@
 								}
 							],
 							"returns": "the value, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::value(at \"tea\", defaultingTo 0)::is(2)\nexpect stock::value(at \"milk\", defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -465,7 +495,9 @@
 							"summary": "Answers the keys, in the order they were first set.",
 							"parameters": [],
 							"returns": "the List of keys.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::keys()::is([\"tea\", \"jam\"])"
+							]
 						}
 					]
 				},
@@ -487,7 +519,9 @@
 							"summary": "Answers the keys, in the order they were first set.",
 							"parameters": [],
 							"returns": "the List of keys, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant first: String = [\"tea\" = 2, \"jam\" = 1]::keys()::firstItem()\n\nexpect first::is(\"tea\")"
+							]
 						}
 					]
 				},
@@ -509,7 +543,9 @@
 							"summary": "Answers the values, in the order their keys were first set.",
 							"parameters": [],
 							"returns": "the List of values.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::values()::is([2, 1])"
+							]
 						}
 					]
 				},
@@ -531,7 +567,9 @@
 							"summary": "Answers the values, in the order their keys were first set.",
 							"parameters": [],
 							"returns": "the List of values, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant first: Integer = [\"tea\" = 2, \"jam\" = 1]::values()::firstItem()\n\nexpect first::is(2)"
+							]
 						}
 					]
 				},
@@ -553,7 +591,9 @@
 							"summary": "Answers the entries, in the order their keys were first set.\n\nEach entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
 							"parameters": [],
 							"returns": "the List of entries.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2]\n\nexpect stock::entries()::is([{ key = \"tea\", value = 2 }])"
+							]
 						}
 					]
 				},
@@ -575,7 +615,9 @@
 							"summary": "Answers the entries, in the order their keys were first set.\n\nEach entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
 							"parameters": [],
 							"returns": "the List of entries, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant { key, value } = [\"tea\" = 2, \"jam\" = 1]::entries()::firstItem()\n\nexpect key::is(\"tea\")\nexpect value::is(2)"
+							]
 						}
 					]
 				},
@@ -597,7 +639,9 @@
 							"summary": "Answers the first entry of the Dictionary.\n\nThe entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
 							"parameters": [],
 							"returns": "the entry in an Optional, or an empty Optional for the empty Dictionary.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\nconstant empty: Dictionary<String, Integer> = [=]\n\nexpect stock::firstEntry()::is({ key = \"tea\", value = 2 })\nexpect empty::firstEntry()::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstEntry(\n\tdefaultingTo fallback: { key: KeyType, value: ValueType },\n) -> { key: KeyType, value: ValueType }",
@@ -612,7 +656,9 @@
 								}
 							],
 							"returns": "the entry, or the given one in its place.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\nconstant empty: Dictionary<String, Integer> = [=]\nconstant fallback = { key = \"none\", value = 0 }\n\nexpect stock::firstEntry(defaultingTo fallback).key::is(\"tea\")\nexpect empty::firstEntry(defaultingTo fallback)::is(fallback)"
+							]
 						}
 					]
 				},
@@ -634,7 +680,9 @@
 							"summary": "Answers the first entry, in the order the keys were first set.\n\nThe entry is a Record of a `key` and a `value`, which a Pattern can take apart.",
 							"parameters": [],
 							"returns": "the entry, which certainly is there.",
-							"examples": []
+							"examples": [
+								"constant { key, value } = [\"tea\" = 2, \"jam\" = 1]::firstEntry()\n\nexpect key::is(\"tea\")\nexpect value::is(2)"
+							]
 						}
 					]
 				}
@@ -677,7 +725,9 @@
 								}
 							],
 							"returns": "the Dictionary with that entry, which certainly has an entry.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::set(\"tea\", to 5)::is([\"tea\" = 5, \"jam\" = 1])\nexpect stock::set(\"tea\", to 5)::keys()::is([\"tea\", \"jam\"])\nexpect stock::set(\"milk\", to 4)::keys()::is([\"tea\", \"jam\", \"milk\"])"
+							]
 						}
 					]
 				},
@@ -714,7 +764,9 @@
 								}
 							],
 							"returns": "the Dictionary with the transformed value.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\nconstant addTen = (_ count: Integer) -> Integer { <- count::add(10) }\n\nexpect stock::update(at \"tea\", with addTen)::is([\"tea\" = 12, \"jam\" = 1])\nexpect stock::update(at \"milk\", with addTen)::is(stock)"
+							]
 						},
 						{
 							"signature": "update<KeyType is Equatable>(\n\tat key: KeyType,\n\tdefaultingTo start: ValueType,\n\twith transform: (_: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
@@ -743,7 +795,9 @@
 								}
 							],
 							"returns": "the Dictionary with the transformed value.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2]\nconstant addOne = (_ count: Integer) -> Integer { <- count::add(1) }\nconstant more = stock::update(at \"tea\", defaultingTo 0, with addOne)\nconstant added = stock::update(at \"jam\", defaultingTo 0, with addOne)\n\nexpect more::is([\"tea\" = 3])\nexpect added::is([\"tea\" = 2, \"jam\" = 1])"
+							]
 						}
 					]
 				},
@@ -773,7 +827,9 @@
 								}
 							],
 							"returns": "the Dictionary without that entry.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::remove(at \"tea\")::is([\"jam\" = 1])\nexpect stock::remove(at \"milk\")::is(stock)"
+							]
 						},
 						{
 							"signature": "remove<KeyType is Equatable>(\n\tatEvery keys: List<KeyType>,\n) -> Dictionary<KeyType, ValueType>",
@@ -788,7 +844,9 @@
 								}
 							],
 							"returns": "the Dictionary without those entries.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1]\n\nexpect stock::remove(atEvery [\"tea\", \"milk\"])::is([\"jam\" = 1])\nexpect stock::remove(atEvery [])::is(stock)"
+							]
 						}
 					]
 				},
@@ -818,7 +876,9 @@
 								}
 							],
 							"returns": "the Dictionary of the entries the check rejects.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 0, \"milk\" = 4]\nconstant inStock = stock::removeEvery(where ({ value }) {\n\t<- value::is(0)\n})\n\nexpect inStock::is([\"tea\" = 2, \"milk\" = 4])"
+							]
 						}
 					]
 				}
@@ -854,7 +914,9 @@
 								}
 							],
 							"returns": "the Dictionary of accepted entries.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 0, \"milk\" = 4]\nconstant soldOut = stock::everyEntry(where ({ value }) {\n\t<- value::is(0)\n})\n\nexpect soldOut::is([\"jam\" = 0])"
+							]
 						}
 					]
 				},
@@ -884,7 +946,9 @@
 								}
 							],
 							"returns": "the Dictionary of transformed values.",
-							"examples": []
+							"examples": [
+								"constant prices = [\"tea\" = 3, \"jam\" = 5]\nconstant doubled = prices::map(({ value }) {\n\t<- value::multiply(with 2)\n})\n\nexpect doubled::is([\"tea\" = 6, \"jam\" = 10])"
+							]
 						}
 					]
 				},
@@ -914,7 +978,9 @@
 								}
 							],
 							"returns": "the Dictionary of transformed values, which certainly has an entry.",
-							"examples": []
+							"examples": [
+								"constant doubled = [\"tea\" = 3, \"jam\" = 5]::map(({ value }) {\n\t<- value::multiply(with 2)\n})\n\nexpect doubled::is([\"tea\" = 6, \"jam\" = 10])"
+							]
 						}
 					]
 				},
@@ -944,7 +1010,9 @@
 								}
 							],
 							"returns": "the merged Dictionary.",
-							"examples": []
+							"examples": [
+								"constant shelf = [\"tea\" = 2, \"jam\" = 1]\nconstant delivery = [\"tea\" = 5, \"milk\" = 3]\nconstant merged = shelf::merge(with delivery)\n\nexpect merged::is([\"tea\" = 5, \"jam\" = 1, \"milk\" = 3])\nexpect merged::keys()::is([\"tea\", \"jam\", \"milk\"])"
+							]
 						},
 						{
 							"signature": "merge<KeyType is Equatable>(\n\twith other: Dictionary<KeyType, ValueType>,\n\tchoosing choose: (_: ValueType, _: ValueType) -> ValueType,\n) -> Dictionary<KeyType, ValueType>",
@@ -966,7 +1034,9 @@
 								}
 							],
 							"returns": "the merged Dictionary.",
-							"examples": []
+							"examples": [
+								"constant shelf = [\"tea\" = 2, \"jam\" = 1]\nconstant delivery = [\"tea\" = 5, \"milk\" = 3]\nconstant total = shelf::merge(with delivery, choosing (held, arrived) {\n\t<- held::add(arrived)\n})\n\nexpect total::is([\"tea\" = 7, \"jam\" = 1, \"milk\" = 3])"
+							]
 						}
 					]
 				},
@@ -996,7 +1066,9 @@
 								}
 							],
 							"returns": "the ordered Dictionary.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1, \"milk\" = 4]\n\nexpect stock::sort()::keys()::is([\"jam\", \"milk\", \"tea\"])\nexpect stock::sort(in #Descending)::keys()::is([\"tea\", \"milk\", \"jam\"])"
+							]
 						},
 						{
 							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: { key: KeyType, value: ValueType }) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> Dictionary<KeyType, ValueType>",
@@ -1018,7 +1090,9 @@
 								}
 							],
 							"returns": "the ordered Dictionary.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 1, \"milk\" = 2]\nconstant fullest = stock::sort(on .value, in #Descending)\n\nexpect stock::sort(on .value)::keys()::is([\"jam\", \"tea\", \"milk\"])\nexpect fullest::keys()::is([\"tea\", \"milk\", \"jam\"])"
+							]
 						}
 					]
 				},
@@ -1048,7 +1122,9 @@
 								}
 							],
 							"returns": "the ordered Dictionary, which certainly has an entry.",
-							"examples": []
+							"examples": [
+								"expect [\"tea\" = 2, \"jam\" = 1]::sort()::firstEntry().key::is(\"jam\")"
+							]
 						},
 						{
 							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: { key: KeyType, value: ValueType }) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyDictionary<KeyType, ValueType>",
@@ -1070,7 +1146,9 @@
 								}
 							],
 							"returns": "the ordered Dictionary, which certainly has an entry.",
-							"examples": []
+							"examples": [
+								"constant first = [\"tea\" = 2, \"jam\" = 1]::sort(on .value)::firstEntry()\n\nexpect first.key::is(\"jam\")"
+							]
 						}
 					]
 				},
@@ -1100,7 +1178,9 @@
 								}
 							],
 							"returns": "how many entries the check accepts, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant stock = [\"tea\" = 2, \"jam\" = 0, \"milk\" = 0]\n\nexpect stock::count(where ({ value }) { <- value::is(0) })::is(2)"
+							]
 						}
 					]
 				}

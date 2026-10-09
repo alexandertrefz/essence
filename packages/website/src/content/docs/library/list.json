@@ -75,7 +75,9 @@
 								}
 							],
 							"returns": "the List of repeated items.",
-							"examples": []
+							"examples": [
+								"expect List.repeat(\"ho\", times 3)::is([\"ho\", \"ho\", \"ho\"])\nexpect List.repeat(\"ho\", times 0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "static repeat(\n\t_ item: ItemType,\n\ttimes count: PositiveInteger,\n) -> NonEmptyList<ItemType>",
@@ -97,7 +99,9 @@
 								}
 							],
 							"returns": "the List of repeated items, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant row: NonEmptyList<String> = List.repeat(\"-\", times 3)\n\nexpect row::is([\"-\", \"-\", \"-\"])"
+							]
 						}
 					]
 				},
@@ -313,7 +317,9 @@
 								}
 							],
 							"returns": "`true` when the Lists are equal.",
-							"examples": []
+							"examples": [
+								"expect [\"Ada\", \"Grace\"]::is([\"Ada\", \"Grace\"])\nexpect [\"Ada\", \"Grace\"]::is([\"Grace\", \"Ada\"])::negate()"
+							]
 						}
 					]
 				},
@@ -343,7 +349,9 @@
 								}
 							],
 							"returns": "`Ordering#Less`, `Ordering#Equal` or `Ordering#Greater`.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 9]::compare(to [1, 3])::is(#Less)\nexpect [1, 2]::compare(to [1, 2, 3])::is(#Less)"
+							]
 						}
 					]
 				},
@@ -365,7 +373,9 @@
 							"summary": "Answers the List and its items as a String, in the form `[1, 2, 3]`.\n\nEach item is rendered by its own `toString`, and a String item is quoted: `[\"a\", \"b\"]` answers `[\"a\", \"b\"]`. A String prints bare on its own and quoted inside a structure. The empty List answers `[]`. The Method is available whenever the items conform to `Printable`.",
 							"parameters": [],
 							"returns": "the String representation of the List.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::toString()::is(\"[1, 2, 3]\")\nexpect [\"a\", \"b\"]::toString()::is(\"[\\\"a\\\", \\\"b\\\"]\")"
+							]
 						}
 					]
 				},
@@ -549,7 +559,9 @@
 							"summary": "Answers whether the List has at least one item.\n\nIt is the opposite of `isEmpty`.",
 							"parameters": [],
 							"returns": "`true` when the List is not empty.",
-							"examples": []
+							"examples": [
+								"constant guests: List<String> = []\n\nexpect [\"Ada\"]::hasItems()\nexpect guests::hasItems()::negate()"
+							]
 						},
 						{
 							"signature": "hasItems(where check: (_: ItemType) -> Boolean) -> Boolean",
@@ -564,7 +576,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts an item.",
-							"examples": []
+							"examples": [
+								"constant none: List<Integer> = []\n\nexpect [1, 2, 3]::hasItems(where (n) { <- n::isEven() })\nexpect none::hasItems(where (n) { <- n::isEven() })::negate()"
+							]
 						}
 					]
 				},
@@ -586,7 +600,9 @@
 							"summary": "Answers whether the List has no items at all.",
 							"parameters": [],
 							"returns": "`true` for the empty List.",
-							"examples": []
+							"examples": [
+								"constant guests: List<String> = []\n\nexpect guests::isEmpty()\nexpect [\"Ada\"]::isEmpty()::negate()"
+							]
 						}
 					]
 				},
@@ -616,7 +632,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts every item.",
-							"examples": []
+							"examples": [
+								"constant none: List<Integer> = []\n\nexpect [2, 4]::hasOnlyItems(where (n) { <- n::isEven() })\nexpect [2, 3]::hasOnlyItems(where (n) { <- n::isEven() })::negate()\nexpect none::hasOnlyItems(where (n) { <- n::isEven() })"
+							]
 						}
 					]
 				},
@@ -646,7 +664,9 @@
 								}
 							],
 							"returns": "`true` when the check accepts no item.",
-							"examples": []
+							"examples": [
+								"constant none: List<Integer> = []\n\nexpect [1, 3]::hasNoItems(where (n) { <- n::isEven() })\nexpect [1, 2]::hasNoItems(where (n) { <- n::isEven() })::negate()\nexpect none::hasNoItems(where (n) { <- n::isEven() })"
+							]
 						}
 					]
 				},
@@ -753,7 +773,9 @@
 								}
 							],
 							"returns": "`true` when the item occurs.",
-							"examples": []
+							"examples": [
+								"expect [\"Ada\", \"Grace\"]::contains(\"Grace\")\nexpect [\"Ada\", \"Grace\"]::contains(\"Alan\")::negate()"
+							]
 						},
 						{
 							"signature": "contains<ItemType is Equatable>(\n\teveryItemOf other: List<ItemType>,\n) -> Boolean",
@@ -800,7 +822,9 @@
 								}
 							],
 							"returns": "`true` when the item does not occur.",
-							"examples": []
+							"examples": [
+								"expect [\"Ada\", \"Grace\"]::doesNotContain(\"Alan\")\nexpect [\"Ada\", \"Grace\"]::doesNotContain(\"Ada\")::negate()"
+							]
 						}
 					]
 				},
@@ -862,7 +886,9 @@
 								}
 							],
 							"returns": "`true` when the List begins with other items.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::doesNotStart(with [2, 3])\nexpect [1, 2, 3]::doesNotStart(with [1])::negate()"
+							]
 						}
 					]
 				},
@@ -892,7 +918,9 @@
 								}
 							],
 							"returns": "`true` when the List ends with those items.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::ends(with [2, 3])\nexpect [1, 2, 3]::ends(with [])"
+							]
 						}
 					]
 				},
@@ -922,7 +950,9 @@
 								}
 							],
 							"returns": "`true` when the List ends with other items.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::doesNotEnd(with [1, 2])\nexpect [1, 2, 3]::doesNotEnd(with [3])::negate()"
+							]
 						}
 					]
 				},
@@ -952,7 +982,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when the item is absent.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"a\"]::firstIndex(of \"a\")::is(0)\nexpect [\"a\", \"b\", \"a\"]::firstIndex(of \"z\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstIndex(where check: (_: ItemType) -> Boolean) -> Optional<Integer>",
@@ -967,7 +999,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when no item is accepted.",
-							"examples": []
+							"examples": [
+								"expect [1, 4, 6]::firstIndex(where (n) { <- n::isEven() })::is(1)\nexpect [1, 3]::firstIndex(where (n) { <- n::isEven() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstIndex<ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -989,7 +1023,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"a\"]::firstIndex(of \"a\", defaultingTo -1)::is(0)\nexpect [\"a\", \"b\", \"a\"]::firstIndex(of \"z\", defaultingTo -1)::is(-1)"
+							]
 						},
 						{
 							"signature": "firstIndex(\n\twhere check: (_: ItemType) -> Boolean,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1011,7 +1047,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }\n\nexpect [1, 4, 6]::firstIndex(where isEven, defaultingTo -1)::is(1)\nexpect [1, 3]::firstIndex(where isEven, defaultingTo -1)::is(-1)"
+							]
 						}
 					]
 				},
@@ -1041,7 +1079,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when the item is absent.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"a\"]::lastIndex(of \"a\")::is(2)\nexpect [\"a\", \"b\", \"a\"]::lastIndex(of \"z\")::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastIndex<ItemType is Equatable>(\n\tof item: ItemType,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1063,7 +1103,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"a\"]::lastIndex(of \"a\", defaultingTo -1)::is(2)\nexpect [\"a\", \"b\", \"a\"]::lastIndex(of \"z\", defaultingTo -1)::is(-1)"
+							]
 						},
 						{
 							"signature": "lastIndex(where check: (_: ItemType) -> Boolean) -> Optional<Integer>",
@@ -1078,7 +1120,9 @@
 								}
 							],
 							"returns": "the zero-based position, or nothing when no item is accepted.",
-							"examples": []
+							"examples": [
+								"expect [2, 4, 5]::lastIndex(where (n) { <- n::isEven() })::is(1)\nexpect [1, 3]::lastIndex(where (n) { <- n::isEven() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastIndex(\n\twhere check: (_: ItemType) -> Boolean,\n\tdefaultingTo fallback: Integer,\n) -> Integer",
@@ -1100,7 +1144,9 @@
 								}
 							],
 							"returns": "the zero-based position, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }\n\nexpect [2, 4, 5]::lastIndex(where isEven, defaultingTo -1)::is(1)\nexpect [1, 3]::lastIndex(where isEven, defaultingTo -1)::is(-1)"
+							]
 						}
 					]
 				},
@@ -1162,7 +1208,9 @@
 								}
 							],
 							"returns": "how many items equal it, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"a\"]::count(of \"a\")::is(2)\nexpect [\"a\", \"b\", \"a\"]::count(of \"z\")::is(0)"
+							]
 						},
 						{
 							"signature": "count(where check: (_: ItemType) -> Boolean) -> NonNegativeInteger",
@@ -1177,7 +1225,9 @@
 								}
 							],
 							"returns": "how many items the check accepts, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3, 4]::count(where (n) { <- n::isEven() })::is(2)"
+							]
 						}
 					]
 				}
@@ -1205,7 +1255,9 @@
 							"summary": "Answers how many items the List has.",
 							"parameters": [],
 							"returns": "the number of items, which is never negative.",
-							"examples": []
+							"examples": [
+								"constant guests: List<String> = [\"Ada\", \"Grace\"]\n\nexpect guests::length()::is(2)"
+							]
 						}
 					]
 				},
@@ -1227,7 +1279,9 @@
 							"summary": "Answers how many items the List has, which is at least one.",
 							"parameters": [],
 							"returns": "the number of items, which is above zero.",
-							"examples": []
+							"examples": [
+								"constant queue: NonEmptyList<String> = [\"Ada\", \"Grace\"]\nconstant count: PositiveInteger = queue::length()\n\nexpect count::is(2)"
+							]
 						}
 					]
 				},
@@ -1249,7 +1303,9 @@
 							"summary": "Answers the first item of the List.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Ada\", \"Grace\"]\nconstant nobody: List<String> = []\n\nexpect queue::firstItem()::is(\"Ada\")\nexpect nobody::firstItem()::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstItem(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>",
@@ -1264,7 +1320,9 @@
 								}
 							],
 							"returns": "the matching item, or nothing when no item is accepted.",
-							"examples": []
+							"examples": [
+								"expect [1, 4, 6]::firstItem(where (n) { <- n::isEven() })::is(4)\nexpect [1, 3]::firstItem(where (n) { <- n::isEven() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstItem(defaultingTo fallback: ItemType) -> ItemType",
@@ -1279,7 +1337,9 @@
 								}
 							],
 							"returns": "the first item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Ada\", \"Grace\"]\nconstant nobody: List<String> = []\n\nexpect queue::firstItem(defaultingTo \"none\")::is(\"Ada\")\nexpect nobody::firstItem(defaultingTo \"none\")::is(\"none\")"
+							]
 						},
 						{
 							"signature": "firstItem(\n\twhere check: (_: ItemType) -> Boolean,\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
@@ -1301,7 +1361,9 @@
 								}
 							],
 							"returns": "the matching item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }\n\nexpect [1, 4, 6]::firstItem(where isEven, defaultingTo 0)::is(4)\nexpect [1, 3]::firstItem(where isEven, defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1323,7 +1385,9 @@
 							"summary": "Answers the first item of the List, which certainly has one.",
 							"parameters": [],
 							"returns": "the first item.",
-							"examples": []
+							"examples": [
+								"constant queue: NonEmptyList<String> = [\"Ada\", \"Grace\"]\nconstant first: String = queue::firstItem()\n\nexpect first::is(\"Ada\")"
+							]
 						}
 					]
 				},
@@ -1345,7 +1409,9 @@
 							"summary": "Answers the last item of the List.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Ada\", \"Grace\"]\nconstant nobody: List<String> = []\n\nexpect queue::lastItem()::is(\"Grace\")\nexpect nobody::lastItem()::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastItem(where check: (_: ItemType) -> Boolean) -> Optional<ItemType>",
@@ -1360,7 +1426,9 @@
 								}
 							],
 							"returns": "the matching item, or nothing when no item is accepted.",
-							"examples": []
+							"examples": [
+								"expect [2, 4, 5]::lastItem(where (n) { <- n::isEven() })::is(4)\nexpect [1, 3]::lastItem(where (n) { <- n::isEven() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastItem(defaultingTo fallback: ItemType) -> ItemType",
@@ -1375,7 +1443,9 @@
 								}
 							],
 							"returns": "the last item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Ada\", \"Grace\"]\nconstant nobody: List<String> = []\n\nexpect queue::lastItem(defaultingTo \"none\")::is(\"Grace\")\nexpect nobody::lastItem(defaultingTo \"none\")::is(\"none\")"
+							]
 						},
 						{
 							"signature": "lastItem(\n\twhere check: (_: ItemType) -> Boolean,\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
@@ -1397,7 +1467,9 @@
 								}
 							],
 							"returns": "the matching item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant isEven = (_ n: Integer) -> Boolean { <- n::isEven() }\n\nexpect [2, 4, 5]::lastItem(where isEven, defaultingTo 0)::is(4)\nexpect [1, 3]::lastItem(where isEven, defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1419,7 +1491,9 @@
 							"summary": "Answers the last item of the List, which certainly has one.",
 							"parameters": [],
 							"returns": "the last item.",
-							"examples": []
+							"examples": [
+								"constant queue: NonEmptyList<String> = [\"Ada\", \"Grace\"]\nconstant last: String = queue::lastItem()\n\nexpect last::is(\"Grace\")"
+							]
 						}
 					]
 				},
@@ -1449,7 +1523,9 @@
 								}
 							],
 							"returns": "the item, or nothing when the position is outside the List.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"c\"]::item(at 0)::is(\"a\")\nexpect [\"a\", \"b\", \"c\"]::item(at -1)::is(\"c\")\nexpect [\"a\", \"b\", \"c\"]::item(at 3)::isEmpty()"
+							]
 						},
 						{
 							"signature": "item(at index: Integer, defaultingTo fallback: ItemType) -> ItemType",
@@ -1471,7 +1547,9 @@
 								}
 							],
 							"returns": "the item at that position, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\"]::item(at 1, defaultingTo \"?\")::is(\"b\")\nexpect [\"a\", \"b\"]::item(at 5, defaultingTo \"?\")::is(\"?\")"
+							]
 						}
 					]
 				},
@@ -1493,7 +1571,9 @@
 							"summary": "Answers the positions the List has, in order.\n\nThe positions count from zero and stop before the length. The empty List answers no positions. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.",
 							"parameters": [],
 							"returns": "the List of positions.",
-							"examples": []
+							"examples": [
+								"constant letters: List<String> = [\"a\", \"b\", \"c\"]\nconstant none: List<String> = []\n\nexpect letters::indices()::is([0, 1, 2])\nexpect none::indices()::isEmpty()"
+							]
 						},
 						{
 							"signature": "indices(where check: (_: ItemType) -> Boolean) -> List<Integer>",
@@ -1532,7 +1612,9 @@
 							"summary": "Answers the positions the List has, in order.\n\nThe positions count from zero and stop before the length. The answer is a whole List of positions: to walk the items beside their positions in one pass, use `enumerate()`.",
 							"parameters": [],
 							"returns": "the List of positions, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant letters: NonEmptyList<String> = [\"a\", \"b\", \"c\"]\nconstant positions: NonEmptyList<Integer> = letters::indices()\n\nexpect positions::is([0, 1, 2])"
+							]
 						}
 					]
 				},
@@ -1571,7 +1653,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"expect [7]::onlyItem(defaultingTo 0)::is(7)\nexpect [7, 8]::onlyItem(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1593,7 +1677,9 @@
 							"summary": "Answers every item beside the position it stands at.\n\nThe position counts from zero. The empty List answers no entries.",
 							"parameters": [],
 							"returns": "the List of Records, each holding a position under `index` and the item at it under `item`.",
-							"examples": []
+							"examples": [
+								"constant letters: List<String> = [\"a\", \"b\"]\n\nexpect letters::enumerate()::is([\n\t{ index = 0, item = \"a\" },\n\t{ index = 1, item = \"b\" },\n])"
+							]
 						}
 					]
 				},
@@ -1615,7 +1701,9 @@
 							"summary": "Answers every item beside the position it stands at.\n\nThe position counts from zero.",
 							"parameters": [],
 							"returns": "the List of Records, each holding a position under `index` and the item at it under `item`. It is never empty.",
-							"examples": []
+							"examples": [
+								"constant letters: NonEmptyList<String> = [\"a\", \"b\"]\n\nexpect letters::enumerate()::firstItem()::is({ index = 0, item = \"a\" })"
+							]
 						}
 					]
 				},
@@ -1645,7 +1733,9 @@
 								}
 							],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant fruit: List<String> = [\"pear\", \"fig\", \"kiwi\"]\nconstant none: List<String> = []\n\nexpect fruit::lowestItem(on (word) { <- word::length() })::is(\"fig\")\nexpect none::lowestItem(on (word) { <- word::length() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "lowestItem<infer Key is Comparable>(\n\ton key: (_: ItemType) -> Key,\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
@@ -1667,7 +1757,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant length = (_ word: String) -> Integer { <- word::length() }\nconstant fruit: List<String> = [\"pear\", \"fig\"]\nconstant none: List<String> = []\n\nexpect fruit::lowestItem(on length, defaultingTo \"none\")::is(\"fig\")\nexpect none::lowestItem(on length, defaultingTo \"none\")::is(\"none\")"
+							]
 						},
 						{
 							"signature": "lowestItem<ItemType is Comparable>() -> Optional<ItemType>",
@@ -1691,7 +1783,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [3, 1, 2]\nconstant none: List<Integer> = []\n\nexpect scores::lowestItem(defaultingTo 0)::is(1)\nexpect none::lowestItem(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1721,14 +1815,18 @@
 								}
 							],
 							"returns": "the item.",
-							"examples": []
+							"examples": [
+								"constant people: NonEmptyList<{ name: String, age: Integer }> = [\n\t{ name = \"Ada\", age = 36 },\n\t{ name = \"Bo\", age = 7 },\n]\n\nexpect people::lowestItem(on .age).name::is(\"Bo\")"
+							]
 						},
 						{
 							"signature": "lowestItem<ItemType is Comparable>() -> ItemType",
 							"summary": "Answers the lowest item, which a non-empty List always has.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item.",
-							"examples": []
+							"examples": [
+								"constant scores: NonEmptyList<Integer> = [3, 1, 2]\nconstant lowest: Integer = scores::lowestItem()\n\nexpect lowest::is(1)"
+							]
 						}
 					]
 				},
@@ -1758,7 +1856,9 @@
 								}
 							],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant fruit: List<String> = [\"pear\", \"fig\", \"kiwi\"]\nconstant none: List<String> = []\n\nexpect fruit::highestItem(on (word) { <- word::length() })::is(\"pear\")\nexpect none::highestItem(on (word) { <- word::length() })::isEmpty()"
+							]
 						},
 						{
 							"signature": "highestItem<infer Key is Comparable>(\n\ton key: (_: ItemType) -> Key,\n\tdefaultingTo fallback: ItemType,\n) -> ItemType",
@@ -1780,7 +1880,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant length = (_ word: String) -> Integer { <- word::length() }\nconstant fruit: List<String> = [\"fig\", \"pear\"]\nconstant none: List<String> = []\n\nexpect fruit::highestItem(on length, defaultingTo \"none\")::is(\"pear\")\nexpect none::highestItem(on length, defaultingTo \"none\")::is(\"none\")"
+							]
 						},
 						{
 							"signature": "highestItem<ItemType is Comparable>() -> Optional<ItemType>",
@@ -1804,7 +1906,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [3, 1, 2]\nconstant none: List<Integer> = []\n\nexpect scores::highestItem(defaultingTo 0)::is(3)\nexpect none::highestItem(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -1834,14 +1938,18 @@
 								}
 							],
 							"returns": "the item.",
-							"examples": []
+							"examples": [
+								"constant people: NonEmptyList<{ name: String, age: Integer }> = [\n\t{ name = \"Ada\", age = 36 },\n\t{ name = \"Bo\", age = 7 },\n]\n\nexpect people::highestItem(on .age).name::is(\"Ada\")"
+							]
 						},
 						{
 							"signature": "highestItem<ItemType is Comparable>() -> ItemType",
 							"summary": "Answers the highest item, which a non-empty List always has.\n\nTies keep the earlier item. The entry is available whenever the items conform to `Comparable`.",
 							"parameters": [],
 							"returns": "the item.",
-							"examples": []
+							"examples": [
+								"constant scores: NonEmptyList<Integer> = [3, 1, 2]\nconstant highest: Integer = scores::highestItem()\n\nexpect highest::is(3)"
+							]
 						}
 					]
 				},
@@ -1871,7 +1979,9 @@
 								}
 							],
 							"returns": "the List of leading items, in the order they were in.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::firstItems(2)::is([1, 2])\nexpect [1, 2, 3]::firstItems(5)::is([1, 2, 3])\nexpect [1, 2, 3]::firstItems(0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "firstItems(while check: (_: ItemType) -> Boolean) -> List<ItemType>",
@@ -1918,7 +2028,9 @@
 								}
 							],
 							"returns": "the List of trailing items, in the order they were in.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::lastItems(2)::is([2, 3])\nexpect [1, 2, 3]::lastItems(5)::is([1, 2, 3])\nexpect [1, 2, 3]::lastItems(0)::isEmpty()"
+							]
 						},
 						{
 							"signature": "lastItems(while check: (_: ItemType) -> Boolean) -> List<ItemType>",
@@ -1971,7 +2083,9 @@
 								}
 							],
 							"returns": "the extended List, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant guests: List<String> = [\"Grace\"]\nconstant queue: NonEmptyList<String> = guests::prepend(\"Ada\")\n\nexpect queue::is([\"Ada\", \"Grace\"])"
+							]
 						},
 						{
 							"signature": "prepend(contentsOf other: List<ItemType>) -> List<ItemType>",
@@ -1986,7 +2100,9 @@
 								}
 							],
 							"returns": "the extended List.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Cy\"]\n\nexpect queue::prepend(contentsOf [\"Ada\", \"Bo\"])::is([\"Ada\", \"Bo\", \"Cy\"])"
+							]
 						}
 					]
 				},
@@ -2016,7 +2132,9 @@
 								}
 							],
 							"returns": "the extended List, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant queue: NonEmptyList<String> = [\"Cy\"]\n\nexpect queue::prepend(contentsOf [\"Ada\", \"Bo\"])::is([\"Ada\", \"Bo\", \"Cy\"])"
+							]
 						}
 					]
 				},
@@ -2046,7 +2164,9 @@
 								}
 							],
 							"returns": "the extended List, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant guests: List<String> = [\"Ada\"]\nconstant queue: NonEmptyList<String> = guests::append(\"Grace\")\n\nexpect queue::is([\"Ada\", \"Grace\"])"
+							]
 						},
 						{
 							"signature": "append(contentsOf other: List<ItemType>) -> List<ItemType>",
@@ -2061,7 +2181,9 @@
 								}
 							],
 							"returns": "the extended List.",
-							"examples": []
+							"examples": [
+								"constant queue: List<String> = [\"Ada\"]\n\nexpect queue::append(contentsOf [\"Bo\", \"Cy\"])::is([\"Ada\", \"Bo\", \"Cy\"])"
+							]
 						}
 					]
 				},
@@ -2091,7 +2213,9 @@
 								}
 							],
 							"returns": "the extended List, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant queue: NonEmptyList<String> = [\"Ada\"]\n\nexpect queue::append(contentsOf [\"Bo\", \"Cy\"])::is([\"Ada\", \"Bo\", \"Cy\"])"
+							]
 						}
 					]
 				},
@@ -2128,7 +2252,9 @@
 								}
 							],
 							"returns": "the List with the item inserted. It is never empty.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"c\"]::insert(\"b\", at 1)::is([\"a\", \"b\", \"c\"])\nexpect [\"a\", \"b\", \"d\"]::insert(\"c\", at -1)::is([\"a\", \"b\", \"c\", \"d\"])\nexpect [\"a\", \"b\"]::insert(\"z\", at 9)::is([\"a\", \"b\", \"z\"])"
+							]
 						}
 					]
 				},
@@ -2165,7 +2291,9 @@
 								}
 							],
 							"returns": "the List with the item replaced.",
-							"examples": []
+							"examples": [
+								"constant letters: List<String> = [\"a\", \"b\", \"c\"]\n\nexpect letters::replace(\"B\", at 1)::is([\"a\", \"B\", \"c\"])\nexpect letters::replace(\"C\", at -1)::is([\"a\", \"b\", \"C\"])\nexpect letters::replace(\"z\", at 5)::is([\"a\", \"b\", \"c\"])"
+							]
 						},
 						{
 							"signature": "replace(\n\tat index: Integer,\n\t_ transform: (_: ItemType) -> ItemType,\n) -> List<ItemType>",
@@ -2187,7 +2315,9 @@
 								}
 							],
 							"returns": "the List with the item replaced.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [10, 20, 30]\n\nexpect scores::replace(at 1, (n) { <- n::add(5) })::is([10, 25, 30])\nexpect scores::replace(at 7, (n) { <- n::add(5) })::is([10, 20, 30])"
+							]
 						}
 					]
 				},
@@ -2224,7 +2354,9 @@
 								}
 							],
 							"returns": "the List with the item replaced, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant names: NonEmptyList<String> = [\"Ada\", \"Bo\"]\n\nexpect names::replace(\"Al\", at -1)::is([\"Ada\", \"Al\"])\nexpect names::replace(\"Al\", at 5)::is([\"Ada\", \"Bo\"])"
+							]
 						},
 						{
 							"signature": "replace(\n\tat index: Integer,\n\t_ transform: (_: ItemType) -> ItemType,\n) -> NonEmptyList<ItemType>",
@@ -2246,7 +2378,9 @@
 								}
 							],
 							"returns": "the List with the item replaced, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant scores: NonEmptyList<Integer> = [10, 20]\n\nexpect scores::replace(at 0, (n) { <- n::add(5) })::is([15, 20])"
+							]
 						}
 					]
 				},
@@ -2328,7 +2462,9 @@
 								}
 							],
 							"returns": "the shortened List.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::removeFirst()::is([2, 3])\nexpect [1, 2, 3]::removeFirst(2)::is([3])\nexpect [1, 2, 3]::removeFirst(5)::isEmpty()"
+							]
 						},
 						{
 							"signature": "removeFirst(while check: (_: ItemType) -> Boolean) -> List<ItemType>",
@@ -2375,7 +2511,9 @@
 								}
 							],
 							"returns": "the List without that item.",
-							"examples": []
+							"examples": [
+								"expect [\"a\", \"b\", \"c\"]::remove(at 1)::is([\"a\", \"c\"])\nexpect [\"a\", \"b\", \"c\"]::remove(at -1)::is([\"a\", \"b\"])\nexpect [\"a\", \"b\", \"c\"]::remove(at 5)::is([\"a\", \"b\", \"c\"])"
+							]
 						}
 					]
 				},
@@ -2405,7 +2543,9 @@
 								}
 							],
 							"returns": "the List of remaining items.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 1, 3]::removeEvery(1)::is([2, 3])"
+							]
 						},
 						{
 							"signature": "removeEvery(where check: (_: ItemType) -> Boolean) -> List<ItemType>",
@@ -2420,7 +2560,9 @@
 								}
 							],
 							"returns": "the List of the items the check rejects.",
-							"examples": []
+							"examples": [
+								"constant odds = [1, 2, 3, 4]::removeEvery(where (n) { <- n::isEven() })\n\nexpect odds::is([1, 3])"
+							]
 						},
 						{
 							"signature": "removeEvery<ItemType is Equatable>(\n\tcontentsOf other: List<ItemType>,\n) -> List<ItemType>",
@@ -2467,7 +2609,9 @@
 								}
 							],
 							"returns": "the shortened List.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::removeLast()::is([1, 2])\nexpect [1, 2, 3]::removeLast(2)::is([1])\nexpect [1, 2, 3]::removeLast(5)::isEmpty()"
+							]
 						},
 						{
 							"signature": "removeLast(while check: (_: ItemType) -> Boolean) -> List<ItemType>",
@@ -2547,7 +2691,9 @@
 							"summary": "Answers a new List keeping only the first occurrence of each item.\n\nThe kept items keep the order they had. Equality is the items' own `is`. The entry is available whenever the items conform to `Equatable`.",
 							"parameters": [],
 							"returns": "the List without duplicates, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant tags: NonEmptyList<String> = [\"a\", \"b\", \"a\"]\nconstant unique: NonEmptyList<String> = tags::removeDuplicates()\n\nexpect unique::is([\"a\", \"b\"])"
+							]
 						},
 						{
 							"signature": "removeDuplicates<infer Key is Equatable>(\n\ton key: (_: ItemType) -> Key,\n) -> NonEmptyList<ItemType>",
@@ -2562,7 +2708,9 @@
 								}
 							],
 							"returns": "the List holding the first item met at each key, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant rows: NonEmptyList<{ id: Integer, name: String }> = [\n\t{ id = 1, name = \"a\" },\n\t{ id = 1, name = \"b\" },\n]\n\nexpect rows::removeDuplicates(on .id)::is([{ id = 1, name = \"a\" }])"
+							]
 						}
 					]
 				}
@@ -2598,7 +2746,9 @@
 								}
 							],
 							"returns": "the List of transformed items.",
-							"examples": []
+							"examples": [
+								"constant names: List<String> = [\"Ada\", \"Grace\"]\n\nexpect names::map((name) { <- name::length() })::is([3, 5])"
+							]
 						}
 					]
 				},
@@ -2628,7 +2778,9 @@
 								}
 							],
 							"returns": "the List of transformed items, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant names: NonEmptyList<String> = [\"Ada\", \"Grace\"]\nconstant lengths: NonEmptyList<Integer> = names::map((name) {\n\t<- name::length()\n})\n\nexpect lengths::is([3, 5])"
+							]
 						}
 					]
 				},
@@ -2665,7 +2817,9 @@
 								}
 							],
 							"returns": "the combined value.",
-							"examples": []
+							"examples": [
+								"constant total = [1, 2, 3]::reduce(startingWith 10, (sum, item) {\n\t<- sum::add(item)\n})\n\nexpect total::is(16)"
+							]
 						},
 						{
 							"signature": "reduce<infer Answer>(\n\tstartingWith initial: Answer,\n\tstep combine: (_: Answer, _: ItemType) -> Step<Answer, Answer>,\n) -> Answer",
@@ -2687,7 +2841,9 @@
 								}
 							],
 							"returns": "the combined value, or the value the first `#Done` carries.",
-							"examples": []
+							"examples": [
+								"constant spent = [40, 30, 50, 20]::reduce(\n\tstartingWith 0,\n\tstep (total, price) {\n\t\tconstant next = total::add(price)\n\n\t\tif next::isGreaterThan(100) {\n\t\t\t<- #Done(total)\n\t\t}\n\n\t\t<- #Continue(next)\n\t},\n)\n\nexpect spent::is(70)"
+							]
 						}
 					]
 				},
@@ -2749,7 +2905,9 @@
 								}
 							],
 							"returns": "the List of accepted items.",
-							"examples": []
+							"examples": [
+								"constant evens = [1, 2, 3, 4]::everyItem(where (n) { <- n::isEven() })\n\nexpect evens::is([2, 4])"
+							]
 						},
 						{
 							"signature": "everyItem<ItemType is Equatable>(\n\talsoIn other: List<ItemType>,\n) -> List<ItemType>",
@@ -2889,7 +3047,9 @@
 							"summary": "Answers a new List with the items in the opposite order.",
 							"parameters": [],
 							"returns": "the reversed List, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant names: NonEmptyList<String> = [\"Ada\", \"Grace\"]\n\nexpect names::reverse()::is([\"Grace\", \"Ada\"])"
+							]
 						}
 					]
 				},
@@ -2919,7 +3079,9 @@
 								}
 							],
 							"returns": "the ordered List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [3, 1, 2]\n\nexpect scores::sort()::is([1, 2, 3])\nexpect scores::sort(in #Descending)::is([3, 2, 1])"
+							]
 						},
 						{
 							"signature": "sort(\n\tby comparison: (_: ItemType, _: ItemType) -> Ordering,\n) -> List<ItemType>",
@@ -2934,7 +3096,9 @@
 								}
 							],
 							"returns": "the ordered List.",
-							"examples": []
+							"examples": [
+								"constant fruit: List<String> = [\"pear\", \"fig\", \"apple\"]\nconstant byLength = fruit::sort(by (a, b) {\n\t<- a::length()::compare(to b::length())\n})\n\nexpect byLength::is([\"fig\", \"pear\", \"apple\"])"
+							]
 						},
 						{
 							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: ItemType) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> List<ItemType>",
@@ -2956,7 +3120,9 @@
 								}
 							],
 							"returns": "the ordered List.",
-							"examples": []
+							"examples": [
+								"constant fruit: List<String> = [\"pear\", \"fig\", \"kiwi\"]\nconstant bySize = fruit::sort(on (word) { <- word::length() })\n\nexpect bySize::is([\"fig\", \"pear\", \"kiwi\"])"
+							]
 						}
 					]
 				},
@@ -2986,7 +3152,9 @@
 								}
 							],
 							"returns": "the ordered List, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant scores: NonEmptyList<Integer> = [3, 1, 2]\n\nexpect scores::sort()::is([1, 2, 3])\nexpect scores::sort(in #Descending)::is([3, 2, 1])"
+							]
 						},
 						{
 							"signature": "sort(\n\tby comparison: (_: ItemType, _: ItemType) -> Ordering,\n) -> NonEmptyList<ItemType>",
@@ -3001,7 +3169,9 @@
 								}
 							],
 							"returns": "the ordered List, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant fruit: NonEmptyList<String> = [\"pear\", \"fig\", \"apple\"]\nconstant longestFirst = fruit::sort(by (a, b) {\n\t<- b::length()::compare(to a::length())\n})\n\nexpect longestFirst::is([\"apple\", \"pear\", \"fig\"])"
+							]
 						},
 						{
 							"signature": "sort<infer Key is Comparable>(\n\ton key: (_: ItemType) -> Key,\n\tin order: SortOrder = #Ascending,\n) -> NonEmptyList<ItemType>",
@@ -3023,7 +3193,9 @@
 								}
 							],
 							"returns": "the ordered List, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant fruit: NonEmptyList<String> = [\"fig\", \"pear\", \"kiwi\"]\nconstant longestFirst = fruit::sort(\n\ton (word) { <- word::length() },\n\tin #Descending,\n)\n\nexpect longestFirst::is([\"pear\", \"kiwi\", \"fig\"])"
+							]
 						}
 					]
 				}
@@ -3066,7 +3238,9 @@
 								}
 							],
 							"returns": "the List of items in that range. It is empty when the range is empty, inverted, or entirely outside the List.",
-							"examples": []
+							"examples": [
+								"constant letters = [\"a\", \"b\", \"c\", \"d\"]\n\nexpect letters::slice(from 1, to 3)::is([\"b\", \"c\"])\nexpect letters::slice(from 0, to -1)::is([\"a\", \"b\", \"c\"])\nexpect letters::slice(from 2)::is([\"c\", \"d\"])"
+							]
 						}
 					]
 				},
@@ -3096,7 +3270,9 @@
 								}
 							],
 							"returns": "a Record holding the accepted items under `accepted` and the others under `refused`.",
-							"examples": []
+							"examples": [
+								"constant halves = [1, 2, 3, 4]::partition(where (n) { <- n::isEven() })\n\nexpect halves.accepted::is([2, 4])\nexpect halves.refused::is([1, 3])"
+							]
 						},
 						{
 							"signature": "partition(\n\twhile check: (_: ItemType) -> Boolean,\n) -> { leading: List<ItemType>, trailing: List<ItemType> }",
@@ -3160,7 +3336,9 @@
 								}
 							],
 							"returns": "the List of groups, each of which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant digits: List<Integer> = [1, 2, 3, 4, 5]\nconstant none: List<Integer> = []\n\nexpect digits::split(intoGroupsOf 2)::is([[1, 2], [3, 4], [5]])\nexpect digits::split(intoGroupsOf 0)::is([[1, 2, 3, 4, 5]])\nexpect none::split(intoGroupsOf 2)::isEmpty()"
+							]
 						},
 						{
 							"signature": "split<ItemType is Equatable>(\n\ton separator: ItemType,\n) -> NonEmptyList<List<ItemType>>",
@@ -3224,7 +3402,9 @@
 								}
 							],
 							"returns": "the List of groups, which certainly has one, and each group certainly has an item.",
-							"examples": []
+							"examples": [
+								"constant digits: NonEmptyList<Integer> = [1, 2, 3]\nconstant groups = digits::split(intoGroupsOf 2)\n\nexpect groups::is([[1, 2], [3]])\nexpect groups::firstItem()::firstItem()::is(1)"
+							]
 						}
 					]
 				},
@@ -3324,7 +3504,9 @@
 								}
 							],
 							"returns": "the joined String. The empty List answers the empty String.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3]::join(with \", \")::is(\"1, 2, 3\")\nexpect [\"Ada\", \"Grace\"]::join(with \" & \")::is(\"Ada & Grace\")"
+							]
 						}
 					]
 				},
@@ -3354,7 +3536,9 @@
 								}
 							],
 							"returns": "a List of Records, each holding one item of this List under `first` and its counterpart under `second`.",
-							"examples": []
+							"examples": [
+								"constant letters: List<String> = [\"a\", \"b\", \"c\"]\n\nexpect letters::pair(with [1, 2])::is([\n\t{ first = \"a\", second = 1 },\n\t{ first = \"b\", second = 2 },\n])"
+							]
 						}
 					]
 				},
@@ -3384,7 +3568,9 @@
 								}
 							],
 							"returns": "a List of Records, each holding one item of this List under `first` and its counterpart under `second`. It is never empty.",
-							"examples": []
+							"examples": [
+								"constant letters: NonEmptyList<String> = [\"a\", \"b\"]\nconstant pairs = letters::pair(with [1, 2, 3])\n\nexpect pairs::firstItem()::is({ first = \"a\", second = 1 })\nexpect pairs::length()::is(2)"
+							]
 						}
 					]
 				}
@@ -3412,7 +3598,9 @@
 							"summary": "Answers the inner Lists flattened by one level, into a single List.\n\nEvery inner List's items keep their order.",
 							"parameters": [],
 							"returns": "the flattened List.",
-							"examples": []
+							"examples": [
+								"expect [[1, 2], [], [3]]::flatten()::is([1, 2, 3])"
+							]
 						}
 					]
 				},
@@ -3434,7 +3622,9 @@
 							"summary": "Answers the inner Lists flattened by one level, into a single List.\n\nEvery inner List's items keep their order.",
 							"parameters": [],
 							"returns": "the flattened List, which certainly has something in it.",
-							"examples": []
+							"examples": [
+								"constant groups: NonEmptyList<NonEmptyList<Integer>> = [[1, 2], [3]]\nconstant digits: NonEmptyList<Integer> = groups::flatten()\n\nexpect digits::is([1, 2, 3])"
+							]
 						}
 					]
 				},
@@ -3486,7 +3676,9 @@
 							"summary": "Answers the values the Optionals hold, in order.\n\nThe empty Optionals are left out, so the answer can be shorter than the receiver. A List of empty Optionals answers the empty List. Where one empty Optional has to answer nothing at all, the Method is `allValues()`.",
 							"parameters": [],
 							"returns": "the List of values.",
-							"examples": []
+							"examples": [
+								"constant parsed = [\"1\", \"x\", \"3\"]::map((text) {\n\t<- Integer.parse(text)\n})\n\nexpect parsed::values()::is([1, 3])"
+							]
 						}
 					]
 				},
@@ -3508,7 +3700,9 @@
 							"summary": "Answers the values the Results hold, in order.\n\nThe failed Results are left out, so the answer can be shorter than the receiver. A List of failed Results answers the empty List. Where one failure has to answer nothing at all, the Method is `allValues()`.",
 							"parameters": [],
 							"returns": "the List of values.",
-							"examples": []
+							"examples": [
+								"constant rows: List<Result<Integer, String>> = [\n\t#Value(1),\n\t#Failure(\"bad row\"),\n\t#Value(3),\n]\n\nexpect rows::values()::is([1, 3])"
+							]
 						}
 					]
 				},
@@ -3578,7 +3772,9 @@
 							"summary": "Answers the value of the first Optional that holds one.\n\nThe walk stops at that Optional. A List holding nothing but empty Optionals answers empty, and so does the empty List.",
 							"parameters": [],
 							"returns": "the first value, or an empty Optional.",
-							"examples": []
+							"examples": [
+								"constant parsed = [\"x\", \"2\", \"3\"]::map((text) {\n\t<- Integer.parse(text)\n})\nconstant none: List<Optional<Integer>> = [#Empty, #Empty]\n\nexpect parsed::firstValue()::is(2)\nexpect none::firstValue()::isEmpty()"
+							]
 						}
 					]
 				},
@@ -3600,7 +3796,9 @@
 							"summary": "Answers the reasons the failed Results hold, in order.\n\nThe Results holding a value are left out. A List of values answers the empty List.",
 							"parameters": [],
 							"returns": "the List of reasons.",
-							"examples": []
+							"examples": [
+								"constant rows: List<Result<Integer, String>> = [\n\t#Value(1),\n\t#Failure(\"bad row\"),\n\t#Value(3),\n]\n\nexpect rows::reasons()::is([\"bad row\"])"
+							]
 						}
 					]
 				},
@@ -3622,7 +3820,9 @@
 							"summary": "Answers the Results split in two: the values they hold, and the reasons they failed with.\n\nBoth halves keep the original order. Every item of the receiver is in exactly one of them.",
 							"parameters": [],
 							"returns": "a Record holding the values under `values` and the reasons under `reasons`.",
-							"examples": []
+							"examples": [
+								"constant rows: List<Result<Integer, String>> = [\n\t#Value(1),\n\t#Failure(\"bad row\"),\n\t#Value(3),\n]\nconstant halves = rows::partition()\n\nexpect halves.values::is([1, 3])\nexpect halves.reasons::is([\"bad row\"])"
+							]
 						}
 					]
 				}
@@ -3658,7 +3858,9 @@
 								}
 							],
 							"returns": "the Dictionary of groups, each of which has an item in it.",
-							"examples": []
+							"examples": [
+								"constant names = [\"Ada\", \"Alan\", \"Bob\"]\nconstant nobody: List<String> = []\nconstant byLength = names::group(on (name) { <- name::length() })\n\nexpect byLength::is([3 = [\"Ada\", \"Bob\"], 4 = [\"Alan\"]])\nexpect byLength::keys()::is([3, 4])\nexpect nobody::group(on (name) { <- name::length() })::isEmpty()"
+							]
 						}
 					]
 				},
@@ -3688,7 +3890,9 @@
 								}
 							],
 							"returns": "the Dictionary of groups, which certainly has a group in it.",
-							"examples": []
+							"examples": [
+								"constant byLength = [\"Ada\", \"Alan\", \"Bob\"]::group(on (name) {\n\t<- name::length()\n})\n\nexpect byLength::is([3 = [\"Ada\", \"Bob\"], 4 = [\"Alan\"]])"
+							]
 						}
 					]
 				},
@@ -3710,7 +3914,9 @@
 							"summary": "Answers how many times each item occurs.\n\nThe items stand in the order they first appear. Equality is the items' own `is`.",
 							"parameters": [],
 							"returns": "the Dictionary of counts, each of which is above zero.",
-							"examples": []
+							"examples": [
+								"constant orders = [\"tea\", \"jam\", \"tea\"]\n\nexpect orders::tally()::is([\"tea\" = 2, \"jam\" = 1])\nexpect orders::tally()::keys()::is([\"tea\", \"jam\"])"
+							]
 						}
 					]
 				},
@@ -3732,7 +3938,9 @@
 							"summary": "Answers how many times each item occurs.\n\nThe items stand in the order they first appear. Equality is the items' own `is`.",
 							"parameters": [],
 							"returns": "the Dictionary of counts, which certainly has a count in it.",
-							"examples": []
+							"examples": [
+								"constant { key, value } = [\"tea\", \"jam\", \"tea\"]::tally()::firstEntry()\n\nexpect key::is(\"tea\")\nexpect value::is(2)"
+							]
 						}
 					]
 				},
@@ -3762,7 +3970,9 @@
 								}
 							],
 							"returns": "the Dictionary of items, keyed by what the Function read off each.",
-							"examples": []
+							"examples": [
+								"constant names = [\"Ada\", \"Alan\", \"Bob\"]\nconstant byLength = names::index(on (name) { <- name::length() })\n\nexpect byLength::is([3 = \"Bob\", 4 = \"Alan\"])\nexpect byLength::keys()::is([3, 4])"
+							]
 						}
 					]
 				},
@@ -3792,7 +4002,9 @@
 								}
 							],
 							"returns": "the Dictionary of items, which certainly has an entry in it.",
-							"examples": []
+							"examples": [
+								"constant byLength = [\"Ada\", \"Alan\", \"Bob\"]::index(on (name) {\n\t<- name::length()\n})\n\nexpect byLength::is([3 = \"Bob\", 4 = \"Alan\"])"
+							]
 						}
 					]
 				}
@@ -3820,7 +4032,9 @@
 							"summary": "Adds every item together.\n\nThe empty List totals zero.",
 							"parameters": [],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Integer> = []\n\nexpect [3, 5, 2]::sum()::is(10)\nexpect empty::sum()::is(0)"
+							]
 						}
 					]
 				},
@@ -3842,7 +4056,9 @@
 							"summary": "Adds every item together.\n\nThe empty List totals zero.",
 							"parameters": [],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Rational> = []\n\nexpect [1/2, 1/4, 1/4]::sum()::is(1/1)\nexpect empty::sum()::is(0/1)"
+							]
 						}
 					]
 				},
@@ -3864,7 +4080,9 @@
 							"summary": "Adds every item together.\n\nThe empty List totals zero. A whole total answers as an Integer, and a fractional one as a Rational.",
 							"parameters": [],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Scalar> = []\n\nexpect [1, 1/2, 1/2]::sum()::is(2)\nexpect [1, 1/2]::sum()::is(3/2)\nexpect empty::sum()::is(0)"
+							]
 						}
 					]
 				},
@@ -3894,7 +4112,9 @@
 								}
 							],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant orders = [{ total = 30 }, { total = 12 }]\n\nexpect orders::sum(on .total)::is(42)"
+							]
 						},
 						{
 							"signature": "sum(on key: (_: ItemType) -> Rational) -> Rational",
@@ -3909,7 +4129,9 @@
 								}
 							],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant parcels = [{ weight = 1/2 }, { weight = 3/4 }]\n\nexpect parcels::sum(on .weight)::is(5/4)"
+							]
 						},
 						{
 							"signature": "sum(on key: (_: ItemType) -> Scalar) -> Scalar",
@@ -3924,7 +4146,9 @@
 								}
 							],
 							"returns": "the total.",
-							"examples": []
+							"examples": [
+								"constant cells = [\"3\", \"1/2\", \"1/2\"]\nconstant total = cells::sum(on (text) {\n\t<- Number.parse(text, defaultingTo 0)\n})\n\nexpect total::is(4)"
+							]
 						}
 					]
 				},
@@ -3946,7 +4170,9 @@
 							"summary": "Multiplies every item together.\n\nThe empty List answers one.",
 							"parameters": [],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Integer> = []\n\nexpect [2, 3, 4]::product()::is(24)\nexpect empty::product()::is(1)"
+							]
 						}
 					]
 				},
@@ -3968,7 +4194,9 @@
 							"summary": "Multiplies every item together.\n\nThe empty List answers one.",
 							"parameters": [],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Rational> = []\n\nexpect [1/2, 2/3]::product()::is(1/3)\nexpect empty::product()::is(1/1)"
+							]
 						}
 					]
 				},
@@ -3990,7 +4218,9 @@
 							"summary": "Multiplies every item together.\n\nThe empty List answers one. A whole product answers as an Integer, and a fractional one as a Rational.",
 							"parameters": [],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Scalar> = []\n\nexpect [4, 1/2]::product()::is(2)\nexpect [3, 1/2]::product()::is(3/2)\nexpect empty::product()::is(1)"
+							]
 						}
 					]
 				},
@@ -4020,7 +4250,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant dice = [{ sides = 6 }, { sides = 4 }]\n\nexpect dice::product(on .sides)::is(24)"
+							]
 						},
 						{
 							"signature": "product(on key: (_: ItemType) -> Rational) -> Rational",
@@ -4035,7 +4267,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant steps = [{ chance = 1/2 }, { chance = 1/3 }]\n\nexpect steps::product(on .chance)::is(1/6)"
+							]
 						},
 						{
 							"signature": "product(on key: (_: ItemType) -> Scalar) -> Scalar",
@@ -4050,7 +4284,9 @@
 								}
 							],
 							"returns": "the product.",
-							"examples": []
+							"examples": [
+								"constant cells   = [\"4\", \"1/2\"]\nconstant product = cells::product(on (text) {\n\t<- Number.parse(text, defaultingTo 0)\n})\n\nexpect product::is(2)"
+							]
 						}
 					]
 				},
@@ -4072,7 +4308,9 @@
 							"summary": "Every total the items build, one after another.\n\nThe answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. The last total is what `sum` answers.",
 							"parameters": [],
 							"returns": "the List of totals, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Integer> = []\n\nexpect [3, 5, 2]::runningTotal()::is([0, 3, 8, 10])\nexpect empty::runningTotal()::is([0])"
+							]
 						}
 					]
 				},
@@ -4094,7 +4332,9 @@
 							"summary": "Every total the items build, one after another.\n\nThe answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. The last total is what `sum` answers.",
 							"parameters": [],
 							"returns": "the List of totals, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Rational> = []\n\nexpect [1/2, 1/4, 1/4]::runningTotal()::is([0/1, 1/2, 3/4, 1/1])\nexpect empty::runningTotal()::is([0/1])"
+							]
 						}
 					]
 				},
@@ -4116,7 +4356,9 @@
 							"summary": "Every total the items build, one after another.\n\nThe answer opens with zero and holds one total for every item after it. So it is one longer than the List, and it is never empty. A total stays a Rational once a Rational has been added to it, where `sum` collapses a whole total to an Integer.",
 							"parameters": [],
 							"returns": "the List of totals, which is never empty.",
-							"examples": []
+							"examples": [
+								"constant empty: List<Scalar> = []\n\nexpect [1, 1/2, 1/2]::runningTotal()::is([0, 1, 3/2, 2])\nexpect empty::runningTotal()::is([0])"
+							]
 						}
 					]
 				}
@@ -4144,7 +4386,9 @@
 							"summary": "The mean of the items.",
 							"parameters": [],
 							"returns": "the mean, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 2, 3, 4]\nconstant empty: List<Integer>  = []\n\nexpect scores::average()::is(5/2)\nexpect empty::average()::isEmpty()"
+							]
 						},
 						{
 							"signature": "average(defaultingTo fallback: Rational) -> Rational",
@@ -4159,7 +4403,9 @@
 								}
 							],
 							"returns": "the mean, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 2, 3, 4]\nconstant empty: List<Integer>  = []\n\nexpect scores::average(defaultingTo 0/1)::is(5/2)\nexpect empty::average(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4181,7 +4427,9 @@
 							"summary": "The mean of the items.",
 							"parameters": [],
 							"returns": "the mean, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::average()::is(1/1)\nexpect empty::average()::isEmpty()"
+							]
 						},
 						{
 							"signature": "average(defaultingTo fallback: Rational) -> Rational",
@@ -4196,7 +4444,9 @@
 								}
 							],
 							"returns": "the mean, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::average(defaultingTo 0/1)::is(1/1)\nexpect empty::average(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4218,7 +4468,9 @@
 							"summary": "The mean of the items.",
 							"parameters": [],
 							"returns": "the mean, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::average()::is(3/4)\nexpect empty::average()::isEmpty()"
+							]
 						},
 						{
 							"signature": "average(defaultingTo fallback: Rational) -> Rational",
@@ -4233,7 +4485,9 @@
 								}
 							],
 							"returns": "the mean, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::average(defaultingTo 0/1)::is(3/4)\nexpect empty::average(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4263,7 +4517,9 @@
 								}
 							],
 							"returns": "the mean, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant orders: List<{ total: Integer }> = [\n\t{ total = 30 },\n\t{ total = 12 },\n]\nconstant empty: List<{ total: Integer }>  = []\n\nexpect orders::average(on .total)::is(21/1)\nexpect empty::average(on .total)::isEmpty()"
+							]
 						},
 						{
 							"signature": "average(\n\ton key: (_: ItemType) -> Scalar,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -4285,7 +4541,9 @@
 								}
 							],
 							"returns": "the mean, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant orders: List<{ total: Integer }> = [\n\t{ total = 30 },\n\t{ total = 12 },\n]\nconstant empty: List<{ total: Integer }>  = []\n\nexpect orders::average(on .total, defaultingTo 0/1)::is(21/1)\nexpect empty::average(on .total, defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4307,7 +4565,9 @@
 							"summary": "The mean of the items: their total divided by their count.",
 							"parameters": [],
 							"returns": "the mean.",
-							"examples": []
+							"examples": [
+								"expect [1, 2, 3, 4]::average()::is(5/2)"
+							]
 						}
 					]
 				},
@@ -4329,7 +4589,9 @@
 							"summary": "The mean of the items: their total divided by their count.",
 							"parameters": [],
 							"returns": "the mean.",
-							"examples": []
+							"examples": [
+								"expect [1/2, 3/2]::average()::is(1/1)"
+							]
 						}
 					]
 				},
@@ -4351,7 +4613,7 @@
 							"summary": "The mean of the items: their total divided by their count.",
 							"parameters": [],
 							"returns": "the mean.",
-							"examples": []
+							"examples": ["expect [1, 1/2]::average()::is(3/4)"]
 						}
 					]
 				},
@@ -4381,7 +4643,9 @@
 								}
 							],
 							"returns": "the mean.",
-							"examples": []
+							"examples": [
+								"constant orders: NonEmptyList<{ total: Integer }> = [\n\t{ total = 30 },\n\t{ total = 12 },\n]\n\nexpect orders::average(on .total)::is(21/1)"
+							]
 						}
 					]
 				},
@@ -4403,7 +4667,9 @@
 							"summary": "The lowest item.",
 							"parameters": [],
 							"returns": "the lowest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [7, 3, 9]\nconstant empty: List<Integer>  = []\n\nexpect scores::lowestNumber()::is(3)\nexpect empty::lowestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "lowestNumber(defaultingTo fallback: Integer) -> Integer",
@@ -4418,7 +4684,9 @@
 								}
 							],
 							"returns": "the lowest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [7, 3, 9]\nconstant empty: List<Integer>  = []\n\nexpect scores::lowestNumber(defaultingTo 0)::is(3)\nexpect empty::lowestNumber(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -4440,7 +4708,9 @@
 							"summary": "The lowest item.",
 							"parameters": [],
 							"returns": "the lowest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/2, 5/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::lowestNumber()::is(1/2)\nexpect empty::lowestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "lowestNumber(defaultingTo fallback: Rational) -> Rational",
@@ -4455,7 +4725,9 @@
 								}
 							],
 							"returns": "the lowest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/2, 5/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::lowestNumber(defaultingTo 0/1)::is(1/2)\nexpect empty::lowestNumber(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4477,7 +4749,9 @@
 							"summary": "The lowest item.",
 							"parameters": [],
 							"returns": "the lowest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::lowestNumber()::is(1/2)\nexpect empty::lowestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "lowestNumber(defaultingTo fallback: Scalar) -> Scalar",
@@ -4492,7 +4766,9 @@
 								}
 							],
 							"returns": "the lowest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::lowestNumber(defaultingTo 0)::is(1/2)\nexpect empty::lowestNumber(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -4514,7 +4790,9 @@
 							"summary": "The lowest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the lowest item.",
-							"examples": []
+							"examples": [
+								"expect [7, 3, 9]::lowestNumber()::is(3)"
+							]
 						}
 					]
 				},
@@ -4536,7 +4814,9 @@
 							"summary": "The lowest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the lowest item.",
-							"examples": []
+							"examples": [
+								"expect [3/4, 1/2, 5/4]::lowestNumber()::is(1/2)"
+							]
 						}
 					]
 				},
@@ -4558,7 +4838,9 @@
 							"summary": "The lowest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the lowest item.",
-							"examples": []
+							"examples": [
+								"expect [2, 1/2, 1]::lowestNumber()::is(1/2)"
+							]
 						}
 					]
 				},
@@ -4580,7 +4862,9 @@
 							"summary": "The highest item.",
 							"parameters": [],
 							"returns": "the highest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [7, 3, 9]\nconstant empty: List<Integer>  = []\n\nexpect scores::highestNumber()::is(9)\nexpect empty::highestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "highestNumber(defaultingTo fallback: Integer) -> Integer",
@@ -4595,7 +4879,9 @@
 								}
 							],
 							"returns": "the highest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [7, 3, 9]\nconstant empty: List<Integer>  = []\n\nexpect scores::highestNumber(defaultingTo 0)::is(9)\nexpect empty::highestNumber(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -4617,7 +4903,9 @@
 							"summary": "The highest item.",
 							"parameters": [],
 							"returns": "the highest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/2, 5/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::highestNumber()::is(5/4)\nexpect empty::highestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "highestNumber(defaultingTo fallback: Rational) -> Rational",
@@ -4632,7 +4920,9 @@
 								}
 							],
 							"returns": "the highest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/2, 5/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::highestNumber(defaultingTo 0/1)::is(5/4)\nexpect empty::highestNumber(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4654,7 +4944,9 @@
 							"summary": "The highest item.",
 							"parameters": [],
 							"returns": "the highest item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::highestNumber()::is(2)\nexpect empty::highestNumber()::isEmpty()"
+							]
 						},
 						{
 							"signature": "highestNumber(defaultingTo fallback: Scalar) -> Scalar",
@@ -4669,7 +4961,9 @@
 								}
 							],
 							"returns": "the highest item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::highestNumber(defaultingTo 0)::is(2)\nexpect empty::highestNumber(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -4691,7 +4985,9 @@
 							"summary": "The highest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the highest item.",
-							"examples": []
+							"examples": [
+								"expect [7, 3, 9]::highestNumber()::is(9)"
+							]
 						}
 					]
 				},
@@ -4713,7 +5009,9 @@
 							"summary": "The highest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the highest item.",
-							"examples": []
+							"examples": [
+								"expect [3/4, 1/2, 5/4]::highestNumber()::is(5/4)"
+							]
 						}
 					]
 				},
@@ -4735,7 +5033,9 @@
 							"summary": "The highest item, which a non-empty List always has.",
 							"parameters": [],
 							"returns": "the highest item.",
-							"examples": []
+							"examples": [
+								"expect [2, 1/2, 1]::highestNumber()::is(2)"
+							]
 						}
 					]
 				},
@@ -4757,7 +5057,9 @@
 							"summary": "The median of the items.",
 							"parameters": [],
 							"returns": "the median, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [9, 1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::median()::is(5/1)\nexpect empty::median()::isEmpty()"
+							]
 						},
 						{
 							"signature": "median(defaultingTo fallback: Rational) -> Rational",
@@ -4772,7 +5074,9 @@
 								}
 							],
 							"returns": "the median, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [9, 1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::median(defaultingTo 0/1)::is(5/1)\nexpect empty::median(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4794,7 +5098,9 @@
 							"summary": "The median of the items.",
 							"parameters": [],
 							"returns": "the median, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/4, 1/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::median()::is(1/2)\nexpect empty::median()::isEmpty()"
+							]
 						},
 						{
 							"signature": "median(defaultingTo fallback: Rational) -> Rational",
@@ -4809,7 +5115,9 @@
 								}
 							],
 							"returns": "the median, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/4, 1/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::median(defaultingTo 0/1)::is(1/2)\nexpect empty::median(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4831,7 +5139,9 @@
 							"summary": "The median of the items.",
 							"parameters": [],
 							"returns": "the median, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::median()::is(1/1)\nexpect empty::median()::isEmpty()"
+							]
 						},
 						{
 							"signature": "median(defaultingTo fallback: Rational) -> Rational",
@@ -4846,7 +5156,9 @@
 								}
 							],
 							"returns": "the median, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [2, 1/2, 1]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::median(defaultingTo 0/1)::is(1/1)\nexpect empty::median(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4868,7 +5180,9 @@
 							"summary": "The middle item, once the items are put in order.\n\nA count that is even has two middle items, and the answer is their mean.",
 							"parameters": [],
 							"returns": "the median.",
-							"examples": []
+							"examples": [
+								"expect [9, 1, 5]::median()::is(5/1)\nexpect [4, 1, 3, 2]::median()::is(5/2)"
+							]
 						}
 					]
 				},
@@ -4890,7 +5204,9 @@
 							"summary": "The middle item, once the items are put in order.\n\nA count that is even has two middle items, and the answer is their mean.",
 							"parameters": [],
 							"returns": "the median.",
-							"examples": []
+							"examples": [
+								"expect [3/4, 1/4, 1/2]::median()::is(1/2)\nexpect [3/4, 1/4]::median()::is(1/2)"
+							]
 						}
 					]
 				},
@@ -4912,7 +5228,9 @@
 							"summary": "The middle item, once the items are put in order.\n\nA count that is even has two middle items, and the answer is their mean.",
 							"parameters": [],
 							"returns": "the median.",
-							"examples": []
+							"examples": [
+								"expect [2, 1/2, 1]::median()::is(1/1)\nexpect [1, 1/2]::median()::is(3/4)"
+							]
 						}
 					]
 				},
@@ -4942,7 +5260,9 @@
 								}
 							],
 							"returns": "the value, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [40, 10, 30, 20]\nconstant empty: List<Integer>  = []\n\nexpect scores::percentile(1/2)::is(25/1)\nexpect empty::percentile(1/2)::isEmpty()"
+							]
 						},
 						{
 							"signature": "percentile(\n\t_ fraction: Rational,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -4964,7 +5284,9 @@
 								}
 							],
 							"returns": "the value, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [40, 10, 30, 20]\nconstant empty: List<Integer>  = []\n\nexpect scores::percentile(1/2, defaultingTo 0/1)::is(25/1)\nexpect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -4994,7 +5316,9 @@
 								}
 							],
 							"returns": "the value, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::percentile(1/2)::is(1/2)\nexpect empty::percentile(1/2)::isEmpty()"
+							]
 						},
 						{
 							"signature": "percentile(\n\t_ fraction: Rational,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -5016,7 +5340,9 @@
 								}
 							],
 							"returns": "the value, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [3/4, 1/4]\nconstant empty: List<Rational>   = []\n\nexpect weights::percentile(1/2, defaultingTo 0/1)::is(1/2)\nexpect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5046,7 +5372,9 @@
 								}
 							],
 							"returns": "the value, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::percentile(1/2)::is(3/4)\nexpect empty::percentile(1/2)::isEmpty()"
+							]
 						},
 						{
 							"signature": "percentile(\n\t_ fraction: Rational,\n\tdefaultingTo fallback: Rational,\n) -> Rational",
@@ -5068,7 +5396,9 @@
 								}
 							],
 							"returns": "the value, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::percentile(1/2, defaultingTo 0/1)::is(3/4)\nexpect empty::percentile(1/2, defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5098,7 +5428,9 @@
 								}
 							],
 							"returns": "the value at that position.",
-							"examples": []
+							"examples": [
+								"constant scores: NonEmptyList<Integer> = [40, 10, 30, 20]\n\nexpect scores::percentile(1/2)::is(25/1)\nexpect scores::percentile(2/1)::is(40/1)"
+							]
 						}
 					]
 				},
@@ -5128,7 +5460,9 @@
 								}
 							],
 							"returns": "the value at that position.",
-							"examples": []
+							"examples": [
+								"constant weights: NonEmptyList<Rational> = [3/4, 1/4]\n\nexpect weights::percentile(1/2)::is(1/2)\nexpect weights::percentile(2/1)::is(3/4)"
+							]
 						}
 					]
 				},
@@ -5158,7 +5492,9 @@
 								}
 							],
 							"returns": "the value at that position.",
-							"examples": []
+							"examples": [
+								"constant amounts: NonEmptyList<Scalar> = [1, 1/2]\n\nexpect amounts::percentile(1/2)::is(3/4)\nexpect amounts::percentile(2/1)::is(1/1)"
+							]
 						}
 					]
 				},
@@ -5180,7 +5516,9 @@
 							"summary": "The item that occurs most often.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant rolls: List<Integer> = [2, 6, 6, 3]\nconstant empty: List<Integer> = []\n\nexpect rolls::mode()::is(6)\nexpect empty::mode()::isEmpty()"
+							]
 						},
 						{
 							"signature": "mode(defaultingTo fallback: Integer) -> Integer",
@@ -5195,7 +5533,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant rolls: List<Integer> = [2, 6, 6, 3]\nconstant empty: List<Integer> = []\n\nexpect rolls::mode(defaultingTo 0)::is(6)\nexpect empty::mode(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -5217,7 +5557,9 @@
 							"summary": "The item that occurs most often.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 1/3, 1/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::mode()::is(1/2)\nexpect empty::mode()::isEmpty()"
+							]
 						},
 						{
 							"signature": "mode(defaultingTo fallback: Rational) -> Rational",
@@ -5232,7 +5574,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 1/3, 1/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::mode(defaultingTo 0/1)::is(1/2)\nexpect empty::mode(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5254,7 +5598,9 @@
 							"summary": "The item that occurs most often.",
 							"parameters": [],
 							"returns": "the item, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1/2, 1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::mode()::is(1/2)\nexpect empty::mode()::isEmpty()"
+							]
 						},
 						{
 							"signature": "mode(defaultingTo fallback: Scalar) -> Scalar",
@@ -5269,7 +5615,9 @@
 								}
 							],
 							"returns": "the item, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1/2, 1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::mode(defaultingTo 0)::is(1/2)\nexpect empty::mode(defaultingTo 0)::is(0)"
+							]
 						}
 					]
 				},
@@ -5291,7 +5639,9 @@
 							"summary": "The item that occurs most often.\n\nItems occurring equally often keep the earlier one, by where each first stands.",
 							"parameters": [],
 							"returns": "the item that occurs most often.",
-							"examples": []
+							"examples": [
+								"expect [2, 6, 6, 3]::mode()::is(6)\nexpect [3, 1, 1, 3]::mode()::is(3)"
+							]
 						}
 					]
 				},
@@ -5313,7 +5663,9 @@
 							"summary": "The item that occurs most often.\n\nItems occurring equally often keep the earlier one, by where each first stands.",
 							"parameters": [],
 							"returns": "the item that occurs most often.",
-							"examples": []
+							"examples": [
+								"expect [1/2, 1/3, 1/2]::mode()::is(1/2)\nexpect [1/3, 1/2]::mode()::is(1/3)"
+							]
 						}
 					]
 				},
@@ -5335,7 +5687,9 @@
 							"summary": "The item that occurs most often.\n\nItems occurring equally often keep the earlier one, by where each first stands.",
 							"parameters": [],
 							"returns": "the item that occurs most often.",
-							"examples": []
+							"examples": [
+								"expect [1/2, 1, 1/2]::mode()::is(1/2)\nexpect [1, 1/2]::mode()::is(1)"
+							]
 						}
 					]
 				},
@@ -5357,7 +5711,9 @@
 							"summary": "The variance of the items.",
 							"parameters": [],
 							"returns": "the variance, which is never negative, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::variance()::is(4/1)\nexpect empty::variance()::isEmpty()"
+							]
 						},
 						{
 							"signature": "variance(\n\tdefaultingTo fallback: NonNegativeRational,\n) -> NonNegativeRational",
@@ -5372,7 +5728,9 @@
 								}
 							],
 							"returns": "the variance, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::variance(defaultingTo 0/1)::is(4/1)\nexpect empty::variance(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5394,7 +5752,9 @@
 							"summary": "The variance of the items.",
 							"parameters": [],
 							"returns": "the variance, which is never negative, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::variance()::is(1/4)\nexpect empty::variance()::isEmpty()"
+							]
 						},
 						{
 							"signature": "variance(\n\tdefaultingTo fallback: NonNegativeRational,\n) -> NonNegativeRational",
@@ -5409,7 +5769,9 @@
 								}
 							],
 							"returns": "the variance, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::variance(defaultingTo 0/1)::is(1/4)\nexpect empty::variance(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5431,7 +5793,9 @@
 							"summary": "The variance of the items.",
 							"parameters": [],
 							"returns": "the variance, which is never negative, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::variance()::is(1/16)\nexpect empty::variance()::isEmpty()"
+							]
 						},
 						{
 							"signature": "variance(\n\tdefaultingTo fallback: NonNegativeRational,\n) -> NonNegativeRational",
@@ -5446,7 +5810,9 @@
 								}
 							],
 							"returns": "the variance, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::variance(defaultingTo 0/1)::is(1/16)\nexpect empty::variance(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5468,7 +5834,7 @@
 							"summary": "The mean of the squared distances from the mean.\n\nThe count divides, so the answer is the variance of the items as a whole population.",
 							"parameters": [],
 							"returns": "the variance, which is never negative.",
-							"examples": []
+							"examples": ["expect [1, 5]::variance()::is(4/1)"]
 						}
 					]
 				},
@@ -5490,7 +5856,9 @@
 							"summary": "The mean of the squared distances from the mean.\n\nThe count divides, so the answer is the variance of the items as a whole population.",
 							"parameters": [],
 							"returns": "the variance, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect [1/2, 3/2]::variance()::is(1/4)"
+							]
 						}
 					]
 				},
@@ -5512,7 +5880,9 @@
 							"summary": "The mean of the squared distances from the mean.\n\nThe count divides, so the answer is the variance of the items as a whole population.",
 							"parameters": [],
 							"returns": "the variance, which is never negative.",
-							"examples": []
+							"examples": [
+								"expect [1, 1/2]::variance()::is(1/16)"
+							]
 						}
 					]
 				},
@@ -5534,7 +5904,9 @@
 							"summary": "The standard deviation of the items.",
 							"parameters": [],
 							"returns": "the standard deviation, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::standardDeviation()::is(2/1)\nexpect empty::standardDeviation()::isEmpty()"
+							]
 						},
 						{
 							"signature": "standardDeviation(\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -5549,7 +5921,9 @@
 								}
 							],
 							"returns": "the standard deviation, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant scores: List<Integer> = [1, 5]\nconstant empty: List<Integer>  = []\n\nexpect scores::standardDeviation(defaultingTo 0/1)::is(2/1)\nexpect empty::standardDeviation(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5571,7 +5945,9 @@
 							"summary": "The standard deviation of the items.",
 							"parameters": [],
 							"returns": "the standard deviation, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::standardDeviation()::is(1/2)\nexpect empty::standardDeviation()::isEmpty()"
+							]
 						},
 						{
 							"signature": "standardDeviation(\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -5586,7 +5962,9 @@
 								}
 							],
 							"returns": "the standard deviation, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant weights: List<Rational> = [1/2, 3/2]\nconstant empty: List<Rational>   = []\n\nexpect weights::standardDeviation(defaultingTo 0/1)::is(1/2)\nexpect empty::standardDeviation(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5608,7 +5986,9 @@
 							"summary": "The standard deviation of the items.",
 							"parameters": [],
 							"returns": "the standard deviation, or nothing for the empty List.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::standardDeviation()::is(1/4)\nexpect empty::standardDeviation()::isEmpty()"
+							]
 						},
 						{
 							"signature": "standardDeviation(\n\tdefaultingTo fallback: Rational | Algebraic,\n) -> Rational | Algebraic",
@@ -5623,7 +6003,9 @@
 								}
 							],
 							"returns": "the standard deviation, or the fallback in its place.",
-							"examples": []
+							"examples": [
+								"constant amounts: List<Scalar> = [1, 1/2]\nconstant empty: List<Scalar>   = []\n\nexpect amounts::standardDeviation(defaultingTo 0/1)::is(1/4)\nexpect empty::standardDeviation(defaultingTo 0/1)::is(0/1)"
+							]
 						}
 					]
 				},
@@ -5645,7 +6027,9 @@
 							"summary": "The square root of the variance.\n\nA variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the standard deviation.",
-							"examples": []
+							"examples": [
+								"expect [1, 5]::standardDeviation()::is(2/1)\nexpect [0, 2, 2, 4]::standardDeviation()::is(2::squareRoot())"
+							]
 						}
 					]
 				},
@@ -5667,7 +6051,9 @@
 							"summary": "The square root of the variance.\n\nA variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the standard deviation.",
-							"examples": []
+							"examples": [
+								"expect [1/2, 3/2]::standardDeviation()::is(1/2)"
+							]
 						}
 					]
 				},
@@ -5689,7 +6075,9 @@
 							"summary": "The square root of the variance.\n\nA variance that is a ratio of two perfect squares answers a Rational, and every other variance answers an exact Algebraic.",
 							"parameters": [],
 							"returns": "the standard deviation.",
-							"examples": []
+							"examples": [
+								"expect [1, 1/2]::standardDeviation()::is(1/4)"
+							]
 						}
 					]
 				}
