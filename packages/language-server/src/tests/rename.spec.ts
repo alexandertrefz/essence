@@ -2806,45 +2806,86 @@ describe("Rename of a name a Case payload default reads", () => {
 			].join("\n"),
 		)
 	})
+})
 
-	// A path is indexed off the Lookups the Enricher synthesizes for it, each
-	// at the span of its step. Rename relies on that, so it is pinned from both
-	// ends.
-	describe("member paths", () => {
-		let source = [
-			"implementation {",
-			"\ttype Product = { name: String, price: Integer }",
-			"\tconstant products: List<Product> = []",
-			"\tconstant prices = products::map(.price)",
-			"}",
-		].join("\n")
+// A path is indexed off the Lookups the Enricher synthesizes for it, each
+// at the span of its step. Rename relies on that, so it is pinned from both
+// ends.
+describe("member paths", () => {
+	let source = [
+		"implementation {",
+		"\ttype Product = { name: String, price: Integer }",
+		"\tconstant products: List<Product> = []",
+		"\tconstant prices = products::map(.price)",
+		"}",
+	].join("\n")
 
-		let renamed = [
-			"implementation {",
-			"\ttype Product = { name: String, cost: Integer }",
-			"\tconstant products: List<Product> = []",
-			"\tconstant prices = products::map(.cost)",
-			"}",
-		].join("\n")
+	let renamed = [
+		"implementation {",
+		"\ttype Product = { name: String, cost: Integer }",
+		"\tconstant products: List<Product> = []",
+		"\tconstant prices = products::map(.cost)",
+		"}",
+	].join("\n")
 
-		it("renames the member a path spells", () => {
-			expect(rename(source, { line: 4, column: 35 }, "cost")).toBe(
-				renamed,
-			)
-		})
-
-		it("reaches a path from the member's declaration", () => {
-			expect(rename(source, { line: 2, column: 33 }, "cost")).toBe(
-				renamed,
-			)
-		})
+	it("renames the member a path spells", () => {
+		expect(rename(source, { line: 4, column: 35 }, "cost")).toBe(renamed)
 	})
 
-	// Every step of a dotted key is a member occurrence. The first is a key of
-	// the written list, the middle ones are synthesized Lookups at the steps'
-	// spans, and `memberPositions` carries the last.
-	describe("path keys", () => {
-		let source = [
+	it("reaches a path from the member's declaration", () => {
+		expect(rename(source, { line: 2, column: 33 }, "cost")).toBe(renamed)
+	})
+})
+
+// Every step of a dotted key is a member occurrence. The first is a key of
+// the written list, the middle ones are synthesized Lookups at the steps'
+// spans, and `memberPositions` carries the last.
+describe("path keys", () => {
+	let source = [
+		"implementation {",
+		"\ttype Tls = { enabled: Boolean }",
+		"\ttype Server = { host: String, port: Integer, tls: Tls }",
+		"\ttype Config = { name: String, server: Server }",
+		"",
+		"\tconstant config: Config = {",
+		'\t\tname = "api",',
+		'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+		"\t}",
+		"\tconstant deep = { config with server.tls.enabled = true }",
+		"}",
+	].join("\n")
+
+	it("renames the first step", () => {
+		expect(rename(source, { line: 10, column: 32 }, "listener")).toBe(
+			source.replaceAll("server", "listener"),
+		)
+	})
+
+	it("renames a step in the middle", () => {
+		expect(rename(source, { line: 10, column: 39 }, "security")).toBe(
+			source
+				.replace("tls: Tls }", "security: Tls }")
+				.replace("tls = { enabled", "security = { enabled")
+				.replace("server.tls.enabled", "server.security.enabled"),
+		)
+	})
+
+	it("renames the last step", () => {
+		expect(rename(source, { line: 10, column: 43 }, "on")).toBe(
+			source.replaceAll("enabled", "on"),
+		)
+	})
+
+	it("reaches a path key from the member's declaration", () => {
+		expect(rename(source, { line: 2, column: 15 }, "on")).toBe(
+			source.replaceAll("enabled", "on"),
+		)
+	})
+
+	// A braced descend's keys are a written list the lexical walk sees, and
+	// a path inside it goes on through the Lookups the desugar wrote.
+	it("renames a member a braced descend writes", () => {
+		let descended = [
 			"implementation {",
 			"\ttype Tls = { enabled: Boolean }",
 			"\ttype Server = { host: String, port: Integer, tls: Tls }",
@@ -2854,19 +2895,132 @@ describe("Rename of a name a Case payload default reads", () => {
 			'\t\tname = "api",',
 			'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
 			"\t}",
-			"\tconstant deep = { config with server.tls.enabled = true }",
+			"\tconstant deep = { config with server.{ tls.{ enabled = true } } }",
+			"}",
+		].join("\n")
+
+		expect(rename(descended, { line: 10, column: 47 }, "on")).toBe(
+			descended.replaceAll("enabled", "on"),
+		)
+	})
+
+	// The update's first step is reached twice, after the member's sites
+	// outgrew a scan, and is still one site.
+	it("renames an update's key once after the member is written many times", () => {
+		let written = [
+			"implementation {",
+			...Array.from(
+				{ length: 17 },
+				(_, index) =>
+					`\tconstant config${index} = { server = { port = ${index} }, name = "x" }`,
+			),
+			"\tconstant moved = { config0 with server.port = 2 }",
+			"",
+			"\tTerminal.inspect(moved.server.port)",
+			"}",
+		].join("\n")
+
+		expect(rename(written, { line: 2, column: 23 }, "host")).toBe(
+			written.replaceAll("server", "host"),
+		)
+	})
+
+	// A bare path key is refused, and its last step is also the value it
+	// reads. Renaming either end spells the other out, as a shorthand does.
+	describe("written bare", () => {
+		let bare = [
+			"implementation {",
+			"\ttype Server = { host: String, port: Integer }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\tconstant port = 8080",
+			'\tconstant config: Config = { name = "a", server = { host = "h", port = 80 } }',
+			'\tconstant moved = { config with server.port, name = "b" }',
+			"}",
+		].join("\n")
+
+		it("keeps the key when the value is renamed", () => {
+			expect(rename(bare, { line: 5, column: 11 }, "chosen")).toBe(
+				bare
+					.replace("constant port", "constant chosen")
+					.replace("server.port,", "server.port = chosen,"),
+			)
+		})
+
+		it("keeps the value when the member is renamed", () => {
+			expect(rename(bare, { line: 2, column: 32 }, "chosen")).toBe(
+				bare
+					.replace("port: Integer", "chosen: Integer")
+					.replace("port = 80 }", "chosen = 80 }")
+					.replace("server.port,", "server.chosen = port,"),
+			)
+		})
+
+		it("keeps the key in an Argument merged into a default", () => {
+			let merged = [
+				"implementation {",
+				"\ttype Server = { host: String, port: Integer }",
+				"\ttype Config = { server: Server }",
+				"",
+				"\t§§ Answers the host.",
+				"\t§§",
+				"\t§§ @param using — where to connect.",
+				"\t§§ @returns — the host.",
+				"\tfunction connect(",
+				'\t\tusing config: Config = { server = { host = "h", port = 80 } },',
+				"\t) -> String {",
+				"\t\t<- config.server.host",
+				"\t}",
+				"",
+				"\tconstant port = 8080",
+				"\tconstant moved = connect(using { server.port })",
+				"}",
+			].join("\n")
+
+			expect(rename(merged, { line: 15, column: 11 }, "chosen")).toBe(
+				merged
+					.replace("constant port", "constant chosen")
+					.replace("server.port }", "server.port = chosen }"),
+			)
+		})
+	})
+
+	// An Argument merged into a default has path keys but no synthesized
+	// Lookups, so `memberPositions` alone carries every step after the
+	// first.
+	describe("in an Argument merged into a default", () => {
+		let merged = [
+			"implementation {",
+			"\ttype Tls = { enabled: Boolean }",
+			"\ttype Server = { host: String, port: Integer, tls: Tls }",
+			"\ttype Config = { name: String, server: Server }",
+			"",
+			"\t§§ Answers the host.",
+			"\t§§",
+			"\t§§ @param using — how to connect.",
+			"\t§§ @returns — the host.",
+			"\tfunction connect(",
+			"\t\tusing config: Config = {",
+			'\t\t\tname = "api",',
+			'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
+			"\t\t},",
+			"\t) -> String {",
+			"\t\t<- config.server.host",
+			"\t}",
+			"",
+			"\tconstant deep = connect(using { server.tls.enabled = true })",
 			"}",
 		].join("\n")
 
 		it("renames the first step", () => {
-			expect(rename(source, { line: 10, column: 32 }, "listener")).toBe(
-				source.replaceAll("server", "listener"),
+			expect(rename(merged, { line: 19, column: 34 }, "listener")).toBe(
+				merged.replaceAll("server", "listener"),
 			)
 		})
 
 		it("renames a step in the middle", () => {
-			expect(rename(source, { line: 10, column: 39 }, "security")).toBe(
-				source
+			expect(rename(merged, { line: 19, column: 41 }, "security")).toBe(
+				merged
 					.replace("tls: Tls }", "security: Tls }")
 					.replace("tls = { enabled", "security = { enabled")
 					.replace("server.tls.enabled", "server.security.enabled"),
@@ -2874,178 +3028,15 @@ describe("Rename of a name a Case payload default reads", () => {
 		})
 
 		it("renames the last step", () => {
-			expect(rename(source, { line: 10, column: 43 }, "on")).toBe(
-				source.replaceAll("enabled", "on"),
+			expect(rename(merged, { line: 19, column: 45 }, "on")).toBe(
+				merged.replaceAll("enabled", "on"),
 			)
 		})
 
-		it("reaches a path key from the member's declaration", () => {
-			expect(rename(source, { line: 2, column: 15 }, "on")).toBe(
-				source.replaceAll("enabled", "on"),
+		it("reaches the last step from the member's declaration", () => {
+			expect(rename(merged, { line: 2, column: 15 }, "on")).toBe(
+				merged.replaceAll("enabled", "on"),
 			)
-		})
-
-		// A braced descend's keys are a written list the lexical walk sees, and
-		// a path inside it goes on through the Lookups the desugar wrote.
-		it("renames a member a braced descend writes", () => {
-			let descended = [
-				"implementation {",
-				"\ttype Tls = { enabled: Boolean }",
-				"\ttype Server = { host: String, port: Integer, tls: Tls }",
-				"\ttype Config = { name: String, server: Server }",
-				"",
-				"\tconstant config: Config = {",
-				'\t\tname = "api",',
-				'\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
-				"\t}",
-				"\tconstant deep = { config with server.{ tls.{ enabled = true } } }",
-				"}",
-			].join("\n")
-
-			expect(rename(descended, { line: 10, column: 47 }, "on")).toBe(
-				descended.replaceAll("enabled", "on"),
-			)
-		})
-
-		// The update's first step is reached twice, after the member's sites
-		// outgrew a scan, and is still one site.
-		it("renames an update's key once after the member is written many times", () => {
-			let written = [
-				"implementation {",
-				...Array.from(
-					{ length: 17 },
-					(_, index) =>
-						`\tconstant config${index} = { server = { port = ${index} }, name = "x" }`,
-				),
-				"\tconstant moved = { config0 with server.port = 2 }",
-				"",
-				"\tTerminal.inspect(moved.server.port)",
-				"}",
-			].join("\n")
-
-			expect(rename(written, { line: 2, column: 23 }, "host")).toBe(
-				written.replaceAll("server", "host"),
-			)
-		})
-
-		// A bare path key is refused, and its last step is also the value it
-		// reads. Renaming either end spells the other out, as a shorthand does.
-		describe("written bare", () => {
-			let bare = [
-				"implementation {",
-				"\ttype Server = { host: String, port: Integer }",
-				"\ttype Config = { name: String, server: Server }",
-				"",
-				"\tconstant port = 8080",
-				'\tconstant config: Config = { name = "a", server = { host = "h", port = 80 } }',
-				'\tconstant moved = { config with server.port, name = "b" }',
-				"}",
-			].join("\n")
-
-			it("keeps the key when the value is renamed", () => {
-				expect(rename(bare, { line: 5, column: 11 }, "chosen")).toBe(
-					bare
-						.replace("constant port", "constant chosen")
-						.replace("server.port,", "server.port = chosen,"),
-				)
-			})
-
-			it("keeps the value when the member is renamed", () => {
-				expect(rename(bare, { line: 2, column: 32 }, "chosen")).toBe(
-					bare
-						.replace("port: Integer", "chosen: Integer")
-						.replace("port = 80 }", "chosen = 80 }")
-						.replace("server.port,", "server.chosen = port,"),
-				)
-			})
-
-			it("keeps the key in an Argument merged into a default", () => {
-				let merged = [
-					"implementation {",
-					"\ttype Server = { host: String, port: Integer }",
-					"\ttype Config = { server: Server }",
-					"",
-					"\t§§ Answers the host.",
-					"\t§§",
-					"\t§§ @param using — where to connect.",
-					"\t§§ @returns — the host.",
-					"\tfunction connect(",
-					'\t\tusing config: Config = { server = { host = "h", port = 80 } },',
-					"\t) -> String {",
-					"\t\t<- config.server.host",
-					"\t}",
-					"",
-					"\tconstant port = 8080",
-					"\tconstant moved = connect(using { server.port })",
-					"}",
-				].join("\n")
-
-				expect(rename(merged, { line: 15, column: 11 }, "chosen")).toBe(
-					merged
-						.replace("constant port", "constant chosen")
-						.replace("server.port }", "server.port = chosen }"),
-				)
-			})
-		})
-
-		// An Argument merged into a default has path keys but no synthesized
-		// Lookups, so `memberPositions` alone carries every step after the
-		// first.
-		describe("in an Argument merged into a default", () => {
-			let merged = [
-				"implementation {",
-				"\ttype Tls = { enabled: Boolean }",
-				"\ttype Server = { host: String, port: Integer, tls: Tls }",
-				"\ttype Config = { name: String, server: Server }",
-				"",
-				"\t§§ Answers the host.",
-				"\t§§",
-				"\t§§ @param using — how to connect.",
-				"\t§§ @returns — the host.",
-				"\tfunction connect(",
-				"\t\tusing config: Config = {",
-				'\t\t\tname = "api",',
-				'\t\t\tserver = { host = "h", port = 80, tls = { enabled = false } },',
-				"\t\t},",
-				"\t) -> String {",
-				"\t\t<- config.server.host",
-				"\t}",
-				"",
-				"\tconstant deep = connect(using { server.tls.enabled = true })",
-				"}",
-			].join("\n")
-
-			it("renames the first step", () => {
-				expect(
-					rename(merged, { line: 19, column: 34 }, "listener"),
-				).toBe(merged.replaceAll("server", "listener"))
-			})
-
-			it("renames a step in the middle", () => {
-				expect(
-					rename(merged, { line: 19, column: 41 }, "security"),
-				).toBe(
-					merged
-						.replace("tls: Tls }", "security: Tls }")
-						.replace("tls = { enabled", "security = { enabled")
-						.replace(
-							"server.tls.enabled",
-							"server.security.enabled",
-						),
-				)
-			})
-
-			it("renames the last step", () => {
-				expect(rename(merged, { line: 19, column: 45 }, "on")).toBe(
-					merged.replaceAll("enabled", "on"),
-				)
-			})
-
-			it("reaches the last step from the member's declaration", () => {
-				expect(rename(merged, { line: 2, column: 15 }, "on")).toBe(
-					merged.replaceAll("enabled", "on"),
-				)
-			})
 		})
 	})
 })
