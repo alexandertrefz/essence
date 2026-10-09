@@ -222,3 +222,131 @@ describe("The test Worker's input", () => {
 		expect(result.code).toBe(0)
 	}, 40_000)
 })
+
+// A Worker is a thread, so the esbuild service it starts is a child of this
+// process. The services alive now, by process id. `ps` lists this process too,
+// so a listing without it failed rather than found nothing.
+function esbuildServices(): Array<number> {
+	let rows = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid=,command="])
+		.stdout.toString()
+		.split("\n")
+		.map((line) => line.trim().split(/\s+/))
+
+	if (!rows.some(([pid]) => Number(pid) === process.pid)) {
+		throw new Error("`ps` listed no processes.")
+	}
+
+	return rows
+		.filter(
+			([, parent, ...command]) =>
+				Number(parent) === process.pid &&
+				command.join(" ").includes("--service="),
+		)
+		.map(([pid]) => Number(pid))
+}
+
+// A Worker handed `bundlerGrace`, and a way to run one source on it and hear
+// how many tests passed.
+function graceWorker(bundlerGrace: number): {
+	run: (run: number, text: string) => Promise<number>
+	worker: Worker
+} {
+	let worker = new Worker(workerPath, {
+		stdout: true,
+		stderr: true,
+		workerData: {
+			staging: stagingDirectory(),
+			bundlerGrace,
+		} satisfies TestWorkerData,
+	})
+	let ready = new Promise<void>((resolve) => {
+		worker.once("message", () => resolve())
+	})
+
+	return {
+		worker,
+		async run(run, text) {
+			await ready
+
+			let passed = 0
+
+			return new Promise((resolve, reject) => {
+				let listen = (message: TestWorkerResponse): void => {
+					if (message.kind === "entry" && message.run === run) {
+						passed += message.events.filter(
+							(event) => event.kind === "test-pass",
+						).length
+					} else if (message.kind === "done" && message.run === run) {
+						worker.off("message", listen)
+						resolve(passed)
+					}
+				}
+
+				worker.on("message", listen)
+				worker.once("error", reject)
+				worker.postMessage(runRequest(run, text))
+			})
+		},
+	}
+}
+
+// esbuild's service keeps the memory it grew until it stops, so the Worker
+// stops it once `bundlerGrace` passes with no run. A burst of runs keeps it.
+describe("The test Worker's esbuild service", () => {
+	it("serves back-to-back runs from one service", async () => {
+		let before = new Set(esbuildServices())
+		let { run, worker } = graceWorker(10 * 60_000)
+
+		try {
+			let passed = [await run(1, source(2))]
+			let first = esbuildServices().filter((pid) => !before.has(pid))
+
+			passed.push(await run(2, source(3)))
+
+			let second = esbuildServices().filter((pid) => !before.has(pid))
+
+			expect(passed).toEqual([1, 1])
+			expect(first).toHaveLength(1)
+			expect(second).toEqual(first)
+		} finally {
+			await worker.terminate()
+		}
+	})
+
+	// A countdown left running would stop the service under the next run's
+	// bundle, which would then fail.
+	it("never stops the service while a run is in flight", async () => {
+		let { run, worker } = graceWorker(1)
+
+		try {
+			expect(
+				await Promise.all([
+					run(1, source(4)),
+					run(2, source(5)),
+					run(3, source(6)),
+				]),
+			).toEqual([1, 1, 1])
+		} finally {
+			await worker.terminate()
+		}
+	})
+
+	// Waits until the service is gone. One that stays holds the spec until the
+	// test budget fails it.
+	it("stops the service once the grace passes, and starts another for the next run", async () => {
+		let before = new Set(esbuildServices())
+		let { run, worker } = graceWorker(1)
+
+		try {
+			expect(await run(1, source(7))).toBe(1)
+
+			while (esbuildServices().some((pid) => !before.has(pid))) {
+				await Bun.sleep(25)
+			}
+
+			expect(await run(2, source(8))).toBe(1)
+		} finally {
+			await worker.terminate()
+		}
+	})
+})

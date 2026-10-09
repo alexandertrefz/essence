@@ -149,6 +149,9 @@ export type TestEntry = {
 // created on first use and removed when the Worker ends.
 export type TestWorkerData = {
 	staging: string
+	// How long esbuild's service outlives the last run, in milliseconds. The
+	// Worker has its own default; only specs pass one.
+	bundlerGrace?: number
 }
 
 export type TestWorkerRequest =

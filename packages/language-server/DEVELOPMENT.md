@@ -553,6 +553,10 @@ The session compiles and runs tests in a Worker rather than in the server, for t
 Every bundle a Worker loads is a Module it can never unload. Once it holds as many as it will, it reports itself
 exhausted, and the session starts a new Worker.
 
+The Worker stops esbuild's service once `BUNDLER_GRACE_IN_MILLISECONDS` passes with no run, since the service keeps
+the memory it grew and the extension's WebAssembly build grows large. A run in flight holds the countdown, and the
+end of every run starts it again. See "The test session's esbuild" in packages/vscode-extension/DEVELOPMENT.md.
+
 ### Cycles
 
 A cycle compiles, loads and runs a set of test files in the Worker of `src/testWorker.ts`. It reads the open buffers

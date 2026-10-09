@@ -5,6 +5,10 @@ inlines the runtime and shakes away whatever the Program does not reach. The out
 in a browser, without the compiler installed. `bundle` writes nothing; `writeOutputs` does, when the
 caller wants files.
 
+esbuild runs as a service process, started by the first `bundle` and kept for the next. It keeps the memory it
+grew until it stops. `stopBundler` stops it, and the next `bundle` starts another, so a host that bundles in bursts,
+such as the live test session's Worker, can give the memory back between them.
+
 ## How esbuild reads a bundle
 
 The rewriter already holds every Module's text, so no Module is read off disk. Each emitted import names a

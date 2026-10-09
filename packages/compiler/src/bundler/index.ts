@@ -53,8 +53,20 @@ export type BundleResult = {
 }
 
 // esbuild is loaded on first use, so a run that never bundles never loads it.
-async function loadESBuild() {
-	return import("esbuild")
+let esbuild: Promise<typeof import("esbuild")> | null = null
+
+function loadESBuild(): Promise<typeof import("esbuild")> {
+	esbuild ??= import("esbuild")
+
+	return esbuild
+}
+
+// Stops esbuild's service process, which keeps the memory it grew until it
+// stops. The next bundle starts another. Loads nothing when nothing bundled.
+export async function stopBundler(): Promise<void> {
+	if (esbuild !== null) {
+		await (await esbuild).stop()
+	}
 }
 
 // Serves every `MODULE_SCHEME` specifier, the prelude included, from

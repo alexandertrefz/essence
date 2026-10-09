@@ -3,6 +3,7 @@ import * as path from "node:path"
 import { pathToFileURL } from "node:url"
 import { parentPort, workerData } from "node:worker_threads"
 
+import { stopBundler } from "@essence-lang/compiler/bundler"
 import { compileToMemory } from "@essence-lang/compiler/embed"
 import type { ModuleHost } from "@essence-lang/compiler/modules"
 import { defaultOptimiserOptions } from "@essence-lang/compiler/optimiser"
@@ -38,10 +39,19 @@ import type {
 // None can be unloaded, and an editing session compiles new ones constantly.
 const BUNDLE_LIMIT = 128
 
+// How long esbuild's service outlives the last run. It keeps the memory it grew
+// until it stops, so a burst of edits reuses it warm and an idle window gives
+// the memory back. See "The test session's esbuild" in
+// packages/vscode-extension/DEVELOPMENT.md.
+const BUNDLER_GRACE_IN_MILLISECONDS = 15_000
+
 type TestEntryPoints = typeof entryPoints
 type LoadedTestBundle = { $tests?: TestEntryPoints }
 
-let { staging } = workerData as TestWorkerData
+let { staging, bundlerGrace = BUNDLER_GRACE_IN_MILLISECONDS } =
+	workerData as TestWorkerData
+// Counts down to stopping esbuild's service, from the end of the last run.
+let bundlerIdle: ReturnType<typeof setTimeout> | null = null
 // Keyed by staged file, as `import()` caches a Module, so a bundle run again
 // does not count toward `BUNDLE_LIMIT`.
 let loaded = new Set<string>()
@@ -292,6 +302,12 @@ function send(message: TestWorkerResponse): void {
 }
 
 async function handle(request: TestWorkerRequest): Promise<void> {
+	// No countdown runs while a request is in flight.
+	if (bundlerIdle !== null) {
+		clearTimeout(bundlerIdle)
+		bundlerIdle = null
+	}
+
 	if (request.kind === "close") {
 		removeStagingDirectory(staging)
 		parentPort?.close()
@@ -302,6 +318,13 @@ async function handle(request: TestWorkerRequest): Promise<void> {
 	for (let entry of request.entries) {
 		send(await runEntry(request, entry))
 	}
+
+	// Unreferenced, so the countdown never keeps the Worker alive.
+	bundlerIdle = setTimeout(() => {
+		bundlerIdle = null
+		void stopBundler()
+	}, bundlerGrace)
+	bundlerIdle.unref()
 
 	send({
 		kind: "done",

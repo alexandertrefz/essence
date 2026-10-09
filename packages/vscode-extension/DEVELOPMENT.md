@@ -343,6 +343,26 @@ binary. `tests/serverBundle.spec.ts` builds the server into a directory with no
 `node_modules` above it, runs it on Node with a `PATH` that holds nothing, and
 checks that a workspace's tests pass.
 
+esbuild's service is a process of its own, and it keeps the memory it grew
+until it stops. The WebAssembly build grows far larger than the native binary:
+on `examples/league` its service reached 315 to 385 MB during a cycle and held
+150 to 385 MB between cycles, where the native one held about 70 MB. So the
+Worker stops the service once 15 seconds pass with no run
+(`BUNDLER_GRACE_IN_MILLISECONDS` in the language server's `testWorker.ts`), and
+the next run starts another. A run in flight holds the countdown, and the end
+of every run starts it again.
+
+A burst of edits therefore keeps the service warm, holding that memory, and its
+cycles run as fast as against a service that never stops: about 0.65 to 0.8 s
+for the four files of the example. A window left idle for 15 seconds holds no
+service at all. Only the first cycle after an idle window pays for a fresh
+service: about 0.15 s to start it on WebAssembly, and about 0.3 s in all on that
+cycle, since V8 has not optimised the new service's code yet. The native binary
+starts in a few milliseconds, so a server run from source barely notices.
+`packages/language-server/src/tests/testWorker.spec.ts` checks that
+back-to-back runs share one service, that a short grace never stops a run in
+flight, and that the service goes once the grace passes.
+
 ## Packaging
 
 ```sh
