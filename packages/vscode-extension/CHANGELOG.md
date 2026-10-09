@@ -86,6 +86,12 @@
   `test.skipTags` in `essence.json` now — one list, obeyed by the editor and
   the terminal alike. `essence.tests.enabled`, `essence.tests.coverage` and
   `essence.tests.debounce` stay: those are yours.
+- The live test session runs in an installed extension. It bundles each test
+  file with esbuild, which it looked for in a `node_modules` an installed
+  extension does not have, so every file reported `bundle-failed` and no test
+  ran. The extension ships esbuild's WebAssembly build beside the server, one
+  package for every platform, and starts it on the Node the server runs on, so
+  a `PATH` without `node` does not stop it either.
 
 ## [0.7.0]
 

@@ -2,7 +2,7 @@
 // the build works inside the monorepo and outside it. The standard library's
 // `.es` sources are copied beside the bundle, since the loader reads them with
 // `readdirSync`.
-import { cpSync, readFileSync, rmSync } from "node:fs"
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import * as path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -24,6 +24,34 @@ let stdlibSources = path.resolve(path.dirname(stdlibEntry), "../sources")
 // `RUNTIME_DIRECTORY` looks for them here.
 let runtimeEntry = fileURLToPath(import.meta.resolve("@essence-lang/runtime"))
 let runtimeSources = path.dirname(runtimeEntry)
+
+// The Worker bundles each Program with esbuild, whose native binary differs per
+// platform. The extension ships esbuild's WebAssembly build instead. See "The
+// test session's esbuild" in DEVELOPMENT.md.
+let esbuildWasmPackage = path.dirname(
+	fileURLToPath(import.meta.resolve("esbuild-wasm/package.json")),
+)
+let compilerBundler = fileURLToPath(
+	import.meta.resolve("@essence-lang/compiler/bundler"),
+)
+let esbuildPackage = path.dirname(
+	Bun.resolveSync("esbuild/package.json", path.dirname(compilerBundler)),
+)
+// What the copy keeps of the package: its API, the WebAssembly binary, and
+// the Go glue its launcher loads. Its `package.json` keeps `lib/main.js`
+// CommonJS. Under the extension's `"type": "module"`, Node would load it as an
+// ES module, and importing it would answer none of esbuild's API.
+const esbuildWasmFiles = [
+	"package.json",
+	"LICENSE.md",
+	"bin/esbuild",
+	"lib/main.js",
+	"esbuild.wasm",
+	"wasm_exec.js",
+	"wasm_exec_node.js",
+]
+// Where the bundles import the copy from, relative to themselves.
+const esbuildWasmEntry = "./esbuild-wasm/lib/main.js"
 
 // Packages whose `main` wraps itself in a universal module factory. The
 // factory takes `require` as a Parameter, which hides its files from the
@@ -49,8 +77,66 @@ const moduleEntries = {
 	},
 }
 
-// Writes `server.js`, `testWorker.js` and the sources they read at run time
-// into `directory`.
+// Points `esbuild` at the copy beside the bundle and leaves it unbundled. Its
+// API finds its binary by a path relative to its own file.
+const wasmESBuild = {
+	name: "wasm-esbuild",
+	setup(build) {
+		build.onResolve({ filter: /^esbuild$/ }, () => ({
+			path: esbuildWasmEntry,
+			external: true,
+		}))
+	},
+}
+
+// Copies esbuild's WebAssembly build beside the bundles. Its API starts the
+// binary under a bare `node`, which `PATH` may lack, so the copy starts it
+// under the process's own executable.
+function copyESBuildWasm(directory) {
+	let { version } = JSON.parse(
+		readFileSync(path.join(esbuildPackage, "package.json"), "utf8"),
+	)
+	let wasm = JSON.parse(
+		readFileSync(path.join(esbuildWasmPackage, "package.json"), "utf8"),
+	)
+
+	if (wasm.version !== version) {
+		throw new Error(
+			`The compiler bundles with esbuild ${version}, but the extension ships esbuild-wasm ${wasm.version}. Pin esbuild-wasm to ${version}.`,
+		)
+	}
+
+	let copy = path.join(directory, "esbuild-wasm")
+
+	rmSync(copy, { recursive: true, force: true })
+
+	for (let file of esbuildWasmFiles) {
+		mkdirSync(path.dirname(path.join(copy, file)), { recursive: true })
+		cpSync(path.join(esbuildWasmPackage, file), path.join(copy, file))
+	}
+
+	let api = path.join(copy, "lib", "main.js")
+	let launch =
+		/\["node", \[(\w+)\.join\(__dirname, "\.\.", "bin", "esbuild"\)\]\]/g
+	let source = readFileSync(api, "utf8")
+
+	if (source.match(launch)?.length !== 1) {
+		throw new Error(
+			`esbuild-wasm ${wasm.version} no longer starts its binary as 'node bin/esbuild' in lib/main.js, so buildServer.js can not point it at the process's own executable.`,
+		)
+	}
+
+	writeFileSync(
+		api,
+		source.replace(
+			launch,
+			'[process.execPath, [$1.join(__dirname, "..", "bin", "esbuild")]]',
+		),
+	)
+}
+
+// Writes `server.js`, `testWorker.js` and what they read at run time into
+// `directory`.
 export async function buildServer(directory) {
 	for (let [entry, name] of [
 		[serverEntry, "server.js"],
@@ -62,7 +148,7 @@ export async function buildServer(directory) {
 			naming: name,
 			target: "node",
 			format: "esm",
-			plugins: [moduleEntries],
+			plugins: [moduleEntries, wasmESBuild],
 			throw: false,
 		})
 
@@ -85,6 +171,8 @@ export async function buildServer(directory) {
 			filter: (from) => path.basename(from) !== "tests",
 		})
 	}
+
+	copyESBuildWasm(directory)
 }
 
 if (import.meta.main) {

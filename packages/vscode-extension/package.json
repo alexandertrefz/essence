@@ -305,6 +305,7 @@
 		"@essence-lang/standard-library": "0.5.0",
 		"@types/vscode": "1.100.0",
 		"@vscode/vsce": "3.9.2",
+		"esbuild-wasm": "0.28.1",
 		"minimatch": "10.2.5",
 		"vscode-languageclient": "9.0.1"
 	}

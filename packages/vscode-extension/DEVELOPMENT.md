@@ -14,19 +14,22 @@ off disk, so no bundler can see through them.
 
 The live test session's Worker is bundled BESIDE the server as
 `server/testWorker.js`: a Worker is started from a file, and the server ships
-as one file with nothing to resolve out of.
+as one file with nothing to resolve out of. The Worker's one import from
+outside its bundle is esbuild, copied beside it as `server/esbuild-wasm/` (see
+"The test session's esbuild").
 
 The bundle runs on the Node VS Code ships, not on Bun. A dependency whose
 `main` is a UMD build, as `jsonc-parser`'s is, requires its own files from
 inside a factory the bundler can not see through, so the bundle would look for
 them beside itself. `buildServer.js` bundles such a package's `module` entry
-instead (`umdPackages`). `tests/serverBundle.spec.ts` builds the server and
-starts it under Node, since no other spec runs the bundle there.
+instead (`umdPackages`). `tests/serverBundle.spec.ts` builds the server, starts
+it under Node and runs a workspace's tests through it, since no other spec runs
+the bundle there.
 
 ```sh
 bun install        # links the workspace, or fetches the published packages
-bun run build      # server/server.js, server/testWorker.js, and the sources
-                   # each of them reads at run time
+bun run build      # server/server.js, server/testWorker.js, and what each of
+                   # them reads at run time
 ```
 
 Press `F5` ("Extension") to open an Extension Development Host.
@@ -301,6 +304,34 @@ What a request asks for follows from how the Server selects tests:
 - A lens sends both its ids and its file. The Server can match ids only
   against a run it has already done. Before the first run, or while
   `essence.tests.enabled` is off, it has none, and ids alone would run nothing.
+
+## The test session's esbuild
+
+The test session's Worker bundles each test file with esbuild before it runs
+it, as `essence test` does. esbuild's API is JavaScript, but it starts a native
+binary, which npm installs for one platform as an optional dependency. A
+packaged extension has no `node_modules`, so an API bundled into the Worker
+would look for that binary and not find it.
+
+The extension ships esbuild's WebAssembly build, `esbuild-wasm`, instead. One
+binary serves every platform, so one package still serves them all, where
+native binaries would need a package per platform. `buildServer.js` copies it
+to `server/esbuild-wasm/` and leaves `esbuild` unbundled, pointing it at the
+copy. The build stops when the copy's version differs from the `esbuild` the
+compiler pins, since the two must speak the same API.
+
+The WebAssembly API starts its binary as `node bin/esbuild`. `PATH` may hold no
+`node` (see "Finding the runtimes"), and the Node VS Code runs the server on is
+not called `node`. So the copy starts it with `process.execPath`, the
+executable the server itself runs on. Under VS Code that is the extension
+host's own executable, which the inherited `ELECTRON_RUN_AS_NODE` runs as Node.
+The build stops if the line of `lib/main.js` that names `node` changes shape.
+
+The WebAssembly build writes the same bundle as the native one, but more
+slowly. The compiler, the CLI and a server run from source keep the native
+binary. `tests/serverBundle.spec.ts` builds the server into a directory with no
+`node_modules` above it, runs it on Node with a `PATH` that holds nothing, and
+checks that a workspace's tests pass.
 
 ## Packaging
 
